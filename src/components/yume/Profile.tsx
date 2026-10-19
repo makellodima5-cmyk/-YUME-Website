@@ -10,7 +10,6 @@ import {
   LifeBuoy,
   Settings2,
   ShieldCheck,
-  Star,
   UserRound,
 } from "lucide-react";
 import type { Anime } from "@/data/anime";
