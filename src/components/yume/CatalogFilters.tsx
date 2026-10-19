@@ -29,12 +29,13 @@ type Props = {
   setDraft: (value: CatalogFiltersValue) => void;
   onApply: () => void;
   onReset: () => void;
+  genres?: string[];
 };
 
 const selectClass = "h-9 w-full rounded-lg border border-border bg-secondary px-2.5 text-sm text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary/50";
 const labelClass = "mb-1 block text-xs text-muted-foreground";
 
-export function CatalogFilters({ open, draft, setDraft, onApply, onReset, placement = "catalog" }: Props) {
+export function CatalogFilters({ open, draft, setDraft, onApply, onReset, placement = "catalog", genres = ALL_GENRES }: Props) {
   const panelRef = useRef<HTMLDivElement>(null);
 
   if (!open) return null;
@@ -59,7 +60,7 @@ export function CatalogFilters({ open, draft, setDraft, onApply, onReset, placem
       <div className="mb-3">
         <label className={labelClass}>Жанры · можно выбрать несколько</label>
         <div className="flex max-h-20 flex-wrap gap-1.5 overflow-y-auto">
-          {ALL_GENRES.map((genre) => {
+          {genres.map((genre) => {
             const active = draft.genres.includes(genre);
             return <button key={genre} type="button" onClick={() => toggleGenre(genre)} aria-pressed={active} className={`rounded-full border px-2.5 py-1 text-xs transition ${active ? "border-primary/70 bg-primary/20 text-foreground" : "border-border bg-secondary/70 text-muted-foreground hover:text-foreground"}`}>{genre}</button>;
           })}
