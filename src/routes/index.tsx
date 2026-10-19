@@ -94,7 +94,11 @@ function Index() {
   const select = (anime: Anime) =>
     navigate({ to: "/anime/$animeId", params: { animeId: anime.id } });
   const random = () => {
-    const anime = ANIME[Math.floor(Math.random() * ANIME.length)]!;
+    const availableAnime = ANIME.filter(
+      (anime) => anime.status === "Онгоинг" || anime.status === "Вышел",
+    );
+    if (!availableAnime.length) return;
+    const anime = availableAnime[Math.floor(Math.random() * availableAnime.length)]!;
     select(anime);
   };
 
