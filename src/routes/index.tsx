@@ -1,11 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useMemo, useState } from "react";
-import { ChevronRight, X } from "lucide-react";
+import { ArrowDownWideNarrow, ChevronDown, ChevronRight, Search, SlidersHorizontal, X } from "lucide-react";
 import { ALL_GENRES, ANIME, COLLECTIONS, SCHEDULE, type Anime, byId, filterAnime } from "@/data/anime";
 import { Header, type View } from "@/components/yume/Header";
 import { AnimeCard, PosterArt } from "@/components/yume/Poster";
 import { CollectionsGrid, ContinueRow, Grid, Hero, Row } from "@/components/yume/Sections";
 import { AnimeModal } from "@/components/yume/AnimeModal";
+import { CatalogFilters, EMPTY_CATALOG_FILTERS, type CatalogFiltersValue } from "@/components/yume/CatalogFilters";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -32,7 +33,12 @@ function SeeAll({ onClick }: { onClick: () => void }) {
 function Index() {
   const [view, setViewRaw] = useState<View>("home");
   const [query, setQuery] = useState("");
-  const [genre, setGenre] = useState<string | null>(null);
+  const [catalogQuery, setCatalogQuery] = useState("");
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [draftFilters, setDraftFilters] = useState<CatalogFiltersValue>(EMPTY_CATALOG_FILTERS);
+  const [activeFilters, setActiveFilters] = useState<CatalogFiltersValue>(EMPTY_CATALOG_FILTERS);
+  const [sortBy, setSortBy] = useState("rating");
+  const [catalogPage, setCatalogPage] = useState(1);
   const [collection, setCollection] = useState<string | null>(null);
   const [selected, setSelected] = useState<{ anime: Anime; note?: string | undefined } | null>(null);
   const [profile, setProfile] = useState(false);
@@ -48,8 +54,54 @@ function Index() {
     setSelected({ anime: pool[Math.floor(Math.random() * pool.length)]!, note: "🎲 Случайный выбор" });
   };
 
-  const results = useMemo(() => filterAnime(ANIME, query, genre), [query, genre]);
-  const searching = query.trim().length > 0;
+  const results = useMemo(() => filterAnime(ANIME, query), [query]);
+  const searching = view === "home" && query.trim().length > 0;
+
+  const catalogResults = useMemo(() => {
+    const q = catalogQuery.trim().toLowerCase();
+    const yearFrom = activeFilters.yearFrom.trim() ? Number(activeFilters.yearFrom) : null;
+    const yearTo = activeFilters.yearTo.trim() ? Number(activeFilters.yearTo) : null;
+    const filtered = ANIME.filter((anime) => {
+      const matchesQuery = !q || anime.title.toLowerCase().includes(q) ||
+        anime.original.toLowerCase().includes(q) ||
+        anime.genres.some((item) => item.toLowerCase().includes(q));
+      const matchesGenres = activeFilters.genres.length === 0 ||
+        activeFilters.genres.some((item) => anime.genres.includes(item));
+      const matchesStatus = activeFilters.status === "Любой" || anime.status === activeFilters.status;
+      const matchesFrom = yearFrom === null || anime.year >= yearFrom;
+      const matchesTo = yearTo === null || anime.year <= yearTo;
+      const matchesRating = anime.rating >= activeFilters.minRating;
+      const animeType = anime.episodes === 1 ? "Фильм" : "TV";
+      const matchesType = activeFilters.type === "Любой" || animeType === activeFilters.type;
+      const ageRating = (anime as Anime & { ageRating?: string }).ageRating;
+      const matchesAge = activeFilters.ageRating === "Любой" || ageRating === activeFilters.ageRating;
+      return matchesQuery && matchesGenres && matchesStatus && matchesFrom && matchesTo &&
+        matchesRating && matchesType && matchesAge;
+    });
+    return filtered.sort((a, b) => {
+      if (sortBy === "newest") return b.year - a.year || b.rating - a.rating;
+      if (sortBy === "oldest") return a.year - b.year || b.rating - a.rating;
+      if (sortBy === "title") return a.title.localeCompare(b.title, "ru");
+      return b.rating - a.rating;
+    });
+  }, [catalogQuery, activeFilters, sortBy]);
+  const catalogPageSize = 20;
+  const totalCatalogPages = Math.max(1, Math.ceil(catalogResults.length / catalogPageSize));
+  const visibleCatalogResults = catalogResults.slice((catalogPage - 1) * catalogPageSize, catalogPage * catalogPageSize);
+  const activeFilterCount = activeFilters.genres.length +
+    Number(activeFilters.status !== "Любой") + Number(activeFilters.yearFrom !== "") +
+    Number(activeFilters.yearTo !== "") + Number(activeFilters.minRating > 0) +
+    Number(activeFilters.type !== "Любой") + Number(activeFilters.ageRating !== "Любой");
+  const applyCatalogFilters = () => {
+    setActiveFilters({ ...draftFilters, genres: [...draftFilters.genres] });
+    setCatalogPage(1);
+    setFiltersOpen(false);
+  };
+  const resetCatalogFilters = () => {
+    setDraftFilters(EMPTY_CATALOG_FILTERS);
+    setActiveFilters(EMPTY_CATALOG_FILTERS);
+    setCatalogPage(1);
+  };
   const activeCollection = COLLECTIONS.find((c) => c.id === collection);
 
   return (
@@ -89,14 +141,45 @@ function Index() {
       ) : view === "catalog" ? (
         <main className="px-4 pt-36 md:px-10 md:pt-24">
           <h1 className="text-2xl font-bold md:text-3xl">Каталог</h1>
-          <div className="scrollbar-none my-6 flex gap-2 overflow-x-auto">
-            {[null, ...ALL_GENRES].map((g) => (
-              <button key={g ?? "all"} onClick={() => setGenre(g)} className={`shrink-0 rounded-full px-4 py-1.5 text-sm ring-1 ring-border transition ${genre === g ? "bg-neon text-primary-foreground" : "bg-secondary hover:bg-accent"}`}>
-                {g ?? "Все"}
+          <p className="mt-1 text-sm text-muted-foreground">Найди историю под своё настроение</p>
+          <div className="relative z-30 mt-5 max-w-xl">
+            <div className="flex h-11 items-center rounded-xl border border-white/10 bg-[#171127]/75 shadow-lg shadow-black/10 backdrop-blur-xl focus-within:border-primary/60">
+              <Search className="ml-3 h-4 w-4 shrink-0 text-muted-foreground" />
+              <input value={catalogQuery} onChange={(event) => { setCatalogQuery(event.target.value); setCatalogPage(1); }} placeholder="Название или жанр..." aria-label="Поиск в каталоге" className="h-full min-w-0 flex-1 bg-transparent px-2.5 text-sm outline-none placeholder:text-muted-foreground" />
+              {catalogQuery && <button type="button" aria-label="Очистить поиск" onClick={() => { setCatalogQuery(""); setCatalogPage(1); }} className="rounded-full p-1.5 text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>}
+              <button type="button" onClick={() => { setDraftFilters({ ...activeFilters, genres: [...activeFilters.genres] }); setFiltersOpen((open) => !open); }} aria-label="Открыть фильтры" aria-expanded={filtersOpen} className={`relative mr-1.5 flex h-8 w-9 shrink-0 items-center justify-center rounded-lg transition ${filtersOpen || activeFilterCount ? "bg-primary/20 text-primary" : "text-muted-foreground hover:bg-accent hover:text-foreground"}`}>
+                <SlidersHorizontal className="h-4 w-4" />
+                {activeFilterCount > 0 && <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-neon px-1 text-[10px] font-bold text-primary-foreground">{activeFilterCount}</span>}
               </button>
-            ))}
+            </div>
+            <CatalogFilters open={filtersOpen} onClose={() => setFiltersOpen(false)} draft={draftFilters} setDraft={setDraftFilters} onApply={applyCatalogFilters} onReset={resetCatalogFilters} />
           </div>
-          <Grid items={results} onSelect={select} empty="В этом жанре пока пусто." />
+          <div className="mb-5 mt-7 flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-muted-foreground">Найдено: <span className="font-semibold text-foreground">{catalogResults.length}</span></p>
+            <label className="flex h-9 items-center gap-2 rounded-lg border border-border bg-secondary/80 px-3 text-sm">
+              <ArrowDownWideNarrow className="h-4 w-4 text-muted-foreground" />
+              <span className="text-muted-foreground max-sm:hidden">Сортировка</span>
+              <select value={sortBy} onChange={(event) => { setSortBy(event.target.value); setCatalogPage(1); }} aria-label="Сортировка каталога" className="max-w-[145px] bg-transparent text-sm outline-none">
+                <option value="rating">По рейтингу</option><option value="newest">Сначала новые</option><option value="oldest">Сначала старые</option><option value="title">По названию</option>
+              </select>
+              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+            </label>
+          </div>
+          <Grid items={visibleCatalogResults} onSelect={select} empty="Ничего не найдено. Измени запрос или сбрось фильтры." />
+          {catalogResults.length > 0 && <nav aria-label="Страницы каталога" className="mt-8 flex flex-wrap items-center justify-center gap-1.5">
+            <button type="button" disabled={catalogPage === 1} onClick={() => { setCatalogPage((page) => Math.max(1, page - 1)); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="h-9 rounded-lg border border-border px-3 text-sm transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-35">Назад</button>
+            {Array.from({ length: totalCatalogPages }, (_, index) => index + 1)
+              .filter((page) => page === 1 || page === totalCatalogPages || Math.abs(page - catalogPage) <= 1)
+              .reduce<(number | "ellipsis")[]>((pages, page, index, visible) => {
+                if (index > 0 && page - visible[index - 1]! > 1) pages.push("ellipsis");
+                pages.push(page);
+                return pages;
+              }, [])
+              .map((page, index) => page === "ellipsis"
+                ? <span key={`ellipsis-${index}`} className="px-1 text-muted-foreground">…</span>
+                : <button key={page} type="button" aria-current={catalogPage === page ? "page" : undefined} onClick={() => { setCatalogPage(page); window.scrollTo({ top: 0, behavior: "smooth" }); }} className={`h-9 min-w-9 rounded-lg border px-3 text-sm transition ${catalogPage === page ? "border-primary/70 bg-primary/20 text-foreground" : "border-border hover:bg-accent"}`}>{page}</button>)}
+            <button type="button" disabled={catalogPage === totalCatalogPages} onClick={() => { setCatalogPage((page) => Math.min(totalCatalogPages, page + 1)); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="h-9 rounded-lg border border-border px-3 text-sm transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-35">Далее</button>
+          </nav>}
         </main>
       ) : view === "collections" ? (
         <main className="px-4 pt-36 md:px-10 md:pt-24">
