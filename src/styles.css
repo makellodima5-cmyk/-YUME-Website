@@ -86,6 +86,9 @@
   background: color-mix(in oklab, var(--background) 70%, transparent);
   backdrop-filter: blur(16px) saturate(140%);
 }
+@utility glass-fixed-header {
+  position: fixed !important;
+}
 @utility glass-liquid {
   background:
     linear-gradient(135deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.055) 26%, rgba(190,80,255,0.13) 55%, rgba(255,70,190,0.09) 100%),
