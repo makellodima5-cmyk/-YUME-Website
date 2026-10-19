@@ -20,39 +20,46 @@ export function Row({ title, action, children }: { title: string; action?: React
 
 export function Hero({ onCatalog, onRandom }: { onCatalog: () => void; onRandom: () => void }) {
   return (
-    <section className="relative h-[82vh] min-h-[560px] w-full overflow-hidden">
-      {/* Layer 1: night city background */}
-      <img src={heroBg} alt="Ночной японский город под луной" width={1920} height={896} className="absolute inset-0 h-full w-full object-cover object-right" />
-      {/* Layer 2: soft light / mist (CSS, animation-ready) */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_75%_30%,oklch(0.7_0.2_330/18%),transparent_55%)]" />
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_85%_85%,oklch(0.65_0.24_300/14%),transparent_50%)]" />
-      {/* Layer 3: heroine, right side */}
+    <section className="relative isolate h-[90svh] min-h-[780px] w-full max-w-[1920px] overflow-hidden md:mx-auto md:mt-2 md:h-[min(76vh,760px)] md:min-h-[560px] md:max-h-none md:w-[calc(100%-2.5rem)] md:rounded-2xl md:ring-1 md:ring-primary/50">
+      {/* Scenic backdrop: brighter and more saturated so the night city stays visible. */}
+      <img
+        src={heroBg}
+        alt="Ночной японский город под луной"
+        width={1920}
+        height={896}
+        className="absolute inset-0 h-full w-full object-cover object-right brightness-110 saturate-150 md:object-center"
+      />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_75%_30%,oklch(0.7_0.2_330/25%),transparent_55%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_85%_85%,oklch(0.65_0.24_300/18%),transparent_50%)]" />
+      {/* Keep the heroine clear and vivid, including on narrow screens. */}
       <img
         src={heroine}
         alt="Героиня YUME смотрит на ночной город"
         width={768}
         height={1152}
-        className="absolute bottom-0 right-0 h-[72%] w-auto object-contain object-bottom drop-shadow-[0_0_40px_oklch(0.65_0.24_300/35%)] max-md:right-0 max-md:h-[64%] max-md:opacity-35 md:right-[6%] lg:right-[10%]"
+        className="absolute bottom-0 right-[2%] h-[82%] w-auto object-contain object-bottom drop-shadow-[0_0_42px_oklch(0.65_0.24_300/45%)] brightness-110 max-md:right-[-7%] max-md:h-[76%] md:right-[6%] lg:right-[10%]"
       />
-      {/* Layer 4: foreground sakura branch */}
-      <img src={sakuraFg} alt="" aria-hidden="true" width={1024} height={768} className="pointer-events-none absolute -right-10 -top-6 w-[45%] max-w-[520px] opacity-90 max-md:w-[70%]" />
-      {/* Readability gradients */}
-      <div className="absolute inset-0 bg-fade-up" />
-      <div className="absolute inset-0 bg-gradient-to-r from-background/90 via-background/40 to-transparent max-md:from-background/80 max-md:via-background/50" />
-      {/* Copy + brand lockup, left */}
-      <div className="relative flex h-full flex-col justify-end px-4 pb-16 md:max-w-2xl md:px-10 md:pb-24">
-        <div className="mb-5"><span className="font-display text-3xl font-bold tracking-[0.3em] md:text-4xl">YUME</span></div>
-        <h1 className="text-4xl font-bold leading-tight md:text-6xl">
+      <img src={sakuraFg} alt="" aria-hidden="true" width={1024} height={768} className="pointer-events-none absolute -right-10 -top-6 w-[45%] max-w-[520px] opacity-95 max-md:w-[70%]" />
+      {/* Desktop keeps the cinematic left-to-right composition; mobile fades behind the copy from top to bottom. */}
+      <div className="absolute inset-0 hidden bg-gradient-to-r from-[#090714]/70 via-[#090714]/15 to-transparent md:block" />
+      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(8,7,22,0.02)_0%,rgba(8,7,22,0.08)_28%,rgba(8,7,22,0.72)_48%,rgba(8,7,22,0.98)_100%)] md:hidden" />
+      <div className="absolute inset-0 bg-fade-up md:hidden" />
+
+      <div className="relative z-10 flex h-full flex-col justify-end px-5 pb-16 pt-28 md:max-w-[760px] md:justify-center md:px-10 md:pb-8 md:pt-8 lg:px-12">
+        <div className="mb-4">
+          <span className="font-display text-3xl font-bold tracking-[0.3em] drop-shadow-[0_2px_18px_rgba(0,0,0,0.7)] md:text-4xl">YUME</span>
+        </div>
+        <h1 className="max-w-[12ch] text-4xl font-bold leading-[1.05] md:max-w-none md:text-5xl lg:text-6xl">
           <span className="text-neon">Больше чем аниме</span>
         </h1>
-        <p className="mt-4 max-w-xl text-base text-muted-foreground md:text-lg">
+        <p className="mt-4 max-w-xl text-base leading-relaxed text-white/85 drop-shadow-[0_2px_10px_rgba(0,0,0,0.8)] md:text-lg">
           Открой для себя удивительные истории, новых героев и целые миры. Смотри, сохраняй любимое и создавай свою историю вместе с YUME.
         </p>
-        <div className="mt-8 flex flex-wrap gap-3">
-          <button onClick={onCatalog} className="inline-flex items-center gap-2 rounded-full bg-neon px-6 py-3 font-semibold text-primary-foreground shadow-neon transition hover:brightness-110">
+        <div className="mt-7 flex flex-col gap-3 sm:flex-row md:mt-8">
+          <button onClick={onCatalog} className="inline-flex w-fit items-center justify-center gap-2 rounded-full bg-neon px-6 py-3 font-semibold text-primary-foreground shadow-neon transition hover:brightness-110 max-sm:w-full">
             <Play className="h-4 w-4 fill-current" /> Перейти в каталог
           </button>
-          <button onClick={onRandom} className="inline-flex items-center gap-2 rounded-full glass px-6 py-3 font-semibold ring-1 ring-border transition hover:bg-accent">
+          <button onClick={onRandom} className="inline-flex w-fit items-center justify-center gap-2 rounded-full bg-[#0b0a19]/55 px-6 py-3 font-semibold text-white ring-1 ring-white/20 backdrop-blur-md transition hover:bg-accent max-sm:w-full">
             <Shuffle className="h-4 w-4" /> Случайное аниме
           </button>
         </div>
@@ -101,7 +108,7 @@ export function CollectionsGrid({ onOpen }: { onOpen: (id: string) => void }) {
           style={{ background: `linear-gradient(135deg, oklch(0.35 0.16 ${c.hue}), oklch(0.15 0.05 285))` }}
         >
           <div className="absolute -right-4 bottom-3 flex">
-            {c.ids.slice(0, 3).map((id, i) => (
+            {c.ids.slice(0, 3).map((id) => (
               <PosterArt key={id} anime={byId(id)} className="h-28 w-20 -ml-6 rounded-lg ring-2 ring-background transition group-hover:-translate-y-1" />
             ))}
           </div>
