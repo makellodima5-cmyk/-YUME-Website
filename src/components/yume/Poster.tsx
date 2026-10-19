@@ -56,7 +56,7 @@ export function AnimeCard({ anime, onSelect }: { anime: Anime; onSelect: (a: Ani
         </div>
         {anime.isNew && (
           <div className="absolute right-2 top-2 rounded-full bg-neon px-2 py-0.5 text-[10px] font-bold uppercase text-primary-foreground">
-            Новое
+            {t("anime.new")}
           </div>
         )}
       </div>
