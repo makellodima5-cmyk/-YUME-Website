@@ -1,5 +1,5 @@
-import { useEffect, useRef } from "react";
-import { Check, ChevronDown, SlidersHorizontal, X } from "lucide-react";
+import { useRef } from "react";
+import { Check, ChevronDown, SlidersHorizontal } from "lucide-react";
 import { ALL_GENRES } from "@/data/anime";
 
 export type CatalogFiltersValue = {
@@ -24,7 +24,7 @@ export const EMPTY_CATALOG_FILTERS: CatalogFiltersValue = {
 
 type Props = {
   open: boolean;
-  onClose: () => void;
+  placement?: "catalog" | "home";
   draft: CatalogFiltersValue;
   setDraft: (value: CatalogFiltersValue) => void;
   onApply: () => void;
@@ -34,26 +34,8 @@ type Props = {
 const selectClass = "h-9 w-full rounded-lg border border-border bg-secondary px-2.5 text-sm text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary/50";
 const labelClass = "mb-1 block text-xs text-muted-foreground";
 
-export function CatalogFilters({ open, onClose, draft, setDraft, onApply, onReset }: Props) {
+export function CatalogFilters({ open, draft, setDraft, onApply, onReset, placement = "catalog" }: Props) {
   const panelRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    const onPointerDown = (event: PointerEvent) => {
-      const target = event.target as HTMLElement;
-      if (target.closest("[data-filter-trigger]")) return;
-      if (panelRef.current && !panelRef.current.contains(target)) onClose();
-    };
-    document.addEventListener("keydown", onKeyDown);
-    document.addEventListener("pointerdown", onPointerDown);
-    return () => {
-      document.removeEventListener("keydown", onKeyDown);
-      document.removeEventListener("pointerdown", onPointerDown);
-    };
-  }, [open, onClose]);
 
   if (!open) return null;
 
@@ -64,11 +46,14 @@ export function CatalogFilters({ open, onClose, draft, setDraft, onApply, onRese
       : [...draft.genres, genre],
   });
 
+  const panelPosition = placement === "home"
+    ? "fixed left-3 right-3 top-[145px] z-[60] max-h-[calc(100svh-230px)] overflow-y-auto sm:left-8 sm:right-auto sm:top-[120px] sm:max-h-[calc(100svh-160px)]"
+    : "absolute right-0 top-full z-40 mt-2 max-h-[calc(100svh-180px)] overflow-y-auto";
+
   return (
-    <div ref={panelRef} className="absolute right-0 top-full z-40 mt-2 w-[min(94vw,440px)] rounded-2xl border border-white/10 bg-[#171127]/[.98] p-3 shadow-2xl shadow-black/40 backdrop-blur-2xl sm:p-4" role="dialog" aria-label="Фильтры каталога">
+    <div ref={panelRef} className={`${panelPosition} w-[min(94vw,440px)] rounded-2xl border border-white/10 bg-[#171127]/[.98] p-3 shadow-2xl shadow-black/40 backdrop-blur-2xl sm:p-4`} role="dialog" aria-label="Фильтры каталога">
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2 text-sm font-semibold"><SlidersHorizontal className="h-4 w-4 text-primary" /> Фильтры</div>
-        <button type="button" onClick={onClose} aria-label="Закрыть фильтры" className="rounded-full p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"><X className="h-4 w-4" /></button>
       </div>
 
       <div className="mb-3">
