@@ -1,10 +1,11 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowDownWideNarrow, ChevronDown, ChevronRight, Search, SlidersHorizontal, X } from "lucide-react";
-import { ANIME, COLLECTIONS, SCHEDULE, type Anime, byId } from "@/data/anime";
+import { ANIME as DEMO_ANIME, COLLECTIONS, type Anime } from "@/data/anime";
+import { getShikimoriAnimes } from "@/data/shikimori";
 import { Header, type View } from "@/components/yume/Header";
 import { AnimeCard, PosterArt } from "@/components/yume/Poster";
-import { CollectionsGrid, ContinueRow, Grid, Hero, Row } from "@/components/yume/Sections";
+import { CollectionsGrid, Grid, Hero, Row } from "@/components/yume/Sections";
 import { CatalogFilters, EMPTY_CATALOG_FILTERS, type CatalogFiltersValue } from "@/components/yume/CatalogFilters";
 
 export const Route = createFileRoute("/")({
@@ -25,6 +26,20 @@ export const Route = createFileRoute("/")({
         ? (search.section as View)
         : undefined,
   }),
+  loader: async () => {
+    const [ranked, recent] = await Promise.all([
+      getShikimoriAnimes({ data: { page: 1, limit: 50, order: "ranked" } }),
+      getShikimoriAnimes({ data: { page: 1, limit: 50, order: "aired_on" } }),
+    ]);
+    const unique = new Map<string, Anime>();
+    [...ranked.items, ...recent.items].forEach((anime) => unique.set(anime.id, anime));
+    return {
+      anime: Array.from(unique.values()),
+      popular: ranked.items,
+      recent: recent.items,
+      apiError: ranked.error && recent.error ? ranked.error : null,
+    };
+  },
   component: Index,
 });
 
@@ -39,6 +54,8 @@ function SeeAll({ onClick }: { onClick: () => void }) {
 function Index() {
   const navigate = useNavigate();
   const { section } = Route.useSearch();
+  const { anime: loadedAnime, popular: popularAnime, recent: recentAnime, apiError } = Route.useLoaderData();
+  const ANIME = loadedAnime.length ? loadedAnime : DEMO_ANIME;
   const [view, setViewRaw] = useState<View>(section ?? "home");
   const [query, setQuery] = useState("");
   const [submittedQuery, setSubmittedQuery] = useState("");
@@ -50,6 +67,8 @@ function Index() {
   const [catalogPage, setCatalogPage] = useState(1);
   const [collection, setCollection] = useState<string | null>(null);
   const [profile, setProfile] = useState(false);
+  const [remoteSearch, setRemoteSearch] = useState<{ query: string; items: Anime[]; error: string | null } | null>(null);
+  const [searchLoading, setSearchLoading] = useState(false);
 
   const setView = (v: View) => {
     // Tapping Home is also a quick way out of search results: restore the default home state.
@@ -80,11 +99,46 @@ function Index() {
   };
 
 
+  const searchText = view === "catalog" ? catalogQuery.trim() : view === "home" ? submittedQuery.trim() : "";
+  useEffect(() => {
+    if (!searchText) {
+      setRemoteSearch(null);
+      setSearchLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setRemoteSearch(null);
+    setSearchLoading(true);
+    const timer = window.setTimeout(() => {
+      getShikimoriAnimes({ data: { page: 1, limit: 50, order: "ranked", search: searchText } })
+        .then((result) => {
+          if (!cancelled) setRemoteSearch({ query: searchText, items: result.items, error: result.error });
+        })
+        .catch(() => {
+          if (!cancelled) setRemoteSearch({ query: searchText, items: [], error: "Не удалось выполнить поиск Shikimori." });
+        })
+        .finally(() => {
+          if (!cancelled) setSearchLoading(false);
+        });
+    }, 450);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [searchText, view]);
+
+  const searchUniverse = searchText
+    ? remoteSearch?.query === searchText ? remoteSearch.items : []
+    : ANIME;
+  const availableGenres = useMemo(
+    () => Array.from(new Set(ANIME.flatMap((anime) => anime.genres))).sort((a, b) => a.localeCompare(b, "ru")),
+    [ANIME],
+  );
   const catalogResults = useMemo(() => {
-    const q = (view === "catalog" ? catalogQuery : submittedQuery).trim().toLowerCase();
+    const q = searchText.toLowerCase();
     const yearFrom = activeFilters.yearFrom.trim() ? Number(activeFilters.yearFrom) : null;
     const yearTo = activeFilters.yearTo.trim() ? Number(activeFilters.yearTo) : null;
-    const filtered = ANIME.filter((anime) => {
+    const filtered = searchUniverse.filter((anime) => {
       const matchesQuery = !q || anime.title.toLowerCase().includes(q) ||
         anime.original.toLowerCase().includes(q) ||
         anime.genres.some((item) => item.toLowerCase().includes(q));
@@ -94,9 +148,9 @@ function Index() {
       const matchesFrom = yearFrom === null || anime.year >= yearFrom;
       const matchesTo = yearTo === null || anime.year <= yearTo;
       const matchesRating = anime.rating >= activeFilters.minRating;
-      const animeType = anime.episodes === 1 ? "Фильм" : "TV";
+      const animeType = anime.kind || (anime.episodes === 1 ? "Фильм" : "TV");
       const matchesType = activeFilters.type === "Любой" || animeType === activeFilters.type;
-      const ageRating = (anime as Anime & { ageRating?: string }).ageRating;
+      const ageRating = anime.ageRating;
       const matchesAge = activeFilters.ageRating === "Любой" || ageRating === activeFilters.ageRating;
       return matchesQuery && matchesGenres && matchesStatus && matchesFrom && matchesTo &&
         matchesRating && matchesType && matchesAge;
@@ -107,7 +161,7 @@ function Index() {
       if (sortBy === "title") return a.title.localeCompare(b.title, "ru");
       return b.rating - a.rating;
     });
-  }, [catalogQuery, submittedQuery, view, activeFilters, sortBy]);
+  }, [searchText, searchUniverse, activeFilters, sortBy]);
   const catalogPageSize = 20;
   const totalCatalogPages = Math.max(1, Math.ceil(catalogResults.length / catalogPageSize));
   const visibleCatalogResults = catalogResults.slice((catalogPage - 1) * catalogPageSize, catalogPage * catalogPageSize);
@@ -131,6 +185,24 @@ function Index() {
     setCatalogPage(1);
   };
   const activeCollection = COLLECTIONS.find((c) => c.id === collection);
+  const activeCollectionAnime = activeCollection
+    ? ANIME.filter((anime) => activeCollection.genres.some((genre) => anime.genres.includes(genre)))
+        .sort((a, b) => b.rating - a.rating)
+        .slice(0, 20)
+    : [];
+  const popularCards = (popularAnime.length ? popularAnime : ANIME)
+    .filter((anime) => anime.rating > 0)
+    .sort((a, b) => b.rating - a.rating)
+    .slice(0, 12);
+  const newReleaseCards = (recentAnime.length ? recentAnime : ANIME.filter((anime) => anime.isNew || anime.status === "Онгоинг"))
+    .slice()
+    .sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? "") || b.year - a.year)
+    .slice(0, 12);
+  const airingCards = ANIME.filter((anime) => anime.status === "Онгоинг")
+    .sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? ""))
+    .slice(0, 12);
+  const scheduledAnime = ANIME.filter((anime) => anime.nextEpisodeAt && anime.status === "Онгоинг")
+    .sort((a, b) => (a.nextEpisodeAt ?? "").localeCompare(b.nextEpisodeAt ?? ""));
 
   return (
     <div className="min-h-screen pb-24 md:pb-12">
