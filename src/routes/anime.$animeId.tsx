@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   Bookmark,
   Check,
@@ -470,7 +470,7 @@ function Selector({
   label: string;
   value: string;
   onChange: (value: string) => void;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
     <label className="block min-w-0 rounded-xl border border-border bg-card px-3 py-2.5 focus-within:border-primary/60">
