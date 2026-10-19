@@ -1,4 +1,4 @@
-import { CalendarDays, Home, LayoutGrid, Library, Search, User } from "lucide-react";
+import { CalendarDays, Home, LayoutGrid, Library, User } from "lucide-react";
 import { Logo } from "./Logo";
 
 export type View = "home" | "catalog" | "collections" | "schedule";
@@ -14,24 +14,10 @@ export const NAV: { id: View; label: string; icon: typeof Home }[] = [
 type Props = {
   view: View;
   setView: (v: View) => void;
-  query: string;
-  setQuery: (q: string) => void;
   onProfile: () => void;
 };
 
-export function Header({ view, setView, query, setQuery, onProfile }: Props) {
-  const search = (
-    <label className="relative flex-1">
-      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-      <input
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder="Поиск аниме, жанра…"
-        aria-label="Поиск"
-        className="glass-search h-9 w-full rounded-full pl-9 pr-3 text-xs text-white outline-none placeholder:text-white/60 focus:ring-2 focus:ring-primary/70 sm:text-sm"
-      />
-    </label>
-  );
+export function Header({ view, setView, onProfile }: Props) {
   return (
     <>
       <header className="glass-fixed-header fixed inset-x-3 top-3 z-40 overflow-hidden rounded-2xl glass-liquid ring-1 ring-white/20 md:inset-x-4 md:top-3">
@@ -48,12 +34,10 @@ export function Header({ view, setView, query, setQuery, onProfile }: Props) {
               </button>
             ))}
           </nav>
-          {view === "home" && <div className="ml-auto hidden w-[min(25vw,300px)] md:flex">{search}</div>}
           <button onClick={onProfile} aria-label="Профиль" className="ml-auto flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.25)] backdrop-blur-xl transition hover:bg-white/20 md:ml-0">
             <User className="h-5 w-5" />
           </button>
         </div>
-        {view === "home" && <div className="flex w-[min(44vw,230px)] justify-start px-4 pb-3 md:hidden">{search}</div>}
       </header>
 
       <nav className="fixed inset-x-3 bottom-3 z-40 overflow-hidden rounded-2xl glass-liquid ring-1 ring-white/25 shadow-[0_12px_50px_rgba(0,0,0,0.55),0_0_30px_rgba(174,66,255,0.2)] md:hidden">
