@@ -230,11 +230,11 @@ export function Profile({ animeList, onSelect, onCatalog }: Props) {
             </section>
 
             <section className="mt-7 grid gap-2.5">
-              {profileRow(Bookmark, {t("profile.watchlist")}, {t("profile.watchlistDescription")}, "watchlist")}
-              {profileRow(Settings2, {t("profile.settings")}, {t("profile.settingsDescription")}, "settings")}
-              {profileRow(ShieldCheck, {t("profile.legal")}, {t("profile.legalDescription")}, "documents")}
-              {profileRow(Info, {t("profile.about")}, {t("profile.aboutDescription")}, "about")}
-              {profileRow(LifeBuoy, {t("profile.support")}, {t("profile.supportDescription")}, "support")}
+              {profileRow(Bookmark, t("profile.watchlist"), t("profile.watchlistDescription"), "watchlist")}
+              {profileRow(Settings2, t("profile.settings"), t("profile.settingsDescription"), "settings")}
+              {profileRow(ShieldCheck, t("profile.legal"), t("profile.legalDescription"), "documents")}
+              {profileRow(Info, t("profile.about"), t("profile.aboutDescription"), "about")}
+              {profileRow(LifeBuoy, t("profile.support"), t("profile.supportDescription"), "support")}
             </section>
           </>
         ) : (
@@ -248,13 +248,13 @@ export function Profile({ animeList, onSelect, onCatalog }: Props) {
             {panel === "favorites" && (
               favorites.length
                 ? <Grid items={favorites} onSelect={onSelect} empty="В избранном пока нет тайтлов." />
-                : emptyLibrary({t("profile.emptyFavoritesTitle")}, {t("profile.emptyFavoritesDescription")})
+                : emptyLibrary(t("profile.emptyFavoritesTitle"), t("profile.emptyFavoritesDescription"))
             )}
 
             {panel === "watchlist" && (
               watchlist.length
                 ? <Grid items={watchlist} onSelect={onSelect} empty="В твоём списке пока нет тайтлов." />
-                : emptyLibrary({t("profile.emptyWatchlistTitle")}, {t("profile.emptyWatchlistDescription")})
+                : emptyLibrary(t("profile.emptyWatchlistTitle"), t("profile.emptyWatchlistDescription"))
             )}
 
             {panel === "settings" && (
@@ -332,9 +332,9 @@ export function Profile({ animeList, onSelect, onCatalog }: Props) {
 
             {panel === "documents" && (
               <div className="grid gap-3 sm:grid-cols-2">
-                {profileRow(ShieldCheck, t("profile.privacy"), {t("profile.privacyDescription")}, "privacy")}
-                {profileRow(FileText, t("profile.rules"), {t("profile.rulesDescription")}, "rules")}
-                {profileRow(Copyright, t("profile.rights"), {t("profile.rightsDescription")}, "rights")}
+                {profileRow(ShieldCheck, t("profile.privacy"), t("profile.privacyDescription"), "privacy")}
+                {profileRow(FileText, t("profile.rules"), t("profile.rulesDescription"), "rules")}
+                {profileRow(Copyright, t("profile.rights"), t("profile.rightsDescription"), "rights")}
               </div>
             )}
 
