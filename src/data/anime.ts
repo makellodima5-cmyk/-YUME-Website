@@ -2,6 +2,7 @@
 export type Anime = {
   id: string;
   title: string;
+  englishTitle?: string;
   original: string;
   year: number;
   episodes: number;
