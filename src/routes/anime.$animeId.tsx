@@ -465,17 +465,20 @@ function Selector({
   value,
   onChange,
   children,
+  disabled = false,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   children: ReactNode;
+  disabled?: boolean;
 }) {
   return (
     <label className="block min-w-0 rounded-xl border border-border bg-card px-3 py-2.5 focus-within:border-primary/60">
       <span className="mb-1 block text-xs text-muted-foreground">{label}</span>
       <select
         aria-label={label}
+        disabled={disabled}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         className="w-full min-w-0 bg-transparent text-sm font-medium outline-none"
