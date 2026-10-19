@@ -170,18 +170,18 @@ html[data-theme="light"] header {
 }
 html[data-theme="light"] header nav button { color: #604a70 !important; }
 html[data-theme="light"] header nav button.glass-active { color: #2e1c3d !important; }
-html[data-theme="light"] header button[aria-label="Профиль"] {
+html[data-theme="light"] header button[aria-label="Профиль"], html[data-theme="light"] header button[aria-label="Profile"] {
   color: #4b315f !important;
   background-color: rgba(117, 75, 151, 0.10) !important;
   border-color: rgba(74, 46, 94, 0.24) !important;
 }
-html[data-theme="light"] nav[aria-label="Основная навигация"].glass-liquid {
+html[data-theme="light"] nav[aria-label="Основная навигация"].glass-liquid, html[data-theme="light"] nav[aria-label="Main navigation"].glass-liquid {
   background: linear-gradient(135deg, rgba(255,255,255,0.92), rgba(247,236,255,0.88) 55%, rgba(255,237,249,0.86)) !important;
   border-color: rgba(102, 63, 132, 0.24) !important;
   box-shadow: 0 12px 40px rgba(46, 25, 62, 0.15), 0 0 24px rgba(179,70,255,0.08) !important;
 }
-html[data-theme="light"] nav[aria-label="Основная навигация"] button { color: #604a70 !important; }
-html[data-theme="light"] nav[aria-label="Основная навигация"] button[aria-current="page"] { color: #2e1c3d !important; }
+html[data-theme="light"] nav[aria-label="Основная навигация"] button, html[data-theme="light"] nav[aria-label="Main navigation"] button { color: #604a70 !important; }
+html[data-theme="light"] nav[aria-label="Основная навигация"] button[aria-current="page"], html[data-theme="light"] nav[aria-label="Main navigation"] button[aria-current="page"] { color: #2e1c3d !important; }
 html[data-theme="light"] [class~="bg-[#120C20]"] {
   background-color: rgba(255, 252, 255, 0.94) !important;
   color: #2e1c3d !important;
