@@ -5,6 +5,7 @@ import logoArtwork from "@/assets/yume-logo-transparent.png";
 import { type Anime, CONTINUE, COLLECTIONS, byId } from "@/data/anime";
 import { AnimeCard, PosterArt } from "./Poster";
 import { CatalogFilters, type CatalogFiltersValue } from "./CatalogFilters";
+import { useYumePreferences, type TranslationKey } from "@/data/preferences";
 
 export function Row({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
   return (
@@ -19,6 +20,7 @@ export function Row({ title, action, children }: { title: string; action?: React
 }
 
 export function Hero({ onCatalog, onRandom, query, setQuery, onSubmitSearch, filtersOpen, setFiltersOpen, draftFilters, setDraftFilters, onApplyFilters, onResetFilters, activeFilterCount, genres }: { onCatalog: () => void; onRandom: () => void; query: string; setQuery: (q: string) => void; onSubmitSearch: () => void; filtersOpen: boolean; setFiltersOpen: (open: boolean) => void; draftFilters: CatalogFiltersValue; setDraftFilters: (value: CatalogFiltersValue) => void; onApplyFilters: () => void; onResetFilters: () => void; activeFilterCount: number; genres: string[] }) {
+  const { t } = useYumePreferences();
   return (
     <section className="relative isolate h-[min(90svh,900px)] min-h-[720px] w-full max-w-[1920px] overflow-hidden md:mx-auto md:mt-2 md:h-[min(76vh,760px)] md:min-h-[560px] md:w-[calc(100%-2.5rem)] md:rounded-2xl md:ring-1 md:ring-primary/50">
       <img
@@ -33,17 +35,17 @@ export function Hero({ onCatalog, onRandom, query, setQuery, onSubmitSearch, fil
       <div className="absolute inset-0 bg-gradient-to-t from-[#090714]/95 via-[#090714]/20 to-transparent md:from-transparent md:via-transparent" />
       <div className="absolute left-4 top-5 z-30 w-[min(76vw,360px)] md:left-8 md:top-7 md:w-[min(36vw,420px)]">
         <div className="flex h-11 items-center rounded-xl border border-white/25 bg-black/30 shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_8px_28px_rgba(0,0,0,0.18)] backdrop-blur-xl transition focus-within:border-white/55 focus-within:bg-black/40">
-          <button type="button" onClick={onSubmitSearch} aria-label="Применить поиск" className="ml-3 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-white/80 transition hover:bg-white/10 hover:text-white"><Search className="h-4 w-4" /></button>
+          <button type="button" onClick={onSubmitSearch} aria-label={t("search.apply")} className="ml-3 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-white/80 transition hover:bg-white/10 hover:text-white"><Search className="h-4 w-4" /></button>
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") onSubmitSearch(); }}
-            placeholder="Название или жанр..."
-            aria-label="Поиск аниме"
+            placeholder={t("search.placeholder")}
+            aria-label={t("search.anime")}
             className="h-full min-w-0 flex-1 bg-transparent px-2.5 text-sm text-white outline-none placeholder:text-white/70"
           />
-          {query && <button type="button" aria-label="Очистить поиск" onClick={() => setQuery("")} className="rounded-full p-1.5 text-white/70 hover:text-white"><X className="h-4 w-4" /></button>}
-          <button type="button" onClick={() => setFiltersOpen(!filtersOpen)} aria-label="Открыть фильтры" aria-expanded={filtersOpen} data-filter-trigger className={`relative mr-1.5 flex h-8 w-9 shrink-0 items-center justify-center rounded-lg transition ${filtersOpen || activeFilterCount ? "bg-white/20 text-white" : "text-white/75 hover:bg-white/15 hover:text-white"}`}>
+          {query && <button type="button" aria-label={t("search.clear")} onClick={() => setQuery("")} className="rounded-full p-1.5 text-white/70 hover:text-white"><X className="h-4 w-4" /></button>}
+          <button type="button" onClick={() => setFiltersOpen(!filtersOpen)} aria-label={t("filters.open")} aria-expanded={filtersOpen} data-filter-trigger className={`relative mr-1.5 flex h-8 w-9 shrink-0 items-center justify-center rounded-lg transition ${filtersOpen || activeFilterCount ? "bg-white/20 text-white" : "text-white/75 hover:bg-white/15 hover:text-white"}`}>
             <SlidersHorizontal className="h-4 w-4" />
             {activeFilterCount > 0 && <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-neon px-1 text-[10px] font-bold text-primary-foreground">{activeFilterCount}</span>}
           </button>
@@ -62,17 +64,17 @@ export function Hero({ onCatalog, onRandom, query, setQuery, onSubmitSearch, fil
           />
         </div>
         <h1 className="max-w-[12ch] text-4xl font-bold leading-[1.05] md:max-w-none md:text-5xl lg:text-6xl">
-          <span className="text-white">Больше чем аниме</span>
+          <span className="text-white">{t("hero.title")}</span>
         </h1>
         <p className="mt-4 max-w-xl text-base leading-relaxed text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.95)] md:text-lg">
-          Открой для себя удивительные истории, новых героев и целые миры. Смотри, сохраняй любимое и создавай свою историю вместе с YUME.
+          {t("hero.description")}
         </p>
         <div className="mt-7 flex flex-col gap-3 sm:flex-row md:mt-8">
           <button onClick={onRandom} className="inline-flex w-fit items-center justify-center gap-2 rounded-full bg-neon px-6 py-3 font-semibold text-primary-foreground shadow-neon transition hover:brightness-110 max-sm:w-full">
-            <Play className="h-4 w-4 fill-current" /> Случайное аниме
+            <Play className="h-4 w-4 fill-current" /> {t("hero.random")}
           </button>
           <button onClick={onCatalog} className="inline-flex w-fit items-center justify-center gap-2 rounded-full bg-[#0b0a19]/65 px-6 py-3 font-semibold text-white ring-1 ring-white/25 backdrop-blur-md transition hover:bg-accent max-sm:w-full">
-            <Shuffle className="h-4 w-4" /> Каталог
+            <Shuffle className="h-4 w-4" /> {t("hero.catalog")}
           </button>
         </div>
       </div>
@@ -110,6 +112,7 @@ export function ContinueRow({ onSelect }: { onSelect: (a: Anime) => void }) {
 }
 
 export function CollectionsGrid({ onOpen, animeList }: { onOpen: (id: string) => void; animeList: Anime[] }) {
+  const { t } = useYumePreferences();
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {COLLECTIONS.map((c) => {
@@ -130,9 +133,9 @@ export function CollectionsGrid({ onOpen, animeList }: { onOpen: (id: string) =>
               ))}
             </div>
             <div className="relative z-10 max-w-[58%]">
-              <div className="text-xs text-foreground/70">{matches.length} {matches.length === 1 ? "тайтл" : matches.length >= 2 && matches.length <= 4 ? "тайтла" : "тайтлов"}</div>
-              <h3 className="mt-1 text-lg font-semibold leading-snug">{c.title}</h3>
-              <p className="mt-1 line-clamp-2 text-sm text-foreground/70">{c.subtitle}</p>
+              <div className="text-xs text-foreground/70">{matches.length} {matches.length === 1 ? t("collection.countOne") : matches.length >= 2 && matches.length <= 4 && matches.length > 0 ? t("collection.countFew") : t("collection.countMany")}</div>
+              <h3 className="mt-1 text-lg font-semibold leading-snug">{t((`collection.${c.id}.title`) as TranslationKey)}</h3>
+              <p className="mt-1 line-clamp-2 text-sm text-foreground/70">{t((`collection.${c.id}.subtitle`) as TranslationKey)}</p>
             </div>
           </button>
         );
