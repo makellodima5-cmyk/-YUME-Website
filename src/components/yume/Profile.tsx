@@ -165,9 +165,9 @@ export function Profile({ animeList, onSelect, onCatalog }: Props) {
                   <UserRound className="h-9 w-9 text-white sm:h-10 sm:w-10" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs font-semibold uppercase tracking-[0.15em] text-primary">Личное пространство</p>
-                  <h1 className="mt-1 text-2xl font-bold sm:text-3xl">Мой профиль</h1>
-                  <p className="mt-1 text-sm text-muted-foreground">Твоя коллекция и настройки YUME</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.15em] text-primary">{t("profile.space")}</p>
+                  <h1 className="mt-1 text-2xl font-bold sm:text-3xl">{t("profile.title")}</h1>
+                  <p className="mt-1 text-sm text-muted-foreground">{t("profile.subtitle")}</p>
                 </div>
               </div>
               <div className="relative mt-6 grid grid-cols-2 gap-3 sm:max-w-md">
@@ -177,7 +177,7 @@ export function Profile({ animeList, onSelect, onCatalog }: Props) {
                   className="rounded-xl border border-white/10 bg-black/15 px-4 py-3 text-left transition hover:bg-white/[0.06]"
                 >
                   <span className="text-2xl font-bold tabular-nums">{favorites.length}</span>
-                  <span className="mt-1 block text-xs text-muted-foreground">В избранном</span>
+                  <span className="mt-1 block text-xs text-muted-foreground">{t("profile.favoritesCount")}</span>
                 </button>
                 <button
                   type="button"
@@ -185,7 +185,7 @@ export function Profile({ animeList, onSelect, onCatalog }: Props) {
                   className="rounded-xl border border-white/10 bg-black/15 px-4 py-3 text-left transition hover:bg-white/[0.06]"
                 >
                   <span className="text-2xl font-bold tabular-nums">{watchlist.length}</span>
-                  <span className="mt-1 block text-xs text-muted-foreground">В моём списке</span>
+                  <span className="mt-1 block text-xs text-muted-foreground">{t("profile.watchlistCount")}</span>
                 </button>
               </div>
             </div>
@@ -193,7 +193,7 @@ export function Profile({ animeList, onSelect, onCatalog }: Props) {
             <section className="mt-8">
               <div className="mb-3 flex items-end justify-between gap-3">
                 <div>
-                  <h2 className="text-xl font-bold">Избранное</h2>
+                  <h2 className="text-xl font-bold">{t("profile.favorites")}</h2>
                 </div>
                 <button
                   type="button"
@@ -221,10 +221,10 @@ export function Profile({ animeList, onSelect, onCatalog }: Props) {
                 <div className="flex items-center gap-3 rounded-2xl border border-dashed border-border px-4 py-4">
                   <Heart className="h-5 w-5 shrink-0 text-primary" />
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium">Пока здесь пусто</p>
-                    <p className="mt-1 text-xs text-muted-foreground">Добавляй любимые тайтлы в избранное на странице аниме.</p>
+                    <p className="text-sm font-medium">{t("profile.empty")}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{t("profile.emptyFavorites")}</p>
                   </div>
-                  <button type="button" onClick={onCatalog} className="shrink-0 text-sm font-semibold text-primary hover:text-neon">Каталог</button>
+                  <button type="button" onClick={onCatalog} className="shrink-0 text-sm font-semibold text-primary hover:text-neon">{t("profile.catalog")}</button>
                 </div>
               )}
             </section>
@@ -242,18 +242,18 @@ export function Profile({ animeList, onSelect, onCatalog }: Props) {
             {backButton()}
             <div className="mb-6">
               <h1 className="text-2xl font-bold sm:text-3xl">{panelTitles[panel]}</h1>
-              {panel === "watchlist" && <p className="mt-1 text-sm text-muted-foreground">Аниме, которые ты сохранил на потом</p>}
+              {panel === "watchlist" && <p className="mt-1 text-sm text-muted-foreground">{t("profile.watchlistSubtitle")}</p>}
             </div>
 
             {panel === "favorites" && (
               favorites.length
-                ? <Grid items={favorites} onSelect={onSelect} empty="В избранном пока нет тайтлов." />
+                ? <Grid items={favorites} onSelect={onSelect} empty={t("profile.emptyFavoritesTitle")} />
                 : emptyLibrary(t("profile.emptyFavoritesTitle"), t("profile.emptyFavoritesDescription"))
             )}
 
             {panel === "watchlist" && (
               watchlist.length
-                ? <Grid items={watchlist} onSelect={onSelect} empty="В твоём списке пока нет тайтлов." />
+                ? <Grid items={watchlist} onSelect={onSelect} empty={t("profile.emptyWatchlistTitle")} />
                 : emptyLibrary(t("profile.emptyWatchlistTitle"), t("profile.emptyWatchlistDescription"))
             )}
 
@@ -342,7 +342,7 @@ export function Profile({ animeList, onSelect, onCatalog }: Props) {
               <article className="max-w-3xl rounded-2xl border border-border bg-card/60 p-5 sm:p-7">
                 <p className="text-sm leading-relaxed text-muted-foreground">{t(panel === "privacy" ? "profile.privacyPlaceholder" : panel === "rules" ? "profile.rulesPlaceholder" : "profile.rightsPlaceholder")}</p>
                 <p className="mt-4 rounded-xl bg-secondary/60 p-3 text-xs leading-relaxed text-muted-foreground">
-                  Текст документа будет подготовлен и проверен перед полноценным запуском сайта.
+                  {t("profile.documentComing")}
                 </p>
               </article>
             )}
@@ -354,22 +354,22 @@ export function Profile({ animeList, onSelect, onCatalog }: Props) {
                     <Info className="h-6 w-6" />
                   </div>
                   <div>
-                    <h2 className="font-semibold">YUME — больше чем аниме</h2>
-                    <p className="mt-1 text-sm text-muted-foreground">Каталог и личное пространство для любителей аниме.</p>
+                    <h2 className="font-semibold">{t("profile.aboutHeading")}</h2>
+                    <p className="mt-1 text-sm text-muted-foreground">{t("profile.aboutText")}</p>
                   </div>
                 </div>
                 <div className="mt-5 divide-y divide-border">
                   <div className="flex items-center justify-between gap-3 py-3 text-sm">
-                    <span className="text-muted-foreground">Версия сайта</span>
-                    <span className="font-medium">Тестовая сборка</span>
+                    <span className="text-muted-foreground">{t("profile.version")}</span>
+                    <span className="font-medium">{t("profile.testBuild")}</span>
                   </div>
                   <div className="flex items-center justify-between gap-3 py-3 text-sm">
-                    <span className="text-muted-foreground">Источник сведений об аниме</span>
+                    <span className="text-muted-foreground">{t("profile.animeSource")}</span>
                     <span className="font-medium">Shikimori</span>
                   </div>
                   <div className="flex items-center justify-between gap-3 py-3 text-sm">
-                    <span className="text-muted-foreground">Состояние проекта</span>
-                    <span className="font-medium">В разработке</span>
+                    <span className="text-muted-foreground">{t("profile.projectState")}</span>
+                    <span className="font-medium">{t("profile.inDevelopment")}</span>
                   </div>
                 </div>
               </div>
@@ -378,9 +378,9 @@ export function Profile({ animeList, onSelect, onCatalog }: Props) {
             {panel === "support" && (
               <div className="rounded-2xl border border-dashed border-border bg-card/40 p-6 sm:p-8">
                 <LifeBuoy className="h-7 w-7 text-primary" />
-                <h2 className="mt-3 text-lg font-semibold">Раздел поддержки готовится</h2>
+                <h2 className="mt-3 text-lg font-semibold">{t("profile.supportComing")}</h2>
                 <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-                  Здесь появится способ сообщить о проблеме, задать вопрос или отправить предложение по улучшению YUME.
+                  {t("profile.supportText")}
                 </p>
               </div>
             )}
