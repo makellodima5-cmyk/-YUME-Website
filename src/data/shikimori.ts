@@ -18,6 +18,7 @@ type ShikimoriRequest = {
 type ShikimoriGraphQLAnime = {
   id: string;
   name: string;
+  english?: string | string[] | null;
   russian?: string | null;
   kind?: string | null;
   score?: number | string | null;
@@ -47,6 +48,7 @@ type GraphQLResponse = {
 const ANIME_FIELDS = [
   "id",
   "name",
+  "english",
   "russian",
   "kind",
   "score",
@@ -136,6 +138,7 @@ function mapAnime(item: ShikimoriGraphQLAnime): Anime {
   return {
     id: String(item.id),
     title: item.russian?.trim() || item.name,
+    englishTitle: (Array.isArray(item.english) ? item.english[0] : item.english)?.trim() || item.name,
     original: item.name,
     year,
     episodes: Math.max(0, Number(item.episodes ?? 0) || 0),
