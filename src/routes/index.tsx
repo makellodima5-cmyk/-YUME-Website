@@ -7,6 +7,7 @@ import { Header, type View } from "@/components/yume/Header";
 import { AnimeCard } from "@/components/yume/Poster";
 import { CollectionsGrid, Grid, Hero, Row } from "@/components/yume/Sections";
 import { CatalogFilters, EMPTY_CATALOG_FILTERS, type CatalogFiltersValue } from "@/components/yume/CatalogFilters";
+import { Profile } from "@/components/yume/Profile";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -22,7 +23,7 @@ export const Route = createFileRoute("/")({
   validateSearch: (search: Record<string, unknown>): { section?: View } => ({
     section:
       typeof search.section === "string" &&
-      ["home", "catalog", "collections", "top"].includes(search.section)
+      ["home", "catalog", "collections", "profile"].includes(search.section)
         ? (search.section as View)
         : undefined,
   }),
@@ -66,7 +67,6 @@ function Index() {
   const [sortBy, setSortBy] = useState("rating");
   const [catalogPage, setCatalogPage] = useState(1);
   const [collection, setCollection] = useState<string | null>(null);
-  const [profile, setProfile] = useState(false);
   const [remoteSearch, setRemoteSearch] = useState<{ query: string; items: Anime[]; error: string | null } | null>(null);
   const [searchLoading, setSearchLoading] = useState(false);
 
@@ -206,13 +206,9 @@ function Index() {
   const airingCards = ANIME.filter((anime) => anime.status === "Онгоинг")
     .sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? ""))
     .slice(0, 12);
-  const topAnime = ANIME
-    .filter((anime) => (anime.status === "Онгоинг" || anime.status === "Вышел") && anime.rating > 0)
-    .sort((a, b) => b.rating - a.rating || b.year - a.year);
-
   return (
     <div className="min-h-screen pb-24 md:pb-12">
-      <Header view={view} setView={setView} onProfile={() => setProfile(true)} />
+      <Header view={view} setView={setView} onProfile={() => setView("profile")} />
       {apiError && (
         <div role="alert" className="mx-4 mt-20 rounded-xl border border-amber-400/25 bg-amber-400/10 px-4 py-3 text-sm text-amber-100 md:mx-10">
           Не удалось загрузить данные Shikimori. Сейчас показан демонстрационный каталог. Обнови страницу чуть позже.
@@ -310,33 +306,11 @@ function Index() {
             </>
           )}
         </main>
-      ) : (
-        <main className="px-4 pt-36 md:px-10 md:pt-24">
-          <div className="mb-6">
-            <h1 className="text-2xl font-bold md:text-3xl">Топ аниме</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Лучшие оценки Shikimori среди тайтлов в текущем каталоге · {topAnime.length} тайтлов
-            </p>
-          </div>
-          <Grid
-            items={topAnime}
-            onSelect={select}
-            empty="В текущем каталоге пока нет вышедших аниме с рейтингом."
-          />
-        </main>
-      )}
+      ) : view === "profile" ? (
+        <Profile animeList={ANIME} onSelect={select} onCatalog={() => setView("catalog")} />
+      ) : null}
       <footer className="mt-16 px-4 text-center text-xs text-muted-foreground md:px-10">YUME · сведения об аниме загружаются из Shikimori</footer>
-
-      {profile && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm" onClick={() => setProfile(false)} role="dialog" aria-modal="true">
-          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-sm rounded-3xl bg-popover p-6 text-center ring-1 ring-border">
-            <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-neon shadow-neon" />
-            <h2 className="text-lg font-semibold">Профиль скоро появится</h2>
-            <p className="mt-2 text-sm text-muted-foreground">Вход, списки и история просмотра будут добавлены на следующем этапе.</p>
-            <button onClick={() => setProfile(false)} className="mt-6 w-full rounded-full bg-secondary py-2.5 text-sm font-semibold ring-1 ring-border hover:bg-accent">Понятно</button>
-          </div>
-        </div>
-      )}
+}
     </div>
   );
 }
