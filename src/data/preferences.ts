@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { Anime } from "@/data/anime";
 
 export type Language = "ru" | "en";
@@ -416,16 +416,28 @@ function publishPreferenceChange() {
   }
 }
 
-export function useYumePreferences() {
+type YumePreferencesValue = {
+  language: Language;
+  setLanguage: (language: Language) => void;
+  theme: ThemePreference;
+  setTheme: (theme: ThemePreference) => void;
+  t: (key: TranslationKey) => string;
+};
+
+const YumePreferencesContext = createContext<YumePreferencesValue | null>(null);
+
+export function YumePreferencesProvider({ children }: { children: ReactNode }) {
   const [language, setLanguageState] = useState<Language>("ru");
   const [theme, setThemeState] = useState<ThemePreference>("dark");
+
   useEffect(() => {
     const sync = () => {
-      setLanguageState(getStoredLanguage());
-      const currentTheme = getStoredTheme();
-      setThemeState(currentTheme);
-      applyTheme(currentTheme);
-      document.documentElement.lang = getStoredLanguage();
+      const nextLanguage = getStoredLanguage();
+      const nextTheme = getStoredTheme();
+      setLanguageState(nextLanguage);
+      setThemeState(nextTheme);
+      applyTheme(nextTheme);
+      document.documentElement.lang = nextLanguage;
     };
     sync();
     window.addEventListener(PREFERENCES_EVENT, sync);
@@ -443,26 +455,42 @@ export function useYumePreferences() {
   }, []);
 
   const setLanguage = useCallback((next: Language) => {
-    setLanguageState(next);
     if (typeof window !== "undefined") {
       window.localStorage.setItem(LANGUAGE_KEY, next);
       document.documentElement.lang = next;
-      publishPreferenceChange();
     }
+    setLanguageState(next);
+    publishPreferenceChange();
   }, []);
 
   const setTheme = useCallback((next: ThemePreference) => {
-    setThemeState(next);
     if (typeof window !== "undefined") {
       window.localStorage.setItem(THEME_KEY, next);
       applyTheme(next);
-      publishPreferenceChange();
     }
+    setThemeState(next);
+    publishPreferenceChange();
   }, []);
 
-  const t = useCallback((key: TranslationKey): string => TRANSLATIONS[language][key] ?? TRANSLATIONS.ru[key] ?? key, [language]);
+  const t = useCallback(
+    (key: TranslationKey): string => TRANSLATIONS[language][key] ?? TRANSLATIONS.ru[key] ?? key,
+    [language],
+  );
 
-  return { language, setLanguage, theme, setTheme, t };
+  const value = useMemo(
+    () => ({ language, setLanguage, theme, setTheme, t }),
+    [language, setLanguage, theme, setTheme, t],
+  );
+
+  return <YumePreferencesContext.Provider value={value}>{children}</YumePreferencesContext.Provider>;
+}
+
+export function useYumePreferences(): YumePreferencesValue {
+  const context = useContext(YumePreferencesContext);
+  if (!context) {
+    throw new Error("useYumePreferences must be used inside YumePreferencesProvider");
+  }
+  return context;
 }
 
 export function displayAnimeTitle(anime: Anime, language: Language): string {
