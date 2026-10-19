@@ -7,6 +7,7 @@ import {
   ChevronLeft,
   ChevronUp,
   CirclePlay,
+  Heart,
   Play,
   Star,
 } from "lucide-react";
@@ -14,6 +15,7 @@ import { ANIME as DEMO_ANIME } from "@/data/anime";
 import { getShikimoriAnimes } from "@/data/shikimori";
 import { Header, type View } from "@/components/yume/Header";
 import { AnimeCard, PosterArt } from "@/components/yume/Poster";
+import { FAVORITES_STORAGE_KEY, readSavedAnimeIds, toggleSavedAnimeId, WATCHLIST_STORAGE_KEY } from "@/data/profile-storage";
 
 export const Route = createFileRoute("/anime/$animeId")({
   loader: async ({ params }) => {
@@ -76,15 +78,16 @@ function AnimeDetailPage() {
   const [selectedVoice, setSelectedVoice] = useState(DEMO_VOICES[0]!);
   const [selectedPlayer, setSelectedPlayer] = useState(DEMO_PLAYERS[0]!);
   const [inList, setInList] = useState(false);
+  const [isFavorite, setIsFavorite] = useState(false);
   const [showListNote, setShowListNote] = useState(false);
-  const [profileOpen, setProfileOpen] = useState(false);
 
   useEffect(() => {
     setDescriptionExpanded(false);
     setSelectedEpisode(1);
     setSelectedVoice(DEMO_VOICES[0]!);
     setSelectedPlayer(DEMO_PLAYERS[0]!);
-    setInList(false);
+    setInList(readSavedAnimeIds(WATCHLIST_STORAGE_KEY).includes(animeId));
+    setIsFavorite(readSavedAnimeIds(FAVORITES_STORAGE_KEY).includes(animeId));
     setShowListNote(false);
     window.scrollTo({ top: 0, behavior: "auto" });
   }, [animeId]);
@@ -103,7 +106,7 @@ function AnimeDetailPage() {
         <Header
           view="catalog"
           setView={navigateToSection}
-          onProfile={() => setProfileOpen(true)}
+          onProfile={() => navigateToSection("profile")}
         />
         <main className="px-4 pt-28 md:px-10 md:pt-32">
           <div className="mx-auto max-w-3xl rounded-3xl border border-border bg-card p-8 text-center">
@@ -120,7 +123,6 @@ function AnimeDetailPage() {
             </button>
           </div>
         </main>
-        <ProfileDialog open={profileOpen} onClose={() => setProfileOpen(false)} />
       </div>
     );
   }
@@ -172,17 +174,33 @@ function AnimeDetailPage() {
     </button>
   );
 
+  const favoriteButton = (
+    <button
+      type="button"
+      onClick={() => {
+        setIsFavorite(toggleSavedAnimeId(FAVORITES_STORAGE_KEY, anime.id));
+        setShowListNote(true);
+      }}
+      className="inline-flex items-center justify-center gap-2 rounded-full bg-secondary px-4 py-2.5 text-sm font-semibold ring-1 ring-border transition hover:bg-accent"
+      aria-pressed={isFavorite}
+    >
+      <Heart className={`h-4 w-4 ${isFavorite ? "fill-current text-primary" : ""}`} />
+      {isFavorite ? "В избранном" : "В избранное"}
+    </button>
+  );
+
   const listButton = (
     <button
       type="button"
       onClick={() => {
-        setInList((value) => !value);
+        setInList(toggleSavedAnimeId(WATCHLIST_STORAGE_KEY, anime.id));
         setShowListNote(true);
       }}
       className="inline-flex items-center justify-center gap-2 rounded-full bg-secondary px-4 py-2.5 text-sm font-semibold ring-1 ring-border transition hover:bg-accent"
+      aria-pressed={inList}
     >
       {inList ? <Check className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
-      {inList ? "В списке" : "В список"}
+      {inList ? "В моём списке" : "В мой список"}
     </button>
   );
 
@@ -191,7 +209,7 @@ function AnimeDetailPage() {
       <Header
         view="catalog"
         setView={navigateToSection}
-        onProfile={() => setProfileOpen(true)}
+        onProfile={() => navigateToSection("profile")}
       />
 
       <main className="px-4 pt-24 md:px-10 md:pt-28">
@@ -285,11 +303,12 @@ function AnimeDetailPage() {
                 </div>
                 <div className="mt-6 flex flex-wrap gap-3">
                   {watchButton}
+                  {favoriteButton}
                   {listButton}
                 </div>
                 {showListNote && (
                   <p className="mt-3 text-xs text-white/60" aria-live="polite">
-                    Списки пока работают в демо-режиме и не сохраняются после ухода со страницы.
+                    Избранное и мой список сохраняются на этом устройстве.
                   </p>
                 )}
               </div>
@@ -326,6 +345,7 @@ function AnimeDetailPage() {
                   </div>
                   <div className="mt-4 flex flex-col items-stretch gap-2">
                     {watchButton}
+                    {favoriteButton}
                     {listButton}
                   </div>
                 </div>
@@ -335,7 +355,7 @@ function AnimeDetailPage() {
                 {descriptionText("anime-description-mobile")}
                 {showListNote && (
                   <p className="mt-3 text-xs text-muted-foreground" aria-live="polite">
-                    Списки пока работают в демо-режиме и не сохраняются после ухода со страницы.
+                    Избранное и мой список сохраняются на этом устройстве.
                   </p>
                 )}
               </div>
@@ -455,7 +475,6 @@ function AnimeDetailPage() {
         YUME · сведения об аниме загружаются из Shikimori
       </footer>
 
-      <ProfileDialog open={profileOpen} onClose={() => setProfileOpen(false)} />
     </div>
   );
 }
@@ -489,33 +508,3 @@ function Selector({
   );
 }
 
-function ProfileDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
-  if (!open) return null;
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm"
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-      aria-label="Профиль"
-    >
-      <div
-        onClick={(event) => event.stopPropagation()}
-        className="w-full max-w-sm rounded-3xl bg-popover p-6 text-center ring-1 ring-border"
-      >
-        <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-neon shadow-neon" />
-        <h2 className="text-lg font-semibold">Профиль скоро появится</h2>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Вход, списки и история просмотра будут добавлены на следующем этапе.
-        </p>
-        <button
-          type="button"
-          onClick={onClose}
-          className="mt-6 w-full rounded-full bg-secondary py-2.5 text-sm font-semibold ring-1 ring-border hover:bg-accent"
-        >
-          Понятно
-        </button>
-      </div>
-    </div>
-  );
-}
