@@ -102,7 +102,7 @@ export function ContinueRow({ onSelect }: { onSelect: (a: Anime) => void }) {
             <div className="p-3">
               <div className="line-clamp-1 text-sm font-semibold">{displayAnimeTitle(a, language)}</div>
               <div className="text-xs text-muted-foreground">
-                {t("anime.episode")} {c.episode} · {c.left} left
+                {t("anime.episode")} {c.episode} · {Number.parseInt(c.left, 10)} {t("home.minutesLeft")}
               </div>
             </div>
           </button>
