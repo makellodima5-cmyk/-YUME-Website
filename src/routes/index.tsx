@@ -191,13 +191,9 @@ function Index() {
     setCatalogPage(1);
   };
   const activeCollection = COLLECTIONS.find((c) => c.id === collection);
-  const matchingCollectionAnime = activeCollection
+  const activeCollectionAnime = activeCollection
     ? ANIME.filter((anime) => activeCollection.genres.some((genre) => anime.genres.includes(genre)))
         .sort((a, b) => b.rating - a.rating)
-        .slice(0, 20)
-    : [];
-  const activeCollectionAnime = activeCollection
-    ? matchingCollectionAnime.length ? matchingCollectionAnime : ANIME.slice(0, 20)
     : [];
   const popularCards = (popularAnime.length ? popularAnime : ANIME)
     .filter((anime) => anime.rating > 0)
