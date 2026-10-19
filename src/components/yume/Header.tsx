@@ -20,7 +20,7 @@ type Props = {
 export function Header({ view, setView, onProfile }: Props) {
   return (
     <>
-      <header className="glass-fixed-header fixed inset-x-3 top-3 z-40 overflow-hidden rounded-2xl glass-liquid ring-1 ring-white/20 md:inset-x-4 md:top-3">
+      <header className="fixed inset-x-0 top-0 z-40 w-full overflow-hidden rounded-none border-b border-white/10 bg-[#090714]/95 shadow-[0_8px_28px_rgba(0,0,0,0.38)] backdrop-blur-xl">
         <div className="flex h-16 items-center gap-6 px-4 md:px-10">
           <Logo />
           <nav className="hidden items-center gap-1 md:flex">
