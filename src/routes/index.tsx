@@ -67,22 +67,24 @@ function Index() {
       ) : view === "home" ? (
         <main className="pt-16">
           <Hero onCatalog={() => setView("catalog")} onRandom={random} query={query} setQuery={setQuery} />
-          <div className="-mt-10 relative">
-            <Row title="Популярное" action={<SeeAll onClick={() => setView("catalog")} />}>
-              {ANIME.filter((a) => a.popular).sort((a, b) => b.rating - a.rating).map((a) => <AnimeCard key={a.id} anime={a} onSelect={select} />)}
-            </Row>
-          </div>
-          <Row title="Новые релизы" action={<SeeAll onClick={() => setView("catalog")} />}>
-            {ANIME.filter((a) => a.isNew).map((a) => <AnimeCard key={a.id} anime={a} onSelect={select} />)}
-          </Row>
-          <ContinueRow onSelect={select} />
-          <section className="mt-10 px-4 md:px-10">
-            <div className="mb-4 flex items-end justify-between">
-              <h2 className="text-lg font-semibold md:text-xl">Подборки</h2>
-              <SeeAll onClick={() => setView("collections")} />
+          <div className="home-content-world -mt-10 pb-12">
+            <div className="relative z-10">
+              <Row title="Популярное" action={<SeeAll onClick={() => setView("catalog")} />}>
+                {ANIME.filter((a) => a.popular).sort((a, b) => b.rating - a.rating).map((a) => <AnimeCard key={a.id} anime={a} onSelect={select} />)}
+              </Row>
+              <Row title="Новые релизы" action={<SeeAll onClick={() => setView("catalog")} />}>
+                {ANIME.filter((a) => a.isNew).map((a) => <AnimeCard key={a.id} anime={a} onSelect={select} />)}
+              </Row>
+              <ContinueRow onSelect={select} />
+              <section className="mt-10 px-4 md:px-10">
+                <div className="mb-4 flex items-end justify-between">
+                  <h2 className="text-lg font-semibold md:text-xl">Подборки</h2>
+                  <SeeAll onClick={() => setView("collections")} />
+                </div>
+                <CollectionsGrid onOpen={(id) => { setCollection(id); setView("collections"); }} />
+              </section>
             </div>
-            <CollectionsGrid onOpen={(id) => { setCollection(id); setView("collections"); }} />
-          </section>
+          </div>
         </main>
       ) : view === "catalog" ? (
         <main className="px-4 pt-36 md:px-10 md:pt-24">
