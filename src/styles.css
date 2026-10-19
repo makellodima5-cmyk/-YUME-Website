@@ -126,3 +126,38 @@
   scrollbar-width: none;
   &::-webkit-scrollbar { display: none; }
 }
+
+/* YUME homepage content atmosphere: sakura, lanterns and Japanese architecture. */
+.home-content-world {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: #0b081b;
+}
+.home-content-world::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    linear-gradient(
+      180deg,
+      rgba(10, 7, 24, 0.12) 0%,
+      rgba(10, 7, 24, 0.22) 18%,
+      rgba(10, 7, 24, 0.34) 48%,
+      rgba(9, 7, 20, 0.58) 100%
+    ),
+    url("/yume-home-atmosphere.svg");
+  background-position: center top, center top;
+  background-repeat: no-repeat, no-repeat;
+  background-size: 100% 100%, cover;
+}
+.home-content-world > * {
+  position: relative;
+}
+@media (prefers-reduced-motion: reduce) {
+  .home-content-world::before {
+    scroll-behavior: auto;
+  }
+}
