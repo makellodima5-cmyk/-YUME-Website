@@ -202,7 +202,6 @@ export function Profile({ animeList, onSelect, onCatalog }: Props) {
               <div className="mb-3 flex items-end justify-between gap-3">
                 <div>
                   <h2 className="text-xl font-bold">Избранное</h2>
-                  <p className="mt-1 text-sm text-muted-foreground">Любимые тайтлы — только постеры, без лишних подписей</p>
                 </div>
                 <button
                   type="button"
@@ -251,7 +250,6 @@ export function Profile({ animeList, onSelect, onCatalog }: Props) {
             {backButton()}
             <div className="mb-6">
               <h1 className="text-2xl font-bold sm:text-3xl">{panelTitles[panel]}</h1>
-              {panel === "favorites" && <p className="mt-1 text-sm text-muted-foreground">Все тайтлы, которые ты добавил в избранное</p>}
               {panel === "watchlist" && <p className="mt-1 text-sm text-muted-foreground">Аниме, которые ты сохранил на потом</p>}
             </div>
 
