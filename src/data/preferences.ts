@@ -192,6 +192,12 @@ const RU = {
   "settings.preferences": "Предпочтения аниме",
   "settings.preferencesDescription": "В будущем здесь можно будет выбрать жанры и другие предпочтения для персональных рекомендаций.",
   "settings.comingWithRecommendations": "Настройки предпочтений появятся вместе с разделом рекомендаций.",
+  "settings.preferredGenres": "Любимые жанры",
+  "settings.preferredGenresDescription": "Выбери жанры, которые тебе интересны. Выбор сохранится на этом устройстве.",
+  "settings.noPreferredGenres": "Пока жанры не выбраны. Можно оставить список пустым.",
+  "settings.clearGenres": "Сбросить выбор",
+  "settings.genresSaved": "Предпочтения сохранены на этом устройстве.",
+  "settings.genreCount": "Выбрано жанров:",
 
 } as const;
 
@@ -380,7 +386,13 @@ const EN: Record<TranslationKey, string> = {
   "settings.savedOnDevice": "Theme and language are saved in this browser on this device.",
   "settings.preferences": "Anime preferences",
   "settings.preferencesDescription": "In the future, you will be able to choose genres and other preferences for personalized recommendations.",
-  "settings.comingWithRecommendations": "Preference settings will arrive with the recommendations section.",
+  "settings.comingWithRecommendations": "These preferences are saved locally. Personalized recommendations will use them once that feature is available.",
+  "settings.preferredGenres": "Preferred genres",
+  "settings.preferredGenresDescription": "Choose the genres you are interested in. Your selection is saved on this device.",
+  "settings.noPreferredGenres": "No genres selected yet. You can leave the list empty.",
+  "settings.clearGenres": "Clear selection",
+  "settings.genresSaved": "Preferences are saved on this device.",
+  "settings.genreCount": "Selected genres:",
 };
 
 const TRANSLATIONS: Record<Language, Record<TranslationKey, string>> = {
