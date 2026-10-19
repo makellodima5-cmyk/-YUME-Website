@@ -83,7 +83,7 @@ function Index() {
       if (sortBy === "title") return a.title.localeCompare(b.title, "ru");
       return b.rating - a.rating;
     });
-  }, [catalogQuery, query, view, activeFilters, sortBy]);
+  }, [catalogQuery, submittedQuery, view, activeFilters, sortBy]);
   const catalogPageSize = 20;
   const totalCatalogPages = Math.max(1, Math.ceil(catalogResults.length / catalogPageSize));
   const visibleCatalogResults = catalogResults.slice((catalogPage - 1) * catalogPageSize, catalogPage * catalogPageSize);
