@@ -109,7 +109,7 @@ function AnimeDetailPage() {
           <div className="mx-auto max-w-3xl rounded-3xl border border-border bg-card p-8 text-center">
             <h1 className="text-2xl font-bold">Аниме не найдено</h1>
             <p className="mt-2 text-sm text-muted-foreground">
-              Возможно, ссылка устарела или тайтл больше недоступен.
+              {apiError ? "Не удалось получить данные от Shikimori. Обнови страницу немного позже." : "Возможно, ссылка устарела или тайтл больше недоступен."}
             </p>
             <button
               type="button"
@@ -130,7 +130,7 @@ function AnimeDetailPage() {
     anime.description.trim().length > 76
       ? anime.description.trim().slice(0, 76).trimEnd() + "…"
       : anime.description;
-  const episodes = Array.from({ length: Math.max(1, anime.episodes) }, (_, index) => index + 1);
+  const episodes = Array.from({ length: Math.min(1000, Math.max(0, anime.episodes)) }, (_, index) => index + 1);
 
   const descriptionControl = (id: string) => (
     <button
@@ -217,6 +217,15 @@ function AnimeDetailPage() {
                   ") 0%, transparent 45%), linear-gradient(110deg, #100d1b 0%, #1b1428 54%, #0b0a14 100%)",
               }}
             >
+              {anime.bannerUrl && (
+                <img
+                  src={anime.bannerUrl}
+                  alt=""
+                  aria-hidden="true"
+                  fetchPriority="high"
+                  className="absolute inset-0 h-full w-full scale-105 object-cover object-center opacity-40 blur-[1px]"
+                />
+              )}
               <div
                 aria-hidden="true"
                 className="pointer-events-none absolute -right-8 -top-20 select-none font-display text-[27rem] leading-none opacity-[0.11] blur-[1px]"
@@ -236,7 +245,7 @@ function AnimeDetailPage() {
                 <div className="mb-3 flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-white/70">
                   <span>{anime.status}</span>
                   <span className="h-1 w-1 rounded-full bg-primary" />
-                  <span>{anime.year}</span>
+                  <span>{anime.year || "Год уточняется"}</span>
                 </div>
                 <h1 id="anime-title-desktop" className="max-w-3xl text-4xl font-bold leading-tight text-white lg:text-5xl">
                   {anime.title}
@@ -249,8 +258,18 @@ function AnimeDetailPage() {
                     {anime.rating.toFixed(1)}
                   </span>
                   <span className="rounded-full border border-white/10 bg-black/25 px-3 py-1.5 text-sm text-white/90 backdrop-blur">
-                    {anime.episodes} серий
+                    {anime.episodes > 0 ? anime.episodes + " серий" : "Количество серий уточняется"}
                   </span>
+                  {anime.kind && (
+                    <span className="rounded-full border border-white/10 bg-black/25 px-3 py-1.5 text-sm text-white/90 backdrop-blur">
+                      {anime.kind}
+                    </span>
+                  )}
+                  {anime.ageRating && (
+                    <span className="rounded-full border border-white/10 bg-black/25 px-3 py-1.5 text-sm text-white/90 backdrop-blur">
+                      {anime.ageRating}
+                    </span>
+                  )}
                   {anime.genres.map((genre) => (
                     <span
                       key={genre}
@@ -279,23 +298,7 @@ function AnimeDetailPage() {
             <div className="md:hidden">
               <div className="flex items-start gap-4">
                 <div className="w-[38%] max-w-[190px] shrink-0">
-                  <div
-                    className="overflow-hidden rounded-2xl ring-1 ring-white/10 shadow-[0_12px_36px_rgba(0,0,0,0.3)]"
-                    style={{
-                      background:
-                        "radial-gradient(circle at 70% 20%, oklch(0.75 0.14 " +
-                        anime.hue +
-                        ") 0%, transparent 34%), linear-gradient(155deg, oklch(0.3 0.12 " +
-                        anime.hue +
-                        "), #100d1b)",
-                    }}
-                  >
-                    <div className="aspect-[2/3]">
-                      <div className="flex h-full items-center justify-center font-display text-7xl text-white/25">
-                        {anime.glyph}
-                      </div>
-                    </div>
-                  </div>
+                  <PosterArt anime={anime} className="aspect-[2/3] w-full rounded-2xl ring-1 ring-white/10 shadow-[0_12px_36px_rgba(0,0,0,0.3)]" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-primary">
@@ -310,7 +313,7 @@ function AnimeDetailPage() {
                       <Star className="h-3 w-3 fill-gold text-gold" />
                       {anime.rating.toFixed(1)}
                     </span>
-                    <span className="rounded-full bg-secondary px-2 py-1">{anime.episodes} серий</span>
+                    <span className="rounded-full bg-secondary px-2 py-1">{anime.episodes > 0 ? anime.episodes + " серий" : "Серии уточняются"}</span>
                   </div>
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {anime.genres.map((genre) => (
@@ -318,6 +321,8 @@ function AnimeDetailPage() {
                         {genre}
                       </span>
                     ))}
+                    {anime.kind && <span className="rounded-full border border-border px-2 py-1 text-[11px] text-muted-foreground">{anime.kind}</span>}
+                    {anime.ageRating && <span className="rounded-full border border-border px-2 py-1 text-[11px] text-muted-foreground">{anime.ageRating}</span>}
                   </div>
                   <div className="mt-4 flex flex-col items-stretch gap-2">
                     {watchButton}
@@ -363,12 +368,13 @@ function AnimeDetailPage() {
                   label="Серия"
                   value={String(selectedEpisode)}
                   onChange={(value) => setSelectedEpisode(Number(value))}
+                  disabled={episodes.length === 0}
                 >
-                  {episodes.map((episode) => (
+                  {episodes.length > 0 ? episodes.map((episode) => (
                     <option key={episode} value={String(episode)}>
                       Серия {episode}
                     </option>
-                  ))}
+                  )) : <option value="1">Количество серий уточняется</option>}
                 </Selector>
                 <Selector
                   label="Озвучка"
