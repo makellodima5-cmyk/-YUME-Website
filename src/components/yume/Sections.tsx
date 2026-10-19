@@ -111,13 +111,12 @@ export function ContinueRow({ onSelect }: { onSelect: (a: Anime) => void }) {
 
 export function CollectionsGrid({ onOpen, animeList }: { onOpen: (id: string) => void; animeList: Anime[] }) {
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {COLLECTIONS.map((c) => {
         const matches = animeList
           .filter((anime) => c.genres.some((genre) => anime.genres.includes(genre)))
-          .sort((a, b) => b.rating - a.rating)
-          .slice(0, 3);
-        const posters = matches.length ? matches : animeList.slice(0, 3);
+          .sort((a, b) => b.rating - a.rating);
+        const posters = matches.slice(0, 4);
         return (
           <button
             key={c.id}
@@ -125,15 +124,15 @@ export function CollectionsGrid({ onOpen, animeList }: { onOpen: (id: string) =>
             className="group relative h-44 overflow-hidden rounded-2xl p-5 text-left ring-1 ring-border transition hover:shadow-neon"
             style={{ background: "linear-gradient(135deg, oklch(0.35 0.16 " + c.hue + "), oklch(0.15 0.05 285))" }}
           >
-            <div className="absolute -right-4 bottom-3 flex">
+            <div className="absolute -right-3 bottom-3 flex max-w-[54%]">
               {posters.map((anime) => (
-                <PosterArt key={anime.id} anime={anime} className="h-28 w-20 -ml-6 rounded-lg ring-2 ring-background transition group-hover:-translate-y-1" />
+                <PosterArt key={anime.id} anime={anime} className="h-28 w-16 -ml-5 rounded-lg ring-2 ring-background transition first:ml-0 group-hover:-translate-y-1 sm:w-[4.5rem]" />
               ))}
             </div>
-            <div className="relative">
-              <div className="text-xs text-foreground/70">{matches.length || animeList.length} тайтлов</div>
-              <h3 className="mt-1 text-lg font-semibold">{c.title}</h3>
-              <p className="text-sm text-foreground/70">{c.subtitle}</p>
+            <div className="relative z-10 max-w-[58%]">
+              <div className="text-xs text-foreground/70">{matches.length} {matches.length === 1 ? "тайтл" : matches.length >= 2 && matches.length <= 4 ? "тайтла" : "тайтлов"}</div>
+              <h3 className="mt-1 text-lg font-semibold leading-snug">{c.title}</h3>
+              <p className="mt-1 line-clamp-2 text-sm text-foreground/70">{c.subtitle}</p>
             </div>
           </button>
         );
