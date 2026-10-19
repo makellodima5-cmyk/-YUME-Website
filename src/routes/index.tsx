@@ -12,7 +12,7 @@ export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "YUME — смотри аниме онлайн" },
-      { name: "description", content: "YUME — каталог аниме, подборки под настроение и расписание новых серий." },
+      { name: "description", content: "YUME — каталог аниме, тематические подборки и рейтинг лучших тайтлов." },
       { property: "og:title", content: "YUME — больше чем аниме" },
       { property: "og:description", content: "Открой свой мир в YUME: популярное, новинки и подборки." },
       { property: "og:type", content: "website" },
@@ -22,7 +22,7 @@ export const Route = createFileRoute("/")({
   validateSearch: (search: Record<string, unknown>): { section?: View } => ({
     section:
       typeof search.section === "string" &&
-      ["home", "catalog", "collections", "schedule"].includes(search.section)
+      ["home", "catalog", "collections", "top"].includes(search.section)
         ? (search.section as View)
         : undefined,
   }),
@@ -206,8 +206,9 @@ function Index() {
   const airingCards = ANIME.filter((anime) => anime.status === "Онгоинг")
     .sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? ""))
     .slice(0, 12);
-  const scheduledAnime = ANIME.filter((anime) => anime.nextEpisodeAt && anime.status === "Онгоинг")
-    .sort((a, b) => (a.nextEpisodeAt ?? "").localeCompare(b.nextEpisodeAt ?? ""));
+  const topAnime = ANIME
+    .filter((anime) => (anime.status === "Онгоинг" || anime.status === "Вышел") && anime.rating > 0)
+    .sort((a, b) => b.rating - a.rating || b.year - a.year);
 
   return (
     <div className="min-h-screen pb-24 md:pb-12">
@@ -311,66 +312,19 @@ function Index() {
         </main>
       ) : (
         <main className="px-4 pt-36 md:px-10 md:pt-24">
-          <h1 className="text-2xl font-bold md:text-3xl">Расписание выхода серий</h1>
-          <p className="mb-6 text-muted-foreground">Даты выхода из Shikimori, время указано по Москве</p>
-          {scheduledAnime.length > 0 ? (
-            <div className="grid gap-4 md:grid-cols-2">
-              {scheduledAnime.map((anime) => {
-                const date = new Date(anime.nextEpisodeAt!);
-                const validDate = !Number.isNaN(date.getTime());
-                return (
-                  <button
-                    key={anime.id}
-                    type="button"
-                    onClick={() => select(anime)}
-                    className="flex w-full items-center gap-3 rounded-2xl bg-card p-4 text-left ring-1 ring-border transition hover:ring-primary"
-                  >
-                    <div className="h-[88px] w-[62px] shrink-0 overflow-hidden rounded-lg">
-                      <PosterArt anime={anime} className="h-full w-full" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="line-clamp-2 text-sm font-semibold">{anime.title}</div>
-                      <div className="mt-1 text-xs text-muted-foreground">
-                        Серия {(anime.episodesAired ?? 0) + 1}
-                      </div>
-                      <div className="mt-2 text-xs text-primary">
-                        {validDate
-                          ? date.toLocaleDateString("ru-RU", {
-                              timeZone: "Europe/Moscow",
-                              weekday: "long",
-                              day: "numeric",
-                              month: "long",
-                            })
-                          : "Дата выхода уточняется"}
-                      </div>
-                    </div>
-                    <span className="shrink-0 rounded-full bg-secondary px-2.5 py-1.5 text-xs font-semibold">
-                      {validDate
-                        ? date.toLocaleTimeString("ru-RU", {
-                            timeZone: "Europe/Moscow",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })
-                        : "—"}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="rounded-2xl border border-dashed border-border p-6 md:p-8">
-              <h2 className="text-lg font-semibold">Пока нет подтверждённых дат выхода</h2>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Shikimori не передал ближайшее время выхода для тайтлов в текущей выдаче. Ниже — реальные онгоинги, чтобы можно было открыть их страницы.
-              </p>
-              <div className="mt-5">
-                <Grid items={airingCards} onSelect={select} empty="В текущей выдаче нет тайтлов со статусом «Онгоинг»." />
-              </div>
-            </div>
-          )}
+          <div className="mb-6">
+            <h1 className="text-2xl font-bold md:text-3xl">Топ аниме</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Лучшие оценки Shikimori среди тайтлов в текущем каталоге · {topAnime.length} тайтлов
+            </p>
+          </div>
+          <Grid
+            items={topAnime}
+            onSelect={select}
+            empty="В текущем каталоге пока нет вышедших аниме с рейтингом."
+          />
         </main>
       )}
-
       <footer className="mt-16 px-4 text-center text-xs text-muted-foreground md:px-10">YUME · сведения об аниме загружаются из Shikimori</footer>
 
       {profile && (
