@@ -1,4 +1,4 @@
-import { useRef, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { CalendarDays, Home, LayoutGrid, Library, User } from "lucide-react";
 import { Logo } from "./Logo";
 
@@ -17,22 +17,31 @@ type Props = {
   onProfile: () => void;
 };
 
+type DragGeometry = { leftPercent: number; widthPercent: number };
+
 export function Header({ view, setView, onProfile }: Props) {
   const mobileNavRef = useRef<HTMLElement | null>(null);
-  const pointerRef = useRef<{ pointerId: number; startX: number; startY: number; moved: boolean } | null>(null);
+  const pointerRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    lastX: number;
+    moved: boolean;
+  } | null>(null);
   const suppressDragClickRef = useRef(false);
+  const [dragGeometry, setDragGeometry] = useState<DragGeometry | null>(null);
   const activeIndex = Math.max(0, NAV.findIndex((item) => item.id === view));
 
   const handlePointerDown = (event: ReactPointerEvent<HTMLElement>) => {
     const target = event.target;
     if (!(target instanceof Element) || !target.closest("[data-nav-id]")) return;
 
-    // A new interaction clears any stale click suppression from a previous drag.
     suppressDragClickRef.current = false;
     pointerRef.current = {
       pointerId: event.pointerId,
       startX: event.clientX,
       startY: event.clientY,
+      lastX: event.clientX,
       moved: false,
     };
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -43,28 +52,34 @@ export function Header({ view, setView, onProfile }: Props) {
     const nav = mobileNavRef.current;
     if (!pointer || !nav || pointer.pointerId !== event.pointerId) return;
 
-    const deltaX = event.clientX - pointer.startX;
-    const deltaY = event.clientY - pointer.startY;
-    // Don't treat a vertical page scroll as a tab drag.
-    if (Math.abs(deltaY) > 12 && Math.abs(deltaY) > Math.abs(deltaX)) return;
-    if (Math.abs(deltaX) < 8) return;
+    const deltaXFromStart = event.clientX - pointer.startX;
+    const deltaYFromStart = event.clientY - pointer.startY;
+    // Keep normal vertical page scrolling separate from the horizontal tab gesture.
+    if (Math.abs(deltaYFromStart) > 12 && Math.abs(deltaYFromStart) > Math.abs(deltaXFromStart)) return;
+    if (Math.abs(deltaXFromStart) < 8) return;
 
     pointer.moved = true;
     const bounds = nav.getBoundingClientRect();
-    if (
-      event.clientX < bounds.left ||
-      event.clientX > bounds.right ||
-      event.clientY < bounds.top - 18 ||
-      event.clientY > bounds.bottom + 18
-    ) return;
+    const localX = Math.max(4, Math.min(bounds.width - 4, event.clientX - bounds.left));
+    const slotWidth = bounds.width / NAV.length;
+    const baseWidth = Math.max(0, slotWidth - 8);
 
-    const buttons = Array.from(nav.querySelectorAll<HTMLButtonElement>("[data-nav-id]"));
-    const targetButton = buttons.find((button) => {
-      const rect = button.getBoundingClientRect();
-      return event.clientX >= rect.left && event.clientX <= rect.right;
+    // Stretch the glass pill in proportion to the current finger movement.
+    // The pill follows the finger continuously; it returns to a regular tab width on release.
+    const deltaX = event.clientX - pointer.lastX;
+    const stretch = Math.min(Math.abs(deltaX) * 1.8, slotWidth * 0.48);
+    const pillWidth = Math.min(bounds.width - 8, baseWidth + stretch);
+    const left = Math.max(4, Math.min(bounds.width - pillWidth - 4, localX - pillWidth / 2));
+    setDragGeometry({
+      leftPercent: (left / bounds.width) * 100,
+      widthPercent: (pillWidth / bounds.width) * 100,
     });
-    const nextView = targetButton?.dataset.navId as View | undefined;
-    if (nextView && nextView !== view) setView(nextView);
+    pointer.lastX = event.clientX;
+
+    if (event.clientX < bounds.left || event.clientX > bounds.right) return;
+    const index = Math.max(0, Math.min(NAV.length - 1, Math.floor((event.clientX - bounds.left) / slotWidth)));
+    const nextView = NAV[index]!.id;
+    if (nextView !== view) setView(nextView);
   };
 
   const handlePointerUp = (event: ReactPointerEvent<HTMLElement>) => {
@@ -72,12 +87,14 @@ export function Header({ view, setView, onProfile }: Props) {
     if (!pointer || pointer.pointerId !== event.pointerId) return;
     if (pointer.moved) suppressDragClickRef.current = true;
     pointerRef.current = null;
+    setDragGeometry(null);
   };
 
   const handlePointerCancel = (event: ReactPointerEvent<HTMLElement>) => {
     if (pointerRef.current?.pointerId !== event.pointerId) return;
     pointerRef.current = null;
     suppressDragClickRef.current = false;
+    setDragGeometry(null);
   };
 
   const handleClickCapture = (event: ReactMouseEvent<HTMLElement>) => {
@@ -122,8 +139,11 @@ export function Header({ view, setView, onProfile }: Props) {
         <div className="relative grid grid-cols-4">
           <span
             aria-hidden="true"
-            className="pointer-events-none absolute bottom-1 top-1 z-0 rounded-xl glass-active transition-[left] duration-300 ease-out motion-reduce:transition-none"
-            style={{ left: `calc(${activeIndex * 25}% + 4px)`, width: "calc(25% - 8px)" }}
+            className={`pointer-events-none absolute bottom-1 top-1 z-0 rounded-xl glass-active ${dragGeometry ? "transition-none" : "transition-[left,width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"}`}
+            style={{
+              left: dragGeometry ? `${dragGeometry.leftPercent}%` : `calc(${activeIndex * 25}% + 4px)`,
+              width: dragGeometry ? `${dragGeometry.widthPercent}%` : "calc(25% - 8px)",
+            }}
           />
           {NAV.map((n) => (
             <button
