@@ -4,7 +4,7 @@ import { ArrowDownWideNarrow, ChevronDown, ChevronRight, Search, SlidersHorizont
 import { ANIME as DEMO_ANIME, COLLECTIONS, type Anime } from "@/data/anime";
 import { getShikimoriAnimes } from "@/data/shikimori";
 import { Header, type View } from "@/components/yume/Header";
-import { AnimeCard, PosterArt } from "@/components/yume/Poster";
+import { AnimeCard } from "@/components/yume/Poster";
 import { CollectionsGrid, Grid, Hero, Row } from "@/components/yume/Sections";
 import { CatalogFilters, EMPTY_CATALOG_FILTERS, type CatalogFiltersValue } from "@/components/yume/CatalogFilters";
 
@@ -207,6 +207,11 @@ function Index() {
   return (
     <div className="min-h-screen pb-24 md:pb-12">
       <Header view={view} setView={setView} onProfile={() => setProfile(true)} />
+      {apiError && (
+        <div role="alert" className="mx-4 mt-20 rounded-xl border border-amber-400/25 bg-amber-400/10 px-4 py-3 text-sm text-amber-100 md:mx-10">
+          Не удалось загрузить данные Shikimori. Сейчас показан демонстрационный каталог. Обнови страницу чуть позже.
+        </div>
+      )}
 
       {searching ? (
         <main className="px-4 pt-36 md:px-10 md:pt-24">
@@ -214,26 +219,28 @@ function Index() {
             <h1 className="text-xl font-semibold">{submittedQuery ? `Результаты: «${submittedQuery}»` : "Результаты по фильтрам"} <span className="text-muted-foreground">· {catalogResults.length}</span></h1>
             <button onClick={() => { setQuery(""); setSubmittedQuery(""); setDraftFilters(EMPTY_CATALOG_FILTERS); setActiveFilters(EMPTY_CATALOG_FILTERS); setFiltersOpen(false); setCatalogPage(1); }} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"><X className="h-4 w-4" />Сбросить</button>
           </div>
-          <Grid items={catalogResults} onSelect={select} empty="Ничего не найдено. Попробуйте изменить запрос или фильтры." />
+          <Grid items={catalogResults} onSelect={select} empty={searchLoading ? "Ищем аниме в Shikimori…" : (remoteSearch?.query === submittedQuery.trim() && remoteSearch.error) || "Ничего не найдено. Попробуйте изменить запрос или фильтры."} />
         </main>
       ) : view === "home" ? (
         <main className="pt-16">
-          <Hero onCatalog={() => setView("catalog")} onRandom={random} query={query} setQuery={setQuery} onSubmitSearch={submitHomeSearch} filtersOpen={filtersOpen} setFiltersOpen={setFiltersOpen} draftFilters={draftFilters} setDraftFilters={setDraftFilters} onApplyFilters={applyCatalogFilters} onResetFilters={resetCatalogFilters} activeFilterCount={activeFilterCount} />
+          <Hero onCatalog={() => setView("catalog")} onRandom={random} query={query} setQuery={setQuery} onSubmitSearch={submitHomeSearch} filtersOpen={filtersOpen} setFiltersOpen={setFiltersOpen} draftFilters={draftFilters} setDraftFilters={setDraftFilters} onApplyFilters={applyCatalogFilters} onResetFilters={resetCatalogFilters} activeFilterCount={activeFilterCount} genres={availableGenres} />
           <div className="home-content-world -mt-10 pb-12">
             <div className="relative z-10">
               <Row title="Популярное" action={<SeeAll onClick={() => setView("catalog")} />}>
-                {ANIME.filter((a) => a.popular).sort((a, b) => b.rating - a.rating).map((a) => <AnimeCard key={a.id} anime={a} onSelect={select} />)}
+                {popularCards.map((a) => <AnimeCard key={a.id} anime={a} onSelect={select} />)}
               </Row>
               <Row title="Новые релизы" action={<SeeAll onClick={() => setView("catalog")} />}>
-                {ANIME.filter((a) => a.isNew).map((a) => <AnimeCard key={a.id} anime={a} onSelect={select} />)}
+                {newReleaseCards.map((a) => <AnimeCard key={a.id} anime={a} onSelect={select} />)}
               </Row>
-              <ContinueRow onSelect={select} />
+              <Row title="Сейчас выходит" action={<SeeAll onClick={() => setView("catalog")} />}>
+                {airingCards.map((a) => <AnimeCard key={a.id} anime={a} onSelect={select} />)}
+              </Row>
               <section className="mt-10 px-4 md:px-10">
                 <div className="mb-4 flex items-end justify-between">
                   <h2 className="text-lg font-semibold md:text-xl">Подборки</h2>
                   <SeeAll onClick={() => setView("collections")} />
                 </div>
-                <CollectionsGrid onOpen={(id) => { setCollection(id); setView("collections"); }} />
+                <CollectionsGrid animeList={ANIME} onOpen={(id) => { setCollection(id); setView("collections"); }} />
               </section>
             </div>
           </div>
@@ -252,10 +259,10 @@ function Index() {
                 {activeFilterCount > 0 && <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-neon px-1 text-[10px] font-bold text-primary-foreground">{activeFilterCount}</span>}
               </button>
             </div>
-            <CatalogFilters open={filtersOpen} draft={draftFilters} setDraft={setDraftFilters} onApply={applyCatalogFilters} onReset={resetCatalogFilters} />
+            <CatalogFilters open={filtersOpen} draft={draftFilters} setDraft={setDraftFilters} onApply={applyCatalogFilters} onReset={resetCatalogFilters} genres={availableGenres} />
           </div>
           <div className="mb-5 mt-7 flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm text-muted-foreground">Найдено: <span className="font-semibold text-foreground">{catalogResults.length}</span></p>
+            <p className="text-sm text-muted-foreground">{searchLoading ? "Ищем в Shikimori…" : <>Найдено: <span className="font-semibold text-foreground">{catalogResults.length}</span></>}</p>
             <label className="flex h-9 items-center gap-2 rounded-lg border border-border bg-secondary/80 px-3 text-sm">
               <ArrowDownWideNarrow className="h-4 w-4 text-muted-foreground" />
               <span className="text-muted-foreground max-sm:hidden">Сортировка</span>
@@ -265,7 +272,7 @@ function Index() {
               <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
             </label>
           </div>
-          <Grid items={visibleCatalogResults} onSelect={select} empty="Ничего не найдено. Измени запрос или сбрось фильтры." />
+          <Grid items={visibleCatalogResults} onSelect={select} empty={searchLoading ? "Ищем аниме в Shikimori…" : (remoteSearch?.query === catalogQuery.trim() && remoteSearch.error) || "Ничего не найдено. Измени запрос или сбрось фильтры."} />
           {catalogResults.length > 0 && <nav aria-label="Страницы каталога" className="mt-8 flex flex-wrap items-center justify-center gap-1.5">
             <button type="button" disabled={catalogPage === 1} onClick={() => { setCatalogPage((page) => Math.max(1, page - 1)); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="h-9 rounded-lg border border-border px-3 text-sm transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-35">Назад</button>
             {Array.from({ length: totalCatalogPages }, (_, index) => index + 1)
@@ -288,12 +295,12 @@ function Index() {
               <button onClick={() => setCollection(null)} className="mb-3 text-sm text-muted-foreground hover:text-primary">← Все подборки</button>
               <h1 className="text-2xl font-bold md:text-3xl">{activeCollection.title}</h1>
               <p className="mb-6 text-muted-foreground">{activeCollection.subtitle}</p>
-              <Grid items={activeCollection.ids.map(byId)} onSelect={select} empty="" />
+              <Grid items={activeCollectionAnime} onSelect={select} empty="В этом настроении пока не найдено тайтлов. Попробуй другую подборку." />
             </>
           ) : (
             <>
               <h1 className="mb-6 text-2xl font-bold md:text-3xl">Подборки</h1>
-              <CollectionsGrid onOpen={setCollection} />
+              <CollectionsGrid animeList={ANIME} onOpen={setCollection} />
             </>
           )}
         </main>
