@@ -58,7 +58,23 @@ function Index() {
   const { t, language } = useYumePreferences();
   const navigate = useNavigate();
   useEffect(() => {
-    document.title = language === "en" ? "YUME — watch anime online" : "YUME — смотри аниме онлайн";
+    const metadata = language === "en"
+      ? {
+          title: "YUME — watch anime online",
+          description: "YUME — an anime catalog with themed collections and top-rated titles.",
+          ogTitle: "YUME — more than anime",
+          ogDescription: "Discover your world in YUME: popular anime, new releases and collections.",
+        }
+      : {
+          title: "YUME — смотри аниме онлайн",
+          description: "YUME — каталог аниме, тематические подборки и рейтинг лучших тайтлов.",
+          ogTitle: "YUME — больше чем аниме",
+          ogDescription: "Открой свой мир в YUME: популярное, новинки и подборки.",
+        };
+    document.title = metadata.title;
+    document.querySelector('meta[name="description"]')?.setAttribute("content", metadata.description);
+    document.querySelector('meta[property="og:title"]')?.setAttribute("content", metadata.ogTitle);
+    document.querySelector('meta[property="og:description"]')?.setAttribute("content", metadata.ogDescription);
   }, [language]);
   const { section } = Route.useSearch();
   const { anime: loadedAnime, popular: popularAnime, recent: recentAnime, apiError } = Route.useLoaderData();
