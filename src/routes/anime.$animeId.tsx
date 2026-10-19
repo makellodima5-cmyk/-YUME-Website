@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   Bookmark,
   Check,
@@ -10,13 +10,44 @@ import {
   Play,
   Star,
 } from "lucide-react";
-import { ANIME } from "@/data/anime";
+import { ANIME as DEMO_ANIME, type Anime } from "@/data/anime";
+import { getShikimoriAnimes } from "@/data/shikimori";
 import { Header, type View } from "@/components/yume/Header";
-import { AnimeCard } from "@/components/yume/Poster";
+import { AnimeCard, PosterArt } from "@/components/yume/Poster";
 
 export const Route = createFileRoute("/anime/$animeId")({
-  head: ({ params }) => {
-    const anime = ANIME.find((item) => item.id === params.animeId);
+  loader: async ({ params }) => {
+    const isShikimoriId = /^\d+$/.test(params.animeId);
+    if (!isShikimoriId) {
+      const demoAnime = DEMO_ANIME.find((item) => item.id === params.animeId) ?? null;
+      const catalog = await getShikimoriAnimes({ data: { page: 1, limit: 50, order: "ranked" } });
+      return {
+        anime: demoAnime,
+        relatedAnime: demoAnime ? DEMO_ANIME.filter((item) => item.id !== demoAnime.id) : catalog.items,
+        apiError: catalog.error,
+      };
+    }
+
+    const [detail, catalog] = await Promise.all([
+      getShikimoriAnimes({ data: { ids: params.animeId, limit: 1, order: "ranked" } }),
+      getShikimoriAnimes({ data: { page: 1, limit: 50, order: "ranked" } }),
+    ]);
+    const anime = detail.items[0] ?? null;
+    const pool = catalog.items;
+    const relatedAnime = anime
+      ? pool
+          .filter((item) => item.id !== anime.id)
+          .sort((a, b) => {
+            const aShared = a.genres.filter((genre) => anime.genres.includes(genre)).length;
+            const bShared = b.genres.filter((genre) => anime.genres.includes(genre)).length;
+            return bShared - aShared || b.rating - a.rating;
+          })
+          .slice(0, 6)
+      : pool.slice(0, 6);
+    return { anime, relatedAnime, apiError: detail.error };
+  },
+  head: ({ loaderData }) => {
+    const anime = loaderData?.anime;
     return {
       meta: [
         { title: anime ? anime.title + " — смотреть аниме | YUME" : "Аниме не найдено | YUME" },
@@ -38,7 +69,7 @@ const DEMO_PLAYERS = ["Демо-источник A", "Демо-источник 
 function AnimeDetailPage() {
   const { animeId } = Route.useParams();
   const navigate = useNavigate();
-  const anime = useMemo(() => ANIME.find((item) => item.id === animeId), [animeId]);
+  const { anime, relatedAnime, apiError } = Route.useLoaderData();
   const playerSectionRef = useRef<HTMLElement | null>(null);
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
   const [selectedEpisode, setSelectedEpisode] = useState(1);
@@ -100,13 +131,6 @@ function AnimeDetailPage() {
       ? anime.description.trim().slice(0, 76).trimEnd() + "…"
       : anime.description;
   const episodes = Array.from({ length: Math.max(1, anime.episodes) }, (_, index) => index + 1);
-  const relatedAnime = ANIME.filter((item) => item.id !== anime.id)
-    .sort((a, b) => {
-      const aShared = a.genres.filter((genre) => anime.genres.includes(genre)).length;
-      const bShared = b.genres.filter((genre) => anime.genres.includes(genre)).length;
-      return bShared - aShared || b.rating - a.rating;
-    })
-    .slice(0, 6);
 
   const descriptionControl = (id: string) => (
     <button
