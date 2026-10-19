@@ -1,14 +1,14 @@
 import { useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
-import { Home, LayoutGrid, Library, Trophy, User } from "lucide-react";
+import { Home, LayoutGrid, Library, User } from "lucide-react";
 import { Logo } from "./Logo";
 
-export type View = "home" | "catalog" | "collections" | "top";
+export type View = "home" | "catalog" | "collections" | "profile";
 
 export const NAV: { id: View; label: string; icon: typeof Home }[] = [
   { id: "home", label: "Главная", icon: Home },
   { id: "catalog", label: "Каталог", icon: LayoutGrid },
   { id: "collections", label: "Подборки", icon: Library },
-  { id: "top", label: "Топ аниме", icon: Trophy },
+  { id: "profile", label: "Профиль", icon: User },
 ];
 
 type Props = {
