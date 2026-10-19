@@ -57,6 +57,9 @@ function SeeAll({ onClick }: { onClick: () => void }) {
 function Index() {
   const { t, language } = useYumePreferences();
   const navigate = useNavigate();
+  useEffect(() => {
+    document.title = language === "en" ? "YUME — watch anime online" : "YUME — смотри аниме онлайн";
+  }, [language]);
   const { section } = Route.useSearch();
   const { anime: loadedAnime, popular: popularAnime, recent: recentAnime, apiError } = Route.useLoaderData();
   const ANIME = loadedAnime.length ? loadedAnime : DEMO_ANIME;
@@ -168,7 +171,7 @@ function Index() {
     return filtered.sort((a, b) => {
       if (sortBy === "newest") return b.year - a.year || b.rating - a.rating;
       if (sortBy === "oldest") return a.year - b.year || b.rating - a.rating;
-      if (sortBy === "title") return a.title.localeCompare(b.title, "ru");
+      if (sortBy === "title") return (language === "en" ? (a.englishTitle || a.original || a.title) : a.title).localeCompare(language === "en" ? (b.englishTitle || b.original || b.title) : b.title, language === "en" ? "en" : "ru");
       return b.rating - a.rating;
     });
   }, [searchText, searchUniverse, activeFilters, sortBy, language]);
@@ -259,7 +262,7 @@ function Index() {
             <div className="flex h-11 items-center rounded-xl border border-white/10 bg-[#171127]/75 shadow-lg shadow-black/10 backdrop-blur-xl focus-within:border-primary/60">
               <Search className="ml-3 h-4 w-4 shrink-0 text-muted-foreground" />
               <input value={catalogQuery} onChange={(event) => { setCatalogQuery(event.target.value); setCatalogPage(1); }} placeholder={t("search.placeholder")} aria-label={t("catalog.search")} className="h-full min-w-0 flex-1 bg-transparent px-2.5 text-sm outline-none placeholder:text-muted-foreground" />
-              {catalogQuery && <button type="button" aria-label="Очистить поиск" onClick={() => { setCatalogQuery(""); setCatalogPage(1); }} className="rounded-full p-1.5 text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>}
+              {catalogQuery && <button type="button" aria-label={t("search.clear")} onClick={() => { setCatalogQuery(""); setCatalogPage(1); }} className="rounded-full p-1.5 text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>}
               <button type="button" onClick={() => { setDraftFilters({ ...activeFilters, genres: [...activeFilters.genres] }); setFiltersOpen((open) => !open); }} aria-label={t("filters.open")} aria-expanded={filtersOpen} data-filter-trigger className={`relative mr-1.5 flex h-8 w-9 shrink-0 items-center justify-center rounded-lg transition ${filtersOpen || activeFilterCount ? "bg-primary/20 text-primary" : "text-muted-foreground hover:bg-accent hover:text-foreground"}`}>
                 <SlidersHorizontal className="h-4 w-4" />
                 {activeFilterCount > 0 && <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-neon px-1 text-[10px] font-bold text-primary-foreground">{activeFilterCount}</span>}
