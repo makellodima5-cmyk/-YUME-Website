@@ -78,16 +78,24 @@ export function Header({ view, setView, onProfile }: Props) {
     });
     pointer.lastX = event.clientX;
 
-    if (event.clientX < bounds.left || event.clientX > bounds.right) return;
-    const index = Math.max(0, Math.min(NAV.length - 1, Math.floor((event.clientX - bounds.left) / slotWidth)));
-    const nextView = NAV[index]!.id;
-    if (nextView !== view) setView(nextView);
   };
 
   const handlePointerUp = (event: ReactPointerEvent<HTMLElement>) => {
     const pointer = pointerRef.current;
-    if (!pointer || pointer.pointerId !== event.pointerId) return;
-    if (pointer.moved) suppressDragClickRef.current = true;
+    const nav = mobileNavRef.current;
+    if (!pointer || !nav || pointer.pointerId !== event.pointerId) return;
+
+    if (pointer.moved) {
+      suppressDragClickRef.current = true;
+      const bounds = nav.getBoundingClientRect();
+      const clampedX = Math.max(bounds.left, Math.min(bounds.right - 1, event.clientX));
+      const slotWidth = bounds.width / NAV.length;
+      const index = Math.max(0, Math.min(NAV.length - 1, Math.floor((clampedX - bounds.left) / slotWidth)));
+      const destination = NAV[index]!.id;
+      // Keep the current page while dragging; navigate only once the gesture ends.
+      if (destination !== view) setView(destination);
+    }
+
     pointerRef.current = null;
     setDragGeometry(null);
   };
