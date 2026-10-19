@@ -35,6 +35,7 @@
 }
 
 :root {
+  color-scheme: dark;
   --radius: 1rem;
   --background: oklch(0.13 0.03 285);
   --foreground: oklch(0.96 0.01 300);
@@ -193,3 +194,21 @@ html[data-theme="light"] [class~="bg-[#171127]/[.98]"] {
 }
 html[data-theme="light"] [class~="bg-[#090714]/95"] { color: #2e1c3d; }
 html[data-theme="light"] [class~="bg-[#090714]/95"] img { filter: none; }
+
+
+/* Light mode adjustments for remaining fixed dark surfaces. */
+html[data-theme="light"] [class~="bg-[#171127]/75"] {
+  background-color: rgba(255, 252, 255, 0.92) !important;
+  border-color: rgba(74, 46, 94, 0.20) !important;
+  color: #2e1c3d;
+}
+html[data-theme="light"] [class~="bg-[#0b0a19]/65"] {
+  background-color: rgba(255, 252, 255, 0.75) !important;
+  color: #2e1c3d !important;
+  border-color: rgba(74, 46, 94, 0.24) !important;
+}
+html[data-theme="light"] [class~="bg-[#0b0a19]/65"] svg { color: #4b315f; }
+html[data-theme="light"] [class~="bg-[#171127]/75"] input { color: #2e1c3d; }
+html[data-theme="light"] [class~="bg-[#171127]/75"] input::placeholder { color: #756680; }
+html[data-theme="light"] [class~="bg-[#080710]"] { color: #f7f0ff; }
+html[data-theme="light"] [class~="bg-[#080710]"] p { color: rgba(255,255,255,0.7); }
