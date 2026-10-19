@@ -366,7 +366,7 @@ function Index() {
         </main>
       )}
 
-      <footer className="mt-16 px-4 text-center text-xs text-muted-foreground md:px-10">YUME · демо-прототип, все тайтлы вымышлены</footer>
+      <footer className="mt-16 px-4 text-center text-xs text-muted-foreground md:px-10">YUME · сведения об аниме загружаются из Shikimori</footer>
 
       {profile && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm" onClick={() => setProfile(false)} role="dialog" aria-modal="true">
