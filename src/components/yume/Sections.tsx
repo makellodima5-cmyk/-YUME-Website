@@ -133,10 +133,10 @@ export function CollectionsGrid({ onOpen, animeList }: { onOpen: (id: string) =>
                 <PosterArt key={anime.id} anime={anime} className="h-28 w-16 -ml-5 rounded-lg ring-2 ring-background transition first:ml-0 group-hover:-translate-y-1 sm:w-[4.5rem]" />
               ))}
             </div>
-            <div className="relative z-10 max-w-[58%]">
-              <div className="text-xs text-foreground/70">{matches.length} {matches.length === 1 ? t("collection.countOne") : matches.length >= 2 && matches.length <= 4 && matches.length > 0 ? t("collection.countFew") : t("collection.countMany")}</div>
-              <h3 className="mt-1 text-lg font-semibold leading-snug">{t((`collection.${c.id}.title`) as TranslationKey)}</h3>
-              <p className="mt-1 line-clamp-2 text-sm text-foreground/70">{t((`collection.${c.id}.subtitle`) as TranslationKey)}</p>
+            <div className="relative z-10 max-w-[58%] text-white">
+              <div className="text-xs text-white/80">{matches.length} {matches.length === 1 ? t("collection.countOne") : matches.length >= 2 && matches.length <= 4 && matches.length > 0 ? t("collection.countFew") : t("collection.countMany")}</div>
+              <h3 className="mt-1 text-lg font-semibold leading-snug text-white">{t((`collection.${c.id}.title`) as TranslationKey)}</h3>
+              <p className="mt-1 line-clamp-2 text-sm text-white/75">{t((`collection.${c.id}.subtitle`) as TranslationKey)}</p>
             </div>
           </button>
         );
