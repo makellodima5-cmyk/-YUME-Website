@@ -228,7 +228,7 @@ function Index() {
             <h1 className="text-xl font-semibold">{submittedQuery ? `${t("catalog.results")}: «${submittedQuery}»` : t("catalog.filterResults")} <span className="text-muted-foreground">· {catalogResults.length}</span></h1>
             <button onClick={() => { setQuery(""); setSubmittedQuery(""); setDraftFilters(EMPTY_CATALOG_FILTERS); setActiveFilters(EMPTY_CATALOG_FILTERS); setFiltersOpen(false); setCatalogPage(1); }} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"><X className="h-4 w-4" />{t("catalog.reset")}</button>
           </div>
-          <Grid items={catalogResults} onSelect={select} empty={searchLoading ? t("catalog.searchingTitle") : (remoteSearch?.query === submittedQuery.trim() && remoteSearch.error) || t("catalog.noResultsFormal")} />
+          <Grid items={catalogResults} onSelect={select} empty={searchLoading ? t("catalog.searchingTitle") : (remoteSearch?.query === submittedQuery.trim() && remoteSearch.error ? t("source.searchError") : t("catalog.noResultsFormal"))} />
         </main>
       ) : view === "home" ? (
         <main className="pt-16">
@@ -281,7 +281,7 @@ function Index() {
               <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
             </label>
           </div>
-          <Grid items={visibleCatalogResults} onSelect={select} empty={searchLoading ? t("catalog.searchingTitle") : (remoteSearch?.query === catalogQuery.trim() && remoteSearch.error) || t("catalog.noResults")} />
+          <Grid items={visibleCatalogResults} onSelect={select} empty={searchLoading ? t("catalog.searchingTitle") : (remoteSearch?.query === catalogQuery.trim() && remoteSearch.error ? t("source.searchError") : t("catalog.noResults"))} />
           {catalogResults.length > 0 && <nav aria-label={t("catalog.pages")} className="mt-8 flex flex-wrap items-center justify-center gap-1.5">
             <button type="button" disabled={catalogPage === 1} onClick={() => { setCatalogPage((page) => Math.max(1, page - 1)); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="h-9 rounded-lg border border-border px-3 text-sm transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-35">{t("catalog.previous")}</button>
             {Array.from({ length: totalCatalogPages }, (_, index) => index + 1)
