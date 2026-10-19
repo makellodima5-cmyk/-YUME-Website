@@ -1,6 +1,7 @@
 import { useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { Home, LayoutGrid, Library, User } from "lucide-react";
 import { Logo } from "./Logo";
+import { useYumePreferences, type TranslationKey } from "@/data/preferences";
 
 export type View = "home" | "catalog" | "collections" | "profile";
 
@@ -20,6 +21,13 @@ type Props = {
 type DragGeometry = { leftPercent: number; widthPercent: number };
 
 export function Header({ view, setView, onProfile }: Props) {
+  const { t } = useYumePreferences();
+  const navLabels: Record<View, TranslationKey> = {
+    home: "nav.home",
+    catalog: "nav.catalog",
+    collections: "nav.collections",
+    profile: "nav.profile",
+  };
   const mobileNavRef = useRef<HTMLElement | null>(null);
   const pointerRef = useRef<{
     pointerId: number;
@@ -126,7 +134,7 @@ export function Header({ view, setView, onProfile }: Props) {
                 onClick={() => setView(n.id)}
                 className={`rounded-full px-4 py-2 text-sm font-medium transition-all duration-300 ${view === n.id ? "glass-active text-white shadow-[0_0_24px_rgba(208,90,255,0.42)]" : "text-white/75 hover:bg-white/10 hover:text-white"}`}
               >
-                {n.label}
+                {t(navLabels[n.id])}
               </button>
             ))}
           </nav>
@@ -165,7 +173,7 @@ export function Header({ view, setView, onProfile }: Props) {
               className={`relative z-10 flex flex-col items-center gap-1 px-1 py-2.5 text-[11px] transition-colors duration-200 focus:outline-none touch-manipulation ${view === n.id ? "text-white" : "text-white/65 hover:text-white"}`}
             >
               <n.icon className="h-5 w-5" />
-              {n.label}
+              {t(navLabels[n.id])}
             </button>
           ))}
         </div>
