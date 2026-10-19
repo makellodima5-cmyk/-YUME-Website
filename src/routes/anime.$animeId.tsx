@@ -58,7 +58,7 @@ export const Route = createFileRoute("/anime/$animeId")({
           name: "description",
           content: anime
             ? anime.description
-            : "Страница аниме не найдена. Открой каталог YUME.",
+            : "Anime page not found. Open the YUME catalog.",
         },
       ],
     };
