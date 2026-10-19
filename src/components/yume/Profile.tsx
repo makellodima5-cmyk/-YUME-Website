@@ -18,6 +18,7 @@ import {
   UserRound,
 } from "lucide-react";
 import type { Anime } from "@/data/anime";
+import { displayAnimeTitle } from "@/data/preferences";
 import { useYumePreferences } from "@/data/preferences";
 import { AnimeCard, PosterArt } from "./Poster";
 import { Grid } from "./Sections";
@@ -200,7 +201,7 @@ export function Profile({ animeList, onSelect, onCatalog }: Props) {
                   onClick={() => navigatePanel("favorites")}
                   className="inline-flex shrink-0 items-center gap-1 text-sm font-medium text-primary transition hover:text-neon"
                 >
-                  Все <ChevronRight className="h-4 w-4" />
+                  {t("profile.all")} <ChevronRight className="h-4 w-4" />
                 </button>
               </div>
               {favorites.length ? (
@@ -209,7 +210,7 @@ export function Profile({ animeList, onSelect, onCatalog }: Props) {
                     <button
                       key={anime.id}
                       type="button"
-                      aria-label={anime.title}
+                      aria-label={displayAnimeTitle(anime, language)}
                       onClick={() => onSelect(anime)}
                       className="group w-[88px] shrink-0 overflow-hidden rounded-xl ring-1 ring-white/10 transition hover:-translate-y-1 hover:ring-primary sm:w-[104px]"
                     >
