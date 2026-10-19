@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Play, Shuffle } from "lucide-react";
 import heroArtwork from "@/assets/yume-hero-70.webp";
+import { MoonMark } from "./Logo";
 import { type Anime, CONTINUE, COLLECTIONS, byId } from "@/data/anime";
 import { AnimeCard, PosterArt } from "./Poster";
 
@@ -30,21 +31,22 @@ export function Hero({ onCatalog, onRandom }: { onCatalog: () => void; onRandom:
       <div className="absolute inset-0 bg-gradient-to-r from-[#090714]/80 via-[#090714]/40 to-transparent md:from-[#090714]/75 md:via-[#090714]/25 md:to-transparent" />
       <div className="absolute inset-0 bg-gradient-to-t from-[#090714]/95 via-[#090714]/20 to-transparent md:from-transparent md:via-transparent" />
       <div className="relative z-10 flex h-full flex-col justify-end px-5 pb-16 pt-28 md:max-w-[760px] md:justify-center md:px-10 md:pb-8 md:pt-8 lg:px-12">
-        <div className="mb-4">
-          <span className="font-display text-3xl font-bold tracking-[0.3em] drop-shadow-[0_2px_18px_rgba(0,0,0,0.7)] md:text-4xl">YUME</span>
+        <div className="mb-3 flex items-center gap-3 md:mb-4 md:gap-4">
+          <MoonMark className="h-16 w-16 shrink-0 drop-shadow-[0_0_18px_rgba(217,122,255,0.55)] md:h-24 md:w-24 lg:h-28 lg:w-28" id="hero-logo-moon" />
+          <span className="font-serif text-6xl font-medium leading-none tracking-[0.015em] text-white drop-shadow-[0_2px_18px_rgba(0,0,0,0.72)] md:text-7xl lg:text-8xl">YUME</span>
         </div>
         <h1 className="max-w-[12ch] text-4xl font-bold leading-[1.05] md:max-w-none md:text-5xl lg:text-6xl">
-          <span className="text-neon">Больше чем аниме</span>
+          <span className="text-white">Больше чем аниме</span>
         </h1>
-        <p className="mt-4 max-w-xl text-base leading-relaxed text-white/90 drop-shadow-[0_2px_10px_rgba(0,0,0,0.9)] md:text-lg">
+        <p className="mt-4 max-w-xl text-base leading-relaxed text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.95)] md:text-lg">
           Открой для себя удивительные истории, новых героев и целые миры. Смотри, сохраняй любимое и создавай свою историю вместе с YUME.
         </p>
         <div className="mt-7 flex flex-col gap-3 sm:flex-row md:mt-8">
-          <button onClick={onCatalog} className="inline-flex w-fit items-center justify-center gap-2 rounded-full bg-neon px-6 py-3 font-semibold text-primary-foreground shadow-neon transition hover:brightness-110 max-sm:w-full">
-            <Play className="h-4 w-4 fill-current" /> Перейти в каталог
+          <button onClick={onRandom} className="inline-flex w-fit items-center justify-center gap-2 rounded-full bg-neon px-6 py-3 font-semibold text-primary-foreground shadow-neon transition hover:brightness-110 max-sm:w-full">
+            <Play className="h-4 w-4 fill-current" /> Смотреть
           </button>
-          <button onClick={onRandom} className="inline-flex w-fit items-center justify-center gap-2 rounded-full bg-[#0b0a19]/65 px-6 py-3 font-semibold text-white ring-1 ring-white/25 backdrop-blur-md transition hover:bg-accent max-sm:w-full">
-            <Shuffle className="h-4 w-4" /> Случайное аниме
+          <button onClick={onCatalog} className="inline-flex w-fit items-center justify-center gap-2 rounded-full bg-[#0b0a19]/65 px-6 py-3 font-semibold text-white ring-1 ring-white/25 backdrop-blur-md transition hover:bg-accent max-sm:w-full">
+            <Shuffle className="h-4 w-4" /> Каталог
           </button>
         </div>
       </div>
