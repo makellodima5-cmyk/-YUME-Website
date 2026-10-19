@@ -138,7 +138,7 @@ export function Header({ view, setView, onProfile }: Props) {
               </button>
             ))}
           </nav>
-          <button onClick={onProfile} aria-label="Профиль" className="ml-auto flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.25)] backdrop-blur-xl transition hover:bg-white/20 md:ml-0">
+          <button onClick={onProfile} aria-label={t("nav.profileButton")} className="ml-auto flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.25)] backdrop-blur-xl transition hover:bg-white/20 md:ml-0">
             <User className="h-5 w-5" />
           </button>
         </div>
@@ -151,7 +151,7 @@ export function Header({ view, setView, onProfile }: Props) {
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerCancel}
         onClickCapture={handleClickCapture}
-        aria-label="Основная навигация"
+        aria-label={t("nav.main")}
         className="fixed inset-x-3 bottom-3 z-40 overflow-hidden rounded-2xl glass-liquid ring-1 ring-white/25 shadow-[0_12px_50px_rgba(0,0,0,0.55),0_0_30px_rgba(174,66,255,0.2)] select-none [touch-action:pan-y] [-webkit-tap-highlight-color:transparent] md:hidden"
       >
         <div className="relative grid grid-cols-4">
