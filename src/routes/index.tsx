@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useMemo, useState } from "react";
 import { ArrowDownWideNarrow, ChevronDown, ChevronRight, Search, SlidersHorizontal, X } from "lucide-react";
-import { ALL_GENRES, ANIME, COLLECTIONS, SCHEDULE, type Anime, byId, filterAnime } from "@/data/anime";
+import { ANIME, COLLECTIONS, SCHEDULE, type Anime, byId, filterAnime } from "@/data/anime";
 import { Header, type View } from "@/components/yume/Header";
 import { AnimeCard, PosterArt } from "@/components/yume/Poster";
 import { CollectionsGrid, ContinueRow, Grid, Hero, Row } from "@/components/yume/Sections";
