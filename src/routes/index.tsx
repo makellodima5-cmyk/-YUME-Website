@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useMemo, useState } from "react";
 import { ArrowDownWideNarrow, ChevronDown, ChevronRight, Search, SlidersHorizontal, X } from "lucide-react";
-import { ANIME, COLLECTIONS, SCHEDULE, type Anime, byId, filterAnime } from "@/data/anime";
+import { ANIME, COLLECTIONS, SCHEDULE, type Anime, byId } from "@/data/anime";
 import { Header, type View } from "@/components/yume/Header";
 import { AnimeCard, PosterArt } from "@/components/yume/Poster";
 import { CollectionsGrid, ContinueRow, Grid, Hero, Row } from "@/components/yume/Sections";
@@ -54,7 +54,6 @@ function Index() {
     setSelected({ anime: pool[Math.floor(Math.random() * pool.length)]!, note: "🎲 Случайный выбор" });
   };
 
-  const results = useMemo(() => filterAnime(ANIME, query), [query]);
 
   const catalogResults = useMemo(() => {
     const q = (view === "catalog" ? catalogQuery : query).trim().toLowerCase();
@@ -147,7 +146,7 @@ function Index() {
               <Search className="ml-3 h-4 w-4 shrink-0 text-muted-foreground" />
               <input value={catalogQuery} onChange={(event) => { setCatalogQuery(event.target.value); setCatalogPage(1); }} placeholder="Название или жанр..." aria-label="Поиск в каталоге" className="h-full min-w-0 flex-1 bg-transparent px-2.5 text-sm outline-none placeholder:text-muted-foreground" />
               {catalogQuery && <button type="button" aria-label="Очистить поиск" onClick={() => { setCatalogQuery(""); setCatalogPage(1); }} className="rounded-full p-1.5 text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>}
-              <button type="button" onClick={() => { setDraftFilters({ ...activeFilters, genres: [...activeFilters.genres] }); setFiltersOpen((open) => !open); }} aria-label="Открыть фильтры" aria-expanded={filtersOpen} className={`relative mr-1.5 flex h-8 w-9 shrink-0 items-center justify-center rounded-lg transition ${filtersOpen || activeFilterCount ? "bg-primary/20 text-primary" : "text-muted-foreground hover:bg-accent hover:text-foreground"}`}>
+              <button type="button" onClick={() => { setDraftFilters({ ...activeFilters, genres: [...activeFilters.genres] }); setFiltersOpen((open) => !open); }} aria-label="Открыть фильтры" aria-expanded={filtersOpen} data-filter-trigger className={`relative mr-1.5 flex h-8 w-9 shrink-0 items-center justify-center rounded-lg transition ${filtersOpen || activeFilterCount ? "bg-primary/20 text-primary" : "text-muted-foreground hover:bg-accent hover:text-foreground"}`}>
                 <SlidersHorizontal className="h-4 w-4" />
                 {activeFilterCount > 0 && <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-neon px-1 text-[10px] font-bold text-primary-foreground">{activeFilterCount}</span>}
               </button>
