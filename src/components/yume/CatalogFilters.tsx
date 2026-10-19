@@ -43,7 +43,9 @@ export function CatalogFilters({ open, onClose, draft, setDraft, onApply, onRese
       if (event.key === "Escape") onClose();
     };
     const onPointerDown = (event: PointerEvent) => {
-      if (panelRef.current && !panelRef.current.contains(event.target as Node)) onClose();
+      const target = event.target as HTMLElement;
+      if (target.closest("[data-filter-trigger]")) return;
+      if (panelRef.current && !panelRef.current.contains(target)) onClose();
     };
     document.addEventListener("keydown", onKeyDown);
     document.addEventListener("pointerdown", onPointerDown);
