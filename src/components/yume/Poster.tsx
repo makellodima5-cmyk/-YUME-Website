@@ -1,5 +1,6 @@
 import { Star } from "lucide-react";
 import type { Anime } from "@/data/anime";
+import { useYumePreferences, displayAnimeTitle, displayGenre, displayAnimeKind, displayAnimeStatus } from "@/data/preferences";
 
 export function PosterArt({ anime, className = "" }: { anime: Anime; className?: string }) {
   const h = anime.hue;
@@ -40,6 +41,7 @@ export function PosterArt({ anime, className = "" }: { anime: Anime; className?:
 }
 
 export function AnimeCard({ anime, onSelect }: { anime: Anime; onSelect: (a: Anime) => void }) {
+  const { language, t } = useYumePreferences();
   return (
     <button
       type="button"
@@ -58,9 +60,9 @@ export function AnimeCard({ anime, onSelect }: { anime: Anime; onSelect: (a: Ani
           </div>
         )}
       </div>
-      <div className="mt-2 line-clamp-1 text-sm font-semibold">{anime.title}</div>
+      <div className="mt-2 line-clamp-1 text-sm font-semibold">{displayAnimeTitle(anime, language)}</div>
       <div className="text-xs text-muted-foreground">
-        {anime.year || "Год уточняется"} · {anime.genres[0] || anime.kind || anime.status}
+        {anime.year || t("anime.yearUnknown")} · {anime.genres[0] ? displayGenre(anime.genres[0], language) : anime.kind ? displayAnimeKind(anime.kind, language) : displayAnimeStatus(anime.status, language)}
       </div>
     </button>
   );
