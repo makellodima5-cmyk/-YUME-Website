@@ -30,6 +30,7 @@ export function Hero({ onCatalog, onRandom, query, setQuery }: { onCatalog: () =
       />
       <div className="absolute inset-0 bg-gradient-to-r from-[#090714]/80 via-[#090714]/40 to-transparent md:from-[#090714]/75 md:via-[#090714]/25 md:to-transparent" />
       <div className="absolute inset-0 bg-gradient-to-t from-[#090714]/95 via-[#090714]/20 to-transparent md:from-transparent md:via-transparent" />
+      <div aria-hidden="true" className="hero-bottom-blend pointer-events-none absolute inset-x-0 bottom-0 z-[5]" />
       <label className="absolute left-5 top-5 z-20 flex w-[min(44vw,230px)] items-center md:left-8 md:top-7 md:w-[min(25vw,300px)]">
         <Search className="pointer-events-none absolute left-3 h-4 w-4 text-white/80" />
         <input
