@@ -28,7 +28,7 @@ export function Header({ view, setView, query, setQuery, onProfile }: Props) {
         onChange={(e) => setQuery(e.target.value)}
         placeholder="Поиск аниме, жанра…"
         aria-label="Поиск"
-        className="glass-search h-11 w-full rounded-full pl-10 pr-4 text-sm text-white outline-none placeholder:text-white/60 focus:ring-2 focus:ring-primary/70"
+        className="glass-search h-9 w-full rounded-full pl-9 pr-3 text-xs text-white outline-none placeholder:text-white/60 focus:ring-2 focus:ring-primary/70 sm:text-sm"
       />
     </label>
   );
@@ -48,12 +48,12 @@ export function Header({ view, setView, query, setQuery, onProfile }: Props) {
               </button>
             ))}
           </nav>
-          <div className="ml-auto hidden w-72 md:flex lg:w-96">{search}</div>
+          {view === "home" && <div className="ml-auto hidden w-[min(25vw,300px)] md:flex">{search}</div>}
           <button onClick={onProfile} aria-label="Профиль" className="ml-auto flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.25)] backdrop-blur-xl transition hover:bg-white/20 md:ml-0">
             <User className="h-5 w-5" />
           </button>
         </div>
-        <div className="flex w-[min(74vw,320px)] justify-start px-4 pb-3 md:hidden">{search}</div>
+        {view === "home" && <div className="flex w-[min(44vw,230px)] justify-start px-4 pb-3 md:hidden">{search}</div>}
       </header>
 
       <nav className="fixed inset-x-3 bottom-3 z-40 overflow-hidden rounded-2xl glass-liquid ring-1 ring-white/25 shadow-[0_12px_50px_rgba(0,0,0,0.55),0_0_30px_rgba(174,66,255,0.2)] md:hidden">
