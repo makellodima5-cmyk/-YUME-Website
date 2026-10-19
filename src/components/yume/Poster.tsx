@@ -1,19 +1,31 @@
 import { Star } from "lucide-react";
 import type { Anime } from "@/data/anime";
 
-// Placeholder poster art: generated from hue + kanji, swap for real images later.
 export function PosterArt({ anime, className = "" }: { anime: Anime; className?: string }) {
   const h = anime.hue;
   return (
     <div
-      className={`relative overflow-hidden ${className}`}
+      className={\`relative overflow-hidden \${className}\`}
       style={{
-        background: `radial-gradient(circle at 70% 25%, oklch(0.85 0.12 ${h}) 0 12%, transparent 13%), radial-gradient(ellipse at 30% 100%, oklch(0.55 0.25 ${h}) 0%, transparent 60%), linear-gradient(160deg, oklch(0.3 0.12 ${h}), oklch(0.12 0.05 ${h + 20}))`,
+        background: \`radial-gradient(circle at 70% 25%, oklch(0.85 0.12 \${h}) 0 12%, transparent 13%), radial-gradient(ellipse at 30% 100%, oklch(0.55 0.25 \${h}) 0%, transparent 60%), linear-gradient(160deg, oklch(0.3 0.12 \${h}), oklch(0.12 0.05 \${h + 20}))\`,
       }}
     >
-      <span className="absolute inset-0 flex items-center justify-center font-display text-6xl font-bold text-foreground/25 select-none">
+      <span className="absolute inset-0 flex select-none items-center justify-center font-display text-6xl font-bold text-foreground/25">
         {anime.glyph}
       </span>
+      {anime.posterUrl && (
+        <img
+          src={anime.posterUrl}
+          alt=""
+          aria-hidden="true"
+          loading="lazy"
+          decoding="async"
+          onError={(event) => {
+            event.currentTarget.style.display = "none";
+          }}
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+      )}
     </div>
   );
 }
@@ -21,8 +33,9 @@ export function PosterArt({ anime, className = "" }: { anime: Anime; className?:
 export function AnimeCard({ anime, onSelect }: { anime: Anime; onSelect: (a: Anime) => void }) {
   return (
     <button
+      type="button"
       onClick={() => onSelect(anime)}
-      className="group w-36 shrink-0 text-left sm:w-44 focus-visible:outline-none"
+      className="group w-36 shrink-0 text-left focus-visible:outline-none sm:w-44"
     >
       <div className="relative aspect-[2/3] overflow-hidden rounded-xl ring-1 ring-border transition duration-300 group-hover:-translate-y-1 group-hover:shadow-neon group-focus-visible:ring-2 group-focus-visible:ring-ring">
         <PosterArt anime={anime} className="h-full w-full transition duration-500 group-hover:scale-105" />
@@ -38,7 +51,7 @@ export function AnimeCard({ anime, onSelect }: { anime: Anime; onSelect: (a: Ani
       </div>
       <div className="mt-2 line-clamp-1 text-sm font-semibold">{anime.title}</div>
       <div className="text-xs text-muted-foreground">
-        {anime.year} · {anime.genres[0]}
+        {anime.year || "Год уточняется"} · {anime.genres[0] || anime.kind || anime.status}
       </div>
     </button>
   );
