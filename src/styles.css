@@ -67,7 +67,12 @@
     background-color: var(--color-background);
     color: var(--color-foreground);
     font-family: var(--font-sans);
-    background-image: radial-gradient(ellipse at top, color-mix(in oklab, var(--primary) 14%, transparent), transparent 60%);
+    background-image:
+      linear-gradient(180deg, rgba(8, 6, 22, 0.40) 0%, rgba(8, 6, 22, 0.48) 55%, rgba(7, 6, 17, 0.58) 100%),
+      url("/a_wide_cinematic_high_resolution_fantasy_anime_s.png");
+    background-position: center top;
+    background-repeat: no-repeat;
+    background-size: cover;
     background-attachment: fixed;
   }
   h1, h2, h3 { font-family: var(--font-display); }
@@ -132,7 +137,7 @@
   position: relative;
   isolation: isolate;
   overflow: hidden;
-  background: #0b081b;
+  background: transparent;
 }
 .home-content-world::before {
   content: "";
@@ -140,24 +145,26 @@
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  background-image:
-    linear-gradient(
-      180deg,
-      rgba(10, 7, 24, 0.12) 0%,
-      rgba(10, 7, 24, 0.22) 18%,
-      rgba(10, 7, 24, 0.34) 48%,
-      rgba(9, 7, 20, 0.58) 100%
-    ),
-    url("/yume-home-atmosphere.svg");
-  background-position: center top, center top;
-  background-repeat: no-repeat, no-repeat;
-  background-size: 100% 100%, cover;
+  background-image: linear-gradient(
+    180deg,
+    rgba(10, 7, 24, 0.12) 0%,
+    rgba(10, 7, 24, 0.24) 34%,
+    rgba(9, 7, 20, 0.44) 100%
+  );
 }
 .home-content-world > * {
   position: relative;
 }
-@media (prefers-reduced-motion: reduce) {
-  .home-content-world::before {
-    scroll-behavior: auto;
+
+/* Use the dedicated portrait artwork on phones instead of cropping the desktop image. */
+@media (max-width: 767px) {
+  body {
+    background-image:
+      linear-gradient(180deg, rgba(8, 6, 22, 0.35) 0%, rgba(8, 6, 22, 0.47) 48%, rgba(7, 6, 17, 0.62) 100%),
+      url("/yume-background-mobile.jpg");
+    background-position: center top;
+    background-repeat: no-repeat;
+    background-size: cover;
+    background-attachment: fixed;
   }
 }
