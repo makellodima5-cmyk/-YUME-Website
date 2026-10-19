@@ -1,3 +1,4 @@
+import { useRef, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { CalendarDays, Home, LayoutGrid, Library, User } from "lucide-react";
 import { Logo } from "./Logo";
 
@@ -10,7 +11,6 @@ export const NAV: { id: View; label: string; icon: typeof Home }[] = [
   { id: "schedule", label: "Расписание", icon: CalendarDays },
 ];
 
-
 type Props = {
   view: View;
   setView: (v: View) => void;
@@ -18,6 +18,75 @@ type Props = {
 };
 
 export function Header({ view, setView, onProfile }: Props) {
+  const mobileNavRef = useRef<HTMLElement | null>(null);
+  const pointerRef = useRef<{ pointerId: number; startX: number; startY: number; moved: boolean } | null>(null);
+  const suppressDragClickRef = useRef(false);
+  const activeIndex = Math.max(0, NAV.findIndex((item) => item.id === view));
+
+  const handlePointerDown = (event: ReactPointerEvent<HTMLElement>) => {
+    const target = event.target;
+    if (!(target instanceof Element) || !target.closest("[data-nav-id]")) return;
+
+    // A new interaction clears any stale click suppression from a previous drag.
+    suppressDragClickRef.current = false;
+    pointerRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      moved: false,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handlePointerMove = (event: ReactPointerEvent<HTMLElement>) => {
+    const pointer = pointerRef.current;
+    const nav = mobileNavRef.current;
+    if (!pointer || !nav || pointer.pointerId !== event.pointerId) return;
+
+    const deltaX = event.clientX - pointer.startX;
+    const deltaY = event.clientY - pointer.startY;
+    // Don't treat a vertical page scroll as a tab drag.
+    if (Math.abs(deltaY) > 12 && Math.abs(deltaY) > Math.abs(deltaX)) return;
+    if (Math.abs(deltaX) < 8) return;
+
+    pointer.moved = true;
+    const bounds = nav.getBoundingClientRect();
+    if (
+      event.clientX < bounds.left ||
+      event.clientX > bounds.right ||
+      event.clientY < bounds.top - 18 ||
+      event.clientY > bounds.bottom + 18
+    ) return;
+
+    const buttons = Array.from(nav.querySelectorAll<HTMLButtonElement>("[data-nav-id]"));
+    const targetButton = buttons.find((button) => {
+      const rect = button.getBoundingClientRect();
+      return event.clientX >= rect.left && event.clientX <= rect.right;
+    });
+    const nextView = targetButton?.dataset.navId as View | undefined;
+    if (nextView && nextView !== view) setView(nextView);
+  };
+
+  const handlePointerUp = (event: ReactPointerEvent<HTMLElement>) => {
+    const pointer = pointerRef.current;
+    if (!pointer || pointer.pointerId !== event.pointerId) return;
+    if (pointer.moved) suppressDragClickRef.current = true;
+    pointerRef.current = null;
+  };
+
+  const handlePointerCancel = (event: ReactPointerEvent<HTMLElement>) => {
+    if (pointerRef.current?.pointerId !== event.pointerId) return;
+    pointerRef.current = null;
+    suppressDragClickRef.current = false;
+  };
+
+  const handleClickCapture = (event: ReactMouseEvent<HTMLElement>) => {
+    if (!suppressDragClickRef.current) return;
+    event.preventDefault();
+    event.stopPropagation();
+    suppressDragClickRef.current = false;
+  };
+
   return (
     <>
       <header className="fixed inset-x-0 top-0 z-40 w-full overflow-hidden rounded-none border-b border-white/10 bg-[#090714]/95 shadow-[0_8px_28px_rgba(0,0,0,0.38)] backdrop-blur-xl">
@@ -40,10 +109,31 @@ export function Header({ view, setView, onProfile }: Props) {
         </div>
       </header>
 
-      <nav className="fixed inset-x-3 bottom-3 z-40 overflow-hidden rounded-2xl glass-liquid ring-1 ring-white/25 shadow-[0_12px_50px_rgba(0,0,0,0.55),0_0_30px_rgba(174,66,255,0.2)] md:hidden">
-        <div className="grid grid-cols-4">
+      <nav
+        ref={mobileNavRef}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerCancel}
+        onClickCapture={handleClickCapture}
+        aria-label="Основная навигация"
+        className="fixed inset-x-3 bottom-3 z-40 overflow-hidden rounded-2xl glass-liquid ring-1 ring-white/25 shadow-[0_12px_50px_rgba(0,0,0,0.55),0_0_30px_rgba(174,66,255,0.2)] select-none [touch-action:pan-y] [-webkit-tap-highlight-color:transparent] md:hidden"
+      >
+        <div className="relative grid grid-cols-4">
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute bottom-1 top-1 z-0 rounded-xl glass-active transition-[left] duration-300 ease-out motion-reduce:transition-none"
+            style={{ left: `calc(${activeIndex * 25}% + 4px)`, width: "calc(25% - 8px)" }}
+          />
           {NAV.map((n) => (
-            <button key={n.id} onClick={() => setView(n.id)} className={`relative flex flex-col items-center gap-1 px-1 py-2.5 text-[11px] transition-all duration-300 ${view === n.id ? "glass-active mx-1 my-1 rounded-xl text-white" : "text-white/65 hover:text-white"}`}>
+            <button
+              key={n.id}
+              type="button"
+              data-nav-id={n.id}
+              aria-current={view === n.id ? "page" : undefined}
+              onClick={() => setView(n.id)}
+              className={`relative z-10 flex flex-col items-center gap-1 px-1 py-2.5 text-[11px] transition-colors duration-200 focus:outline-none touch-manipulation ${view === n.id ? "text-white" : "text-white/65 hover:text-white"}`}
+            >
               <n.icon className="h-5 w-5" />
               {n.label}
             </button>
