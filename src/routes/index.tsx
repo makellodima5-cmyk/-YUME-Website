@@ -45,6 +45,23 @@ function Index() {
   const [profile, setProfile] = useState(false);
 
   const setView = (v: View) => {
+    // Tapping Home is also a quick way out of search results: restore the default home state.
+    if (v === "home") {
+      setQuery("");
+      setSubmittedQuery("");
+      setDraftFilters(EMPTY_CATALOG_FILTERS);
+      setActiveFilters(EMPTY_CATALOG_FILTERS);
+      setFiltersOpen(false);
+      setCatalogPage(1);
+    }
+    // Re-tapping the Catalog tab clears its query and returns to the full catalog.
+    if (v === "catalog" && view === "catalog") {
+      setCatalogQuery("");
+      setDraftFilters(EMPTY_CATALOG_FILTERS);
+      setActiveFilters(EMPTY_CATALOG_FILTERS);
+      setFiltersOpen(false);
+      setCatalogPage(1);
+    }
     setViewRaw(v);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
