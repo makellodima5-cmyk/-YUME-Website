@@ -25,7 +25,7 @@ export function Hero({ onCatalog, onRandom, query, setQuery, onSubmitSearch, fil
     <section className="relative isolate h-[min(90svh,900px)] min-h-[720px] w-full max-w-[1920px] overflow-hidden md:mx-auto md:mt-2 md:h-[min(76vh,760px)] md:min-h-[560px] md:w-[calc(100%-2.5rem)] md:rounded-2xl md:ring-1 md:ring-primary/50">
       <img
         src={heroArtwork}
-        alt="Ночной японский город с сакурой, пагодами, фонарями и героиней YUME"
+        alt={t("hero.artAlt")}
         width={2048}
         height={1024}
         fetchPriority="high"
