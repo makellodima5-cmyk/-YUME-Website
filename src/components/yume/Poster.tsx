@@ -5,9 +5,18 @@ export function PosterArt({ anime, className = "" }: { anime: Anime; className?:
   const h = anime.hue;
   return (
     <div
-      className={\`relative overflow-hidden \${className}\`}
+      className={"relative overflow-hidden " + className}
       style={{
-        background: \`radial-gradient(circle at 70% 25%, oklch(0.85 0.12 \${h}) 0 12%, transparent 13%), radial-gradient(ellipse at 30% 100%, oklch(0.55 0.25 \${h}) 0%, transparent 60%), linear-gradient(160deg, oklch(0.3 0.12 \${h}), oklch(0.12 0.05 \${h + 20}))\`,
+        background:
+          "radial-gradient(circle at 70% 25%, oklch(0.85 0.12 " +
+          h +
+          ") 0 12%, transparent 13%), radial-gradient(ellipse at 30% 100%, oklch(0.55 0.25 " +
+          h +
+          ") 0%, transparent 60%), linear-gradient(160deg, oklch(0.3 0.12 " +
+          h +
+          "), oklch(0.12 0.05 " +
+          (h + 20) +
+          "))",
       }}
     >
       <span className="absolute inset-0 flex select-none items-center justify-center font-display text-6xl font-bold text-foreground/25">
