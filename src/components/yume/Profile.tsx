@@ -18,9 +18,8 @@ import {
   UserRound,
 } from "lucide-react";
 import type { Anime } from "@/data/anime";
-import { displayAnimeTitle } from "@/data/preferences";
-import { useYumePreferences } from "@/data/preferences";
-import { AnimeCard, PosterArt } from "./Poster";
+import { displayAnimeTitle, useYumePreferences } from "@/data/preferences";
+import { PosterArt } from "./Poster";
 import { Grid } from "./Sections";
 import {
   FAVORITES_STORAGE_KEY,
