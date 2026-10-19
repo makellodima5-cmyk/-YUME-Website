@@ -10,7 +10,7 @@ import {
   Play,
   Star,
 } from "lucide-react";
-import { ANIME as DEMO_ANIME, type Anime } from "@/data/anime";
+import { ANIME as DEMO_ANIME } from "@/data/anime";
 import { getShikimoriAnimes } from "@/data/shikimori";
 import { Header, type View } from "@/components/yume/Header";
 import { AnimeCard, PosterArt } from "@/components/yume/Poster";
@@ -452,7 +452,7 @@ function AnimeDetailPage() {
       </main>
 
       <footer className="mt-16 px-4 text-center text-xs text-muted-foreground md:px-10">
-        YUME · демо-прототип, все тайтлы вымышлены
+        YUME · сведения об аниме загружаются из Shikimori
       </footer>
 
       <ProfileDialog open={profileOpen} onClose={() => setProfileOpen(false)} />
