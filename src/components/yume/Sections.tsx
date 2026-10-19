@@ -5,7 +5,7 @@ import logoArtwork from "@/assets/yume-logo-transparent.png";
 import { type Anime, CONTINUE, COLLECTIONS, byId } from "@/data/anime";
 import { AnimeCard, PosterArt } from "./Poster";
 import { CatalogFilters, type CatalogFiltersValue } from "./CatalogFilters";
-import { useYumePreferences, type TranslationKey } from "@/data/preferences";
+import { useYumePreferences, displayAnimeTitle, type TranslationKey } from "@/data/preferences";
 
 export function Row({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
   return (
@@ -83,8 +83,9 @@ export function Hero({ onCatalog, onRandom, query, setQuery, onSubmitSearch, fil
 }
 
 export function ContinueRow({ onSelect }: { onSelect: (a: Anime) => void }) {
+  const { t, language } = useYumePreferences();
   return (
-    <Row title="Продолжить просмотр">
+    <Row title={t("home.continue")}>
       {CONTINUE.map((c) => {
         const a = byId(c.id);
         return (
@@ -99,9 +100,9 @@ export function ContinueRow({ onSelect }: { onSelect: (a: Anime) => void }) {
               </div>
             </div>
             <div className="p-3">
-              <div className="line-clamp-1 text-sm font-semibold">{a.title}</div>
+              <div className="line-clamp-1 text-sm font-semibold">{displayAnimeTitle(a, language)}</div>
               <div className="text-xs text-muted-foreground">
-                Серия {c.episode} из {a.episodes} · осталось {c.left}
+                {t("anime.episode")} {c.episode} · {c.left} left
               </div>
             </div>
           </button>
