@@ -33,6 +33,7 @@ function SeeAll({ onClick }: { onClick: () => void }) {
 function Index() {
   const [view, setViewRaw] = useState<View>("home");
   const [query, setQuery] = useState("");
+  const [submittedQuery, setSubmittedQuery] = useState("");
   const [catalogQuery, setCatalogQuery] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [draftFilters, setDraftFilters] = useState<CatalogFiltersValue>(EMPTY_CATALOG_FILTERS);
@@ -56,7 +57,7 @@ function Index() {
 
 
   const catalogResults = useMemo(() => {
-    const q = (view === "catalog" ? catalogQuery : query).trim().toLowerCase();
+    const q = (view === "catalog" ? catalogQuery : submittedQuery).trim().toLowerCase();
     const yearFrom = activeFilters.yearFrom.trim() ? Number(activeFilters.yearFrom) : null;
     const yearTo = activeFilters.yearTo.trim() ? Number(activeFilters.yearTo) : null;
     const filtered = ANIME.filter((anime) => {
@@ -90,7 +91,11 @@ function Index() {
     Number(activeFilters.status !== "Любой") + Number(activeFilters.yearFrom !== "") +
     Number(activeFilters.yearTo !== "") + Number(activeFilters.minRating > 0) +
     Number(activeFilters.type !== "Любой") + Number(activeFilters.ageRating !== "Любой");
-  const searching = view === "home" && (query.trim().length > 0 || activeFilterCount > 0);
+  const searching = view === "home" && (submittedQuery.length > 0 || activeFilterCount > 0);
+  const submitHomeSearch = () => {
+    setSubmittedQuery(query.trim());
+    setCatalogPage(1);
+  };
   const applyCatalogFilters = () => {
     setActiveFilters({ ...draftFilters, genres: [...draftFilters.genres] });
     setCatalogPage(1);
@@ -110,14 +115,14 @@ function Index() {
       {searching ? (
         <main className="px-4 pt-36 md:px-10 md:pt-24">
           <div className="mb-6 flex items-center justify-between">
-            <h1 className="text-xl font-semibold">{query.trim() ? `Результаты: «${query}»` : "Результаты по фильтрам"} <span className="text-muted-foreground">· {catalogResults.length}</span></h1>
-            <button onClick={() => { setQuery(""); setDraftFilters(EMPTY_CATALOG_FILTERS); setActiveFilters(EMPTY_CATALOG_FILTERS); setFiltersOpen(false); }} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"><X className="h-4 w-4" />Сбросить</button>
+            <h1 className="text-xl font-semibold">{submittedQuery ? `Результаты: «${submittedQuery}»` : "Результаты по фильтрам"} <span className="text-muted-foreground">· {catalogResults.length}</span></h1>
+            <button onClick={() => { setQuery(""); setSubmittedQuery(""); setDraftFilters(EMPTY_CATALOG_FILTERS); setActiveFilters(EMPTY_CATALOG_FILTERS); setFiltersOpen(false); setCatalogPage(1); }} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"><X className="h-4 w-4" />Сбросить</button>
           </div>
           <Grid items={catalogResults} onSelect={select} empty="Ничего не найдено. Попробуйте изменить запрос или фильтры." />
         </main>
       ) : view === "home" ? (
         <main className="pt-16">
-          <Hero onCatalog={() => setView("catalog")} onRandom={random} query={query} setQuery={setQuery} filtersOpen={filtersOpen} setFiltersOpen={setFiltersOpen} draftFilters={draftFilters} setDraftFilters={setDraftFilters} onApplyFilters={applyCatalogFilters} onResetFilters={resetCatalogFilters} activeFilterCount={activeFilterCount} />
+          <Hero onCatalog={() => setView("catalog")} onRandom={random} query={query} setQuery={setQuery} onSubmitSearch={submitHomeSearch} filtersOpen={filtersOpen} setFiltersOpen={setFiltersOpen} draftFilters={draftFilters} setDraftFilters={setDraftFilters} onApplyFilters={applyCatalogFilters} onResetFilters={resetCatalogFilters} activeFilterCount={activeFilterCount} />
           <div className="home-content-world -mt-10 pb-12">
             <div className="relative z-10">
               <Row title="Популярное" action={<SeeAll onClick={() => setView("catalog")} />}>
@@ -151,7 +156,7 @@ function Index() {
                 {activeFilterCount > 0 && <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-neon px-1 text-[10px] font-bold text-primary-foreground">{activeFilterCount}</span>}
               </button>
             </div>
-            <CatalogFilters open={filtersOpen} onClose={() => setFiltersOpen(false)} draft={draftFilters} setDraft={setDraftFilters} onApply={applyCatalogFilters} onReset={resetCatalogFilters} />
+            <CatalogFilters open={filtersOpen} draft={draftFilters} setDraft={setDraftFilters} onApply={applyCatalogFilters} onReset={resetCatalogFilters} />
           </div>
           <div className="mb-5 mt-7 flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-muted-foreground">Найдено: <span className="font-semibold text-foreground">{catalogResults.length}</span></p>
