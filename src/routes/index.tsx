@@ -8,6 +8,7 @@ import { AnimeCard } from "@/components/yume/Poster";
 import { CollectionsGrid, Grid, Hero, Row } from "@/components/yume/Sections";
 import { CatalogFilters, EMPTY_CATALOG_FILTERS, type CatalogFiltersValue } from "@/components/yume/CatalogFilters";
 import { Profile } from "@/components/yume/Profile";
+import { useYumePreferences, displayGenre, type TranslationKey } from "@/data/preferences";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -45,14 +46,16 @@ export const Route = createFileRoute("/")({
 });
 
 function SeeAll({ onClick }: { onClick: () => void }) {
+  const { t } = useYumePreferences();
   return (
     <button onClick={onClick} className="flex items-center text-sm text-muted-foreground hover:text-primary">
-      Все <ChevronRight className="h-4 w-4" />
+      {t("footer.seeAll")} <ChevronRight className="h-4 w-4" />
     </button>
   );
 }
 
 function Index() {
+  const { t, language } = useYumePreferences();
   const navigate = useNavigate();
   const { section } = Route.useSearch();
   const { anime: loadedAnime, popular: popularAnime, recent: recentAnime, apiError } = Route.useLoaderData();
@@ -125,7 +128,7 @@ function Index() {
           if (!cancelled) setRemoteSearch({ query: searchText, items: result.items, error: result.error });
         })
         .catch(() => {
-          if (!cancelled) setRemoteSearch({ query: searchText, items: [], error: "Не удалось выполнить поиск Shikimori." });
+          if (!cancelled) setRemoteSearch({ query: searchText, items: [], error: t("source.searchError") });
         })
         .finally(() => {
           if (!cancelled) setSearchLoading(false);
@@ -146,8 +149,9 @@ function Index() {
     const yearTo = activeFilters.yearTo.trim() ? Number(activeFilters.yearTo) : null;
     const filtered = searchUniverse.filter((anime) => {
       const matchesQuery = !q || anime.title.toLowerCase().includes(q) ||
+        (anime.englishTitle ?? "").toLowerCase().includes(q) ||
         anime.original.toLowerCase().includes(q) ||
-        anime.genres.some((item) => item.toLowerCase().includes(q));
+        anime.genres.some((item) => item.toLowerCase().includes(q) || displayGenre(item, language).toLowerCase().includes(q));
       const matchesGenres = activeFilters.genres.length === 0 ||
         activeFilters.genres.some((item) => anime.genres.includes(item));
       const matchesStatus = activeFilters.status === "Любой" || anime.status === activeFilters.status;
@@ -167,7 +171,7 @@ function Index() {
       if (sortBy === "title") return a.title.localeCompare(b.title, "ru");
       return b.rating - a.rating;
     });
-  }, [searchText, searchUniverse, activeFilters, sortBy]);
+  }, [searchText, searchUniverse, activeFilters, sortBy, language]);
   const catalogPageSize = 20;
   const totalCatalogPages = Math.max(1, Math.ceil(catalogResults.length / catalogPageSize));
   const visibleCatalogResults = catalogResults.slice((catalogPage - 1) * catalogPageSize, catalogPage * catalogPageSize);
@@ -211,35 +215,35 @@ function Index() {
       <Header view={view} setView={setView} onProfile={() => setView("profile")} />
       {apiError && (
         <div role="alert" className="mx-4 mt-20 rounded-xl border border-amber-400/25 bg-amber-400/10 px-4 py-3 text-sm text-amber-100 md:mx-10">
-          Не удалось загрузить данные Shikimori. Сейчас показан демонстрационный каталог. Обнови страницу чуть позже.
+          {t("source.errorBanner")}
         </div>
       )}
 
       {searching ? (
         <main className="px-4 pt-36 md:px-10 md:pt-24">
           <div className="mb-6 flex items-center justify-between">
-            <h1 className="text-xl font-semibold">{submittedQuery ? `Результаты: «${submittedQuery}»` : "Результаты по фильтрам"} <span className="text-muted-foreground">· {catalogResults.length}</span></h1>
-            <button onClick={() => { setQuery(""); setSubmittedQuery(""); setDraftFilters(EMPTY_CATALOG_FILTERS); setActiveFilters(EMPTY_CATALOG_FILTERS); setFiltersOpen(false); setCatalogPage(1); }} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"><X className="h-4 w-4" />Сбросить</button>
+            <h1 className="text-xl font-semibold">{submittedQuery ? `${t("catalog.results")}: «${submittedQuery}»` : t("catalog.filterResults")} <span className="text-muted-foreground">· {catalogResults.length}</span></h1>
+            <button onClick={() => { setQuery(""); setSubmittedQuery(""); setDraftFilters(EMPTY_CATALOG_FILTERS); setActiveFilters(EMPTY_CATALOG_FILTERS); setFiltersOpen(false); setCatalogPage(1); }} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"><X className="h-4 w-4" />{t("catalog.reset")}</button>
           </div>
-          <Grid items={catalogResults} onSelect={select} empty={searchLoading ? "Ищем аниме в Shikimori…" : (remoteSearch?.query === submittedQuery.trim() && remoteSearch.error) || "Ничего не найдено. Попробуйте изменить запрос или фильтры."} />
+          <Grid items={catalogResults} onSelect={select} empty={searchLoading ? t("catalog.searchingTitle") : (remoteSearch?.query === submittedQuery.trim() && remoteSearch.error) || t("catalog.noResultsFormal")} />
         </main>
       ) : view === "home" ? (
         <main className="pt-16">
           <Hero onCatalog={() => setView("catalog")} onRandom={random} query={query} setQuery={setQuery} onSubmitSearch={submitHomeSearch} filtersOpen={filtersOpen} setFiltersOpen={setFiltersOpen} draftFilters={draftFilters} setDraftFilters={setDraftFilters} onApplyFilters={applyCatalogFilters} onResetFilters={resetCatalogFilters} activeFilterCount={activeFilterCount} genres={availableGenres} />
           <div className="home-content-world -mt-10 pb-12">
             <div className="relative z-10">
-              <Row title="Популярное" action={<SeeAll onClick={() => setView("catalog")} />}>
+              <Row title={t("home.popular")} action={<SeeAll onClick={() => setView("catalog")} />}>
                 {popularCards.map((a) => <AnimeCard key={a.id} anime={a} onSelect={select} />)}
               </Row>
-              <Row title="Новые релизы" action={<SeeAll onClick={() => setView("catalog")} />}>
+              <Row title={t("home.newReleases")} action={<SeeAll onClick={() => setView("catalog")} />}>
                 {newReleaseCards.map((a) => <AnimeCard key={a.id} anime={a} onSelect={select} />)}
               </Row>
-              <Row title="Сейчас выходит" action={<SeeAll onClick={() => setView("catalog")} />}>
+              <Row title={t("home.airing")} action={<SeeAll onClick={() => setView("catalog")} />}>
                 {airingCards.map((a) => <AnimeCard key={a.id} anime={a} onSelect={select} />)}
               </Row>
               <section className="mt-10 px-4 md:px-10">
                 <div className="mb-4 flex items-end justify-between">
-                  <h2 className="text-lg font-semibold md:text-xl">Подборки</h2>
+                  <h2 className="text-lg font-semibold md:text-xl">{t("home.collections")}</h2>
                   <SeeAll onClick={() => setView("collections")} />
                 </div>
                 <CollectionsGrid animeList={ANIME} onOpen={(id) => { setCollection(id); setView("collections"); }} />
@@ -249,14 +253,14 @@ function Index() {
         </main>
       ) : view === "catalog" ? (
         <main className="px-4 pt-36 md:px-10 md:pt-24">
-          <h1 className="text-2xl font-bold md:text-3xl">Каталог</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Найди историю под своё настроение</p>
+          <h1 className="text-2xl font-bold md:text-3xl">{t("catalog.title")}</h1>
+          <p className="mt-1 text-sm text-muted-foreground">{t("catalog.subtitle")}</p>
           <div className="relative z-30 mt-5 max-w-xl">
             <div className="flex h-11 items-center rounded-xl border border-white/10 bg-[#171127]/75 shadow-lg shadow-black/10 backdrop-blur-xl focus-within:border-primary/60">
               <Search className="ml-3 h-4 w-4 shrink-0 text-muted-foreground" />
-              <input value={catalogQuery} onChange={(event) => { setCatalogQuery(event.target.value); setCatalogPage(1); }} placeholder="Название или жанр..." aria-label="Поиск в каталоге" className="h-full min-w-0 flex-1 bg-transparent px-2.5 text-sm outline-none placeholder:text-muted-foreground" />
+              <input value={catalogQuery} onChange={(event) => { setCatalogQuery(event.target.value); setCatalogPage(1); }} placeholder={t("search.placeholder")} aria-label={t("catalog.search")} className="h-full min-w-0 flex-1 bg-transparent px-2.5 text-sm outline-none placeholder:text-muted-foreground" />
               {catalogQuery && <button type="button" aria-label="Очистить поиск" onClick={() => { setCatalogQuery(""); setCatalogPage(1); }} className="rounded-full p-1.5 text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>}
-              <button type="button" onClick={() => { setDraftFilters({ ...activeFilters, genres: [...activeFilters.genres] }); setFiltersOpen((open) => !open); }} aria-label="Открыть фильтры" aria-expanded={filtersOpen} data-filter-trigger className={`relative mr-1.5 flex h-8 w-9 shrink-0 items-center justify-center rounded-lg transition ${filtersOpen || activeFilterCount ? "bg-primary/20 text-primary" : "text-muted-foreground hover:bg-accent hover:text-foreground"}`}>
+              <button type="button" onClick={() => { setDraftFilters({ ...activeFilters, genres: [...activeFilters.genres] }); setFiltersOpen((open) => !open); }} aria-label={t("filters.open")} aria-expanded={filtersOpen} data-filter-trigger className={`relative mr-1.5 flex h-8 w-9 shrink-0 items-center justify-center rounded-lg transition ${filtersOpen || activeFilterCount ? "bg-primary/20 text-primary" : "text-muted-foreground hover:bg-accent hover:text-foreground"}`}>
                 <SlidersHorizontal className="h-4 w-4" />
                 {activeFilterCount > 0 && <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-neon px-1 text-[10px] font-bold text-primary-foreground">{activeFilterCount}</span>}
               </button>
@@ -264,19 +268,19 @@ function Index() {
             <CatalogFilters open={filtersOpen} draft={draftFilters} setDraft={setDraftFilters} onApply={applyCatalogFilters} onReset={resetCatalogFilters} genres={availableGenres} />
           </div>
           <div className="mb-5 mt-7 flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm text-muted-foreground">{searchLoading ? "Ищем в Shikimori…" : <>Найдено: <span className="font-semibold text-foreground">{catalogResults.length}</span></>}</p>
+            <p className="text-sm text-muted-foreground">{searchLoading ? t("catalog.searching") : <>{t("catalog.found")} <span className="font-semibold text-foreground">{catalogResults.length}</span></>}</p>
             <label className="flex h-9 items-center gap-2 rounded-lg border border-border bg-secondary/80 px-3 text-sm">
               <ArrowDownWideNarrow className="h-4 w-4 text-muted-foreground" />
-              <span className="text-muted-foreground max-sm:hidden">Сортировка</span>
-              <select value={sortBy} onChange={(event) => { setSortBy(event.target.value); setCatalogPage(1); }} aria-label="Сортировка каталога" className="max-w-[145px] bg-transparent text-sm outline-none">
-                <option value="rating">По рейтингу</option><option value="newest">Сначала новые</option><option value="oldest">Сначала старые</option><option value="title">По названию</option>
+              <span className="text-muted-foreground max-sm:hidden">{t("catalog.sort")}</span>
+              <select value={sortBy} onChange={(event) => { setSortBy(event.target.value); setCatalogPage(1); }} aria-label={t("catalog.sort")} className="max-w-[145px] bg-transparent text-sm outline-none">
+                <option value="rating">{t("catalog.sortRating")}</option><option value="newest">{t("catalog.sortNewest")}</option><option value="oldest">{t("catalog.sortOldest")}</option><option value="title">{t("catalog.sortTitle")}</option>
               </select>
               <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
             </label>
           </div>
-          <Grid items={visibleCatalogResults} onSelect={select} empty={searchLoading ? "Ищем аниме в Shikimori…" : (remoteSearch?.query === catalogQuery.trim() && remoteSearch.error) || "Ничего не найдено. Измени запрос или сбрось фильтры."} />
-          {catalogResults.length > 0 && <nav aria-label="Страницы каталога" className="mt-8 flex flex-wrap items-center justify-center gap-1.5">
-            <button type="button" disabled={catalogPage === 1} onClick={() => { setCatalogPage((page) => Math.max(1, page - 1)); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="h-9 rounded-lg border border-border px-3 text-sm transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-35">Назад</button>
+          <Grid items={visibleCatalogResults} onSelect={select} empty={searchLoading ? t("catalog.searchingTitle") : (remoteSearch?.query === catalogQuery.trim() && remoteSearch.error) || t("catalog.noResults")} />
+          {catalogResults.length > 0 && <nav aria-label={t("catalog.pages")} className="mt-8 flex flex-wrap items-center justify-center gap-1.5">
+            <button type="button" disabled={catalogPage === 1} onClick={() => { setCatalogPage((page) => Math.max(1, page - 1)); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="h-9 rounded-lg border border-border px-3 text-sm transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-35">{t("catalog.previous")}</button>
             {Array.from({ length: totalCatalogPages }, (_, index) => index + 1)
               .filter((page) => page === 1 || page === totalCatalogPages || Math.abs(page - catalogPage) <= 1)
               .reduce<(number | "ellipsis")[]>((pages, page, index, visible) => {
@@ -287,21 +291,21 @@ function Index() {
               .map((page, index) => page === "ellipsis"
                 ? <span key={`ellipsis-${index}`} className="px-1 text-muted-foreground">…</span>
                 : <button key={page} type="button" aria-current={catalogPage === page ? "page" : undefined} onClick={() => { setCatalogPage(page); window.scrollTo({ top: 0, behavior: "smooth" }); }} className={`h-9 min-w-9 rounded-lg border px-3 text-sm transition ${catalogPage === page ? "border-primary/70 bg-primary/20 text-foreground" : "border-border hover:bg-accent"}`}>{page}</button>)}
-            <button type="button" disabled={catalogPage === totalCatalogPages} onClick={() => { setCatalogPage((page) => Math.min(totalCatalogPages, page + 1)); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="h-9 rounded-lg border border-border px-3 text-sm transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-35">Далее</button>
+            <button type="button" disabled={catalogPage === totalCatalogPages} onClick={() => { setCatalogPage((page) => Math.min(totalCatalogPages, page + 1)); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="h-9 rounded-lg border border-border px-3 text-sm transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-35">{t("catalog.next")}</button>
           </nav>}
         </main>
       ) : view === "collections" ? (
         <main className="px-4 pt-36 md:px-10 md:pt-24">
           {activeCollection ? (
             <>
-              <button onClick={() => setCollection(null)} className="mb-3 text-sm text-muted-foreground hover:text-primary">← Все подборки</button>
-              <h1 className="text-2xl font-bold md:text-3xl">{activeCollection.title}</h1>
-              <p className="mb-6 text-muted-foreground">{activeCollection.subtitle}</p>
-              <Grid items={activeCollectionAnime} onSelect={select} empty="В этом настроении пока не найдено тайтлов. Попробуй другую подборку." />
+              <button onClick={() => setCollection(null)} className="mb-3 text-sm text-muted-foreground hover:text-primary">← {t("collections.all")}</button>
+              <h1 className="text-2xl font-bold md:text-3xl">{t((`collection.${activeCollection.id}.title`) as TranslationKey)}</h1>
+              <p className="mb-6 text-muted-foreground">{t((`collection.${activeCollection.id}.subtitle`) as TranslationKey)}</p>
+              <Grid items={activeCollectionAnime} onSelect={select} empty={t("collections.empty")} />
             </>
           ) : (
             <>
-              <h1 className="mb-6 text-2xl font-bold md:text-3xl">Подборки</h1>
+              <h1 className="mb-6 text-2xl font-bold md:text-3xl">{t("collections.title")}</h1>
               <CollectionsGrid animeList={ANIME} onOpen={setCollection} />
             </>
           )}
@@ -309,7 +313,7 @@ function Index() {
       ) : view === "profile" ? (
         <Profile animeList={ANIME} onSelect={select} onCatalog={() => setView("catalog")} />
       ) : null}
-      <footer className="mt-16 px-4 text-center text-xs text-muted-foreground md:px-10">YUME · сведения об аниме загружаются из Shikimori</footer>
+      <footer className="mt-16 px-4 text-center text-xs text-muted-foreground md:px-10">{t("footer.source")}</footer>
     </div>
   );
 }
