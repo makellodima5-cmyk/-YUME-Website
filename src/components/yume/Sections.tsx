@@ -42,7 +42,7 @@ export function Hero({ onCatalog, onRandom, query, setQuery, filtersOpen, setFil
             className="h-full min-w-0 flex-1 bg-transparent px-2.5 text-sm text-white outline-none placeholder:text-white/70"
           />
           {query && <button type="button" aria-label="Очистить поиск" onClick={() => setQuery("")} className="rounded-full p-1.5 text-white/70 hover:text-white"><X className="h-4 w-4" /></button>}
-          <button type="button" onClick={() => setFiltersOpen(!filtersOpen)} aria-label="Открыть фильтры" aria-expanded={filtersOpen} className={`relative mr-1.5 flex h-8 w-9 shrink-0 items-center justify-center rounded-lg transition ${filtersOpen || activeFilterCount ? "bg-white/20 text-white" : "text-white/75 hover:bg-white/15 hover:text-white"}`}>
+          <button type="button" onClick={() => setFiltersOpen(!filtersOpen)} aria-label="Открыть фильтры" aria-expanded={filtersOpen} data-filter-trigger className={`relative mr-1.5 flex h-8 w-9 shrink-0 items-center justify-center rounded-lg transition ${filtersOpen || activeFilterCount ? "bg-white/20 text-white" : "text-white/75 hover:bg-white/15 hover:text-white"}`}>
             <SlidersHorizontal className="h-4 w-4" />
             {activeFilterCount > 0 && <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-neon px-1 text-[10px] font-bold text-primary-foreground">{activeFilterCount}</span>}
           </button>
