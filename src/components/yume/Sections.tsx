@@ -1,9 +1,10 @@
 import type { ReactNode } from "react";
-import { Play, Search, Shuffle } from "lucide-react";
+import { Play, Search, Shuffle, SlidersHorizontal, X } from "lucide-react";
 import heroArtwork from "@/assets/yume-hero-70.webp";
 import logoArtwork from "@/assets/yume-logo-transparent.png";
 import { type Anime, CONTINUE, COLLECTIONS, byId } from "@/data/anime";
 import { AnimeCard, PosterArt } from "./Poster";
+import { CatalogFilters, type CatalogFiltersValue } from "./CatalogFilters";
 
 export function Row({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
   return (
@@ -17,7 +18,7 @@ export function Row({ title, action, children }: { title: string; action?: React
   );
 }
 
-export function Hero({ onCatalog, onRandom, query, setQuery }: { onCatalog: () => void; onRandom: () => void; query: string; setQuery: (q: string) => void }) {
+export function Hero({ onCatalog, onRandom, query, setQuery, filtersOpen, setFiltersOpen, draftFilters, setDraftFilters, onApplyFilters, onResetFilters, activeFilterCount }: { onCatalog: () => void; onRandom: () => void; query: string; setQuery: (q: string) => void; filtersOpen: boolean; setFiltersOpen: (open: boolean) => void; draftFilters: CatalogFiltersValue; setDraftFilters: (value: CatalogFiltersValue) => void; onApplyFilters: () => void; onResetFilters: () => void; activeFilterCount: number }) {
   return (
     <section className="relative isolate h-[min(90svh,900px)] min-h-[720px] w-full max-w-[1920px] overflow-hidden md:mx-auto md:mt-2 md:h-[min(76vh,760px)] md:min-h-[560px] md:w-[calc(100%-2.5rem)] md:rounded-2xl md:ring-1 md:ring-primary/50">
       <img
@@ -30,16 +31,24 @@ export function Hero({ onCatalog, onRandom, query, setQuery }: { onCatalog: () =
       />
       <div className="absolute inset-0 bg-gradient-to-r from-[#090714]/80 via-[#090714]/40 to-transparent md:from-[#090714]/75 md:via-[#090714]/25 md:to-transparent" />
       <div className="absolute inset-0 bg-gradient-to-t from-[#090714]/95 via-[#090714]/20 to-transparent md:from-transparent md:via-transparent" />
-      <label className="absolute left-5 top-5 z-20 flex w-[min(44vw,230px)] items-center md:left-8 md:top-7 md:w-[min(25vw,300px)]">
-        <Search className="pointer-events-none absolute left-3 h-4 w-4 text-white/80" />
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Поиск аниме…"
-          aria-label="Поиск аниме"
-          className="h-9 w-full rounded-full border border-white/30 bg-black/20 pl-9 pr-3 text-xs text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.18)] outline-none placeholder:text-white/70 focus:border-white/60 focus:bg-black/35 focus:ring-2 focus:ring-primary/60 sm:text-sm"
-        />
-      </label>
+      <div className="absolute left-4 top-5 z-30 w-[min(76vw,360px)] md:left-8 md:top-7 md:w-[min(36vw,420px)]">
+        <div className="flex h-11 items-center rounded-xl border border-white/25 bg-black/30 shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_8px_28px_rgba(0,0,0,0.18)] backdrop-blur-xl transition focus-within:border-white/55 focus-within:bg-black/40">
+          <Search className="ml-3 h-4 w-4 shrink-0 text-white/80" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Название или жанр..."
+            aria-label="Поиск аниме"
+            className="h-full min-w-0 flex-1 bg-transparent px-2.5 text-sm text-white outline-none placeholder:text-white/70"
+          />
+          {query && <button type="button" aria-label="Очистить поиск" onClick={() => setQuery("")} className="rounded-full p-1.5 text-white/70 hover:text-white"><X className="h-4 w-4" /></button>}
+          <button type="button" onClick={() => setFiltersOpen(!filtersOpen)} aria-label="Открыть фильтры" aria-expanded={filtersOpen} className={`relative mr-1.5 flex h-8 w-9 shrink-0 items-center justify-center rounded-lg transition ${filtersOpen || activeFilterCount ? "bg-white/20 text-white" : "text-white/75 hover:bg-white/15 hover:text-white"}`}>
+            <SlidersHorizontal className="h-4 w-4" />
+            {activeFilterCount > 0 && <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-neon px-1 text-[10px] font-bold text-primary-foreground">{activeFilterCount}</span>}
+          </button>
+        </div>
+        <CatalogFilters open={filtersOpen} onClose={() => setFiltersOpen(false)} draft={draftFilters} setDraft={setDraftFilters} onApply={onApplyFilters} onReset={onResetFilters} />
+      </div>
       <div className="relative z-10 flex h-full flex-col justify-end px-5 pb-16 pt-28 md:max-w-[760px] md:justify-center md:px-10 md:pb-8 md:pt-8 lg:px-12">
         <div className="mb-3 md:mb-4">
           <img
