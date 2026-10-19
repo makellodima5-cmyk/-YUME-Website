@@ -54,7 +54,7 @@ function Index() {
 
   return (
     <div className="min-h-screen pb-24 md:pb-12">
-      <Header view={view} setView={setView} query={query} setQuery={setQuery} onProfile={() => setProfile(true)} />
+      <Header view={view} setView={setView} onProfile={() => setProfile(true)} />
 
       {searching ? (
         <main className="px-4 pt-36 md:px-10 md:pt-24">
@@ -66,7 +66,7 @@ function Index() {
         </main>
       ) : view === "home" ? (
         <main className="pt-16">
-          <Hero onCatalog={() => setView("catalog")} onRandom={random} />
+          <Hero onCatalog={() => setView("catalog")} onRandom={random} query={query} setQuery={setQuery} />
           <div className="-mt-10 relative">
             <Row title="Популярное" action={<SeeAll onClick={() => setView("catalog")} />}>
               {ANIME.filter((a) => a.popular).sort((a, b) => b.rating - a.rating).map((a) => <AnimeCard key={a.id} anime={a} onSelect={select} />)}
