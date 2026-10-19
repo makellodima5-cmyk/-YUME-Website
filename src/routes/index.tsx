@@ -55,10 +55,9 @@ function Index() {
   };
 
   const results = useMemo(() => filterAnime(ANIME, query), [query]);
-  const searching = view === "home" && query.trim().length > 0;
 
   const catalogResults = useMemo(() => {
-    const q = catalogQuery.trim().toLowerCase();
+    const q = (view === "catalog" ? catalogQuery : query).trim().toLowerCase();
     const yearFrom = activeFilters.yearFrom.trim() ? Number(activeFilters.yearFrom) : null;
     const yearTo = activeFilters.yearTo.trim() ? Number(activeFilters.yearTo) : null;
     const filtered = ANIME.filter((anime) => {
@@ -84,7 +83,7 @@ function Index() {
       if (sortBy === "title") return a.title.localeCompare(b.title, "ru");
       return b.rating - a.rating;
     });
-  }, [catalogQuery, activeFilters, sortBy]);
+  }, [catalogQuery, query, view, activeFilters, sortBy]);
   const catalogPageSize = 20;
   const totalCatalogPages = Math.max(1, Math.ceil(catalogResults.length / catalogPageSize));
   const visibleCatalogResults = catalogResults.slice((catalogPage - 1) * catalogPageSize, catalogPage * catalogPageSize);
@@ -92,6 +91,7 @@ function Index() {
     Number(activeFilters.status !== "Любой") + Number(activeFilters.yearFrom !== "") +
     Number(activeFilters.yearTo !== "") + Number(activeFilters.minRating > 0) +
     Number(activeFilters.type !== "Любой") + Number(activeFilters.ageRating !== "Любой");
+  const searching = view === "home" && (query.trim().length > 0 || activeFilterCount > 0);
   const applyCatalogFilters = () => {
     setActiveFilters({ ...draftFilters, genres: [...draftFilters.genres] });
     setCatalogPage(1);
@@ -111,14 +111,14 @@ function Index() {
       {searching ? (
         <main className="px-4 pt-36 md:px-10 md:pt-24">
           <div className="mb-6 flex items-center justify-between">
-            <h1 className="text-xl font-semibold">Результаты: «{query}» <span className="text-muted-foreground">· {results.length}</span></h1>
-            <button onClick={() => setQuery("")} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"><X className="h-4 w-4" />Сбросить</button>
+            <h1 className="text-xl font-semibold">{query.trim() ? `Результаты: «${query}»` : "Результаты по фильтрам"} <span className="text-muted-foreground">· {catalogResults.length}</span></h1>
+            <button onClick={() => { setQuery(""); setDraftFilters(EMPTY_CATALOG_FILTERS); setActiveFilters(EMPTY_CATALOG_FILTERS); setFiltersOpen(false); }} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"><X className="h-4 w-4" />Сбросить</button>
           </div>
-          <Grid items={results} onSelect={select} empty="Ничего не найдено. Попробуйте другое название или жанр." />
+          <Grid items={catalogResults} onSelect={select} empty="Ничего не найдено. Попробуйте изменить запрос или фильтры." />
         </main>
       ) : view === "home" ? (
         <main className="pt-16">
-          <Hero onCatalog={() => setView("catalog")} onRandom={random} query={query} setQuery={setQuery} />
+          <Hero onCatalog={() => setView("catalog")} onRandom={random} query={query} setQuery={setQuery} filtersOpen={filtersOpen} setFiltersOpen={setFiltersOpen} draftFilters={draftFilters} setDraftFilters={setDraftFilters} onApplyFilters={applyCatalogFilters} onResetFilters={resetCatalogFilters} activeFilterCount={activeFilterCount} />
           <div className="home-content-world -mt-10 pb-12">
             <div className="relative z-10">
               <Row title="Популярное" action={<SeeAll onClick={() => setView("catalog")} />}>
