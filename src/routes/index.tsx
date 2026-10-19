@@ -307,29 +307,62 @@ function Index() {
       ) : (
         <main className="px-4 pt-36 md:px-10 md:pt-24">
           <h1 className="text-2xl font-bold md:text-3xl">Расписание выхода серий</h1>
-          <p className="mb-6 text-muted-foreground">Демо-расписание на эту неделю (МСК)</p>
-          <div className="grid gap-4 md:grid-cols-2">
-            {SCHEDULE.map((d) => (
-              <div key={d.day} className="rounded-2xl bg-card p-5 ring-1 ring-border">
-                <h3 className="mb-3 font-semibold text-primary">{d.day}</h3>
-                <div className="space-y-3">
-                  {d.items.map((it) => {
-                    const a = byId(it.id);
-                    return (
-                      <button key={it.id} onClick={() => select(a)} className="flex w-full items-center gap-3 rounded-xl p-2 text-left transition hover:bg-accent">
-                        <PosterArt anime={a} className="h-14 w-10 shrink-0 rounded-md" />
-                        <div className="flex-1">
-                          <div className="text-sm font-semibold">{a.title}</div>
-                          <div className="text-xs text-muted-foreground">Серия {it.ep}</div>
-                        </div>
-                        <span className="rounded-full bg-secondary px-3 py-1 text-xs font-semibold">{it.time}</span>
-                      </button>
-                    );
-                  })}
-                </div>
+          <p className="mb-6 text-muted-foreground">Даты выхода из Shikimori, время указано по Москве</p>
+          {scheduledAnime.length > 0 ? (
+            <div className="grid gap-4 md:grid-cols-2">
+              {scheduledAnime.map((anime) => {
+                const date = new Date(anime.nextEpisodeAt!);
+                const validDate = !Number.isNaN(date.getTime());
+                return (
+                  <button
+                    key={anime.id}
+                    type="button"
+                    onClick={() => select(anime)}
+                    className="flex w-full items-center gap-3 rounded-2xl bg-card p-4 text-left ring-1 ring-border transition hover:ring-primary"
+                  >
+                    <div className="h-[88px] w-[62px] shrink-0 overflow-hidden rounded-lg">
+                      <PosterArt anime={anime} className="h-full w-full" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="line-clamp-2 text-sm font-semibold">{anime.title}</div>
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        Серия {(anime.episodesAired ?? 0) + 1}
+                      </div>
+                      <div className="mt-2 text-xs text-primary">
+                        {validDate
+                          ? date.toLocaleDateString("ru-RU", {
+                              timeZone: "Europe/Moscow",
+                              weekday: "long",
+                              day: "numeric",
+                              month: "long",
+                            })
+                          : "Дата выхода уточняется"}
+                      </div>
+                    </div>
+                    <span className="shrink-0 rounded-full bg-secondary px-2.5 py-1.5 text-xs font-semibold">
+                      {validDate
+                        ? date.toLocaleTimeString("ru-RU", {
+                            timeZone: "Europe/Moscow",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })
+                        : "—"}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-dashed border-border p-6 md:p-8">
+              <h2 className="text-lg font-semibold">Пока нет подтверждённых дат выхода</h2>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Shikimori не передал ближайшее время выхода для тайтлов в текущей выдаче. Ниже — реальные онгоинги, чтобы можно было открыть их страницы.
+              </p>
+              <div className="mt-5">
+                <Grid items={airingCards} onSelect={select} empty="В текущей выдаче нет тайтлов со статусом «Онгоинг»." />
               </div>
-            ))}
-          </div>
+            </div>
+          )}
         </main>
       )}
 
