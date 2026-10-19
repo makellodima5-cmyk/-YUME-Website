@@ -15,6 +15,7 @@ import { ANIME as DEMO_ANIME } from "@/data/anime";
 import { getShikimoriAnimes } from "@/data/shikimori";
 import { Header, type View } from "@/components/yume/Header";
 import { AnimeCard, PosterArt } from "@/components/yume/Poster";
+import { useYumePreferences, displayAnimeTitle, displayAnimeStatus, displayGenre, displayAnimeKind } from "@/data/preferences";
 import { FAVORITES_STORAGE_KEY, readSavedAnimeIds, toggleSavedAnimeId, WATCHLIST_STORAGE_KEY } from "@/data/profile-storage";
 
 export const Route = createFileRoute("/anime/$animeId")({
@@ -65,27 +66,29 @@ export const Route = createFileRoute("/anime/$animeId")({
   component: AnimeDetailPage,
 });
 
-const DEMO_VOICES = ["Демо-озвучка A", "Демо-озвучка B"];
-const DEMO_PLAYERS = ["Демо-источник A", "Демо-источник B"];
-
 function AnimeDetailPage() {
+  const { language, t } = useYumePreferences();
   const { animeId } = Route.useParams();
   const navigate = useNavigate();
   const { anime, relatedAnime, apiError } = Route.useLoaderData();
   const playerSectionRef = useRef<HTMLElement | null>(null);
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
   const [selectedEpisode, setSelectedEpisode] = useState(1);
-  const [selectedVoice, setSelectedVoice] = useState(DEMO_VOICES[0]!);
-  const [selectedPlayer, setSelectedPlayer] = useState(DEMO_PLAYERS[0]!);
+  const [selectedVoice, setSelectedVoice] = useState("voice-a");
+  const [selectedPlayer, setSelectedPlayer] = useState("source-a");
   const [inList, setInList] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
   const [showListNote, setShowListNote] = useState(false);
 
   useEffect(() => {
+    if (anime) document.title = displayAnimeTitle(anime, language) + (language === "en" ? " — watch anime | YUME" : " — смотреть аниме | YUME");
+  }, [anime, language]);
+
+  useEffect(() => {
     setDescriptionExpanded(false);
     setSelectedEpisode(1);
-    setSelectedVoice(DEMO_VOICES[0]!);
-    setSelectedPlayer(DEMO_PLAYERS[0]!);
+    setSelectedVoice("voice-a");
+    setSelectedPlayer("source-a");
     setInList(readSavedAnimeIds(WATCHLIST_STORAGE_KEY).includes(animeId));
     setIsFavorite(readSavedAnimeIds(FAVORITES_STORAGE_KEY).includes(animeId));
     setShowListNote(false);
@@ -110,9 +113,9 @@ function AnimeDetailPage() {
         />
         <main className="px-4 pt-28 md:px-10 md:pt-32">
           <div className="mx-auto max-w-3xl rounded-3xl border border-border bg-card p-8 text-center">
-            <h1 className="text-2xl font-bold">Аниме не найдено</h1>
+            <h1 className="text-2xl font-bold">{t("anime.notFound")}</h1>
             <p className="mt-2 text-sm text-muted-foreground">
-              {apiError ? "Не удалось получить данные от Shikimori. Обнови страницу немного позже." : "Возможно, ссылка устарела или тайтл больше недоступен."}
+              {apiError ? "{t("anime.notFoundApi")}" : "{t("anime.notFoundInfo")}"}
             </p>
             <button
               type="button"
@@ -144,11 +147,11 @@ function AnimeDetailPage() {
     >
       {descriptionExpanded ? (
         <>
-          Свернуть описание <ChevronUp className="h-4 w-4" />
+          {t("anime.collapseDescription")} <ChevronUp className="h-4 w-4" />
         </>
       ) : (
         <>
-          Раскрыть описание <ChevronDown className="h-4 w-4" />
+          {t("anime.expandDescription")} <ChevronDown className="h-4 w-4" />
         </>
       )}
     </button>
@@ -170,7 +173,7 @@ function AnimeDetailPage() {
       className="inline-flex items-center justify-center gap-2 rounded-full bg-neon px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-neon transition hover:brightness-110"
     >
       <Play className="h-4 w-4 fill-current" />
-      Смотреть
+      {t("anime.watch")}
     </button>
   );
 
@@ -185,7 +188,7 @@ function AnimeDetailPage() {
       aria-pressed={isFavorite}
     >
       <Heart className={`h-4 w-4 ${isFavorite ? "fill-current text-primary" : ""}`} />
-      {isFavorite ? "В избранном" : "В избранное"}
+      {isFavorite ? t("anime.inFavorites") : t("anime.addFavorite")}
     </button>
   );
 
@@ -200,7 +203,7 @@ function AnimeDetailPage() {
       aria-pressed={inList}
     >
       {inList ? <Check className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
-      {inList ? "В моём списке" : "В мой список"}
+      {inList ? t("anime.inWatchlist") : t("anime.addWatchlist")}
     </button>
   );
 
@@ -220,7 +223,7 @@ function AnimeDetailPage() {
             className="mb-4 inline-flex items-center gap-1 text-sm text-muted-foreground transition hover:text-foreground"
           >
             <ChevronLeft className="h-4 w-4" />
-            К каталогу
+            {t("anime.backCatalog")}
           </button>
 
           <section aria-label={anime.title + " — информация об аниме"}>
@@ -261,12 +264,12 @@ function AnimeDetailPage() {
               />
               <div className="relative z-10 flex min-h-[390px] max-w-4xl flex-col items-start justify-center p-9 lg:p-12">
                 <div className="mb-3 flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-white/70">
-                  <span>{anime.status}</span>
+                  <span>{displayAnimeStatus(anime.status, language)}</span>
                   <span className="h-1 w-1 rounded-full bg-primary" />
                   <span>{anime.year || "Год уточняется"}</span>
                 </div>
                 <h1 id="anime-title-desktop" className="max-w-3xl text-4xl font-bold leading-tight text-white lg:text-5xl">
-                  {anime.title}
+                  {displayAnimeTitle(anime, language)}
                 </h1>
                 <p className="mt-1 text-sm text-white/65 lg:text-base">{anime.original}</p>
 
@@ -276,11 +279,11 @@ function AnimeDetailPage() {
                     {anime.rating.toFixed(1)}
                   </span>
                   <span className="rounded-full border border-white/10 bg-black/25 px-3 py-1.5 text-sm text-white/90 backdrop-blur">
-                    {anime.episodes > 0 ? anime.episodes + " серий" : "Количество серий уточняется"}
+                    {anime.episodes > 0 ? anime.episodes + " " + t("anime.series") : t("anime.episodesUnknown")}
                   </span>
                   {anime.kind && (
                     <span className="rounded-full border border-white/10 bg-black/25 px-3 py-1.5 text-sm text-white/90 backdrop-blur">
-                      {anime.kind}
+                      {displayAnimeKind(anime.kind, language)}
                     </span>
                   )}
                   {anime.ageRating && (
@@ -293,7 +296,7 @@ function AnimeDetailPage() {
                       key={genre}
                       className="rounded-full border border-white/10 bg-black/25 px-3 py-1.5 text-sm text-white/90 backdrop-blur"
                     >
-                      {genre}
+                      {displayGenre(genre, language)}
                     </span>
                   ))}
                 </div>
@@ -308,7 +311,7 @@ function AnimeDetailPage() {
                 </div>
                 {showListNote && (
                   <p className="mt-3 text-xs text-white/60" aria-live="polite">
-                    Избранное и мой список сохраняются на этом устройстве.
+                    {t("anime.savedLocally")}
                   </p>
                 )}
               </div>
@@ -321,10 +324,10 @@ function AnimeDetailPage() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-primary">
-                    {anime.status} · {anime.year}
+                    {displayAnimeStatus(anime.status, language)} · {anime.year || t("anime.yearUnknown")}
                   </div>
                   <h1 id="anime-title-mobile" className="text-2xl font-bold leading-tight">
-                    {anime.title}
+                    {displayAnimeTitle(anime, language)}
                   </h1>
                   <p className="mt-1 break-words text-xs text-muted-foreground">{anime.original}</p>
                   <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs">
@@ -332,12 +335,12 @@ function AnimeDetailPage() {
                       <Star className="h-3 w-3 fill-gold text-gold" />
                       {anime.rating.toFixed(1)}
                     </span>
-                    <span className="rounded-full bg-secondary px-2 py-1">{anime.episodes > 0 ? anime.episodes + " серий" : "Серии уточняются"}</span>
+                    <span className="rounded-full bg-secondary px-2 py-1">{anime.episodes > 0 ? anime.episodes + " " + t("anime.series") : t("anime.episodesUnknown")}</span>
                   </div>
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {anime.genres.map((genre) => (
                       <span key={genre} className="rounded-full border border-border px-2 py-1 text-[11px] text-muted-foreground">
-                        {genre}
+                        {displayGenre(genre, language)}
                       </span>
                     ))}
                     {anime.kind && <span className="rounded-full border border-border px-2 py-1 text-[11px] text-muted-foreground">{anime.kind}</span>}
@@ -351,7 +354,7 @@ function AnimeDetailPage() {
                 </div>
               </div>
               <div className="mt-5 rounded-2xl border border-white/10 bg-card/70 p-4">
-                <h2 className="mb-2 text-sm font-semibold">Описание</h2>
+                <h2 className="mb-2 text-sm font-semibold">{t("anime.description")}</h2>
                 {descriptionText("anime-description-mobile")}
                 {showListNote && (
                   <p className="mt-3 text-xs text-muted-foreground" aria-live="polite">
@@ -371,52 +374,46 @@ function AnimeDetailPage() {
             <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
               <div>
                 <h2 id="watch-title" className="text-2xl font-bold md:text-3xl">
-                  Смотреть аниме
+                  {t("anime.watchSection")}
                 </h2>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Выбери серию, озвучку и источник просмотра
+                  {t("anime.chooseSource")}
                 </p>
               </div>
               <span className="rounded-full border border-border bg-card px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Демо-интерфейс
+                {t("anime.demoInterface")}
               </span>
             </div>
 
             <div className="mx-auto w-full max-w-6xl min-w-0">
               <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <Selector
-                  label="Серия"
+                  label={t("anime.episode")}
                   value={String(selectedEpisode)}
                   onChange={(value) => setSelectedEpisode(Number(value))}
                   disabled={episodes.length === 0}
                 >
                   {episodes.length > 0 ? episodes.map((episode) => (
                     <option key={episode} value={String(episode)}>
-                      Серия {episode}
+                      {t("anime.episode")} {episode}
                     </option>
-                  )) : <option value="1">Количество серий уточняется</option>}
+                  )) : <option value="1">{t("anime.episodesUnknown")}</option>}
                 </Selector>
                 <Selector
-                  label="Озвучка"
+                  label={t("anime.voice")}
                   value={selectedVoice}
                   onChange={setSelectedVoice}
                 >
-                  {DEMO_VOICES.map((voice) => (
-                    <option key={voice} value={voice}>
-                      {voice}
-                    </option>
-                  ))}
+                  <option value="voice-a">{t("anime.demoVoiceA")}</option>
+                  <option value="voice-b">{t("anime.demoVoiceB")}</option>
                 </Selector>
                 <Selector
-                  label="Плеер"
+                  label={t("anime.player")}
                   value={selectedPlayer}
                   onChange={setSelectedPlayer}
                 >
-                  {DEMO_PLAYERS.map((player) => (
-                    <option key={player} value={player}>
-                      {player}
-                    </option>
-                  ))}
+                  <option value="source-a">{t("anime.demoSourceA")}</option>
+                  <option value="source-b">{t("anime.demoSourceB")}</option>
                 </Selector>
               </div>
 
@@ -437,12 +434,12 @@ function AnimeDetailPage() {
                   <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-primary/35 bg-primary/10 text-primary shadow-[0_0_42px_rgba(207,95,255,0.14)]">
                     <CirclePlay className="h-9 w-9" />
                   </div>
-                  <h3 className="text-lg font-semibold text-white">Плеер пока не подключён</h3>
+                  <h3 className="text-lg font-semibold text-white">{t("anime.playerNotConnected")}</h3>
                   <p className="mt-2 text-sm leading-relaxed text-white/60">
-                    Здесь появится видео после подключения источника. Сейчас элементы выбора показывают будущую логику интерфейса.
+                    {t("anime.playerPlaceholder")}
                   </p>
                   <p className="mt-4 rounded-full border border-white/10 bg-black/25 px-3 py-1.5 text-xs text-white/70">
-                    Серия {selectedEpisode} · {selectedVoice} · {selectedPlayer}
+                    {t("anime.episode")} {selectedEpisode} · {selectedVoice === "voice-a" ? t("anime.demoVoiceA") : t("anime.demoVoiceB")} · {selectedPlayer === "source-a" ? t("anime.demoSourceA") : t("anime.demoSourceB")}
                   </p>
                 </div>
               </div>
@@ -452,8 +449,8 @@ function AnimeDetailPage() {
           <section className="mt-8">
             <div className="mb-4 flex items-end justify-between">
               <div>
-                <h2 className="text-xl font-bold md:text-2xl">Похожие аниме</h2>
-                <p className="mt-1 text-sm text-muted-foreground">Истории в похожем настроении</p>
+                <h2 className="text-xl font-bold md:text-2xl">{t("anime.similar")}</h2>
+                <p className="mt-1 text-sm text-muted-foreground">{t("anime.similarSubtitle")}</p>
               </div>
             </div>
             <div className="scrollbar-none flex gap-4 overflow-x-auto pb-3">
