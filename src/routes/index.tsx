@@ -1,11 +1,10 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useMemo, useState } from "react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useMemo, useState } from "react";
 import { ArrowDownWideNarrow, ChevronDown, ChevronRight, Search, SlidersHorizontal, X } from "lucide-react";
 import { ANIME, COLLECTIONS, SCHEDULE, type Anime, byId } from "@/data/anime";
 import { Header, type View } from "@/components/yume/Header";
 import { AnimeCard, PosterArt } from "@/components/yume/Poster";
 import { CollectionsGrid, ContinueRow, Grid, Hero, Row } from "@/components/yume/Sections";
-import { AnimeModal } from "@/components/yume/AnimeModal";
 import { CatalogFilters, EMPTY_CATALOG_FILTERS, type CatalogFiltersValue } from "@/components/yume/CatalogFilters";
 
 export const Route = createFileRoute("/")({
@@ -19,6 +18,13 @@ export const Route = createFileRoute("/")({
       { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
+  validateSearch: (search: Record<string, unknown>): { section?: View } => ({
+    section:
+      typeof search.section === "string" &&
+      ["home", "catalog", "collections", "schedule"].includes(search.section)
+        ? (search.section as View)
+        : undefined,
+  }),
   component: Index,
 });
 
@@ -31,7 +37,9 @@ function SeeAll({ onClick }: { onClick: () => void }) {
 }
 
 function Index() {
-  const [view, setViewRaw] = useState<View>("home");
+  const navigate = useNavigate();
+  const { section } = Route.useSearch();
+  const [view, setViewRaw] = useState<View>(section ?? "home");
   const [query, setQuery] = useState("");
   const [submittedQuery, setSubmittedQuery] = useState("");
   const [catalogQuery, setCatalogQuery] = useState("");
@@ -41,7 +49,6 @@ function Index() {
   const [sortBy, setSortBy] = useState("rating");
   const [catalogPage, setCatalogPage] = useState(1);
   const [collection, setCollection] = useState<string | null>(null);
-  const [selected, setSelected] = useState<{ anime: Anime; note?: string | undefined } | null>(null);
   const [profile, setProfile] = useState(false);
 
   const setView = (v: View) => {
@@ -65,11 +72,11 @@ function Index() {
     setViewRaw(v);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
-  const select = (anime: Anime) => setSelected({ anime });
-  const close = useCallback(() => setSelected(null), []);
+  const select = (anime: Anime) =>
+    navigate({ to: "/anime/$animeId", params: { animeId: anime.id } });
   const random = () => {
-    const pool = ANIME.filter((a) => a.id !== selected?.anime.id);
-    setSelected({ anime: pool[Math.floor(Math.random() * pool.length)]!, note: "🎲 Случайный выбор" });
+    const anime = ANIME[Math.floor(Math.random() * ANIME.length)]!;
+    select(anime);
   };
 
 
@@ -248,8 +255,6 @@ function Index() {
       )}
 
       <footer className="mt-16 px-4 text-center text-xs text-muted-foreground md:px-10">YUME · демо-прототип, все тайтлы вымышлены</footer>
-
-      <AnimeModal anime={selected?.anime ?? null} note={selected?.note} onClose={close} />
 
       {profile && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm" onClick={() => setProfile(false)} role="dialog" aria-modal="true">
