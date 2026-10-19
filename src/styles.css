@@ -64,15 +64,20 @@
 @layer base {
   * { border-color: var(--color-border); }
   body {
-    background-color: var(--color-background);
+    background-color: #0c081b;
     color: var(--color-foreground);
     font-family: var(--font-sans);
+    /* YUME palette sampled from the hero mood: indigo, plum, violet and sakura pink. */
     background-image:
-      linear-gradient(180deg, rgba(8, 6, 22, 0.40) 0%, rgba(8, 6, 22, 0.48) 55%, rgba(7, 6, 17, 0.58) 100%),
-      url("/a_wide_cinematic_high_resolution_fantasy_anime_s.png");
+      radial-gradient(ellipse 82% 34% at 50% 0%, rgba(139, 75, 184, 0.44) 0%, rgba(91, 47, 139, 0.25) 42%, transparent 78%),
+      radial-gradient(ellipse 48% 34% at 100% 17%, rgba(213, 77, 158, 0.27) 0%, transparent 74%),
+      radial-gradient(ellipse 58% 36% at 0% 43%, rgba(112, 61, 171, 0.31) 0%, transparent 76%),
+      radial-gradient(ellipse 66% 36% at 100% 76%, rgba(161, 60, 139, 0.21) 0%, transparent 78%),
+      radial-gradient(ellipse 72% 30% at 28% 100%, rgba(95, 56, 153, 0.21) 0%, transparent 78%),
+      linear-gradient(180deg, #1b1233 0%, #15102b 30%, #110c25 66%, #0c081b 100%);
     background-position: center top;
     background-repeat: no-repeat;
-    background-size: cover;
+    background-size: 100% 100%;
     background-attachment: fixed;
   }
   h1, h2, h3 { font-family: var(--font-display); }
@@ -132,39 +137,9 @@
   &::-webkit-scrollbar { display: none; }
 }
 
-/* YUME homepage content atmosphere: sakura, lanterns and Japanese architecture. */
+/* Keep homepage sections transparent so the shared YUME color atmosphere is visible behind them. */
 .home-content-world {
   position: relative;
   isolation: isolate;
-  overflow: hidden;
   background: transparent;
-}
-.home-content-world::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background-image: linear-gradient(
-    180deg,
-    rgba(10, 7, 24, 0.12) 0%,
-    rgba(10, 7, 24, 0.24) 34%,
-    rgba(9, 7, 20, 0.44) 100%
-  );
-}
-.home-content-world > * {
-  position: relative;
-}
-
-/* Use the dedicated portrait artwork on phones instead of cropping the desktop image. */
-@media (max-width: 767px) {
-  body {
-    background-image:
-      linear-gradient(180deg, rgba(8, 6, 22, 0.35) 0%, rgba(8, 6, 22, 0.47) 48%, rgba(7, 6, 17, 0.62) 100%),
-      url("/yume-background-mobile.jpg");
-    background-position: center top;
-    background-repeat: no-repeat;
-    background-size: cover;
-    background-attachment: fixed;
-  }
 }
