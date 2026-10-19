@@ -226,7 +226,7 @@ function AnimeDetailPage() {
             {t("anime.backCatalog")}
           </button>
 
-          <section aria-label={anime.title + " — информация об аниме"}>
+          <section aria-label={displayAnimeTitle(anime, language) + (language === "en" ? " — anime details" : " — информация об аниме")}>
             <div
               className="relative hidden min-h-[390px] overflow-hidden rounded-3xl border border-white/10 shadow-[0_18px_70px_rgba(0,0,0,0.25)] md:block"
               style={{
@@ -266,7 +266,7 @@ function AnimeDetailPage() {
                 <div className="mb-3 flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-white/70">
                   <span>{displayAnimeStatus(anime.status, language)}</span>
                   <span className="h-1 w-1 rounded-full bg-primary" />
-                  <span>{anime.year || "Год уточняется"}</span>
+                  <span>{anime.year || t("anime.yearUnknown")}</span>
                 </div>
                 <h1 id="anime-title-desktop" className="max-w-3xl text-4xl font-bold leading-tight text-white lg:text-5xl">
                   {displayAnimeTitle(anime, language)}
@@ -358,7 +358,7 @@ function AnimeDetailPage() {
                 {descriptionText("anime-description-mobile")}
                 {showListNote && (
                   <p className="mt-3 text-xs text-muted-foreground" aria-live="polite">
-                    Избранное и мой список сохраняются на этом устройстве.
+                    {t("anime.savedLocally")}
                   </p>
                 )}
               </div>
@@ -469,7 +469,7 @@ function AnimeDetailPage() {
       </main>
 
       <footer className="mt-16 px-4 text-center text-xs text-muted-foreground md:px-10">
-        YUME · сведения об аниме загружаются из Shikimori
+        {t("footer.source")}
       </footer>
 
     </div>
