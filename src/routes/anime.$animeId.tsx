@@ -333,104 +333,73 @@ function AnimeDetailPage() {
               </span>
             </div>
 
-            <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_260px]">
-              <div className="min-w-0">
-                <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
-                  <Selector
-                    label="Серия"
-                    value={String(selectedEpisode)}
-                    onChange={(value) => setSelectedEpisode(Number(value))}
-                  >
-                    {episodes.map((episode) => (
-                      <option key={episode} value={String(episode)}>
-                        Серия {episode}
-                      </option>
-                    ))}
-                  </Selector>
-                  <Selector
-                    label="Озвучка"
-                    value={selectedVoice}
-                    onChange={setSelectedVoice}
-                  >
-                    {DEMO_VOICES.map((voice) => (
-                      <option key={voice} value={voice}>
-                        {voice}
-                      </option>
-                    ))}
-                  </Selector>
-                  <Selector
-                    label="Плеер"
-                    value={selectedPlayer}
-                    onChange={setSelectedPlayer}
-                  >
-                    {DEMO_PLAYERS.map((player) => (
-                      <option key={player} value={player}>
-                        {player}
-                      </option>
-                    ))}
-                  </Selector>
-                </div>
-
-                <div
-                  className="relative flex aspect-video min-h-[220px] flex-col items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-[#080710] p-5 text-center sm:min-h-[300px] lg:min-h-[420px]"
-                  style={{
-                    background:
-                      "radial-gradient(ellipse at 50% 40%, oklch(0.19 0.08 " +
-                      anime.hue +
-                      ") 0%, #080710 63%)",
-                  }}
+            <div className="mx-auto w-full max-w-6xl min-w-0">
+              <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <Selector
+                  label="Серия"
+                  value={String(selectedEpisode)}
+                  onChange={(value) => setSelectedEpisode(Number(value))}
                 >
-                  <div
-                    aria-hidden="true"
-                    className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-black/20"
-                  />
-                  <div className="relative z-10 flex max-w-md flex-col items-center">
-                    <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-primary/35 bg-primary/10 text-primary shadow-[0_0_42px_rgba(207,95,255,0.14)]">
-                      <CirclePlay className="h-9 w-9" />
-                    </div>
-                    <h3 className="text-lg font-semibold text-white">Плеер пока не подключён</h3>
-                    <p className="mt-2 text-sm leading-relaxed text-white/60">
-                      Здесь появится видео после подключения источника. Сейчас элементы выбора показывают будущую логику интерфейса.
-                    </p>
-                    <p className="mt-4 rounded-full border border-white/10 bg-black/25 px-3 py-1.5 text-xs text-white/70">
-                      Серия {selectedEpisode} · {selectedVoice} · {selectedPlayer}
-                    </p>
-                  </div>
-                </div>
-                <p className="mt-2 text-xs text-muted-foreground">
-                  Список озвучек и плееров сейчас демонстрационный — реальные варианты будут зависеть от подключённого видеосервиса.
-                </p>
+                  {episodes.map((episode) => (
+                    <option key={episode} value={String(episode)}>
+                      Серия {episode}
+                    </option>
+                  ))}
+                </Selector>
+                <Selector
+                  label="Озвучка"
+                  value={selectedVoice}
+                  onChange={setSelectedVoice}
+                >
+                  {DEMO_VOICES.map((voice) => (
+                    <option key={voice} value={voice}>
+                      {voice}
+                    </option>
+                  ))}
+                </Selector>
+                <Selector
+                  label="Плеер"
+                  value={selectedPlayer}
+                  onChange={setSelectedPlayer}
+                >
+                  {DEMO_PLAYERS.map((player) => (
+                    <option key={player} value={player}>
+                      {player}
+                    </option>
+                  ))}
+                </Selector>
               </div>
 
-              <aside className="rounded-2xl border border-border bg-card/70 p-4">
-                <div className="mb-3 flex items-center justify-between gap-3">
-                  <h3 className="font-semibold">Серии</h3>
-                  <span className="text-xs text-muted-foreground">{anime.episodes} всего</span>
+              <div
+                className="relative mx-auto flex aspect-video w-full min-w-0 flex-col items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-[#080710] p-5 text-center sm:min-h-[300px] lg:min-h-[420px]"
+                style={{
+                  background:
+                    "radial-gradient(ellipse at 50% 40%, oklch(0.19 0.08 " +
+                    anime.hue +
+                    ") 0%, #080710 63%)",
+                }}
+              >
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-black/20"
+                />
+                <div className="relative z-10 flex max-w-md flex-col items-center">
+                  <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-primary/35 bg-primary/10 text-primary shadow-[0_0_42px_rgba(207,95,255,0.14)]">
+                    <CirclePlay className="h-9 w-9" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-white">Плеер пока не подключён</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-white/60">
+                    Здесь появится видео после подключения источника. Сейчас элементы выбора показывают будущую логику интерфейса.
+                  </p>
+                  <p className="mt-4 rounded-full border border-white/10 bg-black/25 px-3 py-1.5 text-xs text-white/70">
+                    Серия {selectedEpisode} · {selectedVoice} · {selectedPlayer}
+                  </p>
                 </div>
-                <div className="grid max-h-[440px] grid-cols-3 gap-2 overflow-y-auto pr-1 sm:grid-cols-4 xl:grid-cols-2">
-                  {episodes.map((episode) => (
-                    <button
-                      key={episode}
-                      type="button"
-                      aria-pressed={selectedEpisode === episode}
-                      onClick={() => setSelectedEpisode(episode)}
-                      className={
-                        "flex min-h-12 items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-sm transition " +
-                        (selectedEpisode === episode
-                          ? "border-primary/70 bg-primary/20 text-foreground shadow-[0_0_18px_rgba(202,94,255,0.08)]"
-                          : "border-border bg-background/40 text-muted-foreground hover:border-primary/40 hover:text-foreground")
-                      }
-                    >
-                      <Play className="h-3 w-3 shrink-0" />
-                      {episode}
-                    </button>
-                  ))}
-                </div>
-              </aside>
+              </div>
             </div>
           </section>
 
-          <section className="mt-12">
+          <section className="mt-8">
             <div className="mb-4 flex items-end justify-between">
               <div>
                 <h2 className="text-xl font-bold md:text-2xl">Похожие аниме</h2>
