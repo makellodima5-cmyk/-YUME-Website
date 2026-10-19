@@ -34,7 +34,7 @@ export function Header({ view, setView, query, setQuery, onProfile }: Props) {
   );
   return (
     <>
-      <header className="fixed inset-x-3 top-3 z-40 overflow-hidden rounded-2xl glass-liquid ring-1 ring-white/20 md:inset-x-4 md:top-3">
+      <header className="glass-fixed-header fixed inset-x-3 top-3 z-40 overflow-hidden rounded-2xl glass-liquid ring-1 ring-white/20 md:inset-x-4 md:top-3">
         <div className="flex h-16 items-center gap-6 px-4 md:px-10">
           <Logo />
           <nav className="hidden items-center gap-1 md:flex">
@@ -53,7 +53,7 @@ export function Header({ view, setView, query, setQuery, onProfile }: Props) {
             <User className="h-5 w-5" />
           </button>
         </div>
-        <div className="flex px-4 pb-3 md:hidden">{search}</div>
+        <div className="flex w-[min(74vw,320px)] justify-start px-4 pb-3 md:hidden">{search}</div>
       </header>
 
       <nav className="fixed inset-x-3 bottom-3 z-40 overflow-hidden rounded-2xl glass-liquid ring-1 ring-white/25 shadow-[0_12px_50px_rgba(0,0,0,0.55),0_0_30px_rgba(174,66,255,0.2)] md:hidden">
