@@ -1,9 +1,8 @@
 import type { ReactNode } from "react";
 import { Play, Shuffle } from "lucide-react";
-import heroBg from "@/assets/hero-bg.jpg";
-import heroine from "@/assets/heroine.png";
-import sakuraFg from "@/assets/sakura-fg.png";
-import { MoonMark } from "./Logo";
+import heroBg from "@/assets/hero-bg.svg";
+import heroine from "@/assets/heroine.svg";
+import sakuraFg from "@/assets/sakura-fg.svg";
 import { type Anime, CONTINUE, COLLECTIONS, byId } from "@/data/anime";
 import { AnimeCard, PosterArt } from "./Poster";
 
@@ -42,10 +41,7 @@ export function Hero({ onCatalog, onRandom }: { onCatalog: () => void; onRandom:
       <div className="absolute inset-0 bg-gradient-to-r from-background/90 via-background/40 to-transparent max-md:from-background/80 max-md:via-background/50" />
       {/* Copy + brand lockup, left */}
       <div className="relative flex h-full flex-col justify-end px-4 pb-16 md:max-w-2xl md:px-10 md:pb-24">
-        <div className="mb-5 flex items-center gap-3">
-          <MoonMark id="hero" className="h-12 w-12 drop-shadow-[0_0_16px_oklch(0.7_0.2_330/70%)] md:h-14 md:w-14" />
-          <span className="font-display text-2xl font-bold tracking-[0.3em] md:text-3xl">YUME</span>
-        </div>
+        <div className="mb-5"><span className="font-display text-3xl font-bold tracking-[0.3em] md:text-4xl">YUME</span></div>
         <h1 className="text-4xl font-bold leading-tight md:text-6xl">
           <span className="text-neon">Больше чем аниме</span>
         </h1>

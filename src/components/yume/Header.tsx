@@ -36,7 +36,7 @@ export function Header({ view, setView, query, setQuery, onProfile }: Props) {
     <>
       <header className="fixed inset-x-0 top-0 z-40 glass border-b">
         <div className="flex h-16 items-center gap-6 px-4 md:px-10">
-          <Logo onClick={() => setView("home")} />
+          <Logo />
           <nav className="hidden items-center gap-1 md:flex">
             {NAV.map((n) => (
               <button

@@ -141,7 +141,7 @@ function Index() {
         </main>
       )}
 
-      <footer className="mt-16 px-4 text-center text-xs text-muted-foreground md:px-10">YUME · 夢 · демо-прототип, все тайтлы вымышлены</footer>
+      <footer className="mt-16 px-4 text-center text-xs text-muted-foreground md:px-10">YUME · демо-прототип, все тайтлы вымышлены</footer>
 
       <AnimeModal anime={selected?.anime ?? null} note={selected?.note} onClose={close} />
 
