@@ -18,7 +18,7 @@ import {
   UserRound,
 } from "lucide-react";
 import type { Anime } from "@/data/anime";
-import { displayAnimeTitle, useYumePreferences } from "@/data/preferences";
+import { displayAnimeTitle, displayGenre, useYumePreferences } from "@/data/preferences";
 import { PosterArt } from "./Poster";
 import { Grid } from "./Sections";
 import {
@@ -51,6 +51,44 @@ export function Profile({ animeList, onSelect, onCatalog }: Props) {
   const [panel, setPanel] = useState<ProfilePanel>("overview");
   const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
   const [watchlistIds, setWatchlistIds] = useState<string[]>([]);
+  const [preferredGenres, setPreferredGenres] = useState<string[]>([]);
+  const [preferencesLoaded, setPreferencesLoaded] = useState(false);
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem("yume-anime-preferred-genres-v1");
+      if (raw) {
+        const parsed: unknown = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          setPreferredGenres(parsed.filter((item): item is string => typeof item === "string"));
+        }
+      }
+    } catch {
+      setPreferredGenres([]);
+    } finally {
+      setPreferencesLoaded(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!preferencesLoaded) return;
+    try {
+      window.localStorage.setItem("yume-anime-preferred-genres-v1", JSON.stringify(preferredGenres));
+    } catch {
+      // Keep the current selection in memory if browser storage is unavailable.
+    }
+  }, [preferredGenres, preferencesLoaded]);
+
+  const availableGenres = useMemo(
+    () => Array.from(new Set(animeList.flatMap((anime) => anime.genres))).sort((a, b) => a.localeCompare(b)),
+    [animeList],
+  );
+
+  const togglePreferredGenre = (genre: string) => {
+    setPreferredGenres((current) => current.includes(genre)
+      ? current.filter((item) => item !== genre)
+      : [...current, genre]);
+  };
 
   useEffect(() => {
     const syncLists = () => {
@@ -323,8 +361,46 @@ export function Profile({ animeList, onSelect, onCatalog }: Props) {
                       <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{t("settings.preferencesDescription")}</p>
                     </div>
                   </div>
-                  <div className="mt-4 rounded-xl border border-dashed border-border px-4 py-3 text-sm text-muted-foreground">
-                    {t("settings.comingWithRecommendations")}
+                  <div className="mt-5 border-t border-border pt-5">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <h3 className="text-sm font-semibold">{t("settings.preferredGenres")}</h3>
+                        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{t("settings.preferredGenresDescription")}</p>
+                      </div>
+                      <span className="shrink-0 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">{preferredGenres.length}</span>
+                    </div>
+                    {availableGenres.length > 0 ? (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {availableGenres.map((genre) => {
+                          const active = preferredGenres.includes(genre);
+                          return (
+                            <button
+                              key={genre}
+                              type="button"
+                              aria-pressed={active}
+                              onClick={() => togglePreferredGenre(genre)}
+                              className={`rounded-full border px-3 py-2 text-xs font-medium transition ${active ? "border-primary/70 bg-primary/15 text-foreground ring-1 ring-primary/25" : "border-border bg-secondary/45 text-muted-foreground hover:bg-accent hover:text-foreground"}`}
+                            >
+                              {displayGenre(genre, language)}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <p className="mt-3 text-sm text-muted-foreground">{t("settings.noPreferredGenres")}</p>
+                    )}
+                    <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-xs text-muted-foreground">{t("settings.genresSaved")}</p>
+                      <button
+                        type="button"
+                        onClick={() => setPreferredGenres([])}
+                        disabled={preferredGenres.length === 0}
+                        className="rounded-full border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        {t("settings.clearGenres")}
+                      </button>
+                    </div>
+                    <p className="mt-3 text-xs leading-relaxed text-muted-foreground">{t("settings.comingWithRecommendations")}</p>
                   </div>
                 </section>
               </div>
