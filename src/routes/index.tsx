@@ -310,7 +310,6 @@ function Index() {
         <Profile animeList={ANIME} onSelect={select} onCatalog={() => setView("catalog")} />
       ) : null}
       <footer className="mt-16 px-4 text-center text-xs text-muted-foreground md:px-10">YUME · сведения об аниме загружаются из Shikimori</footer>
-}
     </div>
   );
 }
