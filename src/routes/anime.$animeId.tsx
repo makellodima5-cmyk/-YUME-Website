@@ -181,7 +181,7 @@ function AnimeDetailPage() {
             К каталогу
           </button>
 
-          <section aria-labelledby="anime-title">
+          <section aria-label={anime.title + " — информация об аниме"}>
             <div
               className="relative hidden min-h-[390px] overflow-hidden rounded-3xl border border-white/10 shadow-[0_18px_70px_rgba(0,0,0,0.25)] md:block"
               style={{
@@ -214,7 +214,7 @@ function AnimeDetailPage() {
                   <span className="h-1 w-1 rounded-full bg-primary" />
                   <span>{anime.year}</span>
                 </div>
-                <h1 id="anime-title" className="max-w-3xl text-4xl font-bold leading-tight text-white lg:text-5xl">
+                <h1 id="anime-title-desktop" className="max-w-3xl text-4xl font-bold leading-tight text-white lg:text-5xl">
                   {anime.title}
                 </h1>
                 <p className="mt-1 text-sm text-white/65 lg:text-base">{anime.original}</p>
@@ -277,7 +277,7 @@ function AnimeDetailPage() {
                   <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-primary">
                     {anime.status} · {anime.year}
                   </div>
-                  <h1 id="anime-title" className="text-2xl font-bold leading-tight">
+                  <h1 id="anime-title-mobile" className="text-2xl font-bold leading-tight">
                     {anime.title}
                   </h1>
                   <p className="mt-1 break-words text-xs text-muted-foreground">{anime.original}</p>
