@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Play, Shuffle } from "lucide-react";
 import heroArtwork from "@/assets/yume-hero-70.webp";
-import logoArtwork from "@/assets/yume-logo.webp";
+import logoArtwork from "@/assets/yume-logo-transparent.png";
 import { type Anime, CONTINUE, COLLECTIONS, byId } from "@/data/anime";
 import { AnimeCard, PosterArt } from "./Poster";
 
@@ -37,7 +37,7 @@ export function Hero({ onCatalog, onRandom }: { onCatalog: () => void; onRandom:
             alt="YUME"
             width={2089}
             height={753}
-            className="h-auto w-[min(72vw,300px)] object-contain mix-blend-screen drop-shadow-[0_0_22px_rgba(180,85,255,0.18)] md:w-[min(38vw,440px)] lg:w-[min(36vw,490px)]"
+            className="relative -left-0.5 h-auto w-[min(72vw,300px)] object-contain drop-shadow-[0_0_16px_rgba(180,85,255,0.14)] md:-left-1 md:w-[min(38vw,440px)] lg:w-[min(36vw,490px)]"
             draggable={false}
           />
         </div>
