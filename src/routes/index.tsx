@@ -115,7 +115,7 @@ function Index() {
   );
   const searchText = view === "catalog" ? catalogQuery.trim() : view === "home" ? submittedQuery.trim() : "";
   const isGenreSearch = Boolean(searchText) &&
-    availableGenres.some((genre) => genre.toLocaleLowerCase("ru") === searchText.toLocaleLowerCase("ru"));
+    availableGenres.some((genre) => genre.toLocaleLowerCase("ru") === searchText.toLocaleLowerCase("ru") || displayGenre(genre, language).toLocaleLowerCase("en") === searchText.toLocaleLowerCase("en"));
   useEffect(() => {
     if (!searchText || isGenreSearch) {
       setRemoteSearch(null);
