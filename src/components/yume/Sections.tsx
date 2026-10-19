@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Play, Shuffle } from "lucide-react";
 import heroArtwork from "@/assets/yume-hero-70.webp";
-import { MoonMark } from "./Logo";
+import logoArtwork from "@/assets/yume-logo.webp";
 import { type Anime, CONTINUE, COLLECTIONS, byId } from "@/data/anime";
 import { AnimeCard, PosterArt } from "./Poster";
 
@@ -31,9 +31,15 @@ export function Hero({ onCatalog, onRandom }: { onCatalog: () => void; onRandom:
       <div className="absolute inset-0 bg-gradient-to-r from-[#090714]/80 via-[#090714]/40 to-transparent md:from-[#090714]/75 md:via-[#090714]/25 md:to-transparent" />
       <div className="absolute inset-0 bg-gradient-to-t from-[#090714]/95 via-[#090714]/20 to-transparent md:from-transparent md:via-transparent" />
       <div className="relative z-10 flex h-full flex-col justify-end px-5 pb-16 pt-28 md:max-w-[760px] md:justify-center md:px-10 md:pb-8 md:pt-8 lg:px-12">
-        <div className="mb-3 flex items-center gap-3 md:mb-4 md:gap-4">
-          <MoonMark className="h-16 w-16 shrink-0 drop-shadow-[0_0_18px_rgba(217,122,255,0.55)] md:h-24 md:w-24 lg:h-28 lg:w-28" id="hero-logo-moon" />
-          <span className="font-serif text-6xl font-medium leading-none tracking-[0.015em] text-white drop-shadow-[0_2px_18px_rgba(0,0,0,0.72)] md:text-7xl lg:text-8xl">YUME</span>
+        <div className="mb-3 md:mb-4">
+          <img
+            src={logoArtwork}
+            alt="YUME"
+            width={2089}
+            height={753}
+            className="h-auto w-[min(72vw,300px)] object-contain mix-blend-screen drop-shadow-[0_0_22px_rgba(180,85,255,0.18)] md:w-[min(38vw,440px)] lg:w-[min(36vw,490px)]"
+            draggable={false}
+          />
         </div>
         <h1 className="max-w-[12ch] text-4xl font-bold leading-[1.05] md:max-w-none md:text-5xl lg:text-6xl">
           <span className="text-white">Больше чем аниме</span>
