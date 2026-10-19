@@ -69,7 +69,9 @@ export function Header({ view, setView, onProfile }: Props) {
     const deltaX = event.clientX - pointer.lastX;
     const stretch = Math.min(Math.abs(deltaX) * 1.8, slotWidth * 0.48);
     const pillWidth = Math.min(bounds.width - 8, baseWidth + stretch);
-    const left = Math.max(4, Math.min(bounds.width - pillWidth - 4, localX - pillWidth / 2));
+    // Bias the stretch behind the moving finger, like a soft elastic tab indicator.
+    const trailingOffset = deltaX > 0 ? stretch * 0.28 : deltaX < 0 ? -stretch * 0.28 : 0;
+    const left = Math.max(4, Math.min(bounds.width - pillWidth - 4, localX - pillWidth / 2 - trailingOffset));
     setDragGeometry({
       leftPercent: (left / bounds.width) * 100,
       widthPercent: (pillWidth / bounds.width) * 100,
@@ -139,7 +141,7 @@ export function Header({ view, setView, onProfile }: Props) {
         <div className="relative grid grid-cols-4">
           <span
             aria-hidden="true"
-            className={`pointer-events-none absolute bottom-1 top-1 z-0 rounded-xl glass-active ${dragGeometry ? "transition-none" : "transition-[left,width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"}`}
+            className={`pointer-events-none absolute bottom-1 top-1 z-0 rounded-xl glass-active ${dragGeometry ? "transition-[width] duration-100 ease-out" : "transition-[left,width] duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] motion-reduce:transition-none"}`}
             style={{
               left: dragGeometry ? `${dragGeometry.leftPercent}%` : `calc(${activeIndex * 25}% + 4px)`,
               width: dragGeometry ? `${dragGeometry.widthPercent}%` : "calc(25% - 8px)",
