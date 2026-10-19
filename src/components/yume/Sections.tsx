@@ -69,7 +69,7 @@ export function Hero({ onCatalog, onRandom, query, setQuery, onSubmitSearch, fil
         </p>
         <div className="mt-7 flex flex-col gap-3 sm:flex-row md:mt-8">
           <button onClick={onRandom} className="inline-flex w-fit items-center justify-center gap-2 rounded-full bg-neon px-6 py-3 font-semibold text-primary-foreground shadow-neon transition hover:brightness-110 max-sm:w-full">
-            <Play className="h-4 w-4 fill-current" /> Смотреть
+            <Play className="h-4 w-4 fill-current" /> Случайное аниме
           </button>
           <button onClick={onCatalog} className="inline-flex w-fit items-center justify-center gap-2 rounded-full bg-[#0b0a19]/65 px-6 py-3 font-semibold text-white ring-1 ring-white/25 backdrop-blur-md transition hover:bg-accent max-sm:w-full">
             <Shuffle className="h-4 w-4" /> Каталог
