@@ -18,7 +18,7 @@ export function Row({ title, action, children }: { title: string; action?: React
   );
 }
 
-export function Hero({ onCatalog, onRandom, query, setQuery, filtersOpen, setFiltersOpen, draftFilters, setDraftFilters, onApplyFilters, onResetFilters, activeFilterCount }: { onCatalog: () => void; onRandom: () => void; query: string; setQuery: (q: string) => void; filtersOpen: boolean; setFiltersOpen: (open: boolean) => void; draftFilters: CatalogFiltersValue; setDraftFilters: (value: CatalogFiltersValue) => void; onApplyFilters: () => void; onResetFilters: () => void; activeFilterCount: number }) {
+export function Hero({ onCatalog, onRandom, query, setQuery, onSubmitSearch, filtersOpen, setFiltersOpen, draftFilters, setDraftFilters, onApplyFilters, onResetFilters, activeFilterCount }: { onCatalog: () => void; onRandom: () => void; query: string; setQuery: (q: string) => void; onSubmitSearch: () => void; filtersOpen: boolean; setFiltersOpen: (open: boolean) => void; draftFilters: CatalogFiltersValue; setDraftFilters: (value: CatalogFiltersValue) => void; onApplyFilters: () => void; onResetFilters: () => void; activeFilterCount: number }) {
   return (
     <section className="relative isolate h-[min(90svh,900px)] min-h-[720px] w-full max-w-[1920px] overflow-hidden md:mx-auto md:mt-2 md:h-[min(76vh,760px)] md:min-h-[560px] md:w-[calc(100%-2.5rem)] md:rounded-2xl md:ring-1 md:ring-primary/50">
       <img
@@ -33,10 +33,11 @@ export function Hero({ onCatalog, onRandom, query, setQuery, filtersOpen, setFil
       <div className="absolute inset-0 bg-gradient-to-t from-[#090714]/95 via-[#090714]/20 to-transparent md:from-transparent md:via-transparent" />
       <div className="absolute left-4 top-5 z-30 w-[min(76vw,360px)] md:left-8 md:top-7 md:w-[min(36vw,420px)]">
         <div className="flex h-11 items-center rounded-xl border border-white/25 bg-black/30 shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_8px_28px_rgba(0,0,0,0.18)] backdrop-blur-xl transition focus-within:border-white/55 focus-within:bg-black/40">
-          <Search className="ml-3 h-4 w-4 shrink-0 text-white/80" />
+          <button type="button" onClick={onSubmitSearch} aria-label="Применить поиск" className="ml-3 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-white/80 transition hover:bg-white/10 hover:text-white"><Search className="h-4 w-4" /></button>
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") onSubmitSearch(); }}
             placeholder="Название или жанр..."
             aria-label="Поиск аниме"
             className="h-full min-w-0 flex-1 bg-transparent px-2.5 text-sm text-white outline-none placeholder:text-white/70"
@@ -47,7 +48,7 @@ export function Hero({ onCatalog, onRandom, query, setQuery, filtersOpen, setFil
             {activeFilterCount > 0 && <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-neon px-1 text-[10px] font-bold text-primary-foreground">{activeFilterCount}</span>}
           </button>
         </div>
-        <CatalogFilters open={filtersOpen} onClose={() => setFiltersOpen(false)} draft={draftFilters} setDraft={setDraftFilters} onApply={onApplyFilters} onReset={onResetFilters} />
+        <CatalogFilters open={filtersOpen} placement="home" draft={draftFilters} setDraft={setDraftFilters} onApply={onApplyFilters} onReset={onResetFilters} />
       </div>
       <div className="relative z-10 flex h-full flex-col justify-end px-5 pb-16 pt-28 md:max-w-[760px] md:justify-center md:px-10 md:pb-8 md:pt-8 lg:px-12">
         <div className="mb-3 md:mb-4">
