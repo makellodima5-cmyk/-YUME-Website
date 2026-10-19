@@ -45,5 +45,5 @@ export function MoonMark({ className, id = "moon" }: MarkProps) {
  * Non-interactive by design (not a button/link, no click handler).
  */
 export function Logo() {
-  return <span className="font-display text-xl font-bold tracking-widest text-foreground select-none">YUME</span>;
+  return <span className="font-serif text-2xl font-semibold tracking-[0.04em] text-white select-none">YUME</span>;
 }
