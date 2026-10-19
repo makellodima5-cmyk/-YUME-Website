@@ -122,7 +122,7 @@ function AnimeDetailPage() {
               onClick={() => navigateToSection("catalog")}
               className="mt-6 rounded-full bg-neon px-5 py-2.5 text-sm font-semibold text-primary-foreground"
             >
-              Открыть каталог
+              {t("anime.openCatalog")}
             </button>
           </div>
         </main>
@@ -226,7 +226,7 @@ function AnimeDetailPage() {
             {t("anime.backCatalog")}
           </button>
 
-          <section aria-label={displayAnimeTitle(anime, language) + (language === "en" ? " — anime details" : " — информация об аниме")}>
+          <section aria-label={displayAnimeTitle(anime, language) + " — " + t("anime.sectionLabel")}>
             <div
               className="relative hidden min-h-[390px] overflow-hidden rounded-3xl border border-white/10 shadow-[0_18px_70px_rgba(0,0,0,0.25)] md:block"
               style={{
