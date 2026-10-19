@@ -44,25 +44,25 @@ type GraphQLResponse = {
   errors?: { message?: string }[];
 };
 
-const ANIME_FIELDS = "
-  id
-  name
-  russian
-  kind
-  score
-  status
-  episodes
-  episodesAired
-  airedOn { date year }
-  releasedOn { date year }
-  description
-  poster { originalUrl mainUrl previewUrl }
-  opengraphImageUrl
-  genres { id name russian kind }
-  nextEpisodeAt
-  rating
-  studios { name }
-";
+const ANIME_FIELDS = [
+  "id",
+  "name",
+  "russian",
+  "kind",
+  "score",
+  "status",
+  "episodes",
+  "episodesAired",
+  "airedOn { date year }",
+  "releasedOn { date year }",
+  "description",
+  "poster { originalUrl mainUrl previewUrl }",
+  "opengraphImageUrl",
+  "genres { id name russian kind }",
+  "nextEpisodeAt",
+  "rating",
+  "studios { name }",
+].join(" ");
 
 function cleanDescription(value: string | null | undefined): string {
   return (value ?? "")
