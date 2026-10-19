@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, createElement, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { Anime } from "@/data/anime";
 
 export type Language = "ru" | "en";
@@ -482,7 +482,7 @@ export function YumePreferencesProvider({ children }: { children: ReactNode }) {
     [language, setLanguage, theme, setTheme, t],
   );
 
-  return <YumePreferencesContext.Provider value={value}>{children}</YumePreferencesContext.Provider>;
+  return createElement(YumePreferencesContext.Provider, { value }, children);
 }
 
 export function useYumePreferences(): YumePreferencesValue {
