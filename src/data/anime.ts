@@ -13,6 +13,14 @@ export type Anime = {
   glyph: string; // kanji on poster
   isNew?: boolean;
   popular?: boolean;
+  posterUrl?: string;
+  bannerUrl?: string;
+  kind?: string;
+  ageRating?: string;
+  nextEpisodeAt?: string;
+  episodesAired?: number;
+  airedOn?: string;
+  studios?: string[];
 };
 
 export const ANIME: Anime[] = [
@@ -38,10 +46,34 @@ export const CONTINUE: { id: string; episode: number; progress: number; left: st
 ];
 
 export const COLLECTIONS = [
-  { id: "c1", title: "Ночной Токио", subtitle: "Неон, дождь и киберпанк", ids: ["a3", "a7", "a9"], hue: 260 },
-  { id: "c2", title: "Весна и сакура", subtitle: "Тёплая романтика", ids: ["a2", "a12", "a5"], hue: 345 },
-  { id: "c3", title: "Легенды и духи", subtitle: "Мистика старой Японии", ids: ["a4", "a6", "a10", "a8"], hue: 20 },
-  { id: "c4", title: "Эпичные бои", subtitle: "Мечи, магия, меха", ids: ["a1", "a11", "a6"], hue: 300 },
+  {
+    id: "c1",
+    title: "Ночной Токио",
+    subtitle: "Неон, технологии и тайны",
+    genres: ["Киберпанк", "Научная фантастика", "Триллер"],
+    hue: 260,
+  },
+  {
+    id: "c2",
+    title: "Весна и сакура",
+    subtitle: "Тёплая романтика",
+    genres: ["Романтика", "Повседневность", "Драма"],
+    hue: 345,
+  },
+  {
+    id: "c3",
+    title: "Легенды и духи",
+    subtitle: "Мистика и старые легенды",
+    genres: ["Мистика", "Сверхъестественное", "Фэнтези", "Исторический"],
+    hue: 20,
+  },
+  {
+    id: "c4",
+    title: "Эпичные бои",
+    subtitle: "Мечи, магия и приключения",
+    genres: ["Экшен", "Фэнтези", "Приключения"],
+    hue: 300,
+  },
 ];
 
 export const SCHEDULE = [
