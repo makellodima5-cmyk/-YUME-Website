@@ -1,29 +1,25 @@
-# Welcome to your Lovable project
+# YUME Website
 
-This project was built with [Lovable](https://lovable.dev).
+Прототип каталога аниме на русском языке. Это пока демонстрационная версия: данные локальные, авторизация и видеоплеер не подключены.
 
-## Build with Lovable
+## Запуск локально
 
-Open your project in the [Lovable editor](https://lovable.dev) and keep building.
+Требуется Node.js и пакетный менеджер npm или Bun.
 
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: connect the project to GitHub and every change made in Lovable is committed straight to your repository.
-- **Full ownership**: this code is yours. Push to your repository and your changes sync back into Lovable, ready for your next prompt.
-
-## Development
-
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
-
-```sh
-git clone <this-repository-url>
-cd <repository-name>
-npm i
+```bash
+npm install
 npm run dev
 ```
 
-## Built with
+Для проверки production-сборки: `npm run build`.
 
-- TanStack Start
-- TypeScript
-- React
+## Состав
+
+- React + TypeScript + TanStack Start
 - Tailwind CSS
+- Каталог, поиск, жанры, подборки, расписание и карточки с демоданными
+- Векторные SVG-иллюстрации для главного баннера — исходные бинарные изображения из Lovable не удалось извлечь автоматически, поэтому они заменены локальными SVG
+
+## Статус переноса
+
+Исходный текстовый код перенесён из Lovable. Репозиторий не опубликован и не развёрнут; перед развёртыванием нужно выполнить сборку и проверить её результат.
