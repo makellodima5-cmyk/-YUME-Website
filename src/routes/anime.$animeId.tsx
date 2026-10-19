@@ -115,7 +115,7 @@ function AnimeDetailPage() {
           <div className="mx-auto max-w-3xl rounded-3xl border border-border bg-card p-8 text-center">
             <h1 className="text-2xl font-bold">{t("anime.notFound")}</h1>
             <p className="mt-2 text-sm text-muted-foreground">
-              {apiError ? "{t("anime.notFoundApi")}" : "{t("anime.notFoundInfo")}"}
+              {apiError ? t("anime.notFoundApi") : t("anime.notFoundInfo")}
             </p>
             <button
               type="button"
