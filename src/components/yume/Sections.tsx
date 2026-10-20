@@ -60,7 +60,7 @@ export function Hero({
 }) {
   const { t } = useYumePreferences();
   return (
-    <section className="relative mx-3 mt-3 isolate h-[340px] min-h-[340px] w-[calc(100%-1.5rem)] max-w-[1920px] overflow-hidden rounded-2xl ring-1 ring-border sm:mx-4 sm:h-[390px] sm:w-[calc(100%-2rem)] md:mx-auto md:mt-3 md:h-[400px] md:min-h-[400px] md:w-[calc(100%-2.5rem)] lg:h-[440px]">
+    <section className="relative mx-3 mt-3 isolate h-[360px] min-h-[360px] w-[calc(100%-1.5rem)] max-w-[1920px] overflow-hidden rounded-2xl ring-1 ring-border sm:mx-4 sm:h-[390px] sm:w-[calc(100%-2rem)] md:mx-auto md:mt-3 md:h-[400px] md:min-h-[400px] md:w-[calc(100%-2.5rem)] lg:h-[440px]">
       <picture className="absolute inset-0 block h-full w-full">
         <source media="(max-width: 767px)" srcSet={mobileHeroArtwork} />
         <img
@@ -74,7 +74,7 @@ export function Hero({
       </picture>
       <div className="absolute inset-0 bg-gradient-to-r from-[#090714]/80 via-[#090714]/40 to-transparent md:from-[#090714]/75 md:via-[#090714]/25 md:to-transparent" />
       <div className="absolute inset-0 bg-gradient-to-t from-[#090714]/95 via-[#090714]/20 to-transparent md:from-transparent md:via-transparent" />
-      <div className="absolute left-4 top-5 z-30 w-[min(76vw,360px)] md:left-8 md:top-7 md:w-[min(36vw,420px)]">
+      <div className="absolute left-4 top-4 z-30 w-[min(76vw,360px)] md:left-8 md:top-7 md:w-[min(36vw,420px)]">
         <div className="flex h-11 items-center rounded-xl border border-white/25 bg-black/30 shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_8px_28px_rgba(0,0,0,0.18)] backdrop-blur-xl transition focus-within:border-white/55 focus-within:bg-black/40">
           <button type="button" onClick={onSubmitSearch} aria-label={t("search.apply")} className="ml-3 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-white/80 transition hover:bg-white/10 hover:text-white"><Search className="h-4 w-4" /></button>
           <input
@@ -93,18 +93,18 @@ export function Hero({
         </div>
         <CatalogFilters open={filtersOpen} placement="home" draft={draftFilters} setDraft={setDraftFilters} onApply={onApplyFilters} onReset={onResetFilters} genres={genres} statuses={statuses} types={types} ageRatings={ageRatings} yearMin={yearMin} yearMax={yearMax} />
       </div>
-      <div className="relative z-10 flex h-full flex-col justify-end px-5 pb-6 pt-24 sm:pb-8 md:max-w-[760px] md:justify-center md:px-10 md:pb-8 md:pt-8 lg:px-12">
+      <div className="relative z-10 flex h-full flex-col justify-end px-5 pb-5 pt-20 sm:pb-8 md:max-w-[760px] md:justify-center md:px-10 md:pb-8 md:pt-8 lg:px-12">
         <h1 className="max-w-[13ch] text-3xl font-bold leading-[1.05] sm:text-4xl md:max-w-none md:text-4xl lg:text-5xl">
           <span className="text-white">{t("hero.title")}</span>
         </h1>
-        <p className="mt-2 max-w-xl text-sm leading-relaxed text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.95)] md:mt-3 md:text-base">
+        <p className="mt-2 line-clamp-3 max-w-xl text-sm leading-relaxed text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.95)] sm:line-clamp-none md:mt-3 md:text-base">
           {t("hero.description")}
         </p>
-        <div className="mt-5 flex flex-col gap-2 sm:flex-row md:mt-6">
-          <button onClick={onRandom} className="inline-flex w-fit items-center justify-center gap-2 rounded-full bg-neon px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-neon transition hover:brightness-110 max-sm:w-full">
+        <div className="mt-4 flex flex-row flex-wrap gap-2 sm:mt-5 md:mt-6">
+          <button onClick={onRandom} className="inline-flex w-fit items-center justify-center gap-1.5 rounded-full bg-neon px-3.5 py-2 text-xs font-semibold text-primary-foreground shadow-neon transition hover:brightness-110 sm:gap-2 sm:px-5 sm:py-2.5 sm:text-sm">
             <Play className="h-4 w-4 fill-current" /> {t("hero.random")}
           </button>
-          <button onClick={onCatalog} className="inline-flex w-fit items-center justify-center gap-2 rounded-full bg-[#0b0a19]/65 px-5 py-2.5 text-sm font-semibold text-white ring-1 ring-white/25 backdrop-blur-md transition hover:bg-accent max-sm:w-full">
+          <button onClick={onCatalog} className="inline-flex w-fit items-center justify-center gap-1.5 rounded-full bg-[#0b0a19]/65 px-3.5 py-2 text-xs font-semibold text-white ring-1 ring-white/25 backdrop-blur-md transition hover:bg-accent sm:gap-2 sm:px-5 sm:py-2.5 sm:text-sm">
             <Shuffle className="h-4 w-4" /> {t("hero.catalog")}
           </button>
         </div>
