@@ -265,7 +265,7 @@ function Index() {
       {searching ? (
         <main className="px-4 pt-36 md:px-10 md:pt-24">
           <div className="mb-6 flex items-center justify-between">
-            <h1 className="text-xl font-semibold">{submittedQuery ? `${t("catalog.results")}: «${submittedQuery}»` : t("catalog.filterResults")} <span className="text-muted-foreground">· {catalogResults.length}</span></h1>
+            <h1 className="text-xl font-semibold">{submittedQuery ? `${t("catalog.results")}: «${submittedQuery}»` : t("catalog.filterResults")} <span className="text-muted-foreground">· {catalogLoadState === "loading" ? "…" : catalogResults.length}</span></h1>
             <button onClick={() => { setQuery(""); setSubmittedQuery(""); setDraftFilters(EMPTY_CATALOG_FILTERS); setActiveFilters(EMPTY_CATALOG_FILTERS); setFiltersOpen(false); setCatalogPage(1); }} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"><X className="h-4 w-4" />{t("catalog.reset")}</button>
           </div>
           {catalogLoadState === "loading" ? (
@@ -286,6 +286,7 @@ function Index() {
         </main>
       ) : view === "home" ? (
         <main className="pt-16">
+          {filtersOpen && catalogLoadState === "loading" && <div role="status" className="mx-4 mt-3 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-muted-foreground md:mx-10">{t("catalog.loading")}</div>}
           <Hero onCatalog={() => setView("catalog")} onRandom={random} query={query} setQuery={setQuery} onSubmitSearch={submitHomeSearch} filtersOpen={filtersOpen && catalogLoadState !== "loading"} setFiltersOpen={setFiltersOpen} draftFilters={draftFilters} setDraftFilters={setDraftFilters} onApplyFilters={applyCatalogFilters} onResetFilters={resetCatalogFilters} activeFilterCount={activeFilterCount} genres={availableGenres} statuses={availableStatuses} types={availableTypes} ageRatings={availableAgeRatings} yearMin={catalogYearRange.min} yearMax={catalogYearRange.max} />
           <div className="home-content-world -mt-10 pb-12">
             <div className="relative z-10">
@@ -348,7 +349,7 @@ function Index() {
             <CatalogFilters open={filtersOpen && catalogLoadState !== "loading"} draft={draftFilters} setDraft={setDraftFilters} onApply={applyCatalogFilters} onReset={resetCatalogFilters} genres={availableGenres} statuses={availableStatuses} types={availableTypes} ageRatings={availableAgeRatings} yearMin={catalogYearRange.min} yearMax={catalogYearRange.max} />
           </div>
           <div className="mb-5 mt-7 flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm text-muted-foreground">{t("catalog.found")} <span className="font-semibold text-foreground">{catalogResults.length}</span></p>
+            <p className="text-sm text-muted-foreground">{t("catalog.found")} <span className="font-semibold text-foreground">{catalogLoadState === "loading" ? "…" : catalogResults.length}</span></p>
             <label className="flex h-9 items-center gap-2 rounded-lg border border-border bg-secondary/80 px-3 text-sm">
               <ArrowDownWideNarrow className="h-4 w-4 text-muted-foreground" />
               <span className="text-muted-foreground max-sm:hidden">{t("catalog.sort")}</span>
