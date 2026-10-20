@@ -374,7 +374,7 @@ export async function getPersistentCatalog(
         imported = await countRows(db);
         console.warn("[YUME] Catalog seed paused; retry in", retryAfterMs, "ms.");
         return {
-          items: [],
+          items: options.progressOnly ? [] : await readRows(db),
           error: null,
           progress: makeProgress("cooldown", imported, retryAfterMs),
         };
