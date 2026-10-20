@@ -19,7 +19,45 @@ export function Row({ title, action, children }: { title: string; action?: React
   );
 }
 
-export function Hero({ onCatalog, onRandom, query, setQuery, onSubmitSearch, filtersOpen, setFiltersOpen, draftFilters, setDraftFilters, onApplyFilters, onResetFilters, activeFilterCount, genres }: { onCatalog: () => void; onRandom: () => void; query: string; setQuery: (q: string) => void; onSubmitSearch: () => void; filtersOpen: boolean; setFiltersOpen: (open: boolean) => void; draftFilters: CatalogFiltersValue; setDraftFilters: (value: CatalogFiltersValue) => void; onApplyFilters: () => void; onResetFilters: () => void; activeFilterCount: number; genres: string[] }) {
+export function Hero({
+  onCatalog,
+  onRandom,
+  query,
+  setQuery,
+  onSubmitSearch,
+  filtersOpen,
+  setFiltersOpen,
+  draftFilters,
+  setDraftFilters,
+  onApplyFilters,
+  onResetFilters,
+  activeFilterCount,
+  genres,
+  statuses,
+  types,
+  ageRatings,
+  yearMin,
+  yearMax,
+}: {
+  onCatalog: () => void;
+  onRandom: () => void;
+  query: string;
+  setQuery: (q: string) => void;
+  onSubmitSearch: () => void;
+  filtersOpen: boolean;
+  setFiltersOpen: (open: boolean) => void;
+  draftFilters: CatalogFiltersValue;
+  setDraftFilters: (value: CatalogFiltersValue) => void;
+  onApplyFilters: () => void;
+  onResetFilters: () => void;
+  activeFilterCount: number;
+  genres: string[];
+  statuses: string[];
+  types: string[];
+  ageRatings: string[];
+  yearMin: number;
+  yearMax: number;
+}) {
   const { t } = useYumePreferences();
   return (
     <section className="relative isolate h-[min(90svh,900px)] min-h-[720px] w-full max-w-[1920px] overflow-hidden md:mx-auto md:mt-2 md:h-[min(76vh,760px)] md:min-h-[560px] md:w-[calc(100%-2.5rem)] md:rounded-2xl md:ring-1 md:ring-primary/50">
@@ -50,7 +88,7 @@ export function Hero({ onCatalog, onRandom, query, setQuery, onSubmitSearch, fil
             {activeFilterCount > 0 && <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-neon px-1 text-[10px] font-bold text-primary-foreground">{activeFilterCount}</span>}
           </button>
         </div>
-        <CatalogFilters open={filtersOpen} placement="home" draft={draftFilters} setDraft={setDraftFilters} onApply={onApplyFilters} onReset={onResetFilters} genres={genres} />
+        <CatalogFilters open={filtersOpen} placement="home" draft={draftFilters} setDraft={setDraftFilters} onApply={onApplyFilters} onReset={onResetFilters} genres={genres} statuses={statuses} types={types} ageRatings={ageRatings} yearMin={yearMin} yearMax={yearMax} />
       </div>
       <div className="relative z-10 flex h-full flex-col justify-end px-5 pb-16 pt-28 md:max-w-[760px] md:justify-center md:px-10 md:pb-8 md:pt-8 lg:px-12">
         <div className="mb-3 md:mb-4">
