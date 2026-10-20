@@ -48,6 +48,7 @@ export const Route = createFileRoute("/")({
       popular,
       recent,
       apiError: catalog.error,
+      catalogProgress: catalog.progress,
     };
   },
   component: Index,
@@ -102,8 +103,17 @@ function Index() {
     document.querySelector('meta[property="og:description"]')?.setAttribute("content", metadata.ogDescription);
   }, [language]);
   const { section } = Route.useSearch();
-  const { anime: loadedAnime, popular: popularAnime, recent: recentAnime, apiError } = Route.useLoaderData();
+  const {
+    anime: loadedAnime,
+    popular: initialPopularAnime,
+    recent: initialRecentAnime,
+    apiError,
+    catalogProgress: initialCatalogProgress,
+  } = Route.useLoaderData();
   const [catalogAnime, setCatalogAnime] = useState<Anime[]>(loadedAnime.slice(0, 1000));
+  const [popularAnime, setPopularAnime] = useState<Anime[]>(initialPopularAnime);
+  const [recentAnime, setRecentAnime] = useState<Anime[]>(initialRecentAnime);
+  const [catalogProgress, setCatalogProgress] = useState(initialCatalogProgress);
   const ANIME = catalogAnime;
   const [catalogLoadState, setCatalogLoadState] = useState<"idle" | "loading" | "loaded" | "error">("idle");
   const [catalogLoadError, setCatalogLoadError] = useState<string | null>(null);
@@ -115,6 +125,79 @@ function Index() {
   useEffect(() => {
     setViewRaw(section ?? "home");
   }, [section]);
+
+  // Continue a partial D1 seed from the persisted cursor without requiring a reload.
+  // Each call fetches at most one 50-title page; cooldown responses are not retried early.
+  useEffect(() => {
+    let cancelled = false;
+    let timeoutId: number | undefined;
+    let progress = initialCatalogProgress;
+    let collectedItems = new Map(loadedAnime.map((anime) => [anime.id, anime]));
+
+    if (progress.status === "ready" || progress.status === "partial") return;
+
+    const refreshDerivedLists = (items: Anime[]) => {
+      setPopularAnime(
+        [...items]
+          .filter((anime) => anime.rating !== null)
+          .sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1))
+          .slice(0, 50),
+      );
+      setRecentAnime(
+        [...items]
+          .sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? "") || b.year - a.year)
+          .slice(0, 50),
+      );
+    };
+
+    async function continueImport() {
+      while (!cancelled && progress.status !== "ready" && progress.status !== "partial") {
+        const waitMs = Math.max(750, progress.retryAfterMs ?? 1250);
+        await new Promise<void>((resolve) => {
+          timeoutId = window.setTimeout(resolve, Math.min(waitMs, 2_147_000_000));
+        });
+        if (cancelled) return;
+
+        try {
+          const result = await getShikimoriCatalog({ data: { progressOnly: true } });
+          if (cancelled) return;
+          progress = result.progress;
+          setCatalogProgress(progress);
+
+          if (progress.status === "ready" || progress.status === "partial") {
+            collectedItems = new Map(result.items.slice(0, 1000).map((anime) => [anime.id, anime]));
+          } else {
+            for (const anime of result.items) {
+              if (!collectedItems.has(anime.id)) collectedItems.set(anime.id, anime);
+            }
+          }
+          const items = Array.from(collectedItems.values()).slice(0, 1000);
+          setCatalogAnime(items);
+          refreshDerivedLists(items);
+
+          if (progress.status === "ready") {
+            setCatalogLoadState("loaded");
+            setCatalogLoadError(null);
+          } else if (progress.status === "partial") {
+            setCatalogLoadState("error");
+            setCatalogLoadError(result.error);
+          } else {
+            setCatalogLoadState("loading");
+            setCatalogLoadError(null);
+          }
+        } catch {
+          progress = { ...progress, status: "cooldown", retryAfterMs: 5000 };
+          setCatalogProgress(progress);
+        }
+      }
+    }
+
+    void continueImport();
+    return () => {
+      cancelled = true;
+      if (timeoutId !== undefined) window.clearTimeout(timeoutId);
+    };
+  }, [initialCatalogProgress.status, loadedAnime]);
 
   const [query, setQuery] = useState("");
   const [submittedQuery, setSubmittedQuery] = useState("");
@@ -237,11 +320,25 @@ function Index() {
     catalogLoadStarted.current = true;
     setCatalogLoadState("loading");
     setCatalogLoadError(null);
-    getShikimoriCatalog({ data: { forceRefresh: catalogLoadAttempt > 0 } })
+    getShikimoriCatalog({ data: { forceRefresh: catalogLoadAttempt > 0, progressOnly: true } })
       .then((result) => {
-        if (result.items.length > 0) setCatalogAnime(result.items.slice(0, 1000));
+        setCatalogProgress(result.progress);
+        if (result.items.length > 0) {
+          const isComplete = result.progress.status === "ready" || result.progress.status === "partial";
+          setCatalogAnime((currentItems) => {
+            const merged = new Map<string, Anime>();
+            if (!isComplete) {
+              for (const anime of currentItems) merged.set(anime.id, anime);
+            }
+            for (const anime of result.items.slice(0, 1000)) {
+              if (isComplete || !merged.has(anime.id)) merged.set(anime.id, anime);
+            }
+            return Array.from(merged.values()).slice(0, 1000);
+          });
+        }
+        const isInProgress = result.progress.status === "seeding" || result.progress.status === "cooldown";
         setCatalogLoadError(result.error);
-        setCatalogLoadState(result.error ? "error" : "loaded");
+        setCatalogLoadState(isInProgress ? "loading" : result.error ? "error" : "loaded");
       })
       .catch(() => {
         setCatalogLoadError(t("source.catalogUnavailable"));
@@ -344,6 +441,16 @@ function Index() {
         <main className="px-4 pt-36 md:px-10 md:pt-24">
           <h1 className="text-2xl font-bold md:text-3xl">{t("catalog.title")}</h1>
           <p className="mt-1 text-sm text-muted-foreground">{t("catalog.subtitle")}</p>
+          {catalogLoadState === "loading" && (
+            <p className="mt-1 text-xs text-muted-foreground" role="status" aria-live="polite">
+              {language === "en"
+                ? "Loading catalog: " + catalogProgress.imported + " / " + catalogProgress.target
+                : "Загрузка каталога: " + catalogProgress.imported + " из " + catalogProgress.target}
+              {catalogProgress.status === "cooldown"
+                ? (language === "en" ? " — waiting before the next request" : " — пауза перед следующим запросом")
+                : ""}
+            </p>
+          )}
           {catalogLoadState === "loaded" && (
             <p className="mt-1 text-xs text-muted-foreground">{t("catalog.loadedCount")} <span className="font-semibold text-foreground">{ANIME.length} / 1 000</span></p>
           )}
