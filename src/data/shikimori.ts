@@ -133,24 +133,33 @@ function mapAnime(item: ShikimoriGraphQLAnime): Anime {
   const score = item.score == null || item.score === "" ? null : Number(item.score);
   const rating = score !== null && Number.isFinite(score) && score > 0 ? score : null;
   const rawGenres = item.genres ?? [];
-  const genres = rawGenres
-    .filter((genre) => genre.kind === "genre")
-    .map((genre) => genre.russian || genre.name)
-    .filter(Boolean);
-  const posterUrl = item.poster?.mainUrl || item.poster?.previewUrl || item.poster?.originalUrl || undefined;
+  const genres = Array.from(new Set(
+    rawGenres
+      .filter((genre) => genre.kind === "genre")
+      .map((genre) => cleanName(genre.russian) || cleanName(genre.name))
+      .filter(Boolean),
+  ));
+  const posterUrl =
+    safeImageUrl(item.poster?.mainUrl) ||
+    safeImageUrl(item.poster?.previewUrl) ||
+    safeImageUrl(item.poster?.originalUrl);
   const bannerUrl =
-    item.opengraphImageUrl && item.opengraphImageUrl.startsWith("https://")
-      ? item.opengraphImageUrl
-      : item.poster?.originalUrl || posterUrl;
+    safeImageUrl(item.opengraphImageUrl) ||
+    safeImageUrl(item.poster?.originalUrl) ||
+    posterUrl;
+  const originalTitle = cleanName(item.name) || "Без названия";
+  const russianTitle = cleanName(item.russian);
+  const englishValue = Array.isArray(item.english) ? item.english[0] : item.english;
+  const englishTitle = cleanName(englishValue);
   const idNumber = Number(item.id);
   const safeHue = Number.isFinite(idNumber) ? Math.abs(idNumber * 37) % 360 : 280;
   const description = cleanDescription(item.description);
 
   return {
     id: String(item.id),
-    title: item.russian?.trim() || item.name,
-    englishTitle: (Array.isArray(item.english) ? item.english[0] : item.english)?.trim() || item.name,
-    original: item.name,
+    title: russianTitle || englishTitle || originalTitle,
+    englishTitle: englishTitle || originalTitle,
+    original: originalTitle,
     year,
     episodes: Math.max(0, Number(item.episodes ?? 0) || 0),
     rating,
@@ -158,17 +167,17 @@ function mapAnime(item: ShikimoriGraphQLAnime): Anime {
     status: mapStatus(item.status),
     description,
     hue: safeHue,
-    glyph: item.name?.slice(0, 1) || "Y",
+    glyph: Array.from(originalTitle)[0] || "Y",
     isNew: year > 0 && year >= new Date().getFullYear() - 1,
     popular: rating !== null && rating >= 8.5,
     posterUrl,
     bannerUrl,
     kind: mapKind(item.kind),
     ageRating: mapAgeRating(item.rating),
-    nextEpisodeAt: item.nextEpisodeAt ?? undefined,
+    nextEpisodeAt: item.nextEpisodeAt || undefined,
     episodesAired: Math.max(0, Number(item.episodesAired ?? 0) || 0),
-    airedOn: item.airedOn?.date ?? item.releasedOn?.date ?? undefined,
-    studios: (item.studios ?? []).map((studio) => studio.name).filter(Boolean),
+    airedOn: item.airedOn?.date || item.releasedOn?.date || undefined,
+    studios: Array.from(new Set((item.studios ?? []).map((studio) => cleanName(studio.name)).filter(Boolean))),
   };
 }
 
