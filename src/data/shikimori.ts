@@ -385,9 +385,9 @@ export const getShikimoriCatalog = createServerFn({ method: "GET" })
     }
 
     // Continue through ranked pages until we have 1,000 unique, non-excluded anime records.
-    for (let page = 11; page <= 40 && unique.size < CATALOG_LIMIT; page += 3) {
+    for (let page = 11; page <= 30 && unique.size < CATALOG_LIMIT; page += 3) {
       const requests = [page, page + 1, page + 2]
-        .filter((value) => value <= 40)
+        .filter((value) => value <= 30)
         .map((value) => ({ page: value, limit: 50, order: "ranked" as const }));
       const results = await Promise.all(requests.map((request) => fetchShikimoriAnimes(validateRequest(request))));
       addResults(results);
