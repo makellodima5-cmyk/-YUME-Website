@@ -55,21 +55,21 @@ export function Header({ view, setView, onProfile }: Props) {
           <button
             type="button"
             onClick={() => setMenuOpen((open) => !open)}
-            aria-label={menuOpen ? "Закрыть меню" : "Открыть меню"}
+            aria-label={menuOpen ? t("nav.closeMenu") : t("nav.openMenu")}
             aria-expanded={menuOpen}
             aria-controls="yume-navigation-drawer"
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-foreground transition hover:bg-primary/10"
           >
             {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
-          <button type="button" onClick={() => goToView("home")} aria-label="YUME — главная" className="shrink-0">
+          <button type="button" onClick={() => goToView("home")} aria-label={t("nav.home")} className="shrink-0">
             <Logo />
           </button>
           <div className="hidden min-w-0 flex-1 md:block" />
           <div className="ml-auto flex items-center gap-1 sm:gap-2">
             <button
               type="button"
-              aria-label="Уведомления"
+              aria-label={t("nav.notifications")}
               title="Уведомления скоро появятся"
               className="relative flex h-10 w-10 items-center justify-center rounded-full text-foreground/80 transition hover:bg-primary/10"
             >
@@ -92,7 +92,7 @@ export function Header({ view, setView, onProfile }: Props) {
         <>
           <button
             type="button"
-            aria-label="Закрыть меню"
+            aria-label={t("nav.closeMenu")}
             onClick={() => setMenuOpen(false)}
             className="fixed inset-0 z-40 cursor-default bg-black/45"
           />
@@ -104,7 +104,7 @@ export function Header({ view, setView, onProfile }: Props) {
             className="fixed bottom-0 left-0 top-16 z-50 flex w-1/2 min-w-[170px] max-w-[320px] flex-col border-r border-border bg-background p-3 shadow-2xl md:w-[290px] md:min-w-0 md:max-w-none md:p-4"
           >
             <div className="mb-4 flex items-center justify-between gap-2 px-1">
-              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">YUME · Навигация</span>
+              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">{t("nav.menuTitle")}</span>
               <button
                 type="button"
                 onClick={() => setMenuOpen(false)}
@@ -151,7 +151,7 @@ export function Header({ view, setView, onProfile }: Props) {
             <div className="mt-auto space-y-3 border-t border-border pt-3">
               <div className="flex items-center justify-between gap-2">
                 <span className="flex items-center gap-2 text-xs font-medium text-muted-foreground"><Moon className="h-4 w-4" />{t("nav.theme")}</span>
-                <button type="button" role="switch" aria-label="Переключить тему" aria-checked={theme === "light"} onClick={() => setTheme(theme === "light" ? "dark" : "light")} className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${theme === "light" ? "bg-primary" : "bg-muted"}`}>
+                <button type="button" role="switch" aria-label={t("nav.toggleTheme")} aria-checked={theme === "light"} onClick={() => setTheme(theme === "light" ? "dark" : "light")} className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${theme === "light" ? "bg-primary" : "bg-muted"}`}>
                   <span className={`absolute top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-background shadow transition-transform ${theme === "light" ? "translate-x-[22px]" : "translate-x-0.5"}`}>{theme === "light" ? <Sun className="h-3 w-3" /> : <Moon className="h-3 w-3" />}</span>
                 </button>
               </div>
