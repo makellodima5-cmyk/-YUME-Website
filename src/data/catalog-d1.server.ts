@@ -1,15 +1,34 @@
 import { env as cloudflareEnv } from "cloudflare:workers";
 import type { Anime } from "@/data/anime";
 
-// The native Cloudflare env binding is the primary source. Keep the injected
-// environment as a fallback for tests and non-Cloudflare server adapters.
+// Prefer Cloudflare's request-scoped env binding; the injected value remains a
+// fallback for local adapters and tests.
 type RuntimeGlobal = typeof globalThis & { __YUME_RUNTIME_ENV__?: unknown };
 
 export function setCatalogRuntimeEnvironment(env: unknown): void {
   (globalThis as RuntimeGlobal).__YUME_RUNTIME_ENV__ = env;
 }
 
-type CatalogResult = { items: Anime[]; error: string | null };
+export type CatalogProgress = {
+  status: "seeding" | "cooldown" | "ready" | "partial";
+  imported: number;
+  target: number;
+  retryAfterMs?: number;
+};
+
+export type CatalogResult = {
+  items: Anime[];
+  error: string | null;
+  progress: CatalogProgress;
+};
+
+export type CatalogSeedPageResult = {
+  items: Anime[];
+  error: string | null;
+  retryAfterMs?: number;
+  done?: boolean;
+};
+
 type RunResult = { meta?: { changes?: number } };
 type AnimeRow = {
   id: string;
@@ -51,49 +70,56 @@ interface D1Database {
 }
 
 const CATALOG_LIMIT = 1000;
-const INITIALIZATION_LOCK_MS = 10 * 60 * 1000;
+const LOCK_TTL_MS = 30 * 1000;
+const DEFAULT_RETRY_MS = 5 * 1000;
 const NEUTRAL_ERROR = "Каталог временно недоступен.";
-const CREATE_SCHEMA = `
-  CREATE TABLE IF NOT EXISTS anime_catalog (
-    id TEXT PRIMARY KEY NOT NULL,
-    title TEXT NOT NULL,
-    english_title TEXT,
-    original_title TEXT NOT NULL,
-    year INTEGER NOT NULL DEFAULT 0,
-    episodes INTEGER NOT NULL DEFAULT 0,
-    rating REAL,
-    genres_json TEXT NOT NULL DEFAULT '[]',
-    status TEXT NOT NULL DEFAULT 'Неизвестно',
-    description TEXT NOT NULL DEFAULT '',
-    hue INTEGER NOT NULL DEFAULT 280,
-    glyph TEXT NOT NULL DEFAULT 'Y',
-    is_new INTEGER NOT NULL DEFAULT 0,
-    popular INTEGER NOT NULL DEFAULT 0,
-    poster_url TEXT,
-    banner_url TEXT,
-    kind TEXT,
-    age_rating TEXT,
-    next_episode_at TEXT,
-    episodes_aired INTEGER NOT NULL DEFAULT 0,
-    aired_on TEXT,
-    studios_json TEXT NOT NULL DEFAULT '[]',
-    youtube_trailer_id TEXT,
-    position INTEGER NOT NULL DEFAULT 0,
-    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-  );
-  CREATE INDEX IF NOT EXISTS idx_anime_catalog_title ON anime_catalog(title);
-  CREATE INDEX IF NOT EXISTS idx_anime_catalog_position ON anime_catalog(position);
-  CREATE TABLE IF NOT EXISTS anime_catalog_meta (
-    key TEXT PRIMARY KEY NOT NULL,
-    value TEXT NOT NULL
-  );
-`;
+const CREATE_SCHEMA = [
+  "CREATE TABLE IF NOT EXISTS anime_catalog (",
+  "  id TEXT PRIMARY KEY NOT NULL,",
+  "  title TEXT NOT NULL,",
+  "  english_title TEXT,",
+  "  original_title TEXT NOT NULL,",
+  "  year INTEGER NOT NULL DEFAULT 0,",
+  "  episodes INTEGER NOT NULL DEFAULT 0,",
+  "  rating REAL,",
+  "  genres_json TEXT NOT NULL DEFAULT '[]',",
+  "  status TEXT NOT NULL DEFAULT 'Неизвестно',",
+  "  description TEXT NOT NULL DEFAULT '',",
+  "  hue INTEGER NOT NULL DEFAULT 280,",
+  "  glyph TEXT NOT NULL DEFAULT 'Y',",
+  "  is_new INTEGER NOT NULL DEFAULT 0,",
+  "  popular INTEGER NOT NULL DEFAULT 0,",
+  "  poster_url TEXT,",
+  "  banner_url TEXT,",
+  "  kind TEXT,",
+  "  age_rating TEXT,",
+  "  next_episode_at TEXT,",
+  "  episodes_aired INTEGER NOT NULL DEFAULT 0,",
+  "  aired_on TEXT,",
+  "  studios_json TEXT NOT NULL DEFAULT '[]',",
+  "  youtube_trailer_id TEXT,",
+  "  position INTEGER NOT NULL DEFAULT 0,",
+  "  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP",
+  ");",
+  "CREATE INDEX IF NOT EXISTS idx_anime_catalog_title ON anime_catalog(title);",
+  "CREATE INDEX IF NOT EXISTS idx_anime_catalog_position ON anime_catalog(position);",
+  "CREATE TABLE IF NOT EXISTS anime_catalog_meta (",
+  "  key TEXT PRIMARY KEY NOT NULL,",
+  "  value TEXT NOT NULL",
+  ");",
+].join("\n");
 
 let schemaReady = false;
 let missingBindingWarningLogged = false;
 
 function database(): D1Database | null {
-  const nativeBinding = (cloudflareEnv as unknown as Record<string, unknown>).YUME_DB;
+  let nativeBinding: unknown;
+  try {
+    nativeBinding = (cloudflareEnv as unknown as Record<string, unknown>).YUME_DB;
+  } catch {
+    nativeBinding = undefined;
+  }
+
   const injectedEnv = (globalThis as RuntimeGlobal).__YUME_RUNTIME_ENV__;
   const injectedBinding =
     injectedEnv && typeof injectedEnv === "object"
@@ -186,126 +212,230 @@ function rowValues(item: Anime, position: number): unknown[] {
   ];
 }
 
-const INSERT_ANIME = `
-  INSERT OR REPLACE INTO anime_catalog (
-    id, title, english_title, original_title, year, episodes, rating,
-    genres_json, status, description, hue, glyph, is_new, popular,
-    poster_url, banner_url, kind, age_rating, next_episode_at, episodes_aired,
-    aired_on, studios_json, youtube_trailer_id, position, updated_at
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-`;
+const INSERT_ANIME = [
+  "INSERT OR IGNORE INTO anime_catalog (",
+  "  id, title, english_title, original_title, year, episodes, rating,",
+  "  genres_json, status, description, hue, glyph, is_new, popular,",
+  "  poster_url, banner_url, kind, age_rating, next_episode_at, episodes_aired,",
+  "  aired_on, studios_json, youtube_trailer_id, position, updated_at",
+  ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)",
+].join("\n");
+
+async function getMeta(db: D1Database, key: string): Promise<string | null> {
+  const row = await db.prepare("SELECT value FROM anime_catalog_meta WHERE key = ?")
+    .bind(key)
+    .first<{ value: string }>();
+  return row?.value ?? null;
+}
+
+function putMeta(db: D1Database, key: string, value: string): D1Statement {
+  return db.prepare("INSERT OR REPLACE INTO anime_catalog_meta (key, value) VALUES (?, ?)")
+    .bind(key, value);
+}
 
 async function readRows(db: D1Database): Promise<Anime[]> {
   const result = await db.prepare("SELECT * FROM anime_catalog ORDER BY position ASC, id ASC").all<AnimeRow>();
   return result.results.map(rowToAnime);
 }
 
-async function catalogState(db: D1Database): Promise<string | null> {
-  const state = await db.prepare("SELECT value FROM anime_catalog_meta WHERE key = ?")
-    .bind("catalog_state")
-    .first<{ value: string }>();
-  return state?.value ?? null;
+async function countRows(db: D1Database): Promise<number> {
+  const result = await db.prepare("SELECT COUNT(*) AS count FROM anime_catalog")
+    .first<{ count: number }>();
+  return Number(result?.count ?? 0);
+}
+
+function makeProgress(
+  status: CatalogProgress["status"],
+  imported: number,
+  retryAfterMs?: number,
+): CatalogProgress {
+  return {
+    status,
+    imported,
+    target: CATALOG_LIMIT,
+    ...(retryAfterMs !== undefined ? { retryAfterMs } : {}),
+  };
 }
 
 /**
- * Reads the editable catalog from D1. If the table has never been initialized,
- * fetches the initial 1,000-entry set once and persists it before returning.
- * Returns null only when this runtime has no YUME_DB binding (for local/Vercel compatibility).
+ * Returns the persistent catalog and advances its seed by at most one upstream
+ * page per invocation. The cursor and every imported page are saved in D1, so a
+ * timeout, deploy, or Shikimori 429 never forces the importer to start over.
  */
 export async function getPersistentCatalog(
-  buildInitialCatalog: () => Promise<CatalogResult>,
+  fetchSeedPage: (cursor: number) => Promise<CatalogSeedPageResult>,
 ): Promise<CatalogResult | null> {
   const db = database();
   if (!db) {
     if (!missingBindingWarningLogged) {
       missingBindingWarningLogged = true;
-      console.error(
-        "[YUME] D1 binding YUME_DB is unavailable in the Worker runtime; catalog requests are falling back to Shikimori.",
-      );
+      console.error("[YUME] D1 binding YUME_DB is unavailable in the Worker runtime.");
     }
     return null;
   }
 
   try {
     await ensureSchema(db);
-    let state = await catalogState(db);
+
+    let state = await getMeta(db, "catalog_state");
+    let imported = await countRows(db);
 
     if (state === "ready") {
-      return { items: await readRows(db), error: null };
+      return { items: await readRows(db), error: null, progress: makeProgress("ready", imported) };
+    }
+    if (state === "partial") {
+      return {
+        items: await readRows(db),
+        error: \`Каталог загружен частично: \${imported} из \${CATALOG_LIMIT} записей.\`,
+        progress: makeProgress("partial", imported),
+      };
     }
 
-    if (state?.startsWith("seeding:")) {
-      const timestamp = Number(state.slice("seeding:".length));
-      if (Number.isFinite(timestamp) && Date.now() - timestamp < INITIALIZATION_LOCK_MS) {
-        return { items: [], error: NEUTRAL_ERROR };
-      }
-
-      const removed = await db.prepare("DELETE FROM anime_catalog_meta WHERE key = ? AND value = ?")
-        .bind("catalog_state", state)
-        .run();
-      if ((removed.meta?.changes ?? 0) > 0) {
-        await db.prepare("DELETE FROM anime_catalog").run();
-      }
-      state = await catalogState(db);
-      if (state === "ready") return { items: await readRows(db), error: null };
+    // Preserve manually inserted catalog rows from earlier deployments.
+    if (!state && imported > 0) {
+      await db.batch([putMeta(db, "catalog_state", "ready")]);
+      return { items: await readRows(db), error: null, progress: makeProgress("ready", imported) };
     }
 
-    // Respect records created manually in D1 before the first YUME visit.
-    const count = await db.prepare("SELECT COUNT(*) AS count FROM anime_catalog")
-      .first<{ count: number }>();
-    if (!state && Number(count?.count ?? 0) > 0) {
-      await db.prepare("INSERT OR REPLACE INTO anime_catalog_meta (key, value) VALUES (?, ?)")
-        .bind("catalog_state", "ready")
-        .run();
-      return { items: await readRows(db), error: null };
+    if (!state) {
+      await db.batch([
+        putMeta(db, "catalog_state", "seeding"),
+        putMeta(db, "catalog_cursor", "0"),
+        putMeta(db, "catalog_failures", "0"),
+        putMeta(db, "catalog_resume_at", "0"),
+      ]);
+      state = "seeding";
     }
 
-    const lockValue = "seeding:" + Date.now();
-    const lock = await db.prepare("INSERT OR IGNORE INTO anime_catalog_meta (key, value) VALUES (?, ?)")
-      .bind("catalog_state", lockValue)
-      .run();
-    if ((lock.meta?.changes ?? 0) !== 1) {
-      const stateAfterLock = await catalogState(db);
-      if (stateAfterLock === "ready") return { items: await readRows(db), error: null };
-      return { items: [], error: NEUTRAL_ERROR };
+    const now = Date.now();
+    const resumeAt = Number(await getMeta(db, "catalog_resume_at") ?? "0");
+    if (Number.isFinite(resumeAt) && resumeAt > now) {
+      return {
+        items: await readRows(db),
+        error: null,
+        progress: makeProgress("cooldown", imported, resumeAt - now),
+      };
+    }
+
+    // Atomic D1 lock: concurrent page requests may read the catalog, but only one
+    // of them is allowed to contact Shikimori and advance the cursor at a time.
+    const lockUntil = now + LOCK_TTL_MS;
+    const lockResult = await db.prepare([
+      "INSERT OR REPLACE INTO anime_catalog_meta (key, value)",
+      "SELECT ?, ?",
+      "WHERE NOT EXISTS (",
+      "  SELECT 1 FROM anime_catalog_meta",
+      "  WHERE key = ? AND CAST(value AS INTEGER) > ?",
+      ")",
+    ].join("\n")).bind("catalog_lock", String(lockUntil), "catalog_lock", now).run();
+
+    if ((lockResult.meta?.changes ?? 0) !== 1) {
+      const existingLockUntil = Number(await getMeta(db, "catalog_lock") ?? String(now + 1000));
+      return {
+        items: await readRows(db),
+        error: null,
+        progress: makeProgress("cooldown", imported, Math.max(1000, existingLockUntil - now)),
+      };
     }
 
     try {
-      const result = await buildInitialCatalog();
-      if (result.error || result.items.length !== CATALOG_LIMIT) {
-        throw new Error("Initial catalog was incomplete: " + result.items.length + "/" + CATALOG_LIMIT);
+      const cursor = Math.max(0, Math.floor(Number(await getMeta(db, "catalog_cursor") ?? "0")));
+      let page: CatalogSeedPageResult;
+      try {
+        page = await fetchSeedPage(cursor);
+      } catch (error) {
+        console.error("[YUME] Catalog seed page failed:", error);
+        page = { items: [], error: "Temporary catalog source error." };
       }
 
-      // Keep the seed all-or-retry from the UI's perspective. The "ready" marker is
-      // written only after every batch succeeded, so visitors never get a partial catalog.
-      await db.prepare("DELETE FROM anime_catalog").run();
-      const batchSize = 75;
-      for (let start = 0; start < result.items.length; start += batchSize) {
-        const statements = result.items.slice(start, start + batchSize).map((item, index) =>
-          db.prepare(INSERT_ANIME).bind(...rowValues(item, start + index)),
+      if (page.done) {
+        await db.batch([putMeta(db, "catalog_state", "partial")]);
+        imported = await countRows(db);
+        return {
+          items: await readRows(db),
+          error: \`Каталог загружен частично: \${imported} из \${CATALOG_LIMIT} записей.\`,
+          progress: makeProgress("partial", imported),
+        };
+      }
+
+      if (page.error) {
+        const failures = Math.max(0, Number(await getMeta(db, "catalog_failures") ?? "0")) + 1;
+        const exponentialBackoff = DEFAULT_RETRY_MS * (2 ** Math.min(failures - 1, 6));
+        const retryAfterMs = Math.max(
+          1000,
+          Math.min(page.retryAfterMs ?? exponentialBackoff, 10 * 60 * 1000),
         );
+        await db.batch([
+          putMeta(db, "catalog_failures", String(failures)),
+          putMeta(db, "catalog_resume_at", String(Date.now() + retryAfterMs)),
+        ]);
+        imported = await countRows(db);
+        console.warn("[YUME] Catalog seed paused; retry in", retryAfterMs, "ms.");
+        return {
+          items: await readRows(db),
+          error: null,
+          progress: makeProgress("cooldown", imported, retryAfterMs),
+        };
+      }
+
+      // Every Shikimori response is capped at 50. INSERT OR IGNORE makes replaying
+      // a page idempotent if the Worker stops between inserting rows and saving cursor.
+      const statements: D1Statement[] = page.items.slice(0, 50).map((item, index) =>
+        db.prepare(INSERT_ANIME).bind(...rowValues(item, cursor * 50 + index)),
+      );
+      if (statements.length) {
+        statements.push(db.prepare([
+          "DELETE FROM anime_catalog",
+          "WHERE id IN (",
+          "  SELECT id FROM anime_catalog",
+          "  ORDER BY position ASC, id ASC",
+          "  LIMIT -1 OFFSET ?",
+          ")",
+        ].join("\n")).bind(CATALOG_LIMIT));
         await db.batch(statements);
       }
-      await db.prepare("INSERT OR REPLACE INTO anime_catalog_meta (key, value) VALUES (?, ?)")
-        .bind("catalog_state", "ready")
-        .run();
 
-      return { items: await readRows(db), error: null };
-    } catch (error) {
-      console.error("[YUME] Persistent catalog initialization failed:", error);
-      try {
-        await db.prepare("DELETE FROM anime_catalog").run();
-        await db.prepare("DELETE FROM anime_catalog_meta WHERE key = ? AND value = ?")
-          .bind("catalog_state", lockValue)
-          .run();
-      } catch (cleanupError) {
-        console.error("[YUME] Could not clean up an incomplete catalog seed:", cleanupError);
-      }
-      return { items: [], error: NEUTRAL_ERROR };
+      imported = await countRows(db);
+      const nextCursor = cursor + 1;
+      const maxRequests = 20 + (500 - 11 + 1);
+      const nextState = imported >= CATALOG_LIMIT
+        ? "ready"
+        : nextCursor >= maxRequests
+          ? "partial"
+          : "seeding";
+
+      await db.batch([
+        putMeta(db, "catalog_cursor", String(nextCursor)),
+        putMeta(db, "catalog_failures", "0"),
+        putMeta(db, "catalog_resume_at", "0"),
+        putMeta(db, "catalog_state", nextState),
+      ]);
+
+      const items = await readRows(db);
+      const error = nextState === "partial"
+        ? \`Каталог загружен частично: \${imported} из \${CATALOG_LIMIT} записей.\`
+        : null;
+      return {
+        items,
+        error,
+        progress: makeProgress(
+          nextState,
+          imported,
+          nextState === "seeding" ? 1250 : undefined,
+        ),
+      };
+    } finally {
+      await db.prepare("DELETE FROM anime_catalog_meta WHERE key = ? AND value = ?")
+        .bind("catalog_lock", String(lockUntil))
+        .run();
     }
   } catch (error) {
     schemaReady = false;
     console.error("[YUME] D1 catalog access failed:", error);
-    return { items: [], error: NEUTRAL_ERROR };
+    return {
+      items: [],
+      error: NEUTRAL_ERROR,
+      progress: makeProgress("cooldown", 0, DEFAULT_RETRY_MS),
+    };
   }
 }
