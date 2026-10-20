@@ -31,7 +31,7 @@ export function Header({ view, setView, onProfile }: Props) {
         collections: "Подборки",
         popular: "Популярное",
         favorites: "Избранное",
-        watchlist: "Список просмотра",
+        watchlist: "Смотреть позже",
         history: "История просмотров",
         legal: "Правовая информация",
         theme: "Тема оформления",
@@ -45,7 +45,7 @@ export function Header({ view, setView, onProfile }: Props) {
         collections: "Collections",
         popular: "Popular",
         favorites: "Favorites",
-        watchlist: "Watchlist",
+        watchlist: "Watch later",
         history: "Watch history",
         legal: "Legal information",
         theme: "Theme",
@@ -132,7 +132,7 @@ export function Header({ view, setView, onProfile }: Props) {
             role="dialog"
             aria-modal="true"
             aria-label={navigationText.main}
-            className="fixed bottom-0 left-0 top-16 z-50 flex w-1/2 min-w-[170px] max-w-[320px] flex-col border-r border-border bg-background p-3 shadow-2xl md:w-[290px] md:min-w-0 md:max-w-none md:p-4"
+            className="fixed bottom-0 left-0 top-16 z-50 flex min-h-0 w-1/2 min-w-[170px] max-w-[320px] flex-col overflow-y-auto overscroll-contain border-r border-border bg-background p-3 shadow-2xl md:w-[290px] md:min-w-0 md:max-w-none md:p-4"
           >
             <div className="mb-4 flex items-center justify-between gap-2 px-1">
               <span className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">{navigationText.menuTitle}</span>
