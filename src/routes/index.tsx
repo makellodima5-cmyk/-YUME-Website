@@ -201,12 +201,12 @@ function Index() {
     Number(activeFilters.yearTo !== "") + Number(activeFilters.minRating > 0) +
     Number(activeFilters.type !== "Любой") + Number(activeFilters.ageRating !== "Любой");
   const searching = view === "home" && (submittedQuery.length > 0 || activeFilterCount > 0);
+  const needsFullCatalog = view === "catalog" ||
+    (view === "home" && (Boolean(submittedQuery.trim()) || activeFilterCount > 0 || filtersOpen));
   // Any search/filter view must use the same capped local catalog of up to 1,000 titles.
   // Never send the user's typed query to Shikimori.
   useEffect(() => {
-    const shouldLoadCatalog = view === "catalog" ||
-      (view === "home" && (Boolean(submittedQuery.trim()) || activeFilterCount > 0 || filtersOpen));
-    if (!shouldLoadCatalog || catalogLoadStarted.current ||
+    if (!needsFullCatalog || catalogLoadStarted.current ||
         catalogLoadState === "loaded" || catalogLoadState === "error") return;
 
     catalogLoadStarted.current = true;
@@ -222,7 +222,7 @@ function Index() {
         setCatalogLoadError(t("source.catalogUnavailable"));
         setCatalogLoadState("error");
       });
-  }, [view, submittedQuery, activeFilterCount, filtersOpen, catalogLoadAttempt, catalogLoadState, t]);
+  }, [needsFullCatalog, catalogLoadAttempt, catalogLoadState, t]);
   const submitHomeSearch = () => {
     setSubmittedQuery(query.trim());
     setCatalogPage(1);
@@ -265,10 +265,10 @@ function Index() {
       {searching ? (
         <main className="px-4 pt-36 md:px-10 md:pt-24">
           <div className="mb-6 flex items-center justify-between">
-            <h1 className="text-xl font-semibold">{submittedQuery ? `${t("catalog.results")}: «${submittedQuery}»` : t("catalog.filterResults")} <span className="text-muted-foreground">· {catalogLoadState === "loading" ? "…" : catalogResults.length}</span></h1>
+            <h1 className="text-xl font-semibold">{submittedQuery ? `${t("catalog.results")}: «${submittedQuery}»` : t("catalog.filterResults")} <span className="text-muted-foreground">· {needsFullCatalog && catalogLoadState !== "loaded" && catalogLoadState !== "error" ? "…" : catalogResults.length}</span></h1>
             <button onClick={() => { setQuery(""); setSubmittedQuery(""); setDraftFilters(EMPTY_CATALOG_FILTERS); setActiveFilters(EMPTY_CATALOG_FILTERS); setFiltersOpen(false); setCatalogPage(1); }} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"><X className="h-4 w-4" />{t("catalog.reset")}</button>
           </div>
-          {catalogLoadState === "loading" ? (
+          {needsFullCatalog && catalogLoadState !== "loaded" && catalogLoadState !== "error" ? (
             <div role="status" className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-6 text-center text-sm text-muted-foreground">
               {t("catalog.loading")}
             </div>
@@ -286,8 +286,8 @@ function Index() {
         </main>
       ) : view === "home" ? (
         <main className="pt-16">
-          {filtersOpen && catalogLoadState === "loading" && <div role="status" className="mx-4 mt-3 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-muted-foreground md:mx-10">{t("catalog.loading")}</div>}
-          <Hero onCatalog={() => setView("catalog")} onRandom={random} query={query} setQuery={setQuery} onSubmitSearch={submitHomeSearch} filtersOpen={filtersOpen && catalogLoadState !== "loading"} setFiltersOpen={setFiltersOpen} draftFilters={draftFilters} setDraftFilters={setDraftFilters} onApplyFilters={applyCatalogFilters} onResetFilters={resetCatalogFilters} activeFilterCount={activeFilterCount} genres={availableGenres} statuses={availableStatuses} types={availableTypes} ageRatings={availableAgeRatings} yearMin={catalogYearRange.min} yearMax={catalogYearRange.max} />
+          {filtersOpen && needsFullCatalog && catalogLoadState !== "loaded" && catalogLoadState !== "error" && <div role="status" className="mx-4 mt-3 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-muted-foreground md:mx-10">{t("catalog.loading")}</div>}
+          <Hero onCatalog={() => setView("catalog")} onRandom={random} query={query} setQuery={setQuery} onSubmitSearch={submitHomeSearch} filtersOpen={filtersOpen && (!needsFullCatalog || catalogLoadState === "loaded" || catalogLoadState === "error")} setFiltersOpen={setFiltersOpen} draftFilters={draftFilters} setDraftFilters={setDraftFilters} onApplyFilters={applyCatalogFilters} onResetFilters={resetCatalogFilters} activeFilterCount={activeFilterCount} genres={availableGenres} statuses={availableStatuses} types={availableTypes} ageRatings={availableAgeRatings} yearMin={catalogYearRange.min} yearMax={catalogYearRange.max} />
           <div className="home-content-world -mt-10 pb-12">
             <div className="relative z-10">
               {ANIME.length === 0 ? (
@@ -325,7 +325,7 @@ function Index() {
           {catalogLoadState === "loaded" && (
             <p className="mt-1 text-xs text-muted-foreground">{t("catalog.loadedCount")} <span className="font-semibold text-foreground">{ANIME.length} / 1 000</span></p>
           )}
-          {catalogLoadState === "loading" && (
+          {needsFullCatalog && catalogLoadState !== "loaded" && catalogLoadState !== "error" && (
             <div role="status" className="mt-4 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-muted-foreground">
               {t("catalog.loading")} <span className="font-semibold text-foreground">{ANIME.length} / 1 000</span>
             </div>
@@ -339,14 +339,14 @@ function Index() {
           <div className="relative z-30 mt-5 max-w-xl">
             <div className="flex h-11 items-center rounded-xl border border-white/10 bg-[#171127]/75 shadow-lg shadow-black/10 backdrop-blur-xl focus-within:border-primary/60">
               <Search className="ml-3 h-4 w-4 shrink-0 text-muted-foreground" />
-              <input value={catalogQuery} onChange={(event) => { setCatalogQuery(event.target.value); setCatalogPage(1); }} disabled={catalogLoadState === "loading"} placeholder={t("search.placeholder")} aria-label={t("catalog.search")} className="h-full min-w-0 flex-1 bg-transparent px-2.5 text-sm outline-none placeholder:text-muted-foreground" />
+              <input value={catalogQuery} onChange={(event) => { setCatalogQuery(event.target.value); setCatalogPage(1); }} disabled={needsFullCatalog && catalogLoadState !== "loaded" && catalogLoadState !== "error"} placeholder={t("search.placeholder")} aria-label={t("catalog.search")} className="h-full min-w-0 flex-1 bg-transparent px-2.5 text-sm outline-none placeholder:text-muted-foreground" />
               {catalogQuery && <button type="button" aria-label={t("search.clear")} onClick={() => { setCatalogQuery(""); setCatalogPage(1); }} className="rounded-full p-1.5 text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>}
-              <button type="button" disabled={catalogLoadState === "loading"} onClick={() => { setDraftFilters({ ...activeFilters, genres: [...activeFilters.genres] }); setFiltersOpen((open) => !open); }} aria-label={t("filters.open")} aria-expanded={filtersOpen} data-filter-trigger className={`relative mr-1.5 flex h-8 w-9 shrink-0 items-center justify-center rounded-lg transition ${filtersOpen || activeFilterCount ? "bg-primary/20 text-primary" : "text-muted-foreground hover:bg-accent hover:text-foreground"}`}>
+              <button type="button" disabled={needsFullCatalog && catalogLoadState !== "loaded" && catalogLoadState !== "error"} onClick={() => { setDraftFilters({ ...activeFilters, genres: [...activeFilters.genres] }); setFiltersOpen((open) => !open); }} aria-label={t("filters.open")} aria-expanded={filtersOpen} data-filter-trigger className={`relative mr-1.5 flex h-8 w-9 shrink-0 items-center justify-center rounded-lg transition ${filtersOpen || activeFilterCount ? "bg-primary/20 text-primary" : "text-muted-foreground hover:bg-accent hover:text-foreground"}`}>
                 <SlidersHorizontal className="h-4 w-4" />
                 {activeFilterCount > 0 && <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-neon px-1 text-[10px] font-bold text-primary-foreground">{activeFilterCount}</span>}
               </button>
             </div>
-            <CatalogFilters open={filtersOpen && catalogLoadState !== "loading"} draft={draftFilters} setDraft={setDraftFilters} onApply={applyCatalogFilters} onReset={resetCatalogFilters} genres={availableGenres} statuses={availableStatuses} types={availableTypes} ageRatings={availableAgeRatings} yearMin={catalogYearRange.min} yearMax={catalogYearRange.max} />
+            <CatalogFilters open={filtersOpen && (!needsFullCatalog || catalogLoadState === "loaded" || catalogLoadState === "error")} draft={draftFilters} setDraft={setDraftFilters} onApply={applyCatalogFilters} onReset={resetCatalogFilters} genres={availableGenres} statuses={availableStatuses} types={availableTypes} ageRatings={availableAgeRatings} yearMin={catalogYearRange.min} yearMax={catalogYearRange.max} />
           </div>
           <div className="mb-5 mt-7 flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-muted-foreground">{t("catalog.found")} <span className="font-semibold text-foreground">{catalogLoadState === "loading" ? "…" : catalogResults.length}</span></p>
@@ -359,7 +359,7 @@ function Index() {
               <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
             </label>
           </div>
-          {catalogLoadState === "loading" ? (
+          {needsFullCatalog && catalogLoadState !== "loaded" && catalogLoadState !== "error" ? (
             <div role="status" className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-8 text-center text-sm text-muted-foreground">
               {t("catalog.loading")}
             </div>
