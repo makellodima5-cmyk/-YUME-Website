@@ -316,9 +316,25 @@ function Index() {
     setCatalogLoadError(null);
     getShikimoriCatalog({ data: { forceRefresh: catalogLoadAttempt > 0 } })
       .then((result) => {
-        if (result.items.length > 0) setCatalogAnime(result.items.slice(0, 1000));
+        setCatalogProgress(result.progress);
+        if (result.items.length > 0) {
+          const items = result.items.slice(0, 1000);
+          setCatalogAnime(items);
+          setPopularAnime(
+            [...items]
+              .filter((anime) => anime.rating !== null)
+              .sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1))
+              .slice(0, 50),
+          );
+          setRecentAnime(
+            [...items]
+              .sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? "") || b.year - a.year)
+              .slice(0, 50),
+          );
+        }
+        const isInProgress = result.progress.status === "seeding" || result.progress.status === "cooldown";
         setCatalogLoadError(result.error);
-        setCatalogLoadState(result.error ? "error" : "loaded");
+        setCatalogLoadState(isInProgress ? "loading" : result.error ? "error" : "loaded");
       })
       .catch(() => {
         setCatalogLoadError(t("source.catalogUnavailable"));
