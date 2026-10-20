@@ -72,6 +72,7 @@ interface D1Database {
 const CATALOG_LIMIT = 1000;
 const LOCK_TTL_MS = 30 * 1000;
 const DEFAULT_RETRY_MS = 5 * 1000;
+const SEED_REQUEST_DELAY_MS = 1250;
 const NEUTRAL_ERROR = "Каталог временно недоступен.";
 const CREATE_SCHEMA = [
   "CREATE TABLE IF NOT EXISTS anime_catalog (",
@@ -407,7 +408,11 @@ export async function getPersistentCatalog(
       await db.batch([
         putMeta(db, "catalog_cursor", String(nextCursor)),
         putMeta(db, "catalog_failures", "0"),
-        putMeta(db, "catalog_resume_at", "0"),
+        putMeta(
+          db,
+          "catalog_resume_at",
+          nextState === "seeding" ? String(Date.now() + SEED_REQUEST_DELAY_MS) : "0",
+        ),
         putMeta(db, "catalog_state", nextState),
       ]);
 
@@ -421,7 +426,7 @@ export async function getPersistentCatalog(
         progress: makeProgress(
           nextState,
           imported,
-          nextState === "seeding" ? 1250 : undefined,
+          nextState === "seeding" ? SEED_REQUEST_DELAY_MS : undefined,
         ),
       };
     } finally {
