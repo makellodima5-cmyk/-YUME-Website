@@ -85,6 +85,24 @@ function cleanDescription(value: string | null | undefined): string {
     .trim();
 }
 
+function safeImageUrl(value: string | null | undefined): string | undefined {
+  if (!value?.trim()) return undefined;
+
+  try {
+    const url = new URL(value.trim());
+    if (url.protocol !== "https:" && url.protocol !== "http:") return undefined;
+    // Avoid mixed-content failures if the source returns a legacy HTTP image URL.
+    url.protocol = "https:";
+    return url.toString();
+  } catch {
+    return undefined;
+  }
+}
+
+function cleanName(value: string | null | undefined): string {
+  return (value ?? "").replace(/\s+/g, " ").trim();
+}
+
 function mapStatus(value: string | null | undefined): Anime["status"] {
   if (value === "ongoing") return "Онгоинг";
   if (value === "anons") return "Анонс";
