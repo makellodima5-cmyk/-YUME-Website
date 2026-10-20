@@ -1,4 +1,5 @@
 import { useRef } from "react";
+import { createPortal } from "react-dom";
 import { Check, ChevronDown, SlidersHorizontal } from "lucide-react";
 import { ALL_GENRES } from "@/data/anime";
 import { useYumePreferences, displayGenre, displayAnimeKind, displayAnimeStatus } from "@/data/preferences";
@@ -68,11 +69,11 @@ export function CatalogFilters({
   });
 
   const panelPosition = placement === "home"
-    ? "fixed left-3 right-3 top-[145px] z-[60] max-h-[calc(100svh-230px)] overflow-y-auto sm:left-8 sm:right-auto sm:top-[120px] sm:max-h-[calc(100svh-160px)]"
-    : "absolute right-0 top-full z-40 mt-2 max-h-[calc(100svh-180px)] overflow-y-auto";
+    ? "fixed left-3 right-3 top-[calc(env(safe-area-inset-top)+76px)] z-[100] mx-auto max-h-[calc(100dvh-env(safe-area-inset-top)-92px)] overflow-y-auto sm:left-8 sm:right-auto sm:top-[calc(env(safe-area-inset-top)+76px)]"
+    : "absolute right-0 top-full z-40 mt-2 max-h-[calc(100dvh-180px)] overflow-y-auto";
 
-  return (
-    <div ref={panelRef} className={`${panelPosition} w-[min(94vw,440px)] rounded-2xl border border-white/10 bg-[#171127]/[.98] p-3 shadow-2xl shadow-black/40 backdrop-blur-2xl sm:p-4`} role="dialog" aria-label={t("filters.dialogLabel")}>
+  const panel = (
+    <div ref={panelRef} className={`${panelPosition} w-[min(calc(100vw-1.5rem),440px)] rounded-2xl border border-border bg-popover p-3 text-popover-foreground shadow-2xl shadow-black/25 sm:p-4`} role="dialog" aria-label={t("filters.dialogLabel")} data-catalog-filter-panel>
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2 text-sm font-semibold"><SlidersHorizontal className="h-4 w-4 text-primary" /> {t("filters.title")}</div>
       </div>
@@ -84,11 +85,11 @@ export function CatalogFilters({
             <span className="truncate">{draft.genres.length ? `${draft.genres.length}: ${draft.genres.slice(0, 2).map((genre) => displayGenre(genre, language)).join(", ")}${draft.genres.length > 2 ? "…" : ""}` : t("filters.chooseGenres")}</span>
             <ChevronDown className="ml-2 h-4 w-4 shrink-0 transition-transform group-open:rotate-180" />
           </summary>
-          <div className="mt-1 max-h-44 space-y-1 overflow-y-auto rounded-xl border border-primary/50 bg-[#171127] p-2">
+          <div className="mt-1 max-h-48 space-y-1 overflow-y-auto rounded-xl border border-border bg-secondary p-2 text-secondary-foreground">
             {genres.map((genre) => {
               const active = draft.genres.includes(genre);
               return (
-                <label key={genre} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-white/5">
+                <label key={genre} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-2 text-sm text-foreground hover:bg-accent hover:text-accent-foreground">
                   <input type="checkbox" checked={active} onChange={() => toggleGenre(genre)} className="h-4 w-4 shrink-0 accent-fuchsia-400" />
                   <span>{displayGenre(genre, language)}</span>
                 </label>
@@ -119,4 +120,11 @@ export function CatalogFilters({
       </div>
     </div>
   );
+
+  // The hero card clips artwork; move its filter panel outside that overflow context
+  // so the full genre menu remains visible on mobile Safari.
+  if (placement === "home" && typeof document !== "undefined") {
+    return createPortal(panel, document.body);
+  }
+  return panel;
 }
