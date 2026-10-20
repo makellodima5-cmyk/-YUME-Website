@@ -293,6 +293,8 @@ const EN: Record<TranslationKey, string> = {
 
   "anime.new": "New",
   "anime.yearUnknown": "Year unknown",
+  "anime.releaseDate": "Release date",
+  "anime.nextEpisodeDate": "Next episode",
   "anime.episode": "Episode",
   "anime.notFound": "Anime not found",
   "anime.notFoundApi": "Could not retrieve data from Shikimori. Please refresh the page later.",
