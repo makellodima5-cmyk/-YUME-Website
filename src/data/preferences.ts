@@ -173,6 +173,10 @@ const RU = {
   "profile.supportText": "Здесь появится способ сообщить о проблеме, задать вопрос или отправить предложение по улучшению YUME.",
   "profile.emptyFavoritesTitle": "Избранное пока пусто",
   "profile.emptyFavoritesDescription": "Открывай страницы аниме и добавляй туда любимые тайтлы — они появятся здесь.",
+  "profile.localLibraryNotice": "Избранное и «Мой список» хранятся только в этом браузере на этом устройстве и не синхронизируются между устройствами.",
+  "profile.savedItemsLoading": "Загружаем сохранённые тайтлы…",
+  "profile.savedItemsError": "Не удалось загрузить часть сохранённых тайтлов. Проверь подключение и обнови страницу.",
+  "profile.savedItemsUnavailable": "Некоторые сохранённые тайтлы больше недоступны в текущем каталоге.",
   "profile.emptyWatchlistTitle": "Мой список пока пуст",
   "profile.emptyWatchlistDescription": "Добавляй в список аниме, которые хочешь посмотреть позже.",
 
@@ -368,6 +372,10 @@ const EN: Record<TranslationKey, string> = {
   "profile.supportText": "Here you'll be able to report a problem, ask a question or suggest an improvement to YUME.",
   "profile.emptyFavoritesTitle": "Your favorites are empty",
   "profile.emptyFavoritesDescription": "Open anime pages and add titles you love to favorites. They'll appear here.",
+  "profile.localLibraryNotice": "Favorites and My List are stored only in this browser on this device and are not synced across devices.",
+  "profile.savedItemsLoading": "Loading saved titles…",
+  "profile.savedItemsError": "Some saved titles could not be loaded. Check your connection and refresh the page.",
+  "profile.savedItemsUnavailable": "Some saved titles are no longer available in the current catalog.",
   "profile.emptyWatchlistTitle": "Your list is empty",
   "profile.emptyWatchlistDescription": "Add anime here to watch them later.",
 
