@@ -11,7 +11,6 @@ import {
   Play,
   Star,
 } from "lucide-react";
-import { ANIME as DEMO_ANIME } from "@/data/anime";
 import { getShikimoriAnimes } from "@/data/shikimori";
 import { Header, type View } from "@/components/yume/Header";
 import { AnimeCard, PosterArt } from "@/components/yume/Poster";
@@ -40,11 +39,10 @@ export const Route = createFileRoute("/anime/$animeId")({
   loader: async ({ params }) => {
     const isShikimoriId = /^\d+$/.test(params.animeId);
     if (!isShikimoriId) {
-      const demoAnime = DEMO_ANIME.find((item) => item.id === params.animeId) ?? null;
       const catalog = await getShikimoriAnimes({ data: { page: 1, limit: 50, order: "ranked" } });
       return {
-        anime: demoAnime,
-        relatedAnime: demoAnime ? DEMO_ANIME.filter((item) => item.id !== demoAnime.id) : catalog.items,
+        anime: null,
+        relatedAnime: catalog.items,
         apiError: catalog.error,
       };
     }
