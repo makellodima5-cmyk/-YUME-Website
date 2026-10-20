@@ -43,7 +43,7 @@ export const Route = createFileRoute("/anime/$animeId")({
           .sort((a, b) => {
             const aShared = a.genres.filter((genre) => anime.genres.includes(genre)).length;
             const bShared = b.genres.filter((genre) => anime.genres.includes(genre)).length;
-            return bShared - aShared || b.rating - a.rating;
+            return bShared - aShared || (b.rating ?? -1) - (a.rating ?? -1);
           })
           .slice(0, 6)
       : pool.slice(0, 6);
@@ -274,10 +274,12 @@ function AnimeDetailPage() {
                 <p className="mt-1 text-sm text-white/65 lg:text-base">{anime.original}</p>
 
                 <div className="mt-4 flex flex-wrap items-center gap-2">
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-black/25 px-3 py-1.5 text-sm font-semibold text-white backdrop-blur">
-                    <Star className="h-4 w-4 fill-gold text-gold" />
-                    {anime.rating.toFixed(1)}
-                  </span>
+                  {anime.rating !== null && (
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-black/25 px-3 py-1.5 text-sm font-semibold text-white backdrop-blur">
+                      <Star className="h-4 w-4 fill-gold text-gold" />
+                      {anime.rating.toFixed(1)}
+                    </span>
+                  )}
                   <span className="rounded-full border border-white/10 bg-black/25 px-3 py-1.5 text-sm text-white/90 backdrop-blur">
                     {anime.episodes > 0 ? anime.episodes + " " + t("anime.series") : t("anime.episodesUnknown")}
                   </span>
@@ -331,10 +333,12 @@ function AnimeDetailPage() {
                   </h1>
                   <p className="mt-1 break-words text-xs text-muted-foreground">{anime.original}</p>
                   <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs">
-                    <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2 py-1 font-semibold">
-                      <Star className="h-3 w-3 fill-gold text-gold" />
-                      {anime.rating.toFixed(1)}
-                    </span>
+                    {anime.rating !== null && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2 py-1 font-semibold">
+                        <Star className="h-3 w-3 fill-gold text-gold" />
+                        {anime.rating.toFixed(1)}
+                      </span>
+                    )}
                     <span className="rounded-full bg-secondary px-2 py-1">{anime.episodes > 0 ? anime.episodes + " " + t("anime.series") : t("anime.episodesUnknown")}</span>
                   </div>
                   <div className="mt-2 flex flex-wrap gap-1.5">
