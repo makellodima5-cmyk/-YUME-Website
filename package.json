@@ -11,7 +11,9 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "deploy:cloudflare": "npm run build && npx --yes wrangler@4 deploy",
+    "cf-typegen": "npx --yes wrangler@4 types"
   },
   "overrides": {
     "rolldown": "1.2.1"
