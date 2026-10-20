@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
-import { Home, LayoutGrid, Library, User, Menu, X, Bell, Moon, Sun, ShieldCheck, Heart, Clock3, Star, Languages, Bookmark } from "lucide-react";
+import { Home, LayoutGrid, Library, User, Menu, X, Bell, Moon, Sun, ShieldCheck, Heart, Clock3, Star, Languages, Bookmark, Megaphone, Radio } from "lucide-react";
 import { Logo } from "./Logo";
 import { useYumePreferences } from "@/data/preferences";
 
-export type View = "home" | "catalog" | "collections" | "profile" | "popular" | "favorites" | "watchlist" | "history" | "privacy";
+export type View = "home" | "catalog" | "collections" | "profile" | "popular" | "announcements" | "airing" | "favorites" | "watchlist" | "history" | "privacy";
 
 export const NAV: { id: View; label: string; icon: typeof Home }[] = [
   { id: "home", label: "Главная", icon: Home },
@@ -30,6 +30,8 @@ export function Header({ view, setView, onProfile }: Props) {
         catalog: "Каталог",
         collections: "Подборки",
         popular: "Популярное",
+        announcements: "Анонсы",
+        airing: "Сейчас выходит",
         favorites: "Избранное",
         watchlist: "Смотреть позже",
         history: "История просмотров",
@@ -44,6 +46,8 @@ export function Header({ view, setView, onProfile }: Props) {
         catalog: "Catalog",
         collections: "Collections",
         popular: "Popular",
+        announcements: "Announcements",
+        airing: "Currently airing",
         favorites: "Favorites",
         watchlist: "Watch later",
         history: "Watch history",
@@ -164,6 +168,12 @@ export function Header({ view, setView, onProfile }: Props) {
               })}
               <button type="button" onClick={() => goToView("popular")} className={navButtonClass(view === "popular")}>
                 <Star className="h-5 w-5 shrink-0" /><span>{navigationText.popular}</span>
+              </button>
+              <button type="button" onClick={() => goToView("announcements")} className={navButtonClass(view === "announcements")}>
+                <Megaphone className="h-5 w-5 shrink-0" /><span>{navigationText.announcements}</span>
+              </button>
+              <button type="button" onClick={() => goToView("airing")} className={navButtonClass(view === "airing")}>
+                <Radio className="h-5 w-5 shrink-0" /><span>{navigationText.airing}</span>
               </button>
               <button type="button" onClick={() => goToView("favorites")} className={navButtonClass(view === "favorites")}>
                 <Heart className="h-5 w-5 shrink-0" /><span>{navigationText.favorites}</span>

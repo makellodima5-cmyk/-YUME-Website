@@ -24,7 +24,7 @@ export const Route = createFileRoute("/")({
   validateSearch: (search: Record<string, unknown>): { section?: View } => ({
     section:
       typeof search.section === "string" &&
-      ["home", "catalog", "collections", "profile", "popular", "favorites", "watchlist", "history", "privacy"].includes(search.section)
+      ["home", "catalog", "collections", "profile", "popular", "announcements", "airing", "favorites", "watchlist", "history", "privacy"].includes(search.section)
         ? (search.section as View)
         : undefined,
   }),
@@ -38,15 +38,14 @@ export const Route = createFileRoute("/")({
       .filter((anime) => anime.rating !== null)
       .sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1))
       .slice(0, 50);
-    const recent = [...items]
+    const seedRecent = [...items]
       .sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? "") || b.year - a.year)
       .slice(0, 50);
     const unique = new Map<string, Anime>();
-    [...popular, ...recent].forEach((anime) => unique.set(anime.id, anime));
+    [...popular, ...seedRecent].forEach((anime) => unique.set(anime.id, anime));
     return {
       anime: Array.from(unique.values()),
       popular,
-      recent,
       apiError: catalog.error,
       catalogProgress: catalog.progress,
     };
@@ -106,13 +105,11 @@ function Index() {
   const {
     anime: loadedAnime,
     popular: initialPopularAnime,
-    recent: initialRecentAnime,
     apiError,
     catalogProgress: initialCatalogProgress,
   } = Route.useLoaderData();
   const [catalogAnime, setCatalogAnime] = useState<Anime[]>(loadedAnime.slice(0, 1000));
   const [popularAnime, setPopularAnime] = useState<Anime[]>(initialPopularAnime);
-  const [recentAnime, setRecentAnime] = useState<Anime[]>(initialRecentAnime);
   const [catalogProgress, setCatalogProgress] = useState(initialCatalogProgress);
   const ANIME = catalogAnime;
   const [catalogLoadState, setCatalogLoadState] = useState<"idle" | "loading" | "loaded" | "error">("idle");
@@ -141,11 +138,6 @@ function Index() {
         [...items]
           .filter((anime) => anime.rating !== null)
           .sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1))
-          .slice(0, 50),
-      );
-      setRecentAnime(
-        [...items]
-          .sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? "") || b.year - a.year)
           .slice(0, 50),
       );
     };
@@ -309,7 +301,7 @@ function Index() {
     Number(activeFilters.yearTo !== "") + Number(activeFilters.minRating > 0) +
     Number(activeFilters.type !== "Любой") + Number(activeFilters.ageRating !== "Любой");
   const searching = view === "home" && (submittedQuery.length > 0 || activeFilterCount > 0);
-  const needsFullCatalog = view === "catalog" ||
+  const needsFullCatalog = ["catalog", "popular", "announcements", "airing"].includes(view) ||
     (view === "home" && (Boolean(submittedQuery.trim()) || activeFilterCount > 0 || filtersOpen));
   // Any search/filter view must use the same capped local catalog of up to 1,000 titles.
   // Never send the user's typed query to Shikimori.
@@ -368,13 +360,19 @@ function Index() {
     .filter((anime) => anime.rating !== null)
     .sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1))
     .slice(0, 12);
-  const newReleaseCards = recentAnime
-    .slice()
-    .sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? "") || b.year - a.year)
-    .slice(0, 12);
-  const airingCards = ANIME.filter((anime) => anime.status === "Онгоинг")
-    .sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? ""))
-    .slice(0, 12);
+  const announcementAnime = ANIME
+    .filter((anime) => anime.status === "Анонс")
+    .sort((a, b) => {
+      if (a.airedOn && b.airedOn) return a.airedOn.localeCompare(b.airedOn);
+      if (a.airedOn) return -1;
+      if (b.airedOn) return 1;
+      return b.year - a.year || (b.rating ?? -1) - (a.rating ?? -1);
+    });
+  const announcementCards = announcementAnime.slice(0, 12);
+  const airingAnime = ANIME
+    .filter((anime) => anime.status === "Онгоинг")
+    .sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? "") || b.year - a.year);
+  const airingCards = airingAnime.slice(0, 12);
   return (
     <div className="min-h-screen pb-8">
       <Header view={view} setView={setView} onProfile={() => setView("profile")} />
@@ -419,12 +417,12 @@ function Index() {
                   {popularCards.length > 0 && <Row title={t("home.popular")} action={<SeeAll onClick={() => setView("popular")} />}>
                     {popularCards.map((a) => <AnimeCard key={a.id} anime={a} onSelect={select} />)}
                   </Row>}
-                  {newReleaseCards.length > 0 && <Row title={t("home.newReleases")} action={<SeeAll onClick={() => setView("catalog")} />}>
-                    {newReleaseCards.map((a) => <AnimeCard key={a.id} anime={a} onSelect={select} />)}
+                  {announcementCards.length > 0 && <Row title={t("home.announcements")} action={<SeeAll onClick={() => setView("announcements")} />}>
+                    {announcementCards.map((a) => <AnimeCard key={a.id} anime={a} onSelect={select} />)}
                   </Row>}
-                  {airingCards.length > 0 && <Row title={t("home.airing")} action={<SeeAll onClick={() => setView("catalog")} />}>
+                  {airingCards.length > 0 && <Row title={t("home.airing")} action={<SeeAll onClick={() => setView("airing")} />}>
                     {airingCards.map((a) => <AnimeCard key={a.id} anime={a} onSelect={select} />)}
-                  </Row>}
+                  </Row>}}
                   <section className="mt-10 px-4 md:px-10">
                     <div className="mb-4 flex items-end justify-between">
                       <h2 className="text-lg font-semibold md:text-xl">{t("home.collections")}</h2>
@@ -441,6 +439,26 @@ function Index() {
         <main className="px-4 pt-24 md:px-10 md:pt-24">
           <h1 className="mb-2 text-2xl font-bold md:text-3xl">{t("home.popular")}</h1>
           <Grid items={popularAnime.slice().sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1))} onSelect={select} empty={t("catalog.noResultsFormal")} />
+        </main>
+      ) : view === "announcements" ? (
+        <main className="px-4 pt-24 md:px-10 md:pt-24">
+          <h1 className="mb-2 text-2xl font-bold md:text-3xl">{t("home.announcements")}</h1>
+          <p className="mb-6 text-sm text-muted-foreground">{t("home.announcementsDescription")}</p>
+          {needsFullCatalog && catalogLoadState !== "loaded" && catalogLoadState !== "error" ? (
+            <CatalogSkeleton count={12} />
+          ) : (
+            <Grid items={announcementAnime} onSelect={select} empty={t("home.noAnnouncements")} />
+          )}
+        </main>
+      ) : view === "airing" ? (
+        <main className="px-4 pt-24 md:px-10 md:pt-24">
+          <h1 className="mb-2 text-2xl font-bold md:text-3xl">{t("home.airing")}</h1>
+          <p className="mb-6 text-sm text-muted-foreground">{t("home.airingDescription")}</p>
+          {needsFullCatalog && catalogLoadState !== "loaded" && catalogLoadState !== "error" ? (
+            <CatalogSkeleton count={12} />
+          ) : (
+            <Grid items={airingAnime} onSelect={select} empty={t("home.noAiring")} />
+          )}
         </main>
       ) : view === "catalog" ? (
         <main className="px-4 pt-36 md:px-10 md:pt-24">
