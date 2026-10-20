@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import type { Anime } from "@/data/anime";
-import { getPersistentCatalog } from "@/data/catalog-d1.server";
+import { getPersistentCatalog, type CatalogResult, type CatalogSeedPageResult } from "@/data/catalog-d1.server";
 
 const API_URL = "https://shikimori.io/api/graphql";
 const CACHE_TTL_MS = 5 * 60 * 1000;
@@ -8,6 +8,16 @@ const responseCache = new Map<string, { expiresAt: number; items: Anime[] }>();
 // A 429 opens a per-isolate circuit breaker to avoid repeated upstream bursts.
 let shikimoriCooldownUntil = 0;
 const SHIKIMORI_429_COOLDOWN_MS = 60 * 1000;
+const SEED_REQUEST_DELAY_MS = 1250;
+const MAX_SEED_REQUESTS = 20 + (500 - 11 + 1);
+
+function retryAfterMilliseconds(header: string | null): number | null {
+  if (!header?.trim()) return null;
+  const seconds = Number(header.trim());
+  if (Number.isFinite(seconds) && seconds >= 0) return Math.max(1000, Math.ceil(seconds * 1000));
+  const date = Date.parse(header);
+  return Number.isFinite(date) ? Math.max(1000, date - Date.now()) : null;
+}
 
 type ShikimoriRequest = {
   page?: number;
@@ -278,20 +288,18 @@ function validateRequest(input: ShikimoriRequest): ShikimoriRequest {
   };
 }
 
-async function fetchShikimoriAnimes(
-  data: ShikimoriRequest,
-  options: { bypassCooldown?: boolean } = {},
-) {
+async function fetchShikimoriAnimes(data: ShikimoriRequest) {
   const key = JSON.stringify(data);
   const cached = responseCache.get(key);
   if (cached && cached.expiresAt > Date.now()) {
     return { items: cached.items, error: null as string | null };
   }
 
-  if (!options.bypassCooldown && Date.now() < shikimoriCooldownUntil) {
+  if (Date.now() < shikimoriCooldownUntil) {
     return {
       items: [] as Anime[],
       error: "Источник каталога временно ограничил запросы. Повтори попытку немного позже.",
+      retryAfterMs: Math.max(1000, shikimoriCooldownUntil - Date.now()),
     };
   }
 
@@ -321,8 +329,15 @@ async function fetchShikimoriAnimes(
     });
 
     if (response.status === 429) {
-      shikimoriCooldownUntil = Date.now() + SHIKIMORI_429_COOLDOWN_MS;
-      throw new Error("Shikimori returned HTTP 429");
+      const retryAfterMs = retryAfterMilliseconds(response.headers.get("Retry-After"))
+        ?? SHIKIMORI_429_COOLDOWN_MS;
+      shikimoriCooldownUntil = Math.max(shikimoriCooldownUntil, Date.now() + retryAfterMs);
+      console.warn("[YUME] Shikimori returned HTTP 429; pausing requests for", retryAfterMs, "ms.");
+      return {
+        items: [] as Anime[],
+        error: "Источник каталога временно ограничил запросы. Повтори попытку немного позже.",
+        retryAfterMs,
+      };
     }
     if (!response.ok) {
       throw new Error("Shikimori returned HTTP " + response.status);
@@ -358,87 +373,122 @@ async function fetchShikimoriAnimes(
     };
   }
 }
-
 export const getShikimoriAnimes = createServerFn({ method: "GET" })
   .validator((input: ShikimoriRequest) => validateRequest(input))
   .handler(async ({ data }) => fetchShikimoriAnimes(data));
 
-let catalogCache: { expiresAt: number; items: Anime[]; error: string | null } | null = null;
 const CATALOG_LIMIT = 1000;
 const CATALOG_CACHE_TTL_MS = 30 * 60 * 1000;
 
-async function buildShikimoriCatalog(forceRefresh: boolean, persistentSeed = false) {
-  if (!forceRefresh && catalogCache && catalogCache.expiresAt > Date.now()) {
-    return { items: catalogCache.items, error: catalogCache.error };
-  }
+const PRIORITY_SEED_REQUESTS: ShikimoriRequest[] = [
+  ...Array.from({ length: 10 }, (_, index) => ({ page: index + 1, limit: 50, order: "ranked" as const })),
+  ...Array.from({ length: 3 }, (_, index) => ({ page: index + 1, limit: 50, order: "aired_on" as const })),
+  ...Array.from({ length: 3 }, (_, index) => ({ page: index + 1, limit: 50, order: "popularity" as const })),
+  ...Array.from({ length: 2 }, (_, index) => ({ page: index + 1, limit: 50, order: "created_at_desc" as const })),
+  ...Array.from({ length: 2 }, (_, index) => ({ page: index + 1, limit: 50, order: "popularity" as const, status: "anons" as const })),
+];
 
-  // Prioritize a broad mix: highly ranked titles, newly aired entries, popular entries,
-  // recently added records, and announced anime. Fill any gaps with further ranked pages.
-  const priorityRequests: ShikimoriRequest[] = [
-    ...Array.from({ length: 10 }, (_, index) => ({ page: index + 1, limit: 50, order: "ranked" as const })),
-    ...Array.from({ length: 3 }, (_, index) => ({ page: index + 1, limit: 50, order: "aired_on" as const })),
-    ...Array.from({ length: 3 }, (_, index) => ({ page: index + 1, limit: 50, order: "popularity" as const })),
-    ...Array.from({ length: 2 }, (_, index) => ({ page: index + 1, limit: 50, order: "created_at_desc" as const })),
-    ...Array.from({ length: 2 }, (_, index) => ({ page: index + 1, limit: 50, order: "popularity" as const, status: "anons" as const })),
-  ];
-
-  const unique = new Map<string, Anime>();
-  let failedRequests = 0;
-  const addResults = (results: Awaited<ReturnType<typeof fetchShikimoriAnimes>>[]) => {
-    for (const result of results) {
-      if (result.error) failedRequests += 1;
-      for (const anime of result.items) {
-        if (unique.size >= CATALOG_LIMIT) break;
-        if (!unique.has(anime.id)) unique.set(anime.id, anime);
-      }
-    }
+function seedRequestForCursor(cursor: number): ShikimoriRequest | null {
+  if (cursor < 0 || cursor >= MAX_SEED_REQUESTS) return null;
+  if (cursor < PRIORITY_SEED_REQUESTS.length) return PRIORITY_SEED_REQUESTS[cursor]!;
+  return {
+    page: cursor - PRIORITY_SEED_REQUESTS.length + 11,
+    limit: 50,
+    order: "ranked",
   };
+}
 
-  // Limit the first persistent import to two concurrent requests and pace batches.
-  // A 429 should not disable every remaining seed request for the full cooldown window:
-  // later pages can still fill gaps in the 1,000-record catalog.
-  const batchSize = persistentSeed ? 2 : 4;
-  for (let index = 0; index < priorityRequests.length && unique.size < CATALOG_LIMIT; index += batchSize) {
-    const batch = priorityRequests.slice(index, index + batchSize);
-    const results = await Promise.all(batch.map((request) =>
-      fetchShikimoriAnimes(validateRequest(request), { bypassCooldown: persistentSeed }),
-    ));
-    addResults(results);
-    if (persistentSeed && index + batch.length < priorityRequests.length && unique.size < CATALOG_LIMIT) {
-      await new Promise<void>((resolve) => setTimeout(resolve, 500));
-    }
+function makeCatalogProgress(
+  status: CatalogResult["progress"]["status"],
+  imported: number,
+  retryAfterMs?: number,
+) {
+  return {
+    status,
+    imported,
+    target: CATALOG_LIMIT,
+    ...(retryAfterMs !== undefined ? { retryAfterMs } : {}),
+  };
+}
+
+type CatalogCacheEntry = { expiresAt: number; result: CatalogResult };
+let catalogCache: CatalogCacheEntry | null = null;
+let fallbackCursor = 0;
+let fallbackResumeAt = 0;
+const fallbackItems = new Map<string, Anime>();
+
+/**
+ * Non-D1 fallback for local previews: also fetches one page per invocation.
+ * The Cloudflare production path uses D1 as the durable source of progress.
+ */
+async function buildShikimoriCatalog(forceRefresh: boolean): Promise<CatalogResult> {
+  const now = Date.now();
+  if (!forceRefresh && catalogCache && catalogCache.expiresAt > now) {
+    return catalogCache.result;
   }
 
-  // Continue through ranked pages until we have 1,000 unique, non-excluded anime records.
-  const extraPageBatchSize = persistentSeed ? 2 : 3;
-  for (let page = 11; page <= 30 && unique.size < CATALOG_LIMIT; page += extraPageBatchSize) {
-    const requests = Array.from({ length: extraPageBatchSize }, (_, index) => page + index)
-      .filter((value) => value <= 30)
-      .map((value) => ({ page: value, limit: 50, order: "ranked" as const }));
-    const results = await Promise.all(requests.map((request) =>
-      fetchShikimoriAnimes(validateRequest(request), { bypassCooldown: persistentSeed }),
-    ));
-    addResults(results);
-    if (persistentSeed && page + requests.length <= 30 && unique.size < CATALOG_LIMIT) {
-      await new Promise<void>((resolve) => setTimeout(resolve, 500));
-    }
+  const existingItems = Array.from(fallbackItems.values());
+  if (fallbackItems.size >= CATALOG_LIMIT) {
+    const result: CatalogResult = {
+      items: existingItems.slice(0, CATALOG_LIMIT),
+      error: null,
+      progress: makeCatalogProgress("ready", Math.min(fallbackItems.size, CATALOG_LIMIT)),
+    };
+    catalogCache = { expiresAt: now + CATALOG_CACHE_TTL_MS, result };
+    return result;
   }
 
-  const items = Array.from(unique.values()).slice(0, CATALOG_LIMIT);
-  const error = items.length < CATALOG_LIMIT
-    ? "Не удалось загрузить все 1 000 записей каталога. Доступная часть каталога показана."
+  if (fallbackResumeAt > now) {
+    return {
+      items: existingItems,
+      error: null,
+      progress: makeCatalogProgress("cooldown", existingItems.length, fallbackResumeAt - now),
+    };
+  }
+
+  const request = seedRequestForCursor(fallbackCursor);
+  if (!request) {
+    return {
+      items: existingItems,
+      error: `Каталог загружен частично: ${existingItems.length} из ${CATALOG_LIMIT} записей.`,
+      progress: makeCatalogProgress("partial", existingItems.length),
+    };
+  }
+
+  const page = await fetchShikimoriAnimes(validateRequest(request));
+  if (page.error) {
+    const retryAfterMs = page.retryAfterMs ?? 5000;
+    fallbackResumeAt = Date.now() + retryAfterMs;
+    return {
+      items: existingItems,
+      error: null,
+      progress: makeCatalogProgress("cooldown", existingItems.length, retryAfterMs),
+    };
+  }
+
+  for (const anime of page.items) {
+    if (fallbackItems.size >= CATALOG_LIMIT) break;
+    if (!fallbackItems.has(anime.id)) fallbackItems.set(anime.id, anime);
+  }
+  fallbackCursor += 1;
+  fallbackResumeAt = Date.now() + SEED_REQUEST_DELAY_MS;
+
+  const items = Array.from(fallbackItems.values()).slice(0, CATALOG_LIMIT);
+  const status = items.length >= CATALOG_LIMIT
+    ? "ready"
+    : fallbackCursor >= MAX_SEED_REQUESTS
+      ? "partial"
+      : "seeding";
+  const error = status === "partial"
+    ? `Каталог загружен частично: ${items.length} из ${CATALOG_LIMIT} записей.`
     : null;
-
-  // Cache a complete catalog longer; cache a partial result briefly so it can be retried.
-  catalogCache = {
-    expiresAt: Date.now() + (items.length === CATALOG_LIMIT ? CATALOG_CACHE_TTL_MS : 2 * 60 * 1000),
+  const result: CatalogResult = {
     items,
     error,
+    progress: makeCatalogProgress(status, items.length, status === "seeding" ? SEED_REQUEST_DELAY_MS : undefined),
   };
-  if (failedRequests > 0 && !error) {
-    console.warn("[YUME] Catalog filled to 1,000 anime despite", failedRequests, "failed page requests.");
-  }
-  return { items, error };
+  if (status === "ready") catalogCache = { expiresAt: Date.now() + CATALOG_CACHE_TTL_MS, result };
+  return result;
 }
 
 export const getShikimoriCatalog = createServerFn({ method: "GET" })
@@ -446,7 +496,11 @@ export const getShikimoriCatalog = createServerFn({ method: "GET" })
     forceRefresh: input.forceRefresh === true,
   }))
   .handler(async ({ data }) => {
-    const persistent = await getPersistentCatalog(() => buildShikimoriCatalog(true, true));
+    const persistent = await getPersistentCatalog(async (cursor): Promise<CatalogSeedPageResult> => {
+      const request = seedRequestForCursor(cursor);
+      if (!request) return { items: [], error: null, done: true };
+      return fetchShikimoriAnimes(validateRequest(request));
+    });
     if (persistent) return persistent;
     return buildShikimoriCatalog(data.forceRefresh);
   });
