@@ -92,6 +92,8 @@ const RU = {
 
   "anime.new": "Новинка",
   "anime.yearUnknown": "Год уточняется",
+  "anime.releaseDate": "Дата выхода",
+  "anime.nextEpisodeDate": "Следующая серия",
   "anime.episode": "Серия",
   "anime.notFound": "Аниме не найдено",
   "anime.notFoundApi": "Не удалось получить данные от Shikimori. Обнови страницу немного позже.",
@@ -594,6 +596,7 @@ const STATUS_EN: Record<string, string> = {
   "Онгоинг": "Airing",
   "Вышел": "Released",
   "Анонс": "Upcoming",
+  "Неизвестно": "Status unknown",
   "Любой": "Any",
 };
 
