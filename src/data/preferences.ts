@@ -126,7 +126,7 @@ const RU = {
   "anime.similar": "Похожие аниме",
   "anime.similarSubtitle": "Истории в похожем настроении",
 
-  "source.errorBanner": "Не удалось загрузить данные Shikimori. Сейчас показан демонстрационный каталог. Обнови страницу чуть позже.",
+  "source.errorBanner": "Не удалось загрузить часть данных Shikimori. Показаны только доступные данные из источника; некоторые разделы могут быть неполными. Попробуй обновить страницу позже.",
   "source.searchError": "Не удалось выполнить поиск Shikimori.",
 
   "profile.title": "Мой профиль",
@@ -327,7 +327,7 @@ const EN: Record<TranslationKey, string> = {
   "anime.similar": "Similar anime",
   "anime.similarSubtitle": "Stories with a similar feel",
 
-  "source.errorBanner": "Couldn't load Shikimori data. Showing the demo catalog for now. Please try again later.",
+  "source.errorBanner": "Some Shikimori data could not be loaded. Only available source data is shown, so some sections may be incomplete. Please try again later.",
   "source.searchError": "Couldn't search Shikimori.",
 
   "profile.title": "My profile",
