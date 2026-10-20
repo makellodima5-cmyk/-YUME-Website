@@ -33,6 +33,8 @@ const RU = {
   "home.airing": "Сейчас выходит",
   "home.minutesLeft": "мин. осталось",
   "home.collections": "Подборки",
+  "home.dataUnavailable": "Сейчас не удалось загрузить каталог аниме. Проверь подключение к интернету и попробуй обновить страницу.",
+  "home.retry": "Обновить страницу",
   "footer.seeAll": "Все",
   "footer.source": "YUME · сведения об аниме загружаются из Shikimori",
 
@@ -128,6 +130,7 @@ const RU = {
 
   "source.errorBanner": "Не удалось загрузить часть данных Shikimori. Показаны только доступные данные из источника; некоторые разделы могут быть неполными. Попробуй обновить страницу позже.",
   "source.searchError": "Не удалось выполнить поиск Shikimori.",
+  "source.catalogUnavailable": "Каталог временно недоступен. Попробуй обновить страницу позже.",
 
   "profile.title": "Мой профиль",
   "profile.space": "Личное пространство",
@@ -234,6 +237,8 @@ const EN: Record<TranslationKey, string> = {
   "home.airing": "Currently airing",
   "home.minutesLeft": "min left",
   "home.collections": "Collections",
+  "home.dataUnavailable": "The anime catalog could not be loaded right now. Check your internet connection and try refreshing the page.",
+  "home.retry": "Refresh page",
   "footer.seeAll": "See all",
   "footer.source": "YUME · anime information provided by Shikimori",
 
@@ -329,6 +334,7 @@ const EN: Record<TranslationKey, string> = {
 
   "source.errorBanner": "Some Shikimori data could not be loaded. Only available source data is shown, so some sections may be incomplete. Please try again later.",
   "source.searchError": "Couldn't search Shikimori.",
+  "source.catalogUnavailable": "The catalog is temporarily unavailable. Please try refreshing the page later.",
 
   "profile.title": "My profile",
   "profile.space": "Personal space",
