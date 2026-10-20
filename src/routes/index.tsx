@@ -258,22 +258,31 @@ function Index() {
           <Hero onCatalog={() => setView("catalog")} onRandom={random} query={query} setQuery={setQuery} onSubmitSearch={submitHomeSearch} filtersOpen={filtersOpen} setFiltersOpen={setFiltersOpen} draftFilters={draftFilters} setDraftFilters={setDraftFilters} onApplyFilters={applyCatalogFilters} onResetFilters={resetCatalogFilters} activeFilterCount={activeFilterCount} genres={availableGenres} />
           <div className="home-content-world -mt-10 pb-12">
             <div className="relative z-10">
-              <Row title={t("home.popular")} action={<SeeAll onClick={() => setView("catalog")} />}>
-                {popularCards.map((a) => <AnimeCard key={a.id} anime={a} onSelect={select} />)}
-              </Row>
-              <Row title={t("home.newReleases")} action={<SeeAll onClick={() => setView("catalog")} />}>
-                {newReleaseCards.map((a) => <AnimeCard key={a.id} anime={a} onSelect={select} />)}
-              </Row>
-              <Row title={t("home.airing")} action={<SeeAll onClick={() => setView("catalog")} />}>
-                {airingCards.map((a) => <AnimeCard key={a.id} anime={a} onSelect={select} />)}
-              </Row>
-              <section className="mt-10 px-4 md:px-10">
-                <div className="mb-4 flex items-end justify-between">
-                  <h2 className="text-lg font-semibold md:text-xl">{t("home.collections")}</h2>
-                  <SeeAll onClick={() => setView("collections")} />
-                </div>
-                <CollectionsGrid animeList={ANIME} onOpen={(id) => { setCollection(id); setView("collections"); }} />
-              </section>
+              {ANIME.length === 0 ? (
+                <section className="mx-4 mt-10 rounded-2xl border border-dashed border-white/15 bg-card/60 px-6 py-10 text-center md:mx-10">
+                  <p className="mx-auto max-w-xl text-muted-foreground">{t("home.dataUnavailable")}</p>
+                  <button type="button" onClick={() => window.location.reload()} className="mt-5 rounded-full bg-neon px-5 py-2.5 text-sm font-semibold text-primary-foreground transition hover:brightness-110">{t("home.retry")}</button>
+                </section>
+              ) : (
+                <>
+                  {popularCards.length > 0 && <Row title={t("home.popular")} action={<SeeAll onClick={() => setView("catalog")} />}>
+                    {popularCards.map((a) => <AnimeCard key={a.id} anime={a} onSelect={select} />)}
+                  </Row>}
+                  {newReleaseCards.length > 0 && <Row title={t("home.newReleases")} action={<SeeAll onClick={() => setView("catalog")} />}>
+                    {newReleaseCards.map((a) => <AnimeCard key={a.id} anime={a} onSelect={select} />)}
+                  </Row>}
+                  {airingCards.length > 0 && <Row title={t("home.airing")} action={<SeeAll onClick={() => setView("catalog")} />}>
+                    {airingCards.map((a) => <AnimeCard key={a.id} anime={a} onSelect={select} />)}
+                  </Row>}
+                  <section className="mt-10 px-4 md:px-10">
+                    <div className="mb-4 flex items-end justify-between">
+                      <h2 className="text-lg font-semibold md:text-xl">{t("home.collections")}</h2>
+                      <SeeAll onClick={() => setView("collections")} />
+                    </div>
+                    <CollectionsGrid animeList={ANIME} onOpen={(id) => { setCollection(id); setView("collections"); }} />
+                  </section>
+                </>
+              )}
             </div>
           </div>
         </main>
@@ -304,7 +313,7 @@ function Index() {
               <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
             </label>
           </div>
-          <Grid items={visibleCatalogResults} onSelect={select} empty={searchLoading ? t("catalog.searchingTitle") : (remoteSearch?.query === catalogQuery.trim() && remoteSearch.error ? t("source.searchError") : t("catalog.noResults"))} />
+          <Grid items={visibleCatalogResults} onSelect={select} empty={searchLoading ? t("catalog.searchingTitle") : (ANIME.length === 0 && apiError ? t("source.catalogUnavailable") : (remoteSearch?.query === catalogQuery.trim() && remoteSearch.error ? t("source.searchError") : t("catalog.noResults")))} />
           {catalogResults.length > 0 && <nav aria-label={t("catalog.pages")} className="mt-8 flex flex-wrap items-center justify-center gap-1.5">
             <button type="button" disabled={catalogPage === 1} onClick={() => { setCatalogPage((page) => Math.max(1, page - 1)); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="h-9 rounded-lg border border-border px-3 text-sm transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-35">{t("catalog.previous")}</button>
             {Array.from({ length: totalCatalogPages }, (_, index) => index + 1)
