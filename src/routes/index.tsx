@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { ArrowDownWideNarrow, ChevronDown, ChevronRight, Search, SlidersHorizontal, X } from "lucide-react";
-import { ANIME as DEMO_ANIME, COLLECTIONS, type Anime } from "@/data/anime";
+import { COLLECTIONS, type Anime } from "@/data/anime";
 import { getShikimoriAnimes } from "@/data/shikimori";
 import { Header, type View } from "@/components/yume/Header";
 import { AnimeCard } from "@/components/yume/Poster";
@@ -39,7 +39,7 @@ export const Route = createFileRoute("/")({
       anime: Array.from(unique.values()),
       popular: ranked.items,
       recent: recent.items,
-      apiError: ranked.error && recent.error ? ranked.error : null,
+      apiError: ranked.error || recent.error,
     };
   },
   component: Index,
@@ -78,7 +78,7 @@ function Index() {
   }, [language]);
   const { section } = Route.useSearch();
   const { anime: loadedAnime, popular: popularAnime, recent: recentAnime, apiError } = Route.useLoaderData();
-  const ANIME = loadedAnime.length ? loadedAnime : DEMO_ANIME;
+  const ANIME = loadedAnime;
   const [view, setViewRaw] = useState<View>(section ?? "home");
 
   // Keep the selected section aligned with the URL, including browser Back/Forward.
@@ -225,11 +225,11 @@ function Index() {
     ? ANIME.filter((anime) => activeCollection.genres.some((genre) => anime.genres.includes(genre)))
         .sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1))
     : [];
-  const popularCards = (popularAnime.length ? popularAnime : ANIME)
+  const popularCards = popularAnime
     .filter((anime) => anime.rating !== null)
     .sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1))
     .slice(0, 12);
-  const newReleaseCards = (recentAnime.length ? recentAnime : ANIME.filter((anime) => anime.isNew || anime.status === "Онгоинг"))
+  const newReleaseCards = recentAnime
     .slice()
     .sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? "") || b.year - a.year)
     .slice(0, 12);
