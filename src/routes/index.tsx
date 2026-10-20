@@ -349,7 +349,7 @@ function Index() {
             <CatalogFilters open={filtersOpen && (!needsFullCatalog || catalogLoadState === "loaded" || catalogLoadState === "error")} draft={draftFilters} setDraft={setDraftFilters} onApply={applyCatalogFilters} onReset={resetCatalogFilters} genres={availableGenres} statuses={availableStatuses} types={availableTypes} ageRatings={availableAgeRatings} yearMin={catalogYearRange.min} yearMax={catalogYearRange.max} />
           </div>
           <div className="mb-5 mt-7 flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm text-muted-foreground">{t("catalog.found")} <span className="font-semibold text-foreground">{catalogLoadState === "loading" ? "…" : catalogResults.length}</span></p>
+            <p className="text-sm text-muted-foreground">{t("catalog.found")} <span className="font-semibold text-foreground">{needsFullCatalog && catalogLoadState !== "loaded" && catalogLoadState !== "error" ? "…" : catalogResults.length}</span></p>
             <label className="flex h-9 items-center gap-2 rounded-lg border border-border bg-secondary/80 px-3 text-sm">
               <ArrowDownWideNarrow className="h-4 w-4 text-muted-foreground" />
               <span className="text-muted-foreground max-sm:hidden">{t("catalog.sort")}</span>
