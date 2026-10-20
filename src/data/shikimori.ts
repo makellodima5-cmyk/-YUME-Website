@@ -5,6 +5,9 @@ import { getPersistentCatalog } from "@/data/catalog-d1.server";
 const API_URL = "https://shikimori.io/api/graphql";
 const CACHE_TTL_MS = 5 * 60 * 1000;
 const responseCache = new Map<string, { expiresAt: number; items: Anime[] }>();
+// A 429 opens a per-isolate circuit breaker to avoid repeated upstream bursts.
+let shikimoriCooldownUntil = 0;
+const SHIKIMORI_429_COOLDOWN_MS = 60 * 1000;
 
 type ShikimoriRequest = {
   page?: number;
@@ -282,6 +285,13 @@ async function fetchShikimoriAnimes(data: ShikimoriRequest) {
     return { items: cached.items, error: null as string | null };
   }
 
+  if (Date.now() < shikimoriCooldownUntil) {
+    return {
+      items: [] as Anime[],
+      error: "Источник каталога временно ограничил запросы. Повтори попытку немного позже.",
+    };
+  }
+
   const args = [
     "page: " + (data.page ?? 1),
     "limit: " + (data.limit ?? 50),
@@ -307,6 +317,10 @@ async function fetchShikimoriAnimes(data: ShikimoriRequest) {
       signal: AbortSignal.timeout(12000),
     });
 
+    if (response.status === 429) {
+      shikimoriCooldownUntil = Date.now() + SHIKIMORI_429_COOLDOWN_MS;
+      throw new Error("Shikimori returned HTTP 429");
+    }
     if (!response.ok) {
       throw new Error("Shikimori returned HTTP " + response.status);
     }
