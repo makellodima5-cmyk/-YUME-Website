@@ -376,7 +376,7 @@ function Index() {
     .sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? ""))
     .slice(0, 12);
   return (
-    <div className="min-h-screen pb-24 md:pb-12">
+    <div className="min-h-screen pb-8">
       <Header view={view} setView={setView} onProfile={() => setView("profile")} />
       {apiError && (
         <div role="alert" className="mx-4 mt-20 rounded-xl border border-amber-400/25 bg-amber-400/10 px-4 py-3 text-sm text-amber-100 md:mx-10">
@@ -407,7 +407,7 @@ function Index() {
       ) : view === "home" ? (
         <main className="pt-16">
           <Hero onCatalog={() => setView("catalog")} onRandom={random} query={query} setQuery={setQuery} onSubmitSearch={submitHomeSearch} filtersOpen={filtersOpen && (!needsFullCatalog || catalogLoadState === "loaded" || catalogLoadState === "error")} setFiltersOpen={setFiltersOpen} draftFilters={draftFilters} setDraftFilters={setDraftFilters} onApplyFilters={applyCatalogFilters} onResetFilters={resetCatalogFilters} activeFilterCount={activeFilterCount} genres={availableGenres} statuses={availableStatuses} types={availableTypes} ageRatings={availableAgeRatings} yearMin={catalogYearRange.min} yearMax={catalogYearRange.max} />
-          <div className="home-content-world -mt-10 pb-12">
+          <div className="home-content-world mt-1 pb-12">
             <div className="relative z-10">
               {ANIME.length === 0 ? (
                 <section className="mx-4 mt-10 rounded-2xl border border-dashed border-white/15 bg-card/60 px-6 py-10 text-center md:mx-10">
