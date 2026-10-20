@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import type { Anime } from "@/data/anime";
+import { getPersistentCatalog } from "@/data/catalog-d1.server";
 
 const API_URL = "https://shikimori.io/api/graphql";
 const CACHE_TTL_MS = 5 * 60 * 1000;
@@ -349,65 +350,72 @@ let catalogCache: { expiresAt: number; items: Anime[]; error: string | null } | 
 const CATALOG_LIMIT = 1000;
 const CATALOG_CACHE_TTL_MS = 30 * 60 * 1000;
 
+async function buildShikimoriCatalog(forceRefresh: boolean) {
+  if (!forceRefresh && catalogCache && catalogCache.expiresAt > Date.now()) {
+    return { items: catalogCache.items, error: catalogCache.error };
+  }
+
+  // Prioritize a broad mix: highly ranked titles, newly aired entries, popular entries,
+  // recently added records, and announced anime. Fill any gaps with further ranked pages.
+  const priorityRequests: ShikimoriRequest[] = [
+    ...Array.from({ length: 10 }, (_, index) => ({ page: index + 1, limit: 50, order: "ranked" as const })),
+    ...Array.from({ length: 3 }, (_, index) => ({ page: index + 1, limit: 50, order: "aired_on" as const })),
+    ...Array.from({ length: 3 }, (_, index) => ({ page: index + 1, limit: 50, order: "popularity" as const })),
+    ...Array.from({ length: 2 }, (_, index) => ({ page: index + 1, limit: 50, order: "created_at_desc" as const })),
+    ...Array.from({ length: 2 }, (_, index) => ({ page: index + 1, limit: 50, order: "popularity" as const, status: "anons" as const })),
+  ];
+
+  const unique = new Map<string, Anime>();
+  let failedRequests = 0;
+  const addResults = (results: Awaited<ReturnType<typeof fetchShikimoriAnimes>>[]) => {
+    for (const result of results) {
+      if (result.error) failedRequests += 1;
+      for (const anime of result.items) {
+        if (unique.size >= CATALOG_LIMIT) break;
+        if (!unique.has(anime.id)) unique.set(anime.id, anime);
+      }
+    }
+  };
+
+  // Limit concurrency to avoid sending a burst of dozens of GraphQL queries upstream.
+  for (let index = 0; index < priorityRequests.length && unique.size < CATALOG_LIMIT; index += 4) {
+    const batch = priorityRequests.slice(index, index + 4);
+    const results = await Promise.all(batch.map((request) => fetchShikimoriAnimes(validateRequest(request))));
+    addResults(results);
+  }
+
+  // Continue through ranked pages until we have 1,000 unique, non-excluded anime records.
+  for (let page = 11; page <= 30 && unique.size < CATALOG_LIMIT; page += 3) {
+    const requests = [page, page + 1, page + 2]
+      .filter((value) => value <= 30)
+      .map((value) => ({ page: value, limit: 50, order: "ranked" as const }));
+    const results = await Promise.all(requests.map((request) => fetchShikimoriAnimes(validateRequest(request))));
+    addResults(results);
+  }
+
+  const items = Array.from(unique.values()).slice(0, CATALOG_LIMIT);
+  const error = items.length < CATALOG_LIMIT
+    ? "Не удалось загрузить все 1 000 записей каталога. Доступная часть каталога показана."
+    : null;
+
+  // Cache a complete catalog longer; cache a partial result briefly so it can be retried.
+  catalogCache = {
+    expiresAt: Date.now() + (items.length === CATALOG_LIMIT ? CATALOG_CACHE_TTL_MS : 2 * 60 * 1000),
+    items,
+    error,
+  };
+  if (failedRequests > 0 && !error) {
+    console.warn("[YUME] Catalog filled to 1,000 anime despite", failedRequests, "failed page requests.");
+  }
+  return { items, error };
+}
+
 export const getShikimoriCatalog = createServerFn({ method: "GET" })
   .validator((input: { forceRefresh?: boolean }) => ({
     forceRefresh: input.forceRefresh === true,
   }))
   .handler(async ({ data }) => {
-    if (!data.forceRefresh && catalogCache && catalogCache.expiresAt > Date.now()) {
-      return { items: catalogCache.items, error: catalogCache.error };
-    }
-
-    // Prioritize a broad mix: highly ranked titles, newly aired entries, popular entries,
-    // recently added records, and announced anime. Fill any gaps with further ranked pages.
-    const priorityRequests: ShikimoriRequest[] = [
-      ...Array.from({ length: 10 }, (_, index) => ({ page: index + 1, limit: 50, order: "ranked" as const })),
-      ...Array.from({ length: 3 }, (_, index) => ({ page: index + 1, limit: 50, order: "aired_on" as const })),
-      ...Array.from({ length: 3 }, (_, index) => ({ page: index + 1, limit: 50, order: "popularity" as const })),
-      ...Array.from({ length: 2 }, (_, index) => ({ page: index + 1, limit: 50, order: "created_at_desc" as const })),
-      ...Array.from({ length: 2 }, (_, index) => ({ page: index + 1, limit: 50, order: "popularity" as const, status: "anons" as const })),
-    ];
-
-    const unique = new Map<string, Anime>();
-    let failedRequests = 0;
-    const addResults = (results: Awaited<ReturnType<typeof fetchShikimoriAnimes>>[]) => {
-      for (const result of results) {
-        if (result.error) failedRequests += 1;
-        for (const anime of result.items) {
-          if (unique.size >= CATALOG_LIMIT) break;
-          if (!unique.has(anime.id)) unique.set(anime.id, anime);
-        }
-      }
-    };
-
-    // Limit concurrent requests to avoid sending a burst of dozens of GraphQL queries upstream.
-    for (let index = 0; index < priorityRequests.length && unique.size < CATALOG_LIMIT; index += 4) {
-      const batch = priorityRequests.slice(index, index + 4);
-      const results = await Promise.all(batch.map((request) => fetchShikimoriAnimes(validateRequest(request))));
-      addResults(results);
-    }
-
-    // Continue through ranked pages until we have 1,000 unique, non-excluded anime records.
-    for (let page = 11; page <= 30 && unique.size < CATALOG_LIMIT; page += 3) {
-      const requests = [page, page + 1, page + 2]
-        .filter((value) => value <= 30)
-        .map((value) => ({ page: value, limit: 50, order: "ranked" as const }));
-      const results = await Promise.all(requests.map((request) => fetchShikimoriAnimes(validateRequest(request))));
-      addResults(results);
-    }
-
-    const items = Array.from(unique.values()).slice(0, CATALOG_LIMIT);
-    const error = items.length < CATALOG_LIMIT
-      ? "Не удалось загрузить все 1 000 записей каталога. Доступная часть каталога показана."
-      : null;
-    // Cache a complete catalog longer; cache a partial result briefly so it can be retried.
-    catalogCache = {
-      expiresAt: Date.now() + (items.length === CATALOG_LIMIT ? CATALOG_CACHE_TTL_MS : 2 * 60 * 1000),
-      items,
-      error,
-    };
-    if (failedRequests > 0 && !error) {
-      console.warn("[YUME] Catalog filled to 1,000 anime despite", failedRequests, "failed page requests.");
-    }
-    return { items, error };
+    const persistent = await getPersistentCatalog(() => buildShikimoriCatalog(true));
+    if (persistent) return persistent;
+    return buildShikimoriCatalog(data.forceRefresh);
   });

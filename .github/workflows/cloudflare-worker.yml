@@ -1,0 +1,71 @@
+name: Cloudflare Worker CI
+
+on:
+  push: {}
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Run automated tests
+        run: bun run test
+
+      - name: Build Cloudflare Worker
+        run: bun run build
+
+      - name: Verify generated Worker configuration, entry and D1 binding
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          const path = ".output/server/wrangler.json";
+          if (!fs.existsSync(path)) {
+            throw new Error(`Expected Nitro Cloudflare output at ${path}; build did not emit the deployable Worker config.`);
+          }
+          const config = JSON.parse(fs.readFileSync(path, "utf8"));
+          console.log("Generated Nitro Wrangler config:", JSON.stringify(config, null, 2));
+          const nitroConfigPath = ".wrangler/deploy/config.json";
+          if (fs.existsSync(nitroConfigPath)) {
+            console.log("Nitro deploy config:", fs.readFileSync(nitroConfigPath, "utf8"));
+          }
+          const binding = (config.d1_databases ?? []).find(
+            (item) => item.binding === "YUME_DB"
+              && item.database_name === "yume_db"
+              && item.database_id === "fb5ba87d-e921-4dde-829e-7b1bddcf123b",
+          );
+          if (!binding) {
+            throw new Error("Generated Worker config does not contain the expected YUME_DB binding.");
+          }
+          const rootConfig = JSON.parse(fs.readFileSync("wrangler.jsonc", "utf8"));
+          if (rootConfig.main !== ".output/server/index.mjs" || !fs.existsSync(rootConfig.main)) {
+            throw new Error("Root Wrangler config must target the built Nitro Worker entry.");
+          }
+          if (rootConfig.assets?.directory !== ".output/public" || !fs.existsSync(rootConfig.assets.directory)) {
+            throw new Error("Root Wrangler config must target the generated public assets.");
+          }
+          console.log("Verified generated Worker config, root entry, assets, and YUME_DB binding.");
+          NODE
+
+      - name: Validate Wrangler deploy artifact
+        run: bunx wrangler@4 deploy --dry-run --config wrangler.jsonc

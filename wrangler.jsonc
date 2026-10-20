@@ -1,0 +1,28 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "yume-website",
+  "compatibility_date": "2026-10-20",
+  "compatibility_flags": ["nodejs_compat"],
+  "main": ".output/server/index.mjs",
+  "observability": {
+    "enabled": true
+  },
+  "no_bundle": true,
+  "assets": {
+    "directory": ".output/public",
+    "binding": "ASSETS"
+  },
+  "rules": [
+    {
+      "type": "ESModule",
+      "globs": ["**/*.mjs", "**/*.js"]
+    }
+  ],
+  "d1_databases": [
+    {
+      "binding": "YUME_DB",
+      "database_name": "yume_db",
+      "database_id": "fb5ba87d-e921-4dde-829e-7b1bddcf123b"
+    }
+  ]
+}
