@@ -119,8 +119,8 @@ function mapAgeRating(value: string | null | undefined): string | undefined {
 
 function mapAnime(item: ShikimoriGraphQLAnime): Anime {
   const year = item.airedOn?.year ?? item.releasedOn?.year ?? 0;
-  const score = Number(item.score ?? 0);
-  const rating = Number.isFinite(score) ? score : 0;
+  const score = item.score == null || item.score === "" ? null : Number(item.score);
+  const rating = score !== null && Number.isFinite(score) && score > 0 ? score : null;
   const rawGenres = item.genres ?? [];
   const genres = rawGenres
     .filter((genre) => genre.kind === "genre")
