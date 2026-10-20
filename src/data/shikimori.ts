@@ -45,6 +45,16 @@ type GraphQLResponse = {
   errors?: { message?: string }[];
 };
 
+const EXCLUDED_GENRE_NAMES = new Set(["хентай", "hentai"]);
+
+function hasExcludedGenre(item: ShikimoriGraphQLAnime): boolean {
+  return (item.genres ?? []).some((genre) =>
+    [genre.russian, genre.name].some((name) =>
+      EXCLUDED_GENRE_NAMES.has((name ?? "").normalize("NFKC").trim().toLocaleLowerCase()),
+    ),
+  );
+}
+
 const ANIME_FIELDS = [
   "id",
   "name",
@@ -226,7 +236,10 @@ export const getShikimoriAnimes = createServerFn({ method: "GET" })
         throw new Error(payload.errors.map((error) => error.message).filter(Boolean).join("; "));
       }
 
-      const items = (payload.data?.animes ?? []).map(mapAnime);
+      // Exclude Hentai titles on the server before results are cached or sent to the site.
+      const items = (payload.data?.animes ?? [])
+        .filter((item) => !hasExcludedGenre(item))
+        .map(mapAnime);
       responseCache.set(key, { expiresAt: Date.now() + CACHE_TTL_MS, items });
       if (responseCache.size > 160) {
         const now = Date.now();
