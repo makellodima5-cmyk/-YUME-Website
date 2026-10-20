@@ -13,6 +13,7 @@ type ShikimoriRequest = {
   status?: "ongoing" | "released" | "anons";
   kind?: "tv" | "movie" | "ova" | "ona" | "special" | "music";
   ids?: string;
+  includeVideos?: boolean;
 };
 
 type ShikimoriGraphQLAnime = {
@@ -38,6 +39,16 @@ type ShikimoriGraphQLAnime = {
   nextEpisodeAt?: string | null;
   rating?: string | null;
   studios?: { name: string }[] | null;
+  videos?: ShikimoriGraphQLVideo[] | null;
+};
+
+type ShikimoriGraphQLVideo = {
+  id?: string | number | null;
+  url?: string | null;
+  name?: string | null;
+  kind?: string | null;
+  playerUrl?: string | null;
+  imageUrl?: string | null;
 };
 
 type GraphQLResponse = {
@@ -54,6 +65,8 @@ function hasExcludedGenre(item: ShikimoriGraphQLAnime): boolean {
     ),
   );
 }
+
+const ANIME_VIDEO_FIELDS = "videos { id url name kind playerUrl imageUrl }";
 
 const ANIME_FIELDS = [
   "id",
@@ -146,6 +159,44 @@ function mapAgeRating(value: string | null | undefined): string | undefined {
   }
 }
 
+function youtubeVideoId(value: string | null | undefined): string | undefined {
+  if (!value?.trim()) return undefined;
+  try {
+    const url = new URL(value.trim());
+    const hostname = url.hostname.toLowerCase().replace(/^www\./, "");
+    let candidate = "";
+    if (hostname === "youtu.be") {
+      candidate = url.pathname.split("/").filter(Boolean)[0] ?? "";
+    } else if (["youtube.com", "m.youtube.com", "music.youtube.com", "youtube-nocookie.com"].includes(hostname)) {
+      if (url.pathname === "/watch") candidate = url.searchParams.get("v") ?? "";
+      else {
+        const match = /^\/(?:embed|shorts|live|v)\/([^/?#]+)/.exec(url.pathname);
+        candidate = match?.[1] ?? "";
+      }
+    }
+    return /^[A-Za-z0-9_-]{11}$/.test(candidate) ? candidate : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function findYouTubeTrailerId(videos: ShikimoriGraphQLVideo[] | null | undefined): string | undefined {
+  const candidates = (videos ?? [])
+    .map((video) => {
+      const sources = [video.playerUrl, video.url];
+      const id = sources.map(youtubeVideoId).find(Boolean);
+      const kind = (video.kind ?? "").toLocaleLowerCase();
+      const name = (video.name ?? "").toLocaleLowerCase();
+      const isTrailerKind = kind === "pv" || kind === "character_trailer";
+      const isTrailerName = /trailer|preview|\bpv\b|промо|трейлер|тизер|予告/i.test(name);
+      const priority = isTrailerKind ? 0 : isTrailerName ? 1 : 2;
+      return id && (isTrailerKind || isTrailerName) ? { id, priority } : null;
+    })
+    .filter((value): value is { id: string; priority: number } => value !== null)
+    .sort((a, b) => a.priority - b.priority);
+  return candidates[0]?.id;
+}
+
 function mapAnime(item: ShikimoriGraphQLAnime): Anime {
   const year = item.airedOn?.year ?? item.releasedOn?.year ?? 0;
   const score = item.score == null || item.score === "" ? null : Number(item.score);
@@ -196,6 +247,7 @@ function mapAnime(item: ShikimoriGraphQLAnime): Anime {
     episodesAired: Math.max(0, Number(item.episodesAired ?? 0) || 0),
     airedOn: item.airedOn?.date || item.releasedOn?.date || undefined,
     studios: Array.from(new Set((item.studios ?? []).map((studio) => cleanName(studio.name)).filter(Boolean))),
+    youtubeTrailerId: findYouTubeTrailerId(item.videos),
   };
 }
 
@@ -218,74 +270,141 @@ function validateRequest(input: ShikimoriRequest): ShikimoriRequest {
     status: allowedStatuses.includes(input.status ?? "") ? input.status : undefined,
     kind: allowedKinds.includes(input.kind ?? "") ? input.kind : undefined,
     ids,
+    includeVideos: input.includeVideos === true,
   };
+}
+
+async function fetchShikimoriAnimes(data: ShikimoriRequest) {
+  const key = JSON.stringify(data);
+  const cached = responseCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) {
+    return { items: cached.items, error: null as string | null };
+  }
+
+  const args = [
+    "page: " + (data.page ?? 1),
+    "limit: " + (data.limit ?? 50),
+    "order: " + (data.order ?? "ranked"),
+  ];
+  if (data.search) args.push("search: " + JSON.stringify(data.search));
+  if (data.status) args.push("status: " + JSON.stringify(data.status));
+  if (data.kind) args.push("kind: " + JSON.stringify(data.kind));
+  if (data.ids) args.push("ids: " + JSON.stringify(data.ids));
+
+  const fields = ANIME_FIELDS + (data.includeVideos ? " " + ANIME_VIDEO_FIELDS : "");
+  const query = "query { animes(" + args.join(", ") + ") { " + fields + " } }";
+
+  try {
+    const response = await fetch(API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        "User-Agent": "YUME/1.0",
+      },
+      body: JSON.stringify({ query }),
+      signal: AbortSignal.timeout(12000),
+    });
+
+    if (!response.ok) {
+      throw new Error("Shikimori returned HTTP " + response.status);
+    }
+
+    const payload = (await response.json()) as GraphQLResponse;
+    if (payload.errors?.length) {
+      throw new Error(payload.errors.map((error) => error.message).filter(Boolean).join("; "));
+    }
+
+    const items = (payload.data?.animes ?? [])
+      .filter((item) => !hasExcludedGenre(item))
+      .map(mapAnime);
+    responseCache.set(key, { expiresAt: Date.now() + CACHE_TTL_MS, items });
+    if (responseCache.size > 160) {
+      const now = Date.now();
+      for (const [cacheKey, entry] of responseCache) {
+        if (entry.expiresAt <= now) responseCache.delete(cacheKey);
+      }
+      while (responseCache.size > 160) {
+        const oldestKey = responseCache.keys().next().value;
+        if (oldestKey === undefined) break;
+        responseCache.delete(oldestKey);
+      }
+    }
+    return { items, error: null as string | null };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown Shikimori API error";
+    console.error("[YUME] Shikimori catalog request failed:", message);
+    return {
+      items: [] as Anime[],
+      error: "Не удалось загрузить каталог Shikimori. Проверь подключение и обнови страницу.",
+    };
+  }
 }
 
 export const getShikimoriAnimes = createServerFn({ method: "GET" })
   .validator((input: ShikimoriRequest) => validateRequest(input))
-  .handler(async ({ data }) => {
-    const key = JSON.stringify(data);
-    const cached = responseCache.get(key);
-    if (cached && cached.expiresAt > Date.now()) {
-      return { items: cached.items, error: null as string | null };
+  .handler(async ({ data }) => fetchShikimoriAnimes(data));
+
+let catalogCache: { expiresAt: number; items: Anime[]; error: string | null } | null = null;
+const CATALOG_LIMIT = 1000;
+const CATALOG_CACHE_TTL_MS = 30 * 60 * 1000;
+
+export const getShikimoriCatalog = createServerFn({ method: "GET" })
+  .handler(async () => {
+    if (catalogCache && catalogCache.expiresAt > Date.now()) {
+      return { items: catalogCache.items, error: catalogCache.error };
     }
 
-    const args = [
-      "page: " + (data.page ?? 1),
-      "limit: " + (data.limit ?? 50),
-      "order: " + (data.order ?? "ranked"),
+    // Prioritize a broad mix: highly ranked titles, newly aired entries, popular entries,
+    // recently added records, and announced anime. Fill any gaps with further ranked pages.
+    const priorityRequests: ShikimoriRequest[] = [
+      ...Array.from({ length: 10 }, (_, index) => ({ page: index + 1, limit: 50, order: "ranked" as const })),
+      ...Array.from({ length: 3 }, (_, index) => ({ page: index + 1, limit: 50, order: "aired_on" as const })),
+      ...Array.from({ length: 3 }, (_, index) => ({ page: index + 1, limit: 50, order: "popularity" as const })),
+      ...Array.from({ length: 2 }, (_, index) => ({ page: index + 1, limit: 50, order: "created_at_desc" as const })),
+      ...Array.from({ length: 2 }, (_, index) => ({ page: index + 1, limit: 50, order: "popularity" as const, status: "anons" as const })),
     ];
-    if (data.search) args.push("search: " + JSON.stringify(data.search));
-    if (data.status) args.push("status: " + JSON.stringify(data.status));
-    if (data.kind) args.push("kind: " + JSON.stringify(data.kind));
-    if (data.ids) args.push("ids: " + JSON.stringify(data.ids));
 
-    const query = "query { animes(" + args.join(", ") + ") { " + ANIME_FIELDS + " } }";
-
-    try {
-      const response = await fetch(API_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-          "User-Agent": "YUME/1.0",
-        },
-        body: JSON.stringify({ query }),
-        signal: AbortSignal.timeout(12000),
-      });
-
-      if (!response.ok) {
-        throw new Error("Shikimori returned HTTP " + response.status);
-      }
-
-      const payload = (await response.json()) as GraphQLResponse;
-      if (payload.errors?.length) {
-        throw new Error(payload.errors.map((error) => error.message).filter(Boolean).join("; "));
-      }
-
-      // Exclude Hentai titles on the server before results are cached or sent to the site.
-      const items = (payload.data?.animes ?? [])
-        .filter((item) => !hasExcludedGenre(item))
-        .map(mapAnime);
-      responseCache.set(key, { expiresAt: Date.now() + CACHE_TTL_MS, items });
-      if (responseCache.size > 160) {
-        const now = Date.now();
-        for (const [cacheKey, entry] of responseCache) {
-          if (entry.expiresAt <= now) responseCache.delete(cacheKey);
-        }
-        while (responseCache.size > 160) {
-          const oldestKey = responseCache.keys().next().value;
-          if (oldestKey === undefined) break;
-          responseCache.delete(oldestKey);
+    const unique = new Map<string, Anime>();
+    let failedRequests = 0;
+    const addResults = (results: Awaited<ReturnType<typeof fetchShikimoriAnimes>>[]) => {
+      for (const result of results) {
+        if (result.error) failedRequests += 1;
+        for (const anime of result.items) {
+          if (unique.size >= CATALOG_LIMIT) break;
+          if (!unique.has(anime.id)) unique.set(anime.id, anime);
         }
       }
-      return { items, error: null as string | null };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown Shikimori API error";
-      console.error("[YUME] Shikimori catalog request failed:", message);
-      return {
-        items: [] as Anime[],
-        error: "Не удалось загрузить каталог Shikimori. Проверь подключение и обнови страницу.",
-      };
+    };
+
+    // Limit concurrent requests to avoid sending a burst of dozens of GraphQL queries upstream.
+    for (let index = 0; index < priorityRequests.length && unique.size < CATALOG_LIMIT; index += 4) {
+      const batch = priorityRequests.slice(index, index + 4);
+      const results = await Promise.all(batch.map((request) => fetchShikimoriAnimes(validateRequest(request))));
+      addResults(results);
     }
+
+    // Continue through ranked pages until we have 1,000 unique, non-excluded anime records.
+    for (let page = 11; page <= 40 && unique.size < CATALOG_LIMIT; page += 3) {
+      const requests = [page, page + 1, page + 2]
+        .filter((value) => value <= 40)
+        .map((value) => ({ page: value, limit: 50, order: "ranked" as const }));
+      const results = await Promise.all(requests.map((request) => fetchShikimoriAnimes(validateRequest(request))));
+      addResults(results);
+    }
+
+    const items = Array.from(unique.values()).slice(0, CATALOG_LIMIT);
+    const error = items.length < CATALOG_LIMIT
+      ? "Не удалось загрузить все 1 000 записей каталога. Доступная часть каталога показана."
+      : null;
+    // Cache a complete catalog longer; cache a partial result briefly so it can be retried.
+    catalogCache = {
+      expiresAt: Date.now() + (items.length === CATALOG_LIMIT ? CATALOG_CACHE_TTL_MS : 2 * 60 * 1000),
+      items,
+      error,
+    };
+    if (failedRequests > 0 && !error) {
+      console.warn("[YUME] Catalog filled to 1,000 anime despite", failedRequests, "failed page requests.");
+    }
+    return { items, error };
   });
