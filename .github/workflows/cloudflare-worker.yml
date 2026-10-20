@@ -44,6 +44,11 @@ jobs:
             throw new Error(`Expected Nitro Cloudflare output at ${path}; build did not emit the deployable Worker config.`);
           }
           const config = JSON.parse(fs.readFileSync(path, "utf8"));
+          console.log("Generated Nitro Wrangler config:", JSON.stringify(config, null, 2));
+          const nitroConfigPath = ".wrangler/deploy/config.json";
+          if (fs.existsSync(nitroConfigPath)) {
+            console.log("Nitro deploy config:", fs.readFileSync(nitroConfigPath, "utf8"));
+          }
           const binding = (config.d1_databases ?? []).find(
             (item) => item.binding === "YUME_DB"
               && item.database_name === "yume_db"
