@@ -112,7 +112,7 @@ export function Profile({ animeList, onSelect, onCatalog }: Props) {
   // Merge the visible catalog with titles fetched by saved ID so the local
   // library also works when a title is outside the currently loaded catalog page.
   const savedAnimeById = useMemo(
-    () => new Map([...savedAnime, ...animeList].map((anime) => [anime.id, anime])),
+    () => new Map<string, Anime>([...savedAnime, ...animeList].map((anime) => [anime.id, anime] as const)),
     [animeList, savedAnime],
   );
 
@@ -147,7 +147,7 @@ export function Profile({ animeList, onSelect, onCatalog }: Props) {
         if (cancelled) return;
         const fetched = results.flatMap((result) => result.items);
         setSavedAnime((current) => {
-          const byId = new Map(current.map((anime) => [anime.id, anime]));
+          const byId = new Map<string, Anime>(current.map((anime) => [anime.id, anime] as const));
           fetched.forEach((anime) => byId.set(anime.id, anime));
           return Array.from(byId.values());
         });
