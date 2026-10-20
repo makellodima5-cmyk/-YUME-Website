@@ -35,7 +35,7 @@ jobs:
       - name: Build Cloudflare Worker
         run: bun run build
 
-      - name: Verify generated Worker configuration and D1 binding
+      - name: Verify generated Worker configuration, entry and D1 binding
         run: |
           node --input-type=module <<'NODE'
           import fs from "node:fs";
@@ -57,5 +57,15 @@ jobs:
           if (!binding) {
             throw new Error("Generated Worker config does not contain the expected YUME_DB binding.");
           }
-          console.log("Verified generated Worker config and YUME_DB binding.");
+          const rootConfig = JSON.parse(fs.readFileSync("wrangler.jsonc", "utf8"));
+          if (rootConfig.main !== ".output/server/index.mjs" || !fs.existsSync(rootConfig.main)) {
+            throw new Error("Root Wrangler config must target the built Nitro Worker entry.");
+          }
+          if (rootConfig.assets?.directory !== ".output/public" || !fs.existsSync(rootConfig.assets.directory)) {
+            throw new Error("Root Wrangler config must target the generated public assets.");
+          }
+          console.log("Verified generated Worker config, root entry, assets, and YUME_DB binding.");
           NODE
+
+      - name: Validate Wrangler deploy artifact
+        run: bunx wrangler@4 deploy --dry-run --config wrangler.jsonc
