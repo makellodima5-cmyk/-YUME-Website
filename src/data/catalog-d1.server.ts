@@ -1,7 +1,11 @@
 import type { Anime } from "@/data/anime";
-// Cloudflare Workers exposes bindings through this runtime module. Unlike a
-// mutable module-level setter, this remains available across split server bundles.
-import { env as cloudflareEnv } from "cloudflare:workers";
+// The custom Worker entry writes bindings to globalThis so they remain visible
+// even when TanStack Start splits the server entry and server-function bundles.
+type RuntimeGlobal = typeof globalThis & { __YUME_RUNTIME_ENV__?: unknown };
+
+export function setCatalogRuntimeEnvironment(env: unknown): void {
+  (globalThis as RuntimeGlobal).__YUME_RUNTIME_ENV__ = env;
+}
 
 type CatalogResult = { items: Anime[]; error: string | null };
 type RunResult = { meta?: { changes?: number } };
@@ -87,7 +91,9 @@ let schemaReady = false;
 let missingBindingWarningLogged = false;
 
 function database(): D1Database | null {
-  const binding = (cloudflareEnv as unknown as Record<string, unknown>).YUME_DB;
+  const env = (globalThis as RuntimeGlobal).__YUME_RUNTIME_ENV__;
+  if (!env || typeof env !== "object") return null;
+  const binding = (env as Record<string, unknown>).YUME_DB;
   return binding && typeof binding === "object" ? (binding as D1Database) : null;
 }
 
