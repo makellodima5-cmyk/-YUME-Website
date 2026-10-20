@@ -33,7 +33,7 @@ type Props = {
   genres?: string[];
 };
 
-const selectClass = "h-9 w-full rounded-lg border border-border bg-secondary px-2.5 text-sm text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary/50";
+const selectClass = "h-9 w-full appearance-none rounded-lg border border-border bg-secondary px-2.5 text-sm text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary/50";
 const labelClass = "mb-1 block text-xs text-muted-foreground";
 
 export function CatalogFilters({ open, draft, setDraft, onApply, onReset, placement = "catalog", genres = ALL_GENRES }: Props) {
