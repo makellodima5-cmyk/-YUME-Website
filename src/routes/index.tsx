@@ -109,7 +109,7 @@ function Index() {
         setCatalogLoadState("error");
         catalogLoadStarted.current = false;
       });
-  }, [view, catalogLoadAttempt]);
+  }, [view, catalogLoadAttempt, t]);
   const [query, setQuery] = useState("");
   const [submittedQuery, setSubmittedQuery] = useState("");
   const [catalogQuery, setCatalogQuery] = useState("");
