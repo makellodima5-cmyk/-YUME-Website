@@ -416,7 +416,7 @@ function Index() {
                 </section>
               ) : (
                 <>
-                  {popularCards.length > 0 && <Row title={t("home.popular")} action={<SeeAll onClick={() => setView("catalog")} />}>
+                  {popularCards.length > 0 && <Row title={t("home.popular")} action={<SeeAll onClick={() => setView("popular")} />}>
                     {popularCards.map((a) => <AnimeCard key={a.id} anime={a} onSelect={select} />)}
                   </Row>}
                   {newReleaseCards.length > 0 && <Row title={t("home.newReleases")} action={<SeeAll onClick={() => setView("catalog")} />}>
