@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowDownWideNarrow, ChevronDown, ChevronRight, Search, SlidersHorizontal, X } from "lucide-react";
 import { COLLECTIONS, type Anime } from "@/data/anime";
 import { getShikimoriCatalog } from "@/data/shikimori";
+import { getExactReleaseDate, isNewRelease, isUpcomingAnnouncement } from "@/data/anime-sections";
 import { Header, type View } from "@/components/yume/Header";
 import { AnimeCard } from "@/components/yume/Poster";
 import { CollectionsGrid, Grid, Hero, Row } from "@/components/yume/Sections";
@@ -24,7 +25,7 @@ export const Route = createFileRoute("/")({
   validateSearch: (search: Record<string, unknown>): { section?: View } => ({
     section:
       typeof search.section === "string" &&
-      ["home", "catalog", "collections", "profile", "popular", "announcements", "airing", "favorites", "watchlist", "history", "privacy"].includes(search.section)
+      ["home", "catalog", "collections", "profile", "popular", "new-releases", "announcements", "airing", "favorites", "watchlist", "history", "privacy"].includes(search.section)
         ? (search.section as View)
         : undefined,
   }),
@@ -76,23 +77,6 @@ function CatalogSkeleton({ count = 8 }: { count?: number }) {
       ))}
     </div>
   );
-}
-
-function isUpcomingAnnouncement(anime: Anime): boolean {
-  if (anime.status !== "Анонс") return false;
-
-  const today = new Date().toISOString().slice(0, 10);
-  const airedOn = anime.airedOn?.trim();
-  if (airedOn) {
-    const dateMatch = /^(\d{4}-\d{2}-\d{2})/.exec(airedOn);
-    if (dateMatch) return dateMatch[1]! > today;
-
-    const timestamp = Date.parse(airedOn);
-    if (Number.isFinite(timestamp)) return new Date(timestamp).toISOString().slice(0, 10) > today;
-  }
-
-  // With no exact air date, avoid old-year entries still marked as announcements.
-  return anime.year >= new Date().getUTCFullYear();
 }
 
 function PageNavigation({
@@ -255,6 +239,7 @@ function Index() {
   const [sortBy, setSortBy] = useState("rating");
   const [catalogPage, setCatalogPage] = useState(1);
   const [popularPage, setPopularPage] = useState(1);
+  const [newReleasesPage, setNewReleasesPage] = useState(1);
   const [announcementsPage, setAnnouncementsPage] = useState(1);
   const [airingPage, setAiringPage] = useState(1);
   const [collection, setCollection] = useState<string | null>(null);
@@ -279,6 +264,7 @@ function Index() {
     }
     setViewRaw(v);
     if (v === "popular") setPopularPage(1);
+    if (v === "new-releases") setNewReleasesPage(1);
     if (v === "announcements") setAnnouncementsPage(1);
     if (v === "airing") setAiringPage(1);
     // Persist the selected section in the URL so refreshing the page keeps the same view.
@@ -362,7 +348,7 @@ function Index() {
     Number(activeFilters.yearTo !== "") + Number(activeFilters.minRating > 0) +
     Number(activeFilters.type !== "Любой") + Number(activeFilters.ageRating !== "Любой");
   const searching = view === "home" && (submittedQuery.length > 0 || activeFilterCount > 0);
-  const needsFullCatalog = ["catalog", "popular", "announcements", "airing"].includes(view) ||
+  const needsFullCatalog = ["catalog", "popular", "new-releases", "announcements", "airing"].includes(view) ||
     (view === "home" && (Boolean(submittedQuery.trim()) || activeFilterCount > 0 || filtersOpen));
   // Any search/filter view must use the same capped local catalog of up to 1,000 titles.
   // Never send the user's typed query to Shikimori.
@@ -417,6 +403,20 @@ function Index() {
     ? ANIME.filter((anime) => activeCollection.genres.some((genre) => anime.genres.includes(genre)))
         .sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1))
     : [];
+  const newReleaseAnime = ANIME
+    .filter((anime) => isNewRelease(anime))
+    .sort((a, b) => {
+      const aDate = getExactReleaseDate(a.airedOn);
+      const bDate = getExactReleaseDate(b.airedOn);
+      if (aDate && bDate) return bDate.localeCompare(aDate);
+      if (aDate) return -1;
+      if (bDate) return 1;
+      return (b.rating ?? -1) - (a.rating ?? -1);
+    });
+  const newReleaseCards = newReleaseAnime.slice(0, 12);
+  const totalNewReleasesPages = Math.max(1, Math.ceil(newReleaseAnime.length / catalogPageSize));
+  const visibleNewReleaseAnime = newReleaseAnime.slice((newReleasesPage - 1) * catalogPageSize, newReleasesPage * catalogPageSize);
+
   const sortedPopularAnime = popularAnime
     .filter((anime) => anime.rating !== null)
     .sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1));
@@ -425,12 +425,14 @@ function Index() {
   const visiblePopularAnime = sortedPopularAnime.slice((popularPage - 1) * catalogPageSize, popularPage * catalogPageSize);
 
   const announcementAnime = ANIME
-    .filter(isUpcomingAnnouncement)
+    .filter((anime) => isUpcomingAnnouncement(anime))
     .sort((a, b) => {
-      if (a.airedOn && b.airedOn) return a.airedOn.localeCompare(b.airedOn);
-      if (a.airedOn) return -1;
-      if (b.airedOn) return 1;
-      return b.year - a.year || (b.rating ?? -1) - (a.rating ?? -1);
+      const aDate = getExactReleaseDate(a.airedOn);
+      const bDate = getExactReleaseDate(b.airedOn);
+      if (aDate && bDate) return aDate.localeCompare(bDate);
+      if (aDate) return -1;
+      if (bDate) return 1;
+      return a.year - b.year || (b.rating ?? -1) - (a.rating ?? -1);
     });
   const announcementCards = announcementAnime.slice(0, 12);
   const totalAnnouncementsPages = Math.max(1, Math.ceil(announcementAnime.length / catalogPageSize));
@@ -486,6 +488,9 @@ function Index() {
                   {popularCards.length > 0 && <Row title={t("home.popular")} action={<SeeAll onClick={() => setView("popular")} />}>
                     {popularCards.map((a) => <AnimeCard key={a.id} anime={a} onSelect={select} />)}
                   </Row>}
+                  {newReleaseCards.length > 0 && <Row title={t("home.newReleases")} action={<SeeAll onClick={() => setView("new-releases")} />}>
+                    {newReleaseCards.map((a) => <AnimeCard key={a.id} anime={a} onSelect={select} />)}
+                  </Row>}
                   {announcementCards.length > 0 && <Row title={t("home.announcements")} action={<SeeAll onClick={() => setView("announcements")} />}>
                     {announcementCards.map((a) => <AnimeCard key={a.id} anime={a} onSelect={select} />)}
                   </Row>}
@@ -517,6 +522,26 @@ function Index() {
                 totalPages={totalPopularPages}
                 onPageChange={setPopularPage}
                 ariaLabel={t("home.popular")}
+                previousLabel={t("catalog.previous")}
+                nextLabel={t("catalog.next")}
+              />
+            </>
+          )}
+        </main>
+      ) : view === "new-releases" ? (
+        <main className="px-4 pt-24 md:px-10 md:pt-24">
+          <h1 className="mb-2 text-2xl font-bold md:text-3xl">{t("home.newReleases")}</h1>
+          <p className="mb-6 text-sm text-muted-foreground">{t("home.newReleasesDescription")}</p>
+          {needsFullCatalog && catalogLoadState !== "loaded" && catalogLoadState !== "error" ? (
+            <CatalogSkeleton count={12} />
+          ) : (
+            <>
+              <Grid items={visibleNewReleaseAnime} onSelect={select} empty={t("home.noNewReleases")} />
+              <PageNavigation
+                page={newReleasesPage}
+                totalPages={totalNewReleasesPages}
+                onPageChange={setNewReleasesPage}
+                ariaLabel={t("home.newReleases")}
                 previousLabel={t("catalog.previous")}
                 nextLabel={t("catalog.next")}
               />

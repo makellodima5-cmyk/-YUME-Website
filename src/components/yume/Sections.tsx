@@ -150,7 +150,7 @@ export function CollectionsGrid({ onOpen, animeList }: { onOpen: (id: string) =>
       {COLLECTIONS.map((c) => {
         const matches = animeList
           .filter((anime) => c.genres.some((genre) => anime.genres.includes(genre)))
-          .sort((a, b) => b.rating - a.rating);
+          .sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1));
         const posters = matches.slice(0, 4);
         return (
           <button
@@ -165,7 +165,7 @@ export function CollectionsGrid({ onOpen, animeList }: { onOpen: (id: string) =>
               ))}
             </div>
             <div className="relative z-10 max-w-[58%] text-white">
-              <div className="text-xs text-white/80">{matches.length} {matches.length === 1 ? t("collection.countOne") : matches.length >= 2 && matches.length <= 4 && matches.length > 0 ? t("collection.countFew") : t("collection.countMany")}</div>
+              <div className="text-xs text-white/80">{matches.length === 0 ? t("collection.emptyPreview") : `${matches.length} ${matches.length === 1 ? t("collection.countOne") : matches.length >= 2 && matches.length <= 4 ? t("collection.countFew") : t("collection.countMany")}`}</div>
               <h3 className="mt-1 text-lg font-semibold leading-snug text-white">{t((`collection.${c.id}.title`) as TranslationKey)}</h3>
               <p className="mt-1 line-clamp-2 text-sm text-white/75">{t((`collection.${c.id}.subtitle`) as TranslationKey)}</p>
             </div>

@@ -1,6 +1,7 @@
 import { Star } from "lucide-react";
 import type { Anime } from "@/data/anime";
 import { useYumePreferences, displayAnimeTitle, displayGenre, displayAnimeKind, displayAnimeStatus } from "@/data/preferences";
+import { isNewRelease } from "@/data/anime-sections";
 
 export function PosterArt({ anime, className = "" }: { anime: Anime; className?: string }) {
   const h = anime.hue;
@@ -56,7 +57,7 @@ export function AnimeCard({ anime, onSelect }: { anime: Anime; onSelect: (a: Ani
             {anime.rating.toFixed(1)}
           </div>
         )}
-        {anime.isNew && (
+        {isNewRelease(anime) && (
           <div className="absolute right-2 top-2 rounded-full bg-neon px-2 py-0.5 text-[10px] font-bold uppercase text-primary-foreground">
             {t("anime.new")}
           </div>

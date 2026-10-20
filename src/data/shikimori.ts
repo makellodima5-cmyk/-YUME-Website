@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import type { Anime } from "@/data/anime";
+import { isNewRelease } from "@/data/anime-sections";
 import { getPersistentCatalog, type CatalogResult, type CatalogSeedPageResult } from "@/data/catalog-d1.server";
 
 const API_URL = "https://shikimori.io/api/graphql";
@@ -212,9 +213,14 @@ function findYouTubeTrailerId(videos: ShikimoriGraphQLVideo[] | null | undefined
 }
 
 function mapAnime(item: ShikimoriGraphQLAnime): Anime {
-  const year = item.airedOn?.year ?? item.releasedOn?.year ?? 0;
+  const rawYear = Number(item.airedOn?.year ?? item.releasedOn?.year ?? 0);
+  const year = Number.isInteger(rawYear) && rawYear > 0 ? rawYear : 0;
   const score = item.score == null || item.score === "" ? null : Number(item.score);
-  const rating = score !== null && Number.isFinite(score) && score > 0 ? score : null;
+  const rating = score !== null && Number.isFinite(score) && score > 0 && score <= 10 ? score : null;
+  const episodes = Math.max(0, Math.floor(Number(item.episodes ?? 0) || 0));
+  const episodesAired = Math.max(0, Math.floor(Number(item.episodesAired ?? 0) || 0));
+  const status = mapStatus(item.status);
+  const airedOn = item.airedOn?.date || item.releasedOn?.date || undefined;
   const rawGenres = item.genres ?? [];
   const genres = Array.from(new Set(
     rawGenres
@@ -244,22 +250,22 @@ function mapAnime(item: ShikimoriGraphQLAnime): Anime {
     englishTitle: englishTitle || originalTitle,
     original: originalTitle,
     year,
-    episodes: Math.max(0, Number(item.episodes ?? 0) || 0),
+    episodes,
     rating,
     genres,
-    status: mapStatus(item.status),
+    status,
     description,
     hue: safeHue,
     glyph: Array.from(originalTitle)[0] || "Y",
-    isNew: year > 0 && year >= new Date().getFullYear() - 1,
+    isNew: isNewRelease({ status, airedOn }),
     popular: rating !== null && rating >= 8.5,
     posterUrl,
     bannerUrl,
     kind: mapKind(item.kind),
     ageRating: mapAgeRating(item.rating),
     nextEpisodeAt: item.nextEpisodeAt || undefined,
-    episodesAired: Math.max(0, Number(item.episodesAired ?? 0) || 0),
-    airedOn: item.airedOn?.date || item.releasedOn?.date || undefined,
+    episodesAired,
+    airedOn,
     studios: Array.from(new Set((item.studios ?? []).map((studio) => cleanName(studio.name)).filter(Boolean))),
     youtubeTrailerId: findYouTubeTrailerId(item.videos),
   };

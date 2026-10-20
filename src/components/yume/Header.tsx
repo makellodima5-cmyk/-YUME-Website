@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
-import { Home, LayoutGrid, Library, User, Menu, X, Bell, Moon, Sun, ShieldCheck, Heart, Clock3, Star, Languages, Bookmark, Megaphone, Radio } from "lucide-react";
+import { Home, LayoutGrid, Library, User, Menu, X, Bell, Moon, Sun, ShieldCheck, Heart, Clock3, Star, Languages, Bookmark, Megaphone, Radio, Sparkles } from "lucide-react";
 import { Logo } from "./Logo";
 import { useYumePreferences } from "@/data/preferences";
 
-export type View = "home" | "catalog" | "collections" | "profile" | "popular" | "announcements" | "airing" | "favorites" | "watchlist" | "history" | "privacy";
+export type View = "home" | "catalog" | "collections" | "profile" | "popular" | "new-releases" | "announcements" | "airing" | "favorites" | "watchlist" | "history" | "privacy";
 
 export const NAV: { id: View; label: string; icon: typeof Home }[] = [
   { id: "home", label: "Главная", icon: Home },
@@ -30,6 +30,7 @@ export function Header({ view, setView, onProfile }: Props) {
         catalog: "Каталог",
         collections: "Подборки",
         popular: "Популярное",
+        newReleases: "Новинки",
         announcements: "Анонсы",
         airing: "Сейчас выходит",
         favorites: "Избранное",
@@ -46,6 +47,7 @@ export function Header({ view, setView, onProfile }: Props) {
         catalog: "Catalog",
         collections: "Collections",
         popular: "Popular",
+        newReleases: "New releases",
         announcements: "Announcements",
         airing: "Currently airing",
         favorites: "Favorites",
@@ -168,6 +170,9 @@ export function Header({ view, setView, onProfile }: Props) {
               })}
               <button type="button" onClick={() => goToView("popular")} className={navButtonClass(view === "popular")}>
                 <Star className="h-5 w-5 shrink-0" /><span>{navigationText.popular}</span>
+              </button>
+              <button type="button" onClick={() => goToView("new-releases")} className={navButtonClass(view === "new-releases")}>
+                <Sparkles className="h-5 w-5 shrink-0" /><span>{navigationText.newReleases}</span>
               </button>
               <button type="button" onClick={() => goToView("announcements")} className={navButtonClass(view === "announcements")}>
                 <Megaphone className="h-5 w-5 shrink-0" /><span>{navigationText.announcements}</span>
