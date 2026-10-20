@@ -158,7 +158,7 @@ export function Header({ view, setView, onProfile }: Props) {
                     className={navButtonClass(view === item.id)}
                   >
                     <Icon className="h-5 w-5 shrink-0" />
-                    <span>{t(navLabels[item.id as keyof typeof navLabels])}</span>
+                    <span>{navLabels[item.id as keyof typeof navLabels]}</span>
                   </button>
                 );
               })}
