@@ -287,7 +287,7 @@ export async function getPersistentCatalog(
     if (state === "partial") {
       return {
         items: await readRows(db),
-        error: \`Каталог загружен частично: \${imported} из \${CATALOG_LIMIT} записей.\`,
+        error: "Каталог загружен частично: " + imported + " из " + CATALOG_LIMIT + " записей.",
         progress: makeProgress("partial", imported),
       };
     }
@@ -354,7 +354,7 @@ export async function getPersistentCatalog(
         imported = await countRows(db);
         return {
           items: await readRows(db),
-          error: \`Каталог загружен частично: \${imported} из \${CATALOG_LIMIT} записей.\`,
+          error: "Каталог загружен частично: " + imported + " из " + CATALOG_LIMIT + " записей.",
           progress: makeProgress("partial", imported),
         };
       }
@@ -418,7 +418,7 @@ export async function getPersistentCatalog(
 
       const items = await readRows(db);
       const error = nextState === "partial"
-        ? \`Каталог загружен частично: \${imported} из \${CATALOG_LIMIT} записей.\`
+        ? "Каталог загружен частично: " + imported + " из " + CATALOG_LIMIT + " записей."
         : null;
       return {
         items,
