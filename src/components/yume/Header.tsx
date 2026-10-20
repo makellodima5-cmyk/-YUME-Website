@@ -1,5 +1,5 @@
 import { useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
-import { Home, LayoutGrid, Library, User } from "lucide-react";
+import { Home, LayoutGrid, Library, User, Menu, X, Bell, Settings, Moon, Sun, ShieldCheck, Heart, Clock3, CalendarDays, Star } from "lucide-react";
 import { Logo } from "./Logo";
 import { useYumePreferences, type TranslationKey } from "@/data/preferences";
 
@@ -21,7 +21,8 @@ type Props = {
 type DragGeometry = { leftPercent: number; widthPercent: number };
 
 export function Header({ view, setView, onProfile }: Props) {
-  const { t } = useYumePreferences();
+  const { t, theme, setTheme } = useYumePreferences();
+  const [menuOpen, setMenuOpen] = useState(false);
   const navLabels: Record<View, TranslationKey> = {
     home: "nav.home",
     catalog: "nav.catalog",
@@ -124,25 +125,40 @@ export function Header({ view, setView, onProfile }: Props) {
 
   return (
     <>
-      <header className="fixed inset-x-0 top-0 z-40 w-full overflow-hidden rounded-none border-b border-white/10 bg-[#090714]/95 shadow-[0_8px_28px_rgba(0,0,0,0.38)] backdrop-blur-xl">
-        <div className="flex h-16 items-center gap-6 px-4 md:px-10">
-          <Logo />
-          <nav className="hidden items-center gap-1 md:flex">
-            {NAV.map((n) => (
-              <button
-                key={n.id}
-                onClick={() => setView(n.id)}
-                className={`rounded-full px-4 py-2 text-sm font-medium transition-all duration-300 ${view === n.id ? "glass-active text-white shadow-[0_0_24px_rgba(208,90,255,0.42)]" : "text-white/75 hover:bg-white/10 hover:text-white"}`}
-              >
-                {t(navLabels[n.id])}
-              </button>
-            ))}
-          </nav>
-          <button onClick={onProfile} aria-label={t("nav.profileButton")} className="ml-auto flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.25)] backdrop-blur-xl transition hover:bg-white/20 md:ml-0">
-            <User className="h-5 w-5" />
+      <header className="fixed inset-x-0 top-0 z-40 w-full border-b border-white/10 bg-background/90 shadow-[0_8px_28px_rgba(0,0,0,0.18)] backdrop-blur-xl">
+        <div className="flex h-16 items-center gap-3 px-4 md:px-6 lg:px-8">
+          <button type="button" onClick={() => setMenuOpen((open) => !open)} aria-label={menuOpen ? "Закрыть меню" : "Открыть меню"} aria-expanded={menuOpen} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-foreground transition hover:bg-primary/10">
+            {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
+          <button type="button" onClick={() => { setView("home"); setMenuOpen(false); }} aria-label="YUME — главная" className="shrink-0"><Logo /></button>
+          <div className="hidden min-w-0 flex-1 md:block" />
+          <div className="ml-auto flex items-center gap-2">
+            <button type="button" aria-label="Уведомления" title="Уведомления скоро появятся" className="relative flex h-10 w-10 items-center justify-center rounded-full text-foreground/80 transition hover:bg-primary/10"><Bell className="h-5 w-5" /><span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-primary" /></button>
+            <button onClick={onProfile} aria-label={t("nav.profileButton")} className="flex h-10 w-10 items-center justify-center rounded-full border border-primary/20 bg-primary/10 text-foreground transition hover:bg-primary/20"><User className="h-5 w-5" /></button>
+          </div>
         </div>
       </header>
+      {menuOpen && <><button type="button" aria-label="Закрыть меню" onClick={() => setMenuOpen(false)} className="fixed inset-0 z-40 bg-black/35 backdrop-blur-[2px]" /><aside className="fixed bottom-0 left-0 top-16 z-50 flex w-[min(82vw,290px)] flex-col border-r border-border bg-background/95 p-4 shadow-2xl backdrop-blur-2xl">
+        <div className="mb-4 px-2 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">YUME · Навигация</div>
+        <nav aria-label={t("nav.main")} className="flex flex-col gap-1">
+          {NAV.filter((item) => item.id !== "profile").map((item) => {
+            const Icon = item.icon;
+            return <button key={item.id} type="button" onClick={() => { setView(item.id); setMenuOpen(false); }} className={`flex items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium transition ${view === item.id ? "bg-primary/15 text-primary" : "text-foreground/80 hover:bg-primary/10"}`}><Icon className="h-5 w-5" />{t(navLabels[item.id])}</button>;
+          })}
+          <button type="button" onClick={() => { setView("catalog"); setMenuOpen(false); }} className="flex items-center gap-3 rounded-xl px-3 py-3 text-left text-sm text-foreground/80 hover:bg-primary/10"><Star className="h-5 w-5" />Популярное</button>
+          <button type="button" onClick={() => { onProfile(); setMenuOpen(false); }} className="flex items-center gap-3 rounded-xl px-3 py-3 text-left text-sm text-foreground/80 hover:bg-primary/10"><Heart className="h-5 w-5" />Избранное</button>
+          <button type="button" onClick={() => { onProfile(); setMenuOpen(false); }} className="flex items-center gap-3 rounded-xl px-3 py-3 text-left text-sm text-foreground/80 hover:bg-primary/10"><Clock3 className="h-5 w-5" />История</button>
+          <button type="button" onClick={() => { onProfile(); setMenuOpen(false); }} className="flex items-center gap-3 rounded-xl px-3 py-3 text-left text-sm text-foreground/80 hover:bg-primary/10"><Settings className="h-5 w-5" />Настройки и политика конфиденциальности</button>
+        </nav>
+        <div className="mt-auto rounded-2xl border border-border bg-card p-3">
+          <div className="mb-3 flex items-center gap-2 text-sm font-semibold"><span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/15 text-primary">{theme === "light" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}</span>Тема оформления</div>
+          <div className="grid grid-cols-2 gap-2">
+            <button type="button" onClick={() => setTheme("light")} className={`rounded-lg px-2 py-2 text-xs ${theme === "light" ? "bg-primary text-primary-foreground" : "bg-muted text-foreground"}`}>Светлая</button>
+            <button type="button" onClick={() => setTheme("dark")} className={`rounded-lg px-2 py-2 text-xs ${theme === "dark" ? "bg-primary text-primary-foreground" : "bg-muted text-foreground"}`}>Тёмная</button>
+          </div>
+        </div>
+      </aside></>}
+
 
       <nav
         ref={mobileNavRef}
