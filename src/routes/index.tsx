@@ -422,7 +422,7 @@ function Index() {
                   </Row>}
                   {airingCards.length > 0 && <Row title={t("home.airing")} action={<SeeAll onClick={() => setView("airing")} />}>
                     {airingCards.map((a) => <AnimeCard key={a.id} anime={a} onSelect={select} />)}
-                  </Row>}}
+                  </Row>}
                   <section className="mt-10 px-4 md:px-10">
                     <div className="mb-4 flex items-end justify-between">
                       <h2 className="text-lg font-semibold md:text-xl">{t("home.collections")}</h2>
