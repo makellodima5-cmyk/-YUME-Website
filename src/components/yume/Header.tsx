@@ -70,7 +70,7 @@ export function Header({ view, setView, onProfile }: Props) {
             <button
               type="button"
               aria-label={t("nav.notifications")}
-              title="Уведомления скоро появятся"
+              title={t("nav.notificationsComing")}
               className="relative flex h-10 w-10 items-center justify-center rounded-full text-foreground/80 transition hover:bg-primary/10"
             >
               <Bell className="h-5 w-5" />
@@ -108,7 +108,7 @@ export function Header({ view, setView, onProfile }: Props) {
               <button
                 type="button"
                 onClick={() => setMenuOpen(false)}
-                aria-label="Закрыть меню"
+                aria-label={t("nav.closeMenu")}
                 className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-foreground transition hover:bg-primary/10"
               >
                 <X className="h-5 w-5" />
