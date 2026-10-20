@@ -212,3 +212,59 @@ html[data-theme="light"] [class~="bg-[#171127]/75"] input { color: #2e1c3d; }
 html[data-theme="light"] [class~="bg-[#171127]/75"] input::placeholder { color: #756680; }
 html[data-theme="light"] [class~="bg-[#080710]"] { color: #f7f0ff; }
 html[data-theme="light"] [class~="bg-[#080710]"] p { color: rgba(255,255,255,0.7); }
+
+
+/* YUME visual refresh: plain monochrome page surfaces, purple active states.
+   Frosted glass remains intentionally limited to search controls. */
+:root {
+  color-scheme: dark;
+  --background: #000000;
+  --foreground: #f7f4fb;
+  --card: #0b0b0d;
+  --card-foreground: #f7f4fb;
+  --popover: #080808;
+  --popover-foreground: #f7f4fb;
+  --secondary: #17141d;
+  --secondary-foreground: #f7f4fb;
+  --muted: #15131a;
+  --muted-foreground: #a5a0ae;
+  --accent: #241633;
+  --accent-foreground: #ffffff;
+  --border: #29252f;
+  --input: #29252f;
+  --ring: #9b5cff;
+  --body-gradient: #000000;
+}
+html[data-theme="light"] {
+  color-scheme: light;
+  --background: #ffffff;
+  --foreground: #241c2c;
+  --card: #ffffff;
+  --card-foreground: #241c2c;
+  --popover: #ffffff;
+  --popover-foreground: #241c2c;
+  --secondary: #f5f2f8;
+  --secondary-foreground: #241c2c;
+  --muted: #f5f2f8;
+  --muted-foreground: #6c6474;
+  --accent: #f0e5ff;
+  --accent-foreground: #3f176e;
+  --border: #e3dce9;
+  --input: #e3dce9;
+  --ring: #7d3cdf;
+  --body-gradient: #ffffff;
+}
+html body {
+  background: var(--background) !important;
+  background-image: none !important;
+}
+html[data-theme="light"] header {
+  background: #ffffff !important;
+  border-color: #e9e3ee !important;
+  color: #241c2c !important;
+  box-shadow: 0 1px 0 rgba(46, 24, 68, 0.05) !important;
+}
+html[data-theme="dark"] header {
+  background: #000000 !important;
+  border-color: #242129 !important;
+}

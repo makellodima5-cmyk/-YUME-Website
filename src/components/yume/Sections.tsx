@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Play, Search, Shuffle, SlidersHorizontal, X } from "lucide-react";
-import heroArtwork from "@/assets/yume-hero-70.webp";
-import logoArtwork from "@/assets/yume-logo-transparent.png";
+import heroArtwork from "@/assets/yume-hero-desktop-new.png.PNG";
+import mobileHeroArtwork from "@/assets/yume-hero-mobile-new.png.PNG";
 import { type Anime, CONTINUE, COLLECTIONS, byId } from "@/data/anime";
 import { AnimeCard, PosterArt } from "./Poster";
 import { CatalogFilters, type CatalogFiltersValue } from "./CatalogFilters";
@@ -60,15 +60,18 @@ export function Hero({
 }) {
   const { t } = useYumePreferences();
   return (
-    <section className="relative isolate h-[min(90svh,900px)] min-h-[720px] w-full max-w-[1920px] overflow-hidden md:mx-auto md:mt-2 md:h-[min(76vh,760px)] md:min-h-[560px] md:w-[calc(100%-2.5rem)] md:rounded-2xl md:ring-1 md:ring-primary/50">
-      <img
+    <section className="relative mx-3 mt-3 isolate h-[340px] min-h-[340px] w-[calc(100%-1.5rem)] max-w-[1920px] overflow-hidden rounded-2xl ring-1 ring-border sm:mx-4 sm:h-[390px] sm:w-[calc(100%-2rem)] md:mx-auto md:mt-3 md:h-[400px] md:min-h-[400px] md:w-[calc(100%-2.5rem)] lg:h-[440px]">
+      <picture className="absolute inset-0 block h-full w-full">
+        <source media="(max-width: 767px)" srcSet={mobileHeroArtwork} />
+        <img
         src={heroArtwork}
         alt={t("hero.artAlt")}
         width={2048}
         height={1024}
         fetchPriority="high"
-        className="absolute inset-0 h-full w-full object-cover object-[62%_center] md:object-center"
-      />
+        className="absolute inset-0 h-full w-full object-cover object-[58%_center] md:object-center"
+        />
+      </picture>
       <div className="absolute inset-0 bg-gradient-to-r from-[#090714]/80 via-[#090714]/40 to-transparent md:from-[#090714]/75 md:via-[#090714]/25 md:to-transparent" />
       <div className="absolute inset-0 bg-gradient-to-t from-[#090714]/95 via-[#090714]/20 to-transparent md:from-transparent md:via-transparent" />
       <div className="absolute left-4 top-5 z-30 w-[min(76vw,360px)] md:left-8 md:top-7 md:w-[min(36vw,420px)]">
@@ -90,28 +93,18 @@ export function Hero({
         </div>
         <CatalogFilters open={filtersOpen} placement="home" draft={draftFilters} setDraft={setDraftFilters} onApply={onApplyFilters} onReset={onResetFilters} genres={genres} statuses={statuses} types={types} ageRatings={ageRatings} yearMin={yearMin} yearMax={yearMax} />
       </div>
-      <div className="relative z-10 flex h-full flex-col justify-end px-5 pb-16 pt-28 md:max-w-[760px] md:justify-center md:px-10 md:pb-8 md:pt-8 lg:px-12">
-        <div className="mb-3 md:mb-4">
-          <img
-            src={logoArtwork}
-            alt="YUME"
-            width={2089}
-            height={753}
-            className="relative -left-0.5 h-auto w-[min(72vw,300px)] object-contain drop-shadow-[0_0_16px_rgba(180,85,255,0.14)] md:-left-1 md:w-[min(38vw,440px)] lg:w-[min(36vw,490px)]"
-            draggable={false}
-          />
-        </div>
-        <h1 className="max-w-[12ch] text-4xl font-bold leading-[1.05] md:max-w-none md:text-5xl lg:text-6xl">
+      <div className="relative z-10 flex h-full flex-col justify-end px-5 pb-6 pt-24 sm:pb-8 md:max-w-[760px] md:justify-center md:px-10 md:pb-8 md:pt-8 lg:px-12">
+        <h1 className="max-w-[13ch] text-3xl font-bold leading-[1.05] sm:text-4xl md:max-w-none md:text-4xl lg:text-5xl">
           <span className="text-white">{t("hero.title")}</span>
         </h1>
-        <p className="mt-4 max-w-xl text-base leading-relaxed text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.95)] md:text-lg">
+        <p className="mt-2 max-w-xl text-sm leading-relaxed text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.95)] md:mt-3 md:text-base">
           {t("hero.description")}
         </p>
-        <div className="mt-7 flex flex-col gap-3 sm:flex-row md:mt-8">
-          <button onClick={onRandom} className="inline-flex w-fit items-center justify-center gap-2 rounded-full bg-neon px-6 py-3 font-semibold text-primary-foreground shadow-neon transition hover:brightness-110 max-sm:w-full">
+        <div className="mt-5 flex flex-col gap-2 sm:flex-row md:mt-6">
+          <button onClick={onRandom} className="inline-flex w-fit items-center justify-center gap-2 rounded-full bg-neon px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-neon transition hover:brightness-110 max-sm:w-full">
             <Play className="h-4 w-4 fill-current" /> {t("hero.random")}
           </button>
-          <button onClick={onCatalog} className="inline-flex w-fit items-center justify-center gap-2 rounded-full bg-[#0b0a19]/65 px-6 py-3 font-semibold text-white ring-1 ring-white/25 backdrop-blur-md transition hover:bg-accent max-sm:w-full">
+          <button onClick={onCatalog} className="inline-flex w-fit items-center justify-center gap-2 rounded-full bg-[#0b0a19]/65 px-5 py-2.5 text-sm font-semibold text-white ring-1 ring-white/25 backdrop-blur-md transition hover:bg-accent max-sm:w-full">
             <Shuffle className="h-4 w-4" /> {t("hero.catalog")}
           </button>
         </div>
