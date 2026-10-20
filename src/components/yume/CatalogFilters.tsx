@@ -73,7 +73,7 @@ export function CatalogFilters({
     const viewportWidth = window.visualViewport?.width ?? window.innerWidth;
     const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
     const safeTop = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--safe-area-inset-top")) || 0;
-    const width = Math.min(440, Math.max(240, viewportWidth - 24), rect?.width || 440);
+    const width = Math.min(440, Math.max(240, viewportWidth - 24));
     const left = Math.max(12, Math.min(rect?.left ?? 12, viewportWidth - width - 12));
     const requestedTop = rect ? rect.bottom + 8 : safeTop + 80;
     const top = Math.max(safeTop + 8, Math.min(requestedTop, viewportHeight - 160));
@@ -99,7 +99,7 @@ export function CatalogFilters({
     <div ref={panelRef} style={positionStyle} className="fixed z-[100] overflow-y-auto overscroll-contain rounded-2xl border border-border bg-popover p-3 text-popover-foreground shadow-2xl shadow-black/25 sm:p-4" role="dialog" aria-label={t("filters.dialogLabel")} data-catalog-filter-panel>
       <div className="mb-3 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-sm font-semibold"><SlidersHorizontal className="h-4 w-4 text-primary" /> {t("filters.title")}</div>
-        <button type="button" onClick={onClose} aria-label={t("nav.closeMenu")} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-accent hover:text-foreground">
+        <button type="button" onClick={onClose} aria-label={t("filters.close")} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-accent hover:text-foreground">
           <X className="h-4 w-4" />
         </button>
       </div>
