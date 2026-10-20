@@ -24,7 +24,7 @@ export const Route = createFileRoute("/")({
   validateSearch: (search: Record<string, unknown>): { section?: View } => ({
     section:
       typeof search.section === "string" &&
-      ["home", "catalog", "collections", "profile"].includes(search.section)
+      ["home", "catalog", "collections", "profile", "popular", "favorites", "watchlist", "history", "privacy"].includes(search.section)
         ? (search.section as View)
         : undefined,
   }),
@@ -437,6 +437,12 @@ function Index() {
             </div>
           </div>
         </main>
+      ) : view === "popular" ? (
+        <main className="px-4 pt-24 md:px-10 md:pt-24">
+          <h1 className="mb-2 text-2xl font-bold md:text-3xl">{t("home.popular")}</h1>
+          <p className="mb-6 text-sm text-muted-foreground">{language === "en" ? "Top-rated anime from the loaded catalog." : "Аниме с самыми высокими оценками из загруженного каталога."}</p>
+          <Grid items={popularAnime.slice().sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1))} onSelect={select} empty={t("catalog.noResultsFormal")} />
+        </main>
       ) : view === "catalog" ? (
         <main className="px-4 pt-36 md:px-10 md:pt-24">
           <h1 className="text-2xl font-bold md:text-3xl">{t("catalog.title")}</h1>
@@ -529,6 +535,17 @@ function Index() {
         </main>
       ) : view === "profile" ? (
         <Profile animeList={ANIME} onSelect={select} onCatalog={() => setView("catalog")} />
+      ) : view === "favorites" ? (
+        <Profile key="favorites" initialPanel="favorites" animeList={ANIME} onSelect={select} onCatalog={() => setView("catalog")} />
+      ) : view === "watchlist" ? (
+        <Profile key="watchlist" initialPanel="watchlist" animeList={ANIME} onSelect={select} onCatalog={() => setView("catalog")} />
+      ) : view === "privacy" ? (
+        <Profile key="privacy" initialPanel="documents" animeList={ANIME} onSelect={select} onCatalog={() => setView("catalog")} />
+      ) : view === "history" ? (
+        <main className="px-4 pt-24 md:px-10 md:pt-24">
+          <h1 className="mb-3 text-2xl font-bold md:text-3xl">{language === "en" ? "History" : "История"}</h1>
+          <p className="rounded-2xl border border-dashed border-border bg-card/40 px-5 py-8 text-sm text-muted-foreground">{language === "en" ? "Viewing history will be available later." : "История просмотров появится позже."}</p>
+        </main>
       ) : null}
       <footer className="mt-16 px-4 text-center text-xs text-muted-foreground md:px-10">{t("footer.source")}</footer>
     </div>
