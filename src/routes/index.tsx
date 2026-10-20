@@ -62,6 +62,23 @@ function SeeAll({ onClick }: { onClick: () => void }) {
   );
 }
 
+function CatalogSkeleton({ count = 8 }: { count?: number }) {
+  return (
+    <div
+      aria-hidden="true"
+      className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5"
+    >
+      {Array.from({ length: count }, (_, index) => (
+        <div key={index} className="animate-pulse">
+          <div className="aspect-[2/3] rounded-xl bg-white/5" />
+          <div className="mt-3 h-3 w-3/4 rounded bg-white/5" />
+          <div className="mt-2 h-3 w-1/2 rounded bg-white/5" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function Index() {
   const { t, language } = useYumePreferences();
   const navigate = useNavigate();
@@ -277,9 +294,7 @@ function Index() {
             <button onClick={() => { setQuery(""); setSubmittedQuery(""); setDraftFilters(EMPTY_CATALOG_FILTERS); setActiveFilters(EMPTY_CATALOG_FILTERS); setFiltersOpen(false); setCatalogPage(1); }} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"><X className="h-4 w-4" />{t("catalog.reset")}</button>
           </div>
           {needsFullCatalog && catalogLoadState !== "loaded" && catalogLoadState !== "error" ? (
-            <div role="status" className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-6 text-center text-sm text-muted-foreground">
-              {t("catalog.loading")}
-            </div>
+            <CatalogSkeleton count={8} />
           ) : (
             <>
               {catalogLoadState === "error" && (
@@ -294,7 +309,6 @@ function Index() {
         </main>
       ) : view === "home" ? (
         <main className="pt-16">
-          {filtersOpen && needsFullCatalog && catalogLoadState !== "loaded" && catalogLoadState !== "error" && <div role="status" className="mx-4 mt-3 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-muted-foreground md:mx-10">{t("catalog.loading")}</div>}
           <Hero onCatalog={() => setView("catalog")} onRandom={random} query={query} setQuery={setQuery} onSubmitSearch={submitHomeSearch} filtersOpen={filtersOpen && (!needsFullCatalog || catalogLoadState === "loaded" || catalogLoadState === "error")} setFiltersOpen={setFiltersOpen} draftFilters={draftFilters} setDraftFilters={setDraftFilters} onApplyFilters={applyCatalogFilters} onResetFilters={resetCatalogFilters} activeFilterCount={activeFilterCount} genres={availableGenres} statuses={availableStatuses} types={availableTypes} ageRatings={availableAgeRatings} yearMin={catalogYearRange.min} yearMax={catalogYearRange.max} />
           <div className="home-content-world -mt-10 pb-12">
             <div className="relative z-10">
@@ -333,11 +347,6 @@ function Index() {
           {catalogLoadState === "loaded" && (
             <p className="mt-1 text-xs text-muted-foreground">{t("catalog.loadedCount")} <span className="font-semibold text-foreground">{ANIME.length} / 1 000</span></p>
           )}
-          {needsFullCatalog && catalogLoadState !== "loaded" && catalogLoadState !== "error" && (
-            <div role="status" className="mt-4 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-muted-foreground">
-              {t("catalog.loading")} <span className="font-semibold text-foreground">{ANIME.length} / 1 000</span>
-            </div>
-          )}
           {catalogLoadState === "error" && (
             <div role="alert" className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-400/25 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
               <span>{t("catalog.loadError")}</span>
@@ -368,9 +377,7 @@ function Index() {
             </label>
           </div>
           {needsFullCatalog && catalogLoadState !== "loaded" && catalogLoadState !== "error" ? (
-            <div role="status" className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-8 text-center text-sm text-muted-foreground">
-              {t("catalog.loading")}
-            </div>
+            <CatalogSkeleton count={12} />
           ) : (
             <>
               {catalogLoadState === "error" && (
