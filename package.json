@@ -12,7 +12,7 @@
     "format": "prettier --write .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "deploy:cloudflare": "bun run build && bunx wrangler@4 deploy",
+    "deploy:cloudflare": "bun run build && bunx nitro deploy --prebuilt",
     "cf-typegen": "npx --yes wrangler@4 types"
   },
   "overrides": {
