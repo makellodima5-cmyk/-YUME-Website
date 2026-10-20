@@ -116,10 +116,9 @@ function rowToAnime(row: AnimeRow): Anime {
     ? (row.status as Anime["status"])
     : "Неизвестно";
 
-  return {
+  const anime: Anime = {
     id: String(row.id),
     title: row.title,
-    englishTitle: optional(row.english_title),
     original: row.original_title,
     year: Number(row.year) || 0,
     episodes: Math.max(0, Number(row.episodes) || 0),
@@ -131,18 +130,21 @@ function rowToAnime(row: AnimeRow): Anime {
     glyph: row.glyph || "Y",
     isNew: Boolean(row.is_new),
     popular: Boolean(row.popular),
-    posterUrl: optional(row.poster_url),
-    bannerUrl: optional(row.banner_url),
-    kind: optional(row.kind),
-    ageRating: optional(row.age_rating),
-    nextEpisodeAt: optional(row.next_episode_at),
     episodesAired: Math.max(0, Number(row.episodes_aired) || 0),
-    airedOn: optional(row.aired_on),
     studios: parseJsonArray(row.studios_json),
-    youtubeTrailerId: optional(row.youtube_trailer_id),
   };
-}
 
+  if (row.english_title) anime.englishTitle = row.english_title;
+  if (row.poster_url) anime.posterUrl = row.poster_url;
+  if (row.banner_url) anime.bannerUrl = row.banner_url;
+  if (row.kind) anime.kind = row.kind;
+  if (row.age_rating) anime.ageRating = row.age_rating;
+  if (row.next_episode_at) anime.nextEpisodeAt = row.next_episode_at;
+  if (row.aired_on) anime.airedOn = row.aired_on;
+  if (row.youtube_trailer_id) anime.youtubeTrailerId = row.youtube_trailer_id;
+
+  return anime;
+}
 function rowValues(item: Anime, position: number): unknown[] {
   return [
     item.id,
