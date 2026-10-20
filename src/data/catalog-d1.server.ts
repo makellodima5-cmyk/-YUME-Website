@@ -1,6 +1,8 @@
+import { env as cloudflareEnv } from "cloudflare:workers";
 import type { Anime } from "@/data/anime";
-// The custom Worker entry writes bindings to globalThis so they remain visible
-// even when TanStack Start splits the server entry and server-function bundles.
+
+// The native Cloudflare env binding is the primary source. Keep the injected
+// environment as a fallback for tests and non-Cloudflare server adapters.
 type RuntimeGlobal = typeof globalThis & { __YUME_RUNTIME_ENV__?: unknown };
 
 export function setCatalogRuntimeEnvironment(env: unknown): void {
@@ -91,9 +93,13 @@ let schemaReady = false;
 let missingBindingWarningLogged = false;
 
 function database(): D1Database | null {
-  const env = (globalThis as RuntimeGlobal).__YUME_RUNTIME_ENV__;
-  if (!env || typeof env !== "object") return null;
-  const binding = (env as Record<string, unknown>).YUME_DB;
+  const nativeBinding = (cloudflareEnv as unknown as Record<string, unknown>).YUME_DB;
+  const injectedEnv = (globalThis as RuntimeGlobal).__YUME_RUNTIME_ENV__;
+  const injectedBinding =
+    injectedEnv && typeof injectedEnv === "object"
+      ? (injectedEnv as Record<string, unknown>).YUME_DB
+      : undefined;
+  const binding = nativeBinding ?? injectedBinding;
   return binding && typeof binding === "object" ? (binding as D1Database) : null;
 }
 
