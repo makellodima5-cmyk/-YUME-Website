@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowDownWideNarrow, ChevronDown, ChevronRight, Search, SlidersHorizontal, X } from "lucide-react";
 import { COLLECTIONS, type Anime } from "@/data/anime";
-import { getShikimoriAnimes, getShikimoriCatalog } from "@/data/shikimori";
+import { getShikimoriCatalog } from "@/data/shikimori";
 import { Header, type View } from "@/components/yume/Header";
 import { AnimeCard } from "@/components/yume/Poster";
 import { CollectionsGrid, Grid, Hero, Row } from "@/components/yume/Sections";
@@ -29,17 +29,25 @@ export const Route = createFileRoute("/")({
         : undefined,
   }),
   loader: async () => {
-    const [ranked, recent] = await Promise.all([
-      getShikimoriAnimes({ data: { page: 1, limit: 50, order: "ranked" } }),
-      getShikimoriAnimes({ data: { page: 1, limit: 50, order: "aired_on" } }),
-    ]);
+    // One server-side catalog source powers the homepage as well as the full catalog.
+    // When D1 is bound, this reads the persistent records instead of querying Shikimori
+    // for popular/recent lists on every page visit.
+    const catalog = await getShikimoriCatalog({ data: {} });
+    const items = catalog.items;
+    const popular = [...items]
+      .filter((anime) => anime.rating !== null)
+      .sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1))
+      .slice(0, 50);
+    const recent = [...items]
+      .sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? "") || b.year - a.year)
+      .slice(0, 50);
     const unique = new Map<string, Anime>();
-    [...ranked.items, ...recent.items].forEach((anime) => unique.set(anime.id, anime));
+    [...popular, ...recent].forEach((anime) => unique.set(anime.id, anime));
     return {
       anime: Array.from(unique.values()),
-      popular: ranked.items,
-      recent: recent.items,
-      apiError: ranked.error || recent.error,
+      popular,
+      recent,
+      apiError: catalog.error,
     };
   },
   component: Index,
