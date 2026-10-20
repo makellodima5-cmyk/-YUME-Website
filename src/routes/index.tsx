@@ -441,6 +441,16 @@ function Index() {
         <main className="px-4 pt-36 md:px-10 md:pt-24">
           <h1 className="text-2xl font-bold md:text-3xl">{t("catalog.title")}</h1>
           <p className="mt-1 text-sm text-muted-foreground">{t("catalog.subtitle")}</p>
+          {catalogLoadState === "loading" && (
+            <p className="mt-1 text-xs text-muted-foreground" role="status" aria-live="polite">
+              {language === "en"
+                ? "Loading catalog: " + catalogProgress.imported + " / " + catalogProgress.target
+                : "Загрузка каталога: " + catalogProgress.imported + " из " + catalogProgress.target}
+              {catalogProgress.status === "cooldown"
+                ? (language === "en" ? " — waiting before the next request" : " — пауза перед следующим запросом")
+                : ""}
+            </p>
+          )}
           {catalogLoadState === "loaded" && (
             <p className="mt-1 text-xs text-muted-foreground">{t("catalog.loadedCount")} <span className="font-semibold text-foreground">{ANIME.length} / 1 000</span></p>
           )}
