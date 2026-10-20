@@ -440,26 +440,11 @@ function Index() {
       ) : view === "popular" ? (
         <main className="px-4 pt-24 md:px-10 md:pt-24">
           <h1 className="mb-2 text-2xl font-bold md:text-3xl">{t("home.popular")}</h1>
-          <p className="mb-6 text-sm text-muted-foreground">{t("home.popularDescription")}</p>
           <Grid items={popularAnime.slice().sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1))} onSelect={select} empty={t("catalog.noResultsFormal")} />
         </main>
       ) : view === "catalog" ? (
         <main className="px-4 pt-36 md:px-10 md:pt-24">
           <h1 className="text-2xl font-bold md:text-3xl">{t("catalog.title")}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{t("catalog.subtitle")}</p>
-          {catalogLoadState === "loading" && (
-            <p className="mt-1 text-xs text-muted-foreground" role="status" aria-live="polite">
-              {language === "en"
-                ? "Loading catalog: " + catalogProgress.imported + " / " + catalogProgress.target
-                : "Загрузка каталога: " + catalogProgress.imported + " из " + catalogProgress.target}
-              {catalogProgress.status === "cooldown"
-                ? (language === "en" ? " — waiting before the next request" : " — пауза перед следующим запросом")
-                : ""}
-            </p>
-          )}
-          {catalogLoadState === "loaded" && (
-            <p className="mt-1 text-xs text-muted-foreground">{t("catalog.loadedCount")} <span className="font-semibold text-foreground">{ANIME.length} / 1 000</span></p>
-          )}
           {catalogLoadState === "error" && (
             <div role="alert" className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-400/25 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
               <span>{t("catalog.loadError")}</span>
@@ -478,8 +463,7 @@ function Index() {
             </div>
             <CatalogFilters open={filtersOpen && (!needsFullCatalog || catalogLoadState === "loaded" || catalogLoadState === "error")} draft={draftFilters} setDraft={setDraftFilters} onApply={applyCatalogFilters} onReset={resetCatalogFilters} onClose={() => setFiltersOpen(false)} genres={availableGenres} statuses={availableStatuses} types={availableTypes} ageRatings={availableAgeRatings} yearMin={catalogYearRange.min} yearMax={catalogYearRange.max} />
           </div>
-          <div className="mb-5 mt-7 flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm text-muted-foreground">{t("catalog.found")} <span className="font-semibold text-foreground">{needsFullCatalog && catalogLoadState !== "loaded" && catalogLoadState !== "error" ? "…" : catalogResults.length}</span></p>
+          <div className="mb-5 mt-7 flex flex-wrap items-center justify-end gap-3">
             <label className="flex h-9 items-center gap-2 rounded-lg border border-border bg-secondary/80 px-3 text-sm">
               <ArrowDownWideNarrow className="h-4 w-4 text-muted-foreground" />
               <span className="text-muted-foreground max-sm:hidden">{t("catalog.sort")}</span>
