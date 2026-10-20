@@ -265,6 +265,7 @@ function makeProgress(
  */
 export async function getPersistentCatalog(
   fetchSeedPage: (cursor: number) => Promise<CatalogSeedPageResult>,
+  options: { progressOnly?: boolean } = {},
 ): Promise<CatalogResult | null> {
   const db = database();
   if (!db) {
@@ -312,7 +313,7 @@ export async function getPersistentCatalog(
     const resumeAt = Number(await getMeta(db, "catalog_resume_at") ?? "0");
     if (Number.isFinite(resumeAt) && resumeAt > now) {
       return {
-        items: await readRows(db),
+        items: options.progressOnly ? [] : await readRows(db),
         error: null,
         progress: makeProgress("cooldown", imported, resumeAt - now),
       };
@@ -333,7 +334,7 @@ export async function getPersistentCatalog(
     if ((lockResult.meta?.changes ?? 0) !== 1) {
       const existingLockUntil = Number(await getMeta(db, "catalog_lock") ?? String(now + 1000));
       return {
-        items: await readRows(db),
+        items: options.progressOnly ? [] : await readRows(db),
         error: null,
         progress: makeProgress("cooldown", imported, Math.max(1000, existingLockUntil - now)),
       };
@@ -373,7 +374,7 @@ export async function getPersistentCatalog(
         imported = await countRows(db);
         console.warn("[YUME] Catalog seed paused; retry in", retryAfterMs, "ms.");
         return {
-          items: await readRows(db),
+          items: [],
           error: null,
           progress: makeProgress("cooldown", imported, retryAfterMs),
         };
@@ -416,7 +417,10 @@ export async function getPersistentCatalog(
         putMeta(db, "catalog_state", nextState),
       ]);
 
-      const items = await readRows(db);
+      const allItems = nextState === "seeding" && options.progressOnly
+        ? null
+        : await readRows(db);
+      const items = allItems ?? page.items.slice(0, 50);
       const error = nextState === "partial"
         ? "Каталог загружен частично: " + imported + " из " + CATALOG_LIMIT + " записей."
         : null;
