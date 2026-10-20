@@ -6,7 +6,7 @@ export type Anime = {
   original: string;
   year: number;
   episodes: number;
-  rating: number;
+  rating: number | null;
   genres: string[];
   status: "Онгоинг" | "Вышел" | "Анонс";
   description: string;
