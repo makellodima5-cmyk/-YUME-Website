@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Home, LayoutGrid, Library, User, Menu, X, Bell, Moon, Sun, ShieldCheck, Heart, Clock3, Star, Languages, Bookmark } from "lucide-react";
 import { Logo } from "./Logo";
-import { useYumePreferences, type TranslationKey } from "@/data/preferences";
+import { useYumePreferences } from "@/data/preferences";
 
 export type View = "home" | "catalog" | "collections" | "profile" | "popular" | "favorites" | "watchlist" | "history" | "privacy";
 
@@ -20,10 +20,41 @@ type Props = {
 export function Header({ view, setView, onProfile }: Props) {
   const { t, theme, setTheme, language, setLanguage } = useYumePreferences();
   const [menuOpen, setMenuOpen] = useState(false);
-  const navLabels: Record<"home" | "catalog" | "collections", TranslationKey> = {
-    home: "nav.home",
-    catalog: "nav.catalog",
-    collections: "nav.collections",
+  // Keep primary navigation labels directly tied to the active language.
+  // This prevents translation-key identifiers from ever appearing in the drawer.
+  const navigationText = language === "ru"
+    ? {
+        menuTitle: "Навигация",
+        main: "Основная навигация",
+        home: "Главная",
+        catalog: "Каталог",
+        collections: "Подборки",
+        popular: "Популярное",
+        favorites: "Избранное",
+        watchlist: "Список просмотра",
+        history: "История просмотров",
+        legal: "Правовая информация",
+        theme: "Тема оформления",
+        language: "Язык",
+      }
+    : {
+        menuTitle: "Navigation",
+        main: "Main navigation",
+        home: "Home",
+        catalog: "Catalog",
+        collections: "Collections",
+        popular: "Popular",
+        favorites: "Favorites",
+        watchlist: "Watchlist",
+        history: "Watch history",
+        legal: "Legal information",
+        theme: "Theme",
+        language: "Language",
+      };
+  const navLabels: Record<"home" | "catalog" | "collections", string> = {
+    home: navigationText.home,
+    catalog: navigationText.catalog,
+    collections: navigationText.collections,
   };
 
   useEffect(() => {
@@ -100,11 +131,11 @@ export function Header({ view, setView, onProfile }: Props) {
             id="yume-navigation-drawer"
             role="dialog"
             aria-modal="true"
-            aria-label={t("nav.main")}
+            aria-label={navigationText.main}
             className="fixed bottom-0 left-0 top-16 z-50 flex w-1/2 min-w-[170px] max-w-[320px] flex-col border-r border-border bg-background p-3 shadow-2xl md:w-[290px] md:min-w-0 md:max-w-none md:p-4"
           >
             <div className="mb-4 flex items-center justify-between gap-2 px-1">
-              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">{t("nav.menuTitle")}</span>
+              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">{navigationText.menuTitle}</span>
               <button
                 type="button"
                 onClick={() => setMenuOpen(false)}
@@ -127,36 +158,36 @@ export function Header({ view, setView, onProfile }: Props) {
                     className={navButtonClass(view === item.id)}
                   >
                     <Icon className="h-5 w-5 shrink-0" />
-                    <span>{t(navLabels[item.id as keyof typeof navLabels])}</span>
+                    <span>{navLabels[item.id as keyof typeof navLabels]}</span>
                   </button>
                 );
               })}
               <button type="button" onClick={() => goToView("popular")} className={navButtonClass(view === "popular")}>
-                <Star className="h-5 w-5 shrink-0" /><span>{t("nav.popular")}</span>
+                <Star className="h-5 w-5 shrink-0" /><span>{navigationText.popular}</span>
               </button>
               <button type="button" onClick={() => goToView("favorites")} className={navButtonClass(view === "favorites")}>
-                <Heart className="h-5 w-5 shrink-0" /><span>{t("nav.favorites")}</span>
+                <Heart className="h-5 w-5 shrink-0" /><span>{navigationText.favorites}</span>
               </button>
               <button type="button" onClick={() => goToView("watchlist")} className={navButtonClass(view === "watchlist")}>
-                <Bookmark className="h-5 w-5 shrink-0" /><span>{t("nav.watchlist")}</span>
+                <Bookmark className="h-5 w-5 shrink-0" /><span>{navigationText.watchlist}</span>
               </button>
               <button type="button" onClick={() => goToView("history")} className={navButtonClass(view === "history")}>
-                <Clock3 className="h-5 w-5 shrink-0" /><span>{t("nav.history")}</span>
+                <Clock3 className="h-5 w-5 shrink-0" /><span>{navigationText.history}</span>
               </button>
               <button type="button" onClick={() => goToView("privacy")} className={navButtonClass(view === "privacy")}>
-                <ShieldCheck className="h-5 w-5 shrink-0" /><span>{t("nav.legal")}</span>
+                <ShieldCheck className="h-5 w-5 shrink-0" /><span>{navigationText.legal}</span>
               </button>
             </nav>
 
             <div className="mt-auto space-y-3 border-t border-border pt-3">
               <div className="flex items-center justify-between gap-2">
-                <span className="flex items-center gap-2 text-xs font-medium text-muted-foreground"><Moon className="h-4 w-4" />{t("nav.theme")}</span>
+                <span className="flex items-center gap-2 text-xs font-medium text-muted-foreground"><Moon className="h-4 w-4" />{navigationText.theme}</span>
                 <button type="button" role="switch" aria-label={t("nav.toggleTheme")} aria-checked={theme === "light"} onClick={() => setTheme(theme === "light" ? "dark" : "light")} className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${theme === "light" ? "bg-primary" : "bg-muted"}`}>
                   <span className={`absolute top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-background shadow transition-transform ${theme === "light" ? "translate-x-[22px]" : "translate-x-0.5"}`}>{theme === "light" ? <Sun className="h-3 w-3" /> : <Moon className="h-3 w-3" />}</span>
                 </button>
               </div>
               <div className="flex items-center justify-between gap-2">
-                <span className="flex items-center gap-2 text-xs font-medium text-muted-foreground"><Languages className="h-4 w-4" />{t("nav.language")}</span>
+                <span className="flex items-center gap-2 text-xs font-medium text-muted-foreground"><Languages className="h-4 w-4" />{navigationText.language}</span>
                 <div className="flex rounded-lg border border-border bg-muted p-0.5">
                   {(["ru", "en"] as const).map((value) => <button key={value} type="button" aria-pressed={language === value} onClick={() => setLanguage(value)} className={`rounded-md px-2.5 py-1 text-[11px] font-semibold uppercase transition ${language === value ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}>{value}</button>)}
                 </div>
