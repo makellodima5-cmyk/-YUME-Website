@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Bookmark,
   Check,
@@ -48,7 +48,7 @@ export const Route = createFileRoute("/anime/$animeId")({
     }
 
     const [detail, catalog] = await Promise.all([
-      getShikimoriAnimes({ data: { ids: params.animeId, limit: 1, order: "ranked" } }),
+      getShikimoriAnimes({ data: { ids: params.animeId, limit: 1, order: "ranked", includeVideos: true } }),
       getShikimoriAnimes({ data: { page: 1, limit: 50, order: "ranked" } }),
     ]);
     const anime = detail.items[0] ?? null;
@@ -89,9 +89,6 @@ function AnimeDetailPage() {
   const { anime, relatedAnime, apiError } = Route.useLoaderData();
   const playerSectionRef = useRef<HTMLElement | null>(null);
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
-  const [selectedEpisode, setSelectedEpisode] = useState(1);
-  const [selectedVoice, setSelectedVoice] = useState("voice-a");
-  const [selectedPlayer, setSelectedPlayer] = useState("source-a");
   const [inList, setInList] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
   const [showListNote, setShowListNote] = useState(false);
@@ -102,9 +99,6 @@ function AnimeDetailPage() {
 
   useEffect(() => {
     setDescriptionExpanded(false);
-    setSelectedEpisode(1);
-    setSelectedVoice("voice-a");
-    setSelectedPlayer("source-a");
     setInList(readSavedAnimeIds(WATCHLIST_STORAGE_KEY).includes(animeId));
     setIsFavorite(readSavedAnimeIds(FAVORITES_STORAGE_KEY).includes(animeId));
     setShowListNote(false);
@@ -151,8 +145,6 @@ function AnimeDetailPage() {
     anime.description.trim().length > 76
       ? anime.description.trim().slice(0, 76).trimEnd() + "…"
       : anime.description;
-  const episodes = Array.from({ length: Math.min(1000, Math.max(0, anime.episodes)) }, (_, index) => index + 1);
-
   const descriptionControl = (id: string) => (
     <button
       type="button"
@@ -182,16 +174,16 @@ function AnimeDetailPage() {
     </>
   );
 
-  const watchButton = (
+  const watchButton = anime.youtubeTrailerId ? (
     <button
       type="button"
       onClick={scrollToPlayer}
       className="inline-flex items-center justify-center gap-2 rounded-full bg-neon px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-neon transition hover:brightness-110"
     >
       <Play className="h-4 w-4 fill-current" />
-      {t("anime.watch")}
+      {t("anime.watchTrailer")}
     </button>
-  );
+  ) : null;
 
   const favoriteButton = (
     <button
@@ -420,69 +412,37 @@ function AnimeDetailPage() {
                   {t("anime.chooseSource")}
                 </p>
               </div>
-              <span className="rounded-full border border-border bg-card px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                {t("anime.demoInterface")}
+              <span className="max-w-full rounded-full border border-border bg-card px-3 py-1 text-center text-[10px] font-semibold text-muted-foreground">
+                {anime.youtubeTrailerId ? t("anime.videoPartial") : t("anime.videoUnavailable")}
               </span>
             </div>
 
             <div className="mx-auto w-full max-w-6xl min-w-0">
-              <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <Selector
-                  label={t("anime.episode")}
-                  value={String(selectedEpisode)}
-                  onChange={(value) => setSelectedEpisode(Number(value))}
-                  disabled={episodes.length === 0}
-                >
-                  {episodes.length > 0 ? episodes.map((episode) => (
-                    <option key={episode} value={String(episode)}>
-                      {t("anime.episode")} {episode}
-                    </option>
-                  )) : <option value="1">{t("anime.episodesUnknown")}</option>}
-                </Selector>
-                <Selector
-                  label={t("anime.voice")}
-                  value={selectedVoice}
-                  onChange={setSelectedVoice}
-                >
-                  <option value="voice-a">{t("anime.demoVoiceA")}</option>
-                  <option value="voice-b">{t("anime.demoVoiceB")}</option>
-                </Selector>
-                <Selector
-                  label={t("anime.player")}
-                  value={selectedPlayer}
-                  onChange={setSelectedPlayer}
-                >
-                  <option value="source-a">{t("anime.demoSourceA")}</option>
-                  <option value="source-b">{t("anime.demoSourceB")}</option>
-                </Selector>
-              </div>
-
-              <div
-                className="relative mx-auto flex aspect-video w-full min-w-0 flex-col items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-[#080710] p-5 text-center sm:min-h-[300px] lg:min-h-[420px]"
-                style={{
-                  background:
-                    "radial-gradient(ellipse at 50% 40%, oklch(0.19 0.08 " +
-                    anime.hue +
-                    ") 0%, #080710 63%)",
-                }}
-              >
+              {anime.youtubeTrailerId ? (
+                <div className="relative mx-auto aspect-video w-full min-w-0 overflow-hidden rounded-2xl border border-white/10 bg-[#080710] shadow-2xl">
+                  <iframe
+                    title={displayAnimeTitle(anime, language) + " — " + t("anime.trailerTitle")}
+                    src={"https://www.youtube-nocookie.com/embed/" + anime.youtubeTrailerId + "?rel=0"}
+                    className="absolute inset-0 h-full w-full"
+                    loading="lazy"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    referrerPolicy="strict-origin-when-cross-origin"
+                    allowFullScreen
+                  />
+                </div>
+              ) : (
                 <div
-                  aria-hidden="true"
-                  className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-black/20"
-                />
-                <div className="relative z-10 flex max-w-md flex-col items-center">
-                  <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-primary/35 bg-primary/10 text-primary shadow-[0_0_42px_rgba(207,95,255,0.14)]">
+                  className="relative mx-auto flex aspect-video w-full min-w-0 flex-col items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-[#080710] p-5 text-center sm:min-h-[300px] lg:min-h-[420px]"
+                  style={{ background: "radial-gradient(ellipse at 50% 40%, oklch(0.19 0.08 " + anime.hue + ") 0%, #080710 63%)" }}
+                >
+                  <div aria-hidden="true" className="mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-primary/35 bg-primary/10 text-primary shadow-[0_0_42px_rgba(207,95,255,0.14)]">
                     <CirclePlay className="h-9 w-9" />
                   </div>
-                  <h3 className="text-lg font-semibold text-white">{t("anime.playerNotConnected")}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-white/60">
-                    {t("anime.playerPlaceholder")}
-                  </p>
-                  <p className="mt-4 rounded-full border border-white/10 bg-black/25 px-3 py-1.5 text-xs text-white/70">
-                    {t("anime.episode")} {selectedEpisode} · {selectedVoice === "voice-a" ? t("anime.demoVoiceA") : t("anime.demoVoiceB")} · {selectedPlayer === "source-a" ? t("anime.demoSourceA") : t("anime.demoSourceB")}
-                  </p>
+                  <h3 className="text-lg font-semibold text-white">{t("anime.trailerUnavailable")}</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-white/60">{t("anime.playerNotConnected")}</p>
+                  <p className="mt-2 max-w-md text-sm leading-relaxed text-white/50">{t("anime.playerPlaceholder")}</p>
                 </div>
-              </div>
+              )}
             </div>
           </section>
 
@@ -515,33 +475,3 @@ function AnimeDetailPage() {
     </div>
   );
 }
-
-function Selector({
-  label,
-  value,
-  onChange,
-  children,
-  disabled = false,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  children: ReactNode;
-  disabled?: boolean;
-}) {
-  return (
-    <label className="block min-w-0 rounded-xl border border-border bg-card px-3 py-2.5 focus-within:border-primary/60">
-      <span className="mb-1 block text-xs text-muted-foreground">{label}</span>
-      <select
-        aria-label={label}
-        disabled={disabled}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="w-full min-w-0 bg-transparent text-sm font-medium outline-none"
-      >
-        {children}
-      </select>
-    </label>
-  );
-}
-
