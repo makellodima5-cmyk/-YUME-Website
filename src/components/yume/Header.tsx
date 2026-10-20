@@ -132,7 +132,7 @@ export function Header({ view, setView, onProfile }: Props) {
             role="dialog"
             aria-modal="true"
             aria-label={navigationText.main}
-            className="fixed inset-y-0 left-0 z-50 flex min-h-0 w-[min(82vw,360px)] min-w-[260px] max-w-[360px] flex-col overflow-y-auto overscroll-contain rounded-r-[2rem] border-r border-border bg-background p-3 pb-[calc(env(safe-area-inset-bottom)+1rem)] shadow-2xl md:w-[290px] md:min-w-0 md:max-w-none md:p-4"
+            className="fixed inset-y-0 left-0 z-50 flex min-h-0 w-1/2 min-w-0 max-w-[320px] flex-col overflow-y-auto overscroll-contain rounded-r-[2rem] border-r border-border bg-background p-3 pb-[calc(env(safe-area-inset-bottom)+1rem)] shadow-2xl md:w-[290px] md:min-w-0 md:max-w-none md:p-4"
           >
             <div className="mb-4 flex items-center justify-between gap-2 px-1">
               <span className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">{navigationText.menuTitle}</span>
