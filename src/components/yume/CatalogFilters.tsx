@@ -70,12 +70,16 @@ export function CatalogFilters({
     const trigger = document.querySelector<HTMLElement>('[data-filter-trigger][aria-expanded="true"]');
     const anchor = trigger?.closest<HTMLElement>("[data-filter-anchor]") ?? trigger;
     const rect = anchor?.getBoundingClientRect();
+    const triggerRect = trigger?.getBoundingClientRect();
     const viewportWidth = window.visualViewport?.width ?? window.innerWidth;
     const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
     const safeTop = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--safe-area-inset-top")) || 0;
     const width = Math.min(440, Math.max(240, viewportWidth - 24));
     const left = Math.max(12, Math.min(rect?.left ?? 12, viewportWidth - width - 12));
-    const requestedTop = rect ? rect.bottom + 8 : safeTop + 80;
+    // Anchor the panel to the filter control, then freeze that viewport coordinate.
+    // The portal to document.body prevents transformed/overflowing hero containers
+    // from turning fixed positioning into page-relative positioning.
+    const requestedTop = triggerRect ? triggerRect.bottom + 8 : rect ? rect.bottom + 8 : safeTop + 80;
     const top = Math.max(safeTop + 8, Math.min(requestedTop, viewportHeight - 160));
     setPositionStyle({
       position: "fixed",
