@@ -80,6 +80,11 @@ function Index() {
   const { anime: loadedAnime, popular: popularAnime, recent: recentAnime, apiError } = Route.useLoaderData();
   const ANIME = loadedAnime.length ? loadedAnime : DEMO_ANIME;
   const [view, setViewRaw] = useState<View>(section ?? "home");
+
+  // Keep the selected section aligned with the URL, including browser Back/Forward.
+  useEffect(() => {
+    setViewRaw(section ?? "home");
+  }, [section]);
   const [query, setQuery] = useState("");
   const [submittedQuery, setSubmittedQuery] = useState("");
   const [catalogQuery, setCatalogQuery] = useState("");
@@ -111,6 +116,8 @@ function Index() {
       setCatalogPage(1);
     }
     setViewRaw(v);
+    // Persist the selected section in the URL so refreshing the page keeps the same view.
+    navigate({ to: "/", search: { section: v } });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
   const select = (anime: Anime) =>
