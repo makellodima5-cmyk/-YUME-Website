@@ -91,25 +91,6 @@ function Index() {
     setViewRaw(section ?? "home");
   }, [section]);
 
-  // Load the capped 1,000-title catalog only when Catalog is opened.
-  // Searches and filters stay local and never query Shikimori by the typed title.
-  useEffect(() => {
-    if (view !== "catalog" || catalogLoadStarted.current) return;
-    catalogLoadStarted.current = true;
-    setCatalogLoadState("loading");
-    setCatalogLoadError(null);
-    getShikimoriCatalog()
-      .then((result) => {
-        if (result.items.length > 0) setCatalogAnime(result.items.slice(0, 1000));
-        setCatalogLoadError(result.error);
-        setCatalogLoadState(result.error ? "error" : "loaded");
-      })
-      .catch(() => {
-        setCatalogLoadError(t("source.catalogUnavailable"));
-        setCatalogLoadState("error");
-        catalogLoadStarted.current = false;
-      });
-  }, [view, catalogLoadAttempt, t]);
   const [query, setQuery] = useState("");
   const [submittedQuery, setSubmittedQuery] = useState("");
   const [catalogQuery, setCatalogQuery] = useState("");
@@ -220,6 +201,28 @@ function Index() {
     Number(activeFilters.yearTo !== "") + Number(activeFilters.minRating > 0) +
     Number(activeFilters.type !== "Любой") + Number(activeFilters.ageRating !== "Любой");
   const searching = view === "home" && (submittedQuery.length > 0 || activeFilterCount > 0);
+  // Any search/filter view must use the same capped local catalog of up to 1,000 titles.
+  // Never send the user's typed query to Shikimori.
+  useEffect(() => {
+    const shouldLoadCatalog = view === "catalog" ||
+      (view === "home" && (Boolean(submittedQuery.trim()) || activeFilterCount > 0 || filtersOpen));
+    if (!shouldLoadCatalog || catalogLoadStarted.current ||
+        catalogLoadState === "loaded" || catalogLoadState === "error") return;
+
+    catalogLoadStarted.current = true;
+    setCatalogLoadState("loading");
+    setCatalogLoadError(null);
+    getShikimoriCatalog({ data: { forceRefresh: catalogLoadAttempt > 0 } })
+      .then((result) => {
+        if (result.items.length > 0) setCatalogAnime(result.items.slice(0, 1000));
+        setCatalogLoadError(result.error);
+        setCatalogLoadState(result.error ? "error" : "loaded");
+      })
+      .catch(() => {
+        setCatalogLoadError(t("source.catalogUnavailable"));
+        setCatalogLoadState("error");
+      });
+  }, [view, submittedQuery, activeFilterCount, filtersOpen, catalogLoadAttempt, catalogLoadState, t]);
   const submitHomeSearch = () => {
     setSubmittedQuery(query.trim());
     setCatalogPage(1);
@@ -265,11 +268,25 @@ function Index() {
             <h1 className="text-xl font-semibold">{submittedQuery ? `${t("catalog.results")}: «${submittedQuery}»` : t("catalog.filterResults")} <span className="text-muted-foreground">· {catalogResults.length}</span></h1>
             <button onClick={() => { setQuery(""); setSubmittedQuery(""); setDraftFilters(EMPTY_CATALOG_FILTERS); setActiveFilters(EMPTY_CATALOG_FILTERS); setFiltersOpen(false); setCatalogPage(1); }} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"><X className="h-4 w-4" />{t("catalog.reset")}</button>
           </div>
-          <Grid items={catalogResults} onSelect={select} empty={t("catalog.noResultsFormal")} />
+          {catalogLoadState === "loading" ? (
+            <div role="status" className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-6 text-center text-sm text-muted-foreground">
+              {t("catalog.loading")}
+            </div>
+          ) : (
+            <>
+              {catalogLoadState === "error" && (
+                <div role="alert" className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-400/25 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
+                  <span>{t("catalog.loadError")}</span>
+                  <button type="button" onClick={() => { catalogLoadStarted.current = false; setCatalogLoadState("idle"); setCatalogLoadAttempt((value) => value + 1); }} className="rounded-lg border border-amber-100/20 px-3 py-1.5 font-semibold hover:bg-amber-100/10">{t("home.retry")}</button>
+                </div>
+              )}
+              <Grid items={catalogResults} onSelect={select} empty={t("catalog.noResultsFormal")} />
+            </>
+          )}
         </main>
       ) : view === "home" ? (
         <main className="pt-16">
-          <Hero onCatalog={() => setView("catalog")} onRandom={random} query={query} setQuery={setQuery} onSubmitSearch={submitHomeSearch} filtersOpen={filtersOpen} setFiltersOpen={setFiltersOpen} draftFilters={draftFilters} setDraftFilters={setDraftFilters} onApplyFilters={applyCatalogFilters} onResetFilters={resetCatalogFilters} activeFilterCount={activeFilterCount} genres={availableGenres} statuses={availableStatuses} types={availableTypes} ageRatings={availableAgeRatings} yearMin={catalogYearRange.min} yearMax={catalogYearRange.max} />
+          <Hero onCatalog={() => setView("catalog")} onRandom={random} query={query} setQuery={setQuery} onSubmitSearch={submitHomeSearch} filtersOpen={filtersOpen && catalogLoadState !== "loading"} setFiltersOpen={setFiltersOpen} draftFilters={draftFilters} setDraftFilters={setDraftFilters} onApplyFilters={applyCatalogFilters} onResetFilters={resetCatalogFilters} activeFilterCount={activeFilterCount} genres={availableGenres} statuses={availableStatuses} types={availableTypes} ageRatings={availableAgeRatings} yearMin={catalogYearRange.min} yearMax={catalogYearRange.max} />
           <div className="home-content-world -mt-10 pb-12">
             <div className="relative z-10">
               {ANIME.length === 0 ? (
@@ -341,21 +358,35 @@ function Index() {
               <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
             </label>
           </div>
-          <Grid items={visibleCatalogResults} onSelect={select} empty={ANIME.length === 0 && (apiError || catalogLoadError) ? t("source.catalogUnavailable") : t("catalog.noResults")} />
-          {catalogResults.length > 0 && <nav aria-label={t("catalog.pages")} className="mt-8 flex flex-wrap items-center justify-center gap-1.5">
-            <button type="button" disabled={catalogPage === 1} onClick={() => { setCatalogPage((page) => Math.max(1, page - 1)); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="h-9 rounded-lg border border-border px-3 text-sm transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-35">{t("catalog.previous")}</button>
-            {Array.from({ length: totalCatalogPages }, (_, index) => index + 1)
-              .filter((page) => page === 1 || page === totalCatalogPages || Math.abs(page - catalogPage) <= 1)
-              .reduce<(number | "ellipsis")[]>((pages, page, index, visible) => {
-                if (index > 0 && page - visible[index - 1]! > 1) pages.push("ellipsis");
-                pages.push(page);
-                return pages;
-              }, [])
-              .map((page, index) => page === "ellipsis"
-                ? <span key={`ellipsis-${index}`} className="px-1 text-muted-foreground">…</span>
-                : <button key={page} type="button" aria-current={catalogPage === page ? "page" : undefined} onClick={() => { setCatalogPage(page); window.scrollTo({ top: 0, behavior: "smooth" }); }} className={`h-9 min-w-9 rounded-lg border px-3 text-sm transition ${catalogPage === page ? "border-primary/70 bg-primary/20 text-foreground" : "border-border hover:bg-accent"}`}>{page}</button>)}
-            <button type="button" disabled={catalogPage === totalCatalogPages} onClick={() => { setCatalogPage((page) => Math.min(totalCatalogPages, page + 1)); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="h-9 rounded-lg border border-border px-3 text-sm transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-35">{t("catalog.next")}</button>
-          </nav>}
+          {catalogLoadState === "loading" ? (
+            <div role="status" className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-8 text-center text-sm text-muted-foreground">
+              {t("catalog.loading")}
+            </div>
+          ) : (
+            <>
+              {catalogLoadState === "error" && (
+                <div role="alert" className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-400/25 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
+                  <span>{t("catalog.loadError")}</span>
+                  <button type="button" onClick={() => { catalogLoadStarted.current = false; setCatalogLoadState("idle"); setCatalogLoadAttempt((value) => value + 1); }} className="rounded-lg border border-amber-100/20 px-3 py-1.5 font-semibold hover:bg-amber-100/10">{t("home.retry")}</button>
+                </div>
+              )}
+              <Grid items={visibleCatalogResults} onSelect={select} empty={ANIME.length === 0 && (apiError || catalogLoadError) ? t("source.catalogUnavailable") : t("catalog.noResults")} />
+              {catalogResults.length > 0 && <nav aria-label={t("catalog.pages")} className="mt-8 flex flex-wrap items-center justify-center gap-1.5">
+                <button type="button" disabled={catalogPage === 1} onClick={() => { setCatalogPage((page) => Math.max(1, page - 1)); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="h-9 rounded-lg border border-border px-3 text-sm transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-35">{t("catalog.previous")}</button>
+                {Array.from({ length: totalCatalogPages }, (_, index) => index + 1)
+                  .filter((page) => page === 1 || page === totalCatalogPages || Math.abs(page - catalogPage) <= 1)
+                  .reduce<(number | "ellipsis")[]>((pages, page, index, visible) => {
+                    if (index > 0 && page - visible[index - 1]! > 1) pages.push("ellipsis");
+                    pages.push(page);
+                    return pages;
+                  }, [])
+                  .map((page, index) => page === "ellipsis"
+                    ? <span key={`ellipsis-${index}`} className="px-1 text-muted-foreground">…</span>
+                    : <button key={page} type="button" aria-current={catalogPage === page ? "page" : undefined} onClick={() => { setCatalogPage(page); window.scrollTo({ top: 0, behavior: "smooth" }); }} className={`h-9 min-w-9 rounded-lg border px-3 text-sm transition ${catalogPage === page ? "border-primary/70 bg-primary/20 text-foreground" : "border-border hover:bg-accent"}`}>{page}</button>)}
+                <button type="button" disabled={catalogPage === totalCatalogPages} onClick={() => { setCatalogPage((page) => Math.min(totalCatalogPages, page + 1)); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="h-9 rounded-lg border border-border px-3 text-sm transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-35">{t("catalog.next")}</button>
+              </nav>}
+            </>
+          )}
         </main>
       ) : view === "collections" ? (
         <main className="px-4 pt-36 md:px-10 md:pt-24">
