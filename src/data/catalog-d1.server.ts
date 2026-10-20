@@ -81,6 +81,7 @@ const CREATE_SCHEMA = `
 `;
 
 let schemaReady = false;
+let missingBindingWarningLogged = false;
 
 let runtimeEnvironment: Record<string, unknown> | null = null;
 
@@ -214,7 +215,15 @@ export async function getPersistentCatalog(
   buildInitialCatalog: () => Promise<CatalogResult>,
 ): Promise<CatalogResult | null> {
   const db = database();
-  if (!db) return null;
+  if (!db) {
+    if (!missingBindingWarningLogged) {
+      missingBindingWarningLogged = true;
+      console.error(
+        "[YUME] D1 binding YUME_DB is unavailable in the Worker runtime; catalog requests are falling back to Shikimori.",
+      );
+    }
+    return null;
+  }
 
   try {
     await ensureSchema(db);
