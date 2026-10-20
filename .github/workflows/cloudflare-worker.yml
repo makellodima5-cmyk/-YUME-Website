@@ -39,9 +39,9 @@ jobs:
         run: |
           node --input-type=module <<'NODE'
           import fs from "node:fs";
-          const path = "dist/wrangler.json";
+          const path = ".output/server/wrangler.json";
           if (!fs.existsSync(path)) {
-            throw new Error(`Expected Cloudflare Vite output at ${path}; build did not emit the deployable Worker config.`);
+            throw new Error(`Expected Nitro Cloudflare output at ${path}; build did not emit the deployable Worker config.`);
           }
           const config = JSON.parse(fs.readFileSync(path, "utf8"));
           const binding = (config.d1_databases ?? []).find(
