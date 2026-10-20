@@ -126,6 +126,73 @@ function Index() {
     setViewRaw(section ?? "home");
   }, [section]);
 
+  // Continue a partial D1 seed from the persisted cursor without requiring a reload.
+  // Each call fetches at most one 50-title page; cooldown responses are not retried early.
+  useEffect(() => {
+    let cancelled = false;
+    let timeoutId: number | undefined;
+    let progress = initialCatalogProgress;
+
+    if (progress.status === "ready" || progress.status === "partial") return;
+
+    const refreshDerivedLists = (items: Anime[]) => {
+      setPopularAnime(
+        [...items]
+          .filter((anime) => anime.rating !== null)
+          .sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1))
+          .slice(0, 50),
+      );
+      setRecentAnime(
+        [...items]
+          .sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? "") || b.year - a.year)
+          .slice(0, 50),
+      );
+    };
+
+    async function continueImport() {
+      while (!cancelled && progress.status !== "ready" && progress.status !== "partial") {
+        const waitMs = Math.max(750, progress.retryAfterMs ?? 1250);
+        await new Promise<void>((resolve) => {
+          timeoutId = window.setTimeout(resolve, Math.min(waitMs, 2_147_000_000));
+        });
+        if (cancelled) return;
+
+        try {
+          const result = await getShikimoriCatalog({ data: {} });
+          if (cancelled) return;
+          progress = result.progress;
+          setCatalogProgress(progress);
+
+          if (result.items.length > 0) {
+            const items = result.items.slice(0, 1000);
+            setCatalogAnime(items);
+            refreshDerivedLists(items);
+          }
+
+          if (progress.status === "ready") {
+            setCatalogLoadState("loaded");
+            setCatalogLoadError(null);
+          } else if (progress.status === "partial") {
+            setCatalogLoadState("error");
+            setCatalogLoadError(result.error);
+          } else {
+            setCatalogLoadState("loading");
+            setCatalogLoadError(null);
+          }
+        } catch {
+          progress = { ...progress, status: "cooldown", retryAfterMs: 5000 };
+          setCatalogProgress(progress);
+        }
+      }
+    }
+
+    void continueImport();
+    return () => {
+      cancelled = true;
+      if (timeoutId !== undefined) window.clearTimeout(timeoutId);
+    };
+  }, [initialCatalogProgress.status]);
+
   const [query, setQuery] = useState("");
   const [submittedQuery, setSubmittedQuery] = useState("");
   const [catalogQuery, setCatalogQuery] = useState("");
