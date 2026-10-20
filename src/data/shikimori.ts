@@ -78,7 +78,8 @@ function cleanDescription(value: string | null | undefined): string {
 function mapStatus(value: string | null | undefined): Anime["status"] {
   if (value === "ongoing") return "Онгоинг";
   if (value === "anons") return "Анонс";
-  return "Вышел";
+  if (value === "released") return "Вышел";
+  return "Неизвестно";
 }
 
 function mapKind(value: string | null | undefined): string {
