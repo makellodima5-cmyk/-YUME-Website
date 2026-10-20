@@ -89,6 +89,7 @@ function AnimeDetailPage() {
   const { anime, relatedAnime, apiError } = Route.useLoaderData();
   const playerSectionRef = useRef<HTMLElement | null>(null);
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
+  const [usePosterAsBanner, setUsePosterAsBanner] = useState(false);
   const [inList, setInList] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
   const [showListNote, setShowListNote] = useState(false);
@@ -98,6 +99,7 @@ function AnimeDetailPage() {
   }, [anime, language]);
 
   useEffect(() => {
+    setUsePosterAsBanner(false);
     setDescriptionExpanded(false);
     setInList(readSavedAnimeIds(WATCHLIST_STORAGE_KEY).includes(animeId));
     setIsFavorite(readSavedAnimeIds(FAVORITES_STORAGE_KEY).includes(animeId));
@@ -246,13 +248,18 @@ function AnimeDetailPage() {
                   ") 0%, transparent 45%), linear-gradient(110deg, #100d1b 0%, #1b1428 54%, #0b0a14 100%)",
               }}
             >
-              {anime.bannerUrl && (
+              {(usePosterAsBanner ? anime.posterUrl : anime.bannerUrl || anime.posterUrl) && (
                 <img
-                  src={anime.bannerUrl}
+                  src={usePosterAsBanner ? anime.posterUrl : anime.bannerUrl || anime.posterUrl}
                   alt=""
                   aria-hidden="true"
                   fetchPriority="high"
-                  className="absolute inset-0 h-full w-full scale-105 object-cover object-center opacity-40 blur-[1px]"
+                  onError={() => {
+                    if (!usePosterAsBanner && anime.posterUrl && anime.posterUrl !== anime.bannerUrl) {
+                      setUsePosterAsBanner(true);
+                    }
+                  }}
+                  className="absolute inset-0 h-full w-full scale-105 object-cover object-center opacity-55 blur-[1px]"
                 />
               )}
               <div
