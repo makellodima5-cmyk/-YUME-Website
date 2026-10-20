@@ -1,5 +1,6 @@
 import { env as cloudflareEnv } from "cloudflare:workers";
 import type { Anime } from "@/data/anime";
+import { isNewRelease } from "@/data/anime-sections";
 
 // Prefer Cloudflare's request-scoped env binding; the injected value remains a
 // fallback for local adapters and tests.
@@ -170,7 +171,7 @@ function rowToAnime(row: AnimeRow): Anime {
     description: row.description ?? "",
     hue: Number(row.hue) || 280,
     glyph: row.glyph || "Y",
-    isNew: Boolean(row.is_new),
+    isNew: isNewRelease({ status, airedOn: row.aired_on || undefined }),
     popular: Boolean(row.popular),
     episodesAired: Math.max(0, Number(row.episodes_aired) || 0),
     studios: parseJsonArray(row.studios_json),
