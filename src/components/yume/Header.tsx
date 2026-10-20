@@ -132,31 +132,31 @@ export function Header({ view, setView, onProfile }: Props) {
                 );
               })}
               <button type="button" onClick={() => goToView("popular")} className={navButtonClass(view === "popular")}>
-                <Star className="h-5 w-5 shrink-0" /><span>Популярное</span>
+                <Star className="h-5 w-5 shrink-0" /><span>{t("nav.popular")}</span>
               </button>
               <button type="button" onClick={() => goToView("favorites")} className={navButtonClass(view === "favorites")}>
-                <Heart className="h-5 w-5 shrink-0" /><span>Избранное</span>
+                <Heart className="h-5 w-5 shrink-0" /><span>{t("nav.favorites")}</span>
               </button>
               <button type="button" onClick={() => goToView("watchlist")} className={navButtonClass(view === "watchlist")}>
-                <Bookmark className="h-5 w-5 shrink-0" /><span>Смотреть позже</span>
+                <Bookmark className="h-5 w-5 shrink-0" /><span>{t("nav.watchlist")}</span>
               </button>
               <button type="button" onClick={() => goToView("history")} className={navButtonClass(view === "history")}>
-                <Clock3 className="h-5 w-5 shrink-0" /><span>История</span>
+                <Clock3 className="h-5 w-5 shrink-0" /><span>{t("nav.history")}</span>
               </button>
               <button type="button" onClick={() => goToView("privacy")} className={navButtonClass(view === "privacy")}>
-                <ShieldCheck className="h-5 w-5 shrink-0" /><span>Политика и правила</span>
+                <ShieldCheck className="h-5 w-5 shrink-0" /><span>{t("nav.legal")}</span>
               </button>
             </nav>
 
             <div className="mt-auto space-y-3 border-t border-border pt-3">
               <div className="flex items-center justify-between gap-2">
-                <span className="flex items-center gap-2 text-xs font-medium text-muted-foreground"><Moon className="h-4 w-4" />Тема</span>
+                <span className="flex items-center gap-2 text-xs font-medium text-muted-foreground"><Moon className="h-4 w-4" />{t("nav.theme")}</span>
                 <button type="button" role="switch" aria-label="Переключить тему" aria-checked={theme === "light"} onClick={() => setTheme(theme === "light" ? "dark" : "light")} className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${theme === "light" ? "bg-primary" : "bg-muted"}`}>
                   <span className={`absolute top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-background shadow transition-transform ${theme === "light" ? "translate-x-[22px]" : "translate-x-0.5"}`}>{theme === "light" ? <Sun className="h-3 w-3" /> : <Moon className="h-3 w-3" />}</span>
                 </button>
               </div>
               <div className="flex items-center justify-between gap-2">
-                <span className="flex items-center gap-2 text-xs font-medium text-muted-foreground"><Languages className="h-4 w-4" />Язык</span>
+                <span className="flex items-center gap-2 text-xs font-medium text-muted-foreground"><Languages className="h-4 w-4" />{t("nav.language")}</span>
                 <div className="flex rounded-lg border border-border bg-muted p-0.5">
                   {(["ru", "en"] as const).map((value) => <button key={value} type="button" aria-pressed={language === value} onClick={() => setLanguage(value)} className={`rounded-md px-2.5 py-1 text-[11px] font-semibold uppercase transition ${language === value ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}>{value}</button>)}
                 </div>
