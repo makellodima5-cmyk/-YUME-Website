@@ -278,14 +278,17 @@ function validateRequest(input: ShikimoriRequest): ShikimoriRequest {
   };
 }
 
-async function fetchShikimoriAnimes(data: ShikimoriRequest) {
+async function fetchShikimoriAnimes(
+  data: ShikimoriRequest,
+  options: { bypassCooldown?: boolean } = {},
+) {
   const key = JSON.stringify(data);
   const cached = responseCache.get(key);
   if (cached && cached.expiresAt > Date.now()) {
     return { items: cached.items, error: null as string | null };
   }
 
-  if (Date.now() < shikimoriCooldownUntil) {
+  if (!options.bypassCooldown && Date.now() < shikimoriCooldownUntil) {
     return {
       items: [] as Anime[],
       error: "Источник каталога временно ограничил запросы. Повтори попытку немного позже.",
@@ -364,7 +367,7 @@ let catalogCache: { expiresAt: number; items: Anime[]; error: string | null } | 
 const CATALOG_LIMIT = 1000;
 const CATALOG_CACHE_TTL_MS = 30 * 60 * 1000;
 
-async function buildShikimoriCatalog(forceRefresh: boolean) {
+async function buildShikimoriCatalog(forceRefresh: boolean, persistentSeed = false) {
   if (!forceRefresh && catalogCache && catalogCache.expiresAt > Date.now()) {
     return { items: catalogCache.items, error: catalogCache.error };
   }
@@ -391,20 +394,34 @@ async function buildShikimoriCatalog(forceRefresh: boolean) {
     }
   };
 
-  // Limit concurrency to avoid sending a burst of dozens of GraphQL queries upstream.
-  for (let index = 0; index < priorityRequests.length && unique.size < CATALOG_LIMIT; index += 4) {
-    const batch = priorityRequests.slice(index, index + 4);
-    const results = await Promise.all(batch.map((request) => fetchShikimoriAnimes(validateRequest(request))));
+  // Limit the first persistent import to two concurrent requests and pace batches.
+  // A 429 should not disable every remaining seed request for the full cooldown window:
+  // later pages can still fill gaps in the 1,000-record catalog.
+  const batchSize = persistentSeed ? 2 : 4;
+  for (let index = 0; index < priorityRequests.length && unique.size < CATALOG_LIMIT; index += batchSize) {
+    const batch = priorityRequests.slice(index, index + batchSize);
+    const results = await Promise.all(batch.map((request) =>
+      fetchShikimoriAnimes(validateRequest(request), { bypassCooldown: persistentSeed }),
+    ));
     addResults(results);
+    if (persistentSeed && index + batch.length < priorityRequests.length && unique.size < CATALOG_LIMIT) {
+      await new Promise<void>((resolve) => setTimeout(resolve, 500));
+    }
   }
 
   // Continue through ranked pages until we have 1,000 unique, non-excluded anime records.
-  for (let page = 11; page <= 30 && unique.size < CATALOG_LIMIT; page += 3) {
-    const requests = [page, page + 1, page + 2]
+  const extraPageBatchSize = persistentSeed ? 2 : 3;
+  for (let page = 11; page <= 30 && unique.size < CATALOG_LIMIT; page += extraPageBatchSize) {
+    const requests = Array.from({ length: extraPageBatchSize }, (_, index) => page + index)
       .filter((value) => value <= 30)
       .map((value) => ({ page: value, limit: 50, order: "ranked" as const }));
-    const results = await Promise.all(requests.map((request) => fetchShikimoriAnimes(validateRequest(request))));
+    const results = await Promise.all(requests.map((request) =>
+      fetchShikimoriAnimes(validateRequest(request), { bypassCooldown: persistentSeed }),
+    ));
     addResults(results);
+    if (persistentSeed && page + requests.length <= 30 && unique.size < CATALOG_LIMIT) {
+      await new Promise<void>((resolve) => setTimeout(resolve, 500));
+    }
   }
 
   const items = Array.from(unique.values()).slice(0, CATALOG_LIMIT);
@@ -429,7 +446,7 @@ export const getShikimoriCatalog = createServerFn({ method: "GET" })
     forceRefresh: input.forceRefresh === true,
   }))
   .handler(async ({ data }) => {
-    const persistent = await getPersistentCatalog(() => buildShikimoriCatalog(true));
+    const persistent = await getPersistentCatalog(() => buildShikimoriCatalog(true, true));
     if (persistent) return persistent;
     return buildShikimoriCatalog(data.forceRefresh);
   });
