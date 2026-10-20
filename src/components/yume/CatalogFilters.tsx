@@ -31,12 +31,30 @@ type Props = {
   onApply: () => void;
   onReset: () => void;
   genres?: string[];
+  statuses?: string[];
+  types?: string[];
+  ageRatings?: string[];
+  yearMin?: number;
+  yearMax?: number;
 };
 
 const selectClass = "h-9 w-full appearance-none rounded-lg border border-border bg-secondary px-2.5 text-sm text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary/50";
 const labelClass = "mb-1 block text-xs text-muted-foreground";
 
-export function CatalogFilters({ open, draft, setDraft, onApply, onReset, placement = "catalog", genres = ALL_GENRES }: Props) {
+export function CatalogFilters({
+  open,
+  draft,
+  setDraft,
+  onApply,
+  onReset,
+  placement = "catalog",
+  genres = ALL_GENRES,
+  statuses = ["Вышел", "Онгоинг", "Анонс"],
+  types = ["TV", "Фильм", "OVA", "ONA"],
+  ageRatings = ["Без ограничений", "12+", "16+", "18+"],
+  yearMin = 1900,
+  yearMax = new Date().getFullYear(),
+}: Props) {
   const { t, language } = useYumePreferences();
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -81,10 +99,10 @@ export function CatalogFilters({ open, draft, setDraft, onApply, onReset, placem
       </div>
 
       <div className="grid grid-cols-2 gap-2.5">
-        <label><span className={labelClass}>{t("filters.status")}</span><span className="relative block"><select className={selectClass} value={draft.status} onChange={(e) => update({ status: e.target.value })}><option value="Любой">{t("filters.any")}</option><option value="Вышел">{displayAnimeStatus("Вышел", language)}</option><option value="Онгоинг">{displayAnimeStatus("Онгоинг", language)}</option><option value="Анонс">{displayAnimeStatus("Анонс", language)}</option></select><ChevronDown className="pointer-events-none absolute right-2.5 top-3 h-3.5 w-3.5 text-muted-foreground" /></span></label>
-        <label><span className={labelClass}>{t("filters.type")}</span><span className="relative block"><select className={selectClass} value={draft.type} onChange={(e) => update({ type: e.target.value })}><option value="Любой">{t("filters.any")}</option><option value="TV">TV</option><option value="Фильм">{displayAnimeKind("Фильм", language)}</option><option value="OVA">OVA</option><option value="ONA">ONA</option></select><ChevronDown className="pointer-events-none absolute right-2.5 top-3 h-3.5 w-3.5 text-muted-foreground" /></span></label>
-        <label><span className={labelClass}>{t("filters.yearFrom")}</span><input className={selectClass} inputMode="numeric" type="number" min="1900" max="2100" placeholder={t("filters.yearExample")} value={draft.yearFrom} onChange={(e) => update({ yearFrom: e.target.value })} /></label>
-        <label><span className={labelClass}>{t("filters.yearTo")}</span><input className={selectClass} inputMode="numeric" type="number" min="1900" max="2100" placeholder={t("filters.yearExample")} value={draft.yearTo} onChange={(e) => update({ yearTo: e.target.value })} /></label>
+        <label><span className={labelClass}>{t("filters.status")}</span><span className="relative block"><select className={selectClass} value={draft.status} onChange={(e) => update({ status: e.target.value })}><option value="Любой">{t("filters.any")}</option>{statuses.map((status) => <option key={status} value={status}>{displayAnimeStatus(status, language)}</option>)}</select><ChevronDown className="pointer-events-none absolute right-2.5 top-3 h-3.5 w-3.5 text-muted-foreground" /></span></label>
+        <label><span className={labelClass}>{t("filters.type")}</span><span className="relative block"><select className={selectClass} value={draft.type} onChange={(e) => update({ type: e.target.value })}><option value="Любой">{t("filters.any")}</option>{types.map((kind) => <option key={kind} value={kind}>{displayAnimeKind(kind, language)}</option>)}</select><ChevronDown className="pointer-events-none absolute right-2.5 top-3 h-3.5 w-3.5 text-muted-foreground" /></span></label>
+        <label><span className={labelClass}>{t("filters.yearFrom")}</span><input className={selectClass} inputMode="numeric" type="number" min={yearMin} max={yearMax} placeholder={t("filters.yearExample")} value={draft.yearFrom} onChange={(e) => update({ yearFrom: e.target.value })} /></label>
+        <label><span className={labelClass}>{t("filters.yearTo")}</span><input className={selectClass} inputMode="numeric" type="number" min={yearMin} max={yearMax} placeholder={t("filters.yearExample")} value={draft.yearTo} onChange={(e) => update({ yearTo: e.target.value })} /></label>
       </div>
 
       <div className="mt-3">
@@ -93,7 +111,7 @@ export function CatalogFilters({ open, draft, setDraft, onApply, onReset, placem
         <div className="flex justify-between text-[10px] text-muted-foreground"><span>0</span><span>9</span></div>
       </div>
 
-      <label className="mt-3 block"><span className={labelClass}>{t("filters.ageRating")}</span><span className="relative block"><select className={selectClass} value={draft.ageRating} onChange={(e) => update({ ageRating: e.target.value })}><option value="Любой">{t("filters.any")}</option><option value="Без ограничений">{t("filters.unrestricted")}</option><option>12+</option><option>16+</option><option>18+</option></select><ChevronDown className="pointer-events-none absolute right-2.5 top-3 h-3.5 w-3.5 text-muted-foreground" /></span></label>
+      <label className="mt-3 block"><span className={labelClass}>{t("filters.ageRating")}</span><span className="relative block"><select className={selectClass} value={draft.ageRating} onChange={(e) => update({ ageRating: e.target.value })}><option value="Любой">{t("filters.any")}</option>{ageRatings.map((rating) => <option key={rating} value={rating}>{rating === "Без ограничений" ? t("filters.unrestricted") : rating}</option>)}</select><ChevronDown className="pointer-events-none absolute right-2.5 top-3 h-3.5 w-3.5 text-muted-foreground" /></span></label>
 
       <div className="mt-4 flex gap-2">
         <button type="button" onClick={onReset} className="h-9 flex-1 rounded-lg border border-border bg-secondary text-sm transition hover:bg-accent">{t("catalog.reset")}</button>
