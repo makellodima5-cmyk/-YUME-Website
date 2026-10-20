@@ -18,6 +18,24 @@ import { AnimeCard, PosterArt } from "@/components/yume/Poster";
 import { useYumePreferences, displayAnimeTitle, displayAnimeStatus, displayGenre, displayAnimeKind } from "@/data/preferences";
 import { FAVORITES_STORAGE_KEY, readSavedAnimeIds, toggleSavedAnimeId, WATCHLIST_STORAGE_KEY } from "@/data/profile-storage";
 
+function formatAnimeDate(value: string | undefined, language: "ru" | "en", includeTime = false): string | null {
+  if (!value) return null;
+  let date: Date;
+  const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (dateOnly) {
+    date = new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]));
+  } else {
+    date = new Date(value);
+  }
+  if (!Number.isFinite(date.getTime())) return null;
+  return new Intl.DateTimeFormat(language === "en" ? "en-GB" : "ru-RU", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    ...(includeTime ? { hour: "2-digit", minute: "2-digit" } : {}),
+  }).format(date);
+}
+
 export const Route = createFileRoute("/anime/$animeId")({
   loader: async ({ params }) => {
     const isShikimoriId = /^\d+$/.test(params.animeId);
@@ -302,6 +320,16 @@ function AnimeDetailPage() {
                     </span>
                   ))}
                 </div>
+                {(formatAnimeDate(anime.airedOn, language) || formatAnimeDate(anime.nextEpisodeAt, language, true)) && (
+                  <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-white/75">
+                    {formatAnimeDate(anime.airedOn, language) && (
+                      <span>{t("anime.releaseDate")}: {formatAnimeDate(anime.airedOn, language)}</span>
+                    )}
+                    {formatAnimeDate(anime.nextEpisodeAt, language, true) && (
+                      <span>{t("anime.nextEpisodeDate")}: {formatAnimeDate(anime.nextEpisodeAt, language, true)}</span>
+                    )}
+                  </div>
+                )}
 
                 <div className="mt-5 max-w-2xl">
                   {descriptionText("anime-description-desktop")}
@@ -350,6 +378,16 @@ function AnimeDetailPage() {
                     {anime.kind && <span className="rounded-full border border-border px-2 py-1 text-[11px] text-muted-foreground">{anime.kind}</span>}
                     {anime.ageRating && <span className="rounded-full border border-border px-2 py-1 text-[11px] text-muted-foreground">{anime.ageRating}</span>}
                   </div>
+                  {(formatAnimeDate(anime.airedOn, language) || formatAnimeDate(anime.nextEpisodeAt, language, true)) && (
+                    <div className="mt-3 space-y-1 text-xs text-muted-foreground">
+                      {formatAnimeDate(anime.airedOn, language) && (
+                        <p>{t("anime.releaseDate")}: {formatAnimeDate(anime.airedOn, language)}</p>
+                      )}
+                      {formatAnimeDate(anime.nextEpisodeAt, language, true) && (
+                        <p>{t("anime.nextEpisodeDate")}: {formatAnimeDate(anime.nextEpisodeAt, language, true)}</p>
+                      )}
+                    </div>
+                  )}
                   <div className="mt-4 flex flex-col items-stretch gap-2">
                     {watchButton}
                     {favoriteButton}
