@@ -1,4 +1,7 @@
 import type { Anime } from "@/data/anime";
+// Cloudflare Workers exposes bindings through this runtime module. Unlike a
+// mutable module-level setter, this remains available across split server bundles.
+import { env as cloudflareEnv } from "cloudflare:workers";
 
 type CatalogResult = { items: Anime[]; error: string | null };
 type RunResult = { meta?: { changes?: number } };
@@ -83,22 +86,8 @@ const CREATE_SCHEMA = `
 let schemaReady = false;
 let missingBindingWarningLogged = false;
 
-let runtimeEnvironment: Record<string, unknown> | null = null;
-
-/**
- * The project server entry passes the current Worker environment to the D1
- * adapter. This avoids importing the Cloudflare-only module directly, so
- * the legacy Vercel build can still compile and use its non-D1 fallback.
- */
-export function setCatalogRuntimeEnvironment(environment: unknown): void {
-  runtimeEnvironment =
-    environment && typeof environment === "object"
-      ? (environment as Record<string, unknown>)
-      : null;
-}
-
 function database(): D1Database | null {
-  const binding = runtimeEnvironment?.YUME_DB;
+  const binding = (cloudflareEnv as unknown as Record<string, unknown>).YUME_DB;
   return binding && typeof binding === "object" ? (binding as D1Database) : null;
 }
 
