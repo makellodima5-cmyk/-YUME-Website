@@ -36,8 +36,7 @@ export const Route = createFileRoute("/")({
     const items = catalog.items;
     const popular = [...items]
       .filter((anime) => anime.rating !== null)
-      .sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1))
-      .slice(0, 50);
+      .sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1));
     const seedRecent = [...items]
       .sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? "") || b.year - a.year)
       .slice(0, 50);
@@ -79,6 +78,63 @@ function CatalogSkeleton({ count = 8 }: { count?: number }) {
   );
 }
 
+function isUpcomingAnnouncement(anime: Anime): boolean {
+  if (anime.status !== "Анонс") return false;
+
+  const today = new Date().toISOString().slice(0, 10);
+  const airedOn = anime.airedOn?.trim();
+  if (airedOn) {
+    const dateMatch = /^(\d{4}-\d{2}-\d{2})/.exec(airedOn);
+    if (dateMatch) return dateMatch[1]! > today;
+
+    const timestamp = Date.parse(airedOn);
+    if (Number.isFinite(timestamp)) return new Date(timestamp).toISOString().slice(0, 10) > today;
+  }
+
+  // With no exact air date, avoid old-year entries still marked as announcements.
+  return anime.year >= new Date().getUTCFullYear();
+}
+
+function PageNavigation({
+  page,
+  totalPages,
+  onPageChange,
+  ariaLabel,
+  previousLabel,
+  nextLabel,
+}: {
+  page: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
+  ariaLabel: string;
+  previousLabel: string;
+  nextLabel: string;
+}) {
+  if (totalPages <= 1) return null;
+
+  const changePage = (nextPage: number) => {
+    onPageChange(nextPage);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const visiblePages = Array.from({ length: totalPages }, (_, index) => index + 1)
+    .filter((candidate) => candidate === 1 || candidate === totalPages || Math.abs(candidate - page) <= 1)
+    .reduce<(number | "ellipsis")[]>((pages, candidate, index, visible) => {
+      if (index > 0 && candidate - visible[index - 1]! > 1) pages.push("ellipsis");
+      pages.push(candidate);
+      return pages;
+    }, []);
+
+  return (
+    <nav aria-label={ariaLabel} className="mt-8 flex flex-wrap items-center justify-center gap-1.5">
+      <button type="button" disabled={page === 1} onClick={() => changePage(Math.max(1, page - 1))} className="h-9 rounded-lg border border-border px-3 text-sm transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-35">{previousLabel}</button>
+      {visiblePages.map((candidate, index) => candidate === "ellipsis"
+        ? <span key={"ellipsis-" + index} className="px-1 text-muted-foreground">…</span>
+        : <button key={candidate} type="button" aria-current={page === candidate ? "page" : undefined} onClick={() => changePage(candidate)} className={"h-9 min-w-9 rounded-lg border px-3 text-sm transition " + (page === candidate ? "border-primary/70 bg-primary/20 text-foreground" : "border-border hover:bg-accent")}>{candidate}</button>)}
+      <button type="button" disabled={page === totalPages} onClick={() => changePage(Math.min(totalPages, page + 1))} className="h-9 rounded-lg border border-border px-3 text-sm transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-35">{nextLabel}</button>
+    </nav>
+  );
+}
 function Index() {
   const { t, language } = useYumePreferences();
   const navigate = useNavigate();
@@ -137,8 +193,7 @@ function Index() {
       setPopularAnime(
         [...items]
           .filter((anime) => anime.rating !== null)
-          .sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1))
-          .slice(0, 50),
+          .sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1)),
       );
     };
 
@@ -199,6 +254,9 @@ function Index() {
   const [activeFilters, setActiveFilters] = useState<CatalogFiltersValue>(EMPTY_CATALOG_FILTERS);
   const [sortBy, setSortBy] = useState("rating");
   const [catalogPage, setCatalogPage] = useState(1);
+  const [popularPage, setPopularPage] = useState(1);
+  const [announcementsPage, setAnnouncementsPage] = useState(1);
+  const [airingPage, setAiringPage] = useState(1);
   const [collection, setCollection] = useState<string | null>(null);
 
   const setView = (v: View) => {
@@ -220,6 +278,9 @@ function Index() {
       setCatalogPage(1);
     }
     setViewRaw(v);
+    if (v === "popular") setPopularPage(1);
+    if (v === "announcements") setAnnouncementsPage(1);
+    if (v === "airing") setAiringPage(1);
     // Persist the selected section in the URL so refreshing the page keeps the same view.
     navigate({ to: "/", search: { section: v } });
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -356,12 +417,15 @@ function Index() {
     ? ANIME.filter((anime) => activeCollection.genres.some((genre) => anime.genres.includes(genre)))
         .sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1))
     : [];
-  const popularCards = popularAnime
+  const sortedPopularAnime = popularAnime
     .filter((anime) => anime.rating !== null)
-    .sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1))
-    .slice(0, 12);
+    .sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1));
+  const popularCards = sortedPopularAnime.slice(0, 12);
+  const totalPopularPages = Math.max(1, Math.ceil(sortedPopularAnime.length / catalogPageSize));
+  const visiblePopularAnime = sortedPopularAnime.slice((popularPage - 1) * catalogPageSize, popularPage * catalogPageSize);
+
   const announcementAnime = ANIME
-    .filter((anime) => anime.status === "Анонс")
+    .filter(isUpcomingAnnouncement)
     .sort((a, b) => {
       if (a.airedOn && b.airedOn) return a.airedOn.localeCompare(b.airedOn);
       if (a.airedOn) return -1;
@@ -369,10 +433,15 @@ function Index() {
       return b.year - a.year || (b.rating ?? -1) - (a.rating ?? -1);
     });
   const announcementCards = announcementAnime.slice(0, 12);
+  const totalAnnouncementsPages = Math.max(1, Math.ceil(announcementAnime.length / catalogPageSize));
+  const visibleAnnouncementAnime = announcementAnime.slice((announcementsPage - 1) * catalogPageSize, announcementsPage * catalogPageSize);
+
   const airingAnime = ANIME
     .filter((anime) => anime.status === "Онгоинг")
     .sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? "") || b.year - a.year);
   const airingCards = airingAnime.slice(0, 12);
+  const totalAiringPages = Math.max(1, Math.ceil(airingAnime.length / catalogPageSize));
+  const visibleAiringAnime = airingAnime.slice((airingPage - 1) * catalogPageSize, airingPage * catalogPageSize);
   return (
     <div className="min-h-screen pb-8">
       <Header view={view} setView={setView} onProfile={() => setView("profile")} />
@@ -438,7 +507,21 @@ function Index() {
       ) : view === "popular" ? (
         <main className="px-4 pt-24 md:px-10 md:pt-24">
           <h1 className="mb-2 text-2xl font-bold md:text-3xl">{t("home.popular")}</h1>
-          <Grid items={popularAnime.slice().sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1))} onSelect={select} empty={t("catalog.noResultsFormal")} />
+          {needsFullCatalog && catalogLoadState !== "loaded" && catalogLoadState !== "error" ? (
+            <CatalogSkeleton count={12} />
+          ) : (
+            <>
+              <Grid items={visiblePopularAnime} onSelect={select} empty={t("catalog.noResultsFormal")} />
+              <PageNavigation
+                page={popularPage}
+                totalPages={totalPopularPages}
+                onPageChange={setPopularPage}
+                ariaLabel={t("home.popular")}
+                previousLabel={t("catalog.previous")}
+                nextLabel={t("catalog.next")}
+              />
+            </>
+          )}
         </main>
       ) : view === "announcements" ? (
         <main className="px-4 pt-24 md:px-10 md:pt-24">
@@ -447,7 +530,17 @@ function Index() {
           {needsFullCatalog && catalogLoadState !== "loaded" && catalogLoadState !== "error" ? (
             <CatalogSkeleton count={12} />
           ) : (
-            <Grid items={announcementAnime} onSelect={select} empty={t("home.noAnnouncements")} />
+            <>
+              <Grid items={visibleAnnouncementAnime} onSelect={select} empty={t("home.noAnnouncements")} />
+              <PageNavigation
+                page={announcementsPage}
+                totalPages={totalAnnouncementsPages}
+                onPageChange={setAnnouncementsPage}
+                ariaLabel={t("home.announcements")}
+                previousLabel={t("catalog.previous")}
+                nextLabel={t("catalog.next")}
+              />
+            </>
           )}
         </main>
       ) : view === "airing" ? (
@@ -457,7 +550,17 @@ function Index() {
           {needsFullCatalog && catalogLoadState !== "loaded" && catalogLoadState !== "error" ? (
             <CatalogSkeleton count={12} />
           ) : (
-            <Grid items={airingAnime} onSelect={select} empty={t("home.noAiring")} />
+            <>
+              <Grid items={visibleAiringAnime} onSelect={select} empty={t("home.noAiring")} />
+              <PageNavigation
+                page={airingPage}
+                totalPages={totalAiringPages}
+                onPageChange={setAiringPage}
+                ariaLabel={t("home.airing")}
+                previousLabel={t("catalog.previous")}
+                nextLabel={t("catalog.next")}
+              />
+            </>
           )}
         </main>
       ) : view === "catalog" ? (
