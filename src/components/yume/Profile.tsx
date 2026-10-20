@@ -18,6 +18,7 @@ import {
   UserRound,
 } from "lucide-react";
 import type { Anime } from "@/data/anime";
+import { getShikimoriAnimes } from "@/data/shikimori";
 import { displayAnimeTitle, displayGenre, useYumePreferences } from "@/data/preferences";
 import { PosterArt } from "./Poster";
 import { Grid } from "./Sections";
@@ -51,6 +52,10 @@ export function Profile({ animeList, onSelect, onCatalog }: Props) {
   const [panel, setPanel] = useState<ProfilePanel>("overview");
   const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
   const [watchlistIds, setWatchlistIds] = useState<string[]>([]);
+  const [savedAnime, setSavedAnime] = useState<Anime[]>([]);
+  const [checkedSavedIds, setCheckedSavedIds] = useState<string[]>([]);
+  const [savedAnimeLoading, setSavedAnimeLoading] = useState(false);
+  const [savedAnimeLoadError, setSavedAnimeLoadError] = useState(false);
   const [preferredGenres, setPreferredGenres] = useState<string[]>([]);
   const [preferencesLoaded, setPreferencesLoaded] = useState(false);
 
@@ -104,14 +109,89 @@ export function Profile({ animeList, onSelect, onCatalog }: Props) {
     };
   }, []);
 
+  // Merge the visible catalog with titles fetched by saved ID so the local
+  // library also works when a title is outside the currently loaded catalog page.
+  const savedAnimeById = useMemo(
+    () => new Map([...savedAnime, ...animeList].map((anime) => [anime.id, anime])),
+    [animeList, savedAnime],
+  );
+
+  const missingSavedIds = useMemo(
+    () => Array.from(new Set([...favoriteIds, ...watchlistIds])).filter(
+      (id) => /^\d+$/.test(id) && !savedAnimeById.has(id) && !checkedSavedIds.includes(id),
+    ),
+    [checkedSavedIds, favoriteIds, savedAnimeById, watchlistIds],
+  );
+
+  useEffect(() => {
+    if (missingSavedIds.length === 0) {
+      setSavedAnimeLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setSavedAnimeLoading(true);
+    setSavedAnimeLoadError(false);
+
+    const chunks: string[][] = [];
+    for (let index = 0; index < missingSavedIds.length; index += 50) {
+      chunks.push(missingSavedIds.slice(index, index + 50));
+    }
+
+    Promise.all(
+      chunks.map((ids) => getShikimoriAnimes({
+        data: { ids: ids.join(","), limit: ids.length, order: "ranked" },
+      })),
+    )
+      .then((results) => {
+        if (cancelled) return;
+        const fetched = results.flatMap((result) => result.items);
+        setSavedAnime((current) => {
+          const byId = new Map(current.map((anime) => [anime.id, anime]));
+          fetched.forEach((anime) => byId.set(anime.id, anime));
+          return Array.from(byId.values());
+        });
+        setSavedAnimeLoadError(results.some((result) => Boolean(result.error)));
+        setCheckedSavedIds((current) => Array.from(new Set([...current, ...missingSavedIds])));
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setSavedAnimeLoadError(true);
+        setCheckedSavedIds((current) => Array.from(new Set([...current, ...missingSavedIds])));
+      })
+      .finally(() => {
+        if (!cancelled) setSavedAnimeLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [missingSavedIds]);
+
   const favorites = useMemo(
-    () => favoriteIds.map((id) => animeList.find((anime) => anime.id === id)).filter((anime): anime is Anime => Boolean(anime)),
-    [animeList, favoriteIds],
+    () => favoriteIds.map((id) => savedAnimeById.get(id)).filter((anime): anime is Anime => Boolean(anime)),
+    [favoriteIds, savedAnimeById],
   );
   const watchlist = useMemo(
-    () => watchlistIds.map((id) => animeList.find((anime) => anime.id === id)).filter((anime): anime is Anime => Boolean(anime)),
-    [animeList, watchlistIds],
+    () => watchlistIds.map((id) => savedAnimeById.get(id)).filter((anime): anime is Anime => Boolean(anime)),
+    [savedAnimeById, watchlistIds],
   );
+  const unresolvedFavoriteCount = favoriteIds.filter((id) => !savedAnimeById.has(id)).length;
+  const unresolvedWatchlistCount = watchlistIds.filter((id) => !savedAnimeById.has(id)).length;
+
+  const savedItemsNotice = (unresolvedCount: number) => {
+    if (unresolvedCount === 0) return null;
+    const message = savedAnimeLoading
+      ? t("profile.savedItemsLoading")
+      : savedAnimeLoadError
+        ? t("profile.savedItemsError")
+        : t("profile.savedItemsUnavailable");
+    return (
+      <p className="mt-3 rounded-xl border border-border bg-card/40 px-3 py-2 text-xs leading-relaxed text-muted-foreground">
+        {message}
+      </p>
+    );
+  };
 
   const panelTitles: Record<ProfilePanel, string> = {
     overview: t("profile.title"),
@@ -227,6 +307,7 @@ export function Profile({ animeList, onSelect, onCatalog }: Props) {
                 </button>
               </div>
             </div>
+            <p className="mt-3 text-xs leading-relaxed text-muted-foreground">{t("profile.localLibraryNotice")}</p>
 
             <section className="mt-8">
               <div className="mb-3 flex items-end justify-between gap-3">
@@ -284,15 +365,39 @@ export function Profile({ animeList, onSelect, onCatalog }: Props) {
             </div>
 
             {panel === "favorites" && (
-              favorites.length
-                ? <Grid items={favorites} onSelect={onSelect} empty={t("profile.emptyFavoritesTitle")} />
-                : emptyLibrary(t("profile.emptyFavoritesTitle"), t("profile.emptyFavoritesDescription"))
+              <>
+                {favorites.length
+                  ? <Grid items={favorites} onSelect={onSelect} empty={t("profile.emptyFavoritesTitle")} />
+                  : favoriteIds.length > 0
+                    ? <div className="rounded-2xl border border-dashed border-border bg-card/40 px-5 py-8 text-center">
+                        <p className="text-sm leading-relaxed text-muted-foreground">
+                          {savedAnimeLoading ? t("profile.savedItemsLoading") : savedAnimeLoadError ? t("profile.savedItemsError") : t("profile.savedItemsUnavailable")}
+                        </p>
+                        <button type="button" onClick={onCatalog} className="mt-4 rounded-full bg-neon px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-neon transition hover:brightness-110">
+                          {t("profile.goCatalog")}
+                        </button>
+                      </div>
+                    : emptyLibrary(t("profile.emptyFavoritesTitle"), t("profile.emptyFavoritesDescription"))}
+                {savedItemsNotice(unresolvedFavoriteCount)}
+              </>
             )}
 
             {panel === "watchlist" && (
-              watchlist.length
-                ? <Grid items={watchlist} onSelect={onSelect} empty={t("profile.emptyWatchlistTitle")} />
-                : emptyLibrary(t("profile.emptyWatchlistTitle"), t("profile.emptyWatchlistDescription"))
+              <>
+                {watchlist.length
+                  ? <Grid items={watchlist} onSelect={onSelect} empty={t("profile.emptyWatchlistTitle")} />
+                  : watchlistIds.length > 0
+                    ? <div className="rounded-2xl border border-dashed border-border bg-card/40 px-5 py-8 text-center">
+                        <p className="text-sm leading-relaxed text-muted-foreground">
+                          {savedAnimeLoading ? t("profile.savedItemsLoading") : savedAnimeLoadError ? t("profile.savedItemsError") : t("profile.savedItemsUnavailable")}
+                        </p>
+                        <button type="button" onClick={onCatalog} className="mt-4 rounded-full bg-neon px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-neon transition hover:brightness-110">
+                          {t("profile.goCatalog")}
+                        </button>
+                      </div>
+                    : emptyLibrary(t("profile.emptyWatchlistTitle"), t("profile.emptyWatchlistDescription"))}
+                {savedItemsNotice(unresolvedWatchlistCount)}
+              </>
             )}
 
             {panel === "settings" && (
