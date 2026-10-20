@@ -1,0 +1,60 @@
+name: Cloudflare Worker CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Cloudflare Worker
+        run: npm run build
+
+      - name: Verify generated Worker configuration and D1 binding
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          const path = "dist/wrangler.json";
+          if (!fs.existsSync(path)) {
+            throw new Error(`Expected Cloudflare Vite output at ${path}; build did not emit the deployable Worker config.`);
+          }
+          const config = JSON.parse(fs.readFileSync(path, "utf8"));
+          const binding = (config.d1_databases ?? []).find(
+            (item) => item.binding === "YUME_DB"
+              && item.database_name === "yume_db"
+              && item.database_id === "fb5ba87d-e921-4dde-829e-7b1bddcf123b",
+          );
+          if (!binding) {
+            throw new Error("Generated Worker config does not contain the expected YUME_DB binding.");
+          }
+          console.log("Verified generated Worker config and YUME_DB binding.");
+          NODE
+
+      - name: Deploy to Cloudflare Workers
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != '' }}
+        run: npx --yes wrangler@4 deploy --config dist/wrangler.json
+
+      - name: Report deployment prerequisites
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && (env.CLOUDFLARE_API_TOKEN == '' || env.CLOUDFLARE_ACCOUNT_ID == '') }}
+        run: echo "Cloudflare deploy skipped: configure CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID in GitHub Actions secrets."
