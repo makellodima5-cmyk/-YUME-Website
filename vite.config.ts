@@ -7,9 +7,14 @@
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
 export default defineConfig({
-  // Keep Cloudflare's runtime-only module external to the SSR bundler. It is provided
-  // by the Workers runtime and cannot be resolved by the local Vite/Rolldown build.
+  // Cloudflare provides this runtime-only module. Keep it external to Rolldown so
+  // the local SSR build does not try to resolve it as an npm package.
   vite: {
+    build: {
+      rolldownOptions: {
+        external: ["cloudflare:workers"],
+      },
+    },
     ssr: {
       external: ["cloudflare:workers"],
     },
