@@ -60,13 +60,24 @@ export function CatalogFilters({ open, draft, setDraft, onApply, onReset, placem
       </div>
 
       <div className="mb-3">
-        <label className={labelClass}>{t("filters.genres")}</label>
-        <div className="flex max-h-20 flex-wrap gap-1.5 overflow-y-auto">
-          {genres.map((genre) => {
-            const active = draft.genres.includes(genre);
-            return <button key={genre} type="button" onClick={() => toggleGenre(genre)} aria-pressed={active} className={`rounded-full border px-2.5 py-1 text-xs transition ${active ? "border-primary/70 bg-primary/20 text-foreground" : "border-border bg-secondary/70 text-muted-foreground hover:text-foreground"}`}>{displayGenre(genre, language)}</button>;
-          })}
-        </div>
+        <label className={labelClass} htmlFor="catalog-genre-toggle">{t("filters.genres")}</label>
+        <details className="group">
+          <summary id="catalog-genre-toggle" className={`${selectClass} flex cursor-pointer list-none items-center justify-between py-2.5 [&::-webkit-details-marker]:hidden`}>
+            <span className="truncate">{draft.genres.length ? `${draft.genres.length}: ${draft.genres.slice(0, 2).map((genre) => displayGenre(genre, language)).join(", ")}${draft.genres.length > 2 ? "…" : ""}` : t("filters.chooseGenres")}</span>
+            <ChevronDown className="ml-2 h-4 w-4 shrink-0 transition-transform group-open:rotate-180" />
+          </summary>
+          <div className="mt-1 max-h-44 space-y-1 overflow-y-auto rounded-xl border border-primary/50 bg-[#171127] p-2">
+            {genres.map((genre) => {
+              const active = draft.genres.includes(genre);
+              return (
+                <label key={genre} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-white/5">
+                  <input type="checkbox" checked={active} onChange={() => toggleGenre(genre)} className="h-4 w-4 shrink-0 accent-fuchsia-400" />
+                  <span>{displayGenre(genre, language)}</span>
+                </label>
+              );
+            })}
+          </div>
+        </details>
       </div>
 
       <div className="grid grid-cols-2 gap-2.5">
