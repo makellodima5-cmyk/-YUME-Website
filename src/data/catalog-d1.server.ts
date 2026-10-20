@@ -361,10 +361,10 @@ export async function getPersistentCatalog(
       if (page.error) {
         const failures = Math.max(0, Number(await getMeta(db, "catalog_failures") ?? "0")) + 1;
         const exponentialBackoff = DEFAULT_RETRY_MS * (2 ** Math.min(failures - 1, 6));
-        const retryAfterMs = Math.max(
-          1000,
-          Math.min(page.retryAfterMs ?? exponentialBackoff, 10 * 60 * 1000),
-        );
+        // Do not shorten an upstream Retry-After value: it is a minimum wait imposed by Shikimori.
+        const retryAfterMs = page.retryAfterMs !== undefined
+          ? Math.max(1000, page.retryAfterMs)
+          : Math.min(exponentialBackoff, 10 * 60 * 1000);
         await db.batch([
           putMeta(db, "catalog_failures", String(failures)),
           putMeta(db, "catalog_resume_at", String(Date.now() + retryAfterMs)),
