@@ -350,8 +350,11 @@ const CATALOG_LIMIT = 1000;
 const CATALOG_CACHE_TTL_MS = 30 * 60 * 1000;
 
 export const getShikimoriCatalog = createServerFn({ method: "GET" })
-  .handler(async () => {
-    if (catalogCache && catalogCache.expiresAt > Date.now()) {
+  .validator((input: { forceRefresh?: boolean }) => ({
+    forceRefresh: input.forceRefresh === true,
+  }))
+  .handler(async ({ data }) => {
+    if (!data.forceRefresh && catalogCache && catalogCache.expiresAt > Date.now()) {
       return { items: catalogCache.items, error: catalogCache.error };
     }
 
