@@ -161,7 +161,8 @@ export function Header({ view, setView, onProfile }: Props) {
                   {(["ru", "en"] as const).map((value) => <button key={value} type="button" aria-pressed={language === value} onClick={() => setLanguage(value)} className={`rounded-md px-2.5 py-1 text-[11px] font-semibold uppercase transition ${language === value ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}>{value}</button>)}
                 </div>
               </div>
-            </div>          </aside>
+            </div>
+          </aside>
         </>
       )}
     </>
