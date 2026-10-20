@@ -89,7 +89,6 @@ function AnimeDetailPage() {
   const { anime, relatedAnime, apiError } = Route.useLoaderData();
   const playerSectionRef = useRef<HTMLElement | null>(null);
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
-  const [usePosterAsBanner, setUsePosterAsBanner] = useState(false);
   const [inList, setInList] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
   const [showListNote, setShowListNote] = useState(false);
@@ -99,7 +98,6 @@ function AnimeDetailPage() {
   }, [anime, language]);
 
   useEffect(() => {
-    setUsePosterAsBanner(false);
     setDescriptionExpanded(false);
     setInList(readSavedAnimeIds(WATCHLIST_STORAGE_KEY).includes(animeId));
     setIsFavorite(readSavedAnimeIds(FAVORITES_STORAGE_KEY).includes(animeId));
@@ -237,88 +235,54 @@ function AnimeDetailPage() {
           </button>
 
           <section aria-label={displayAnimeTitle(anime, language) + " — " + t("anime.sectionLabel")}>
-            <div
-              className="relative hidden min-h-[390px] overflow-hidden rounded-3xl border border-white/10 shadow-[0_18px_70px_rgba(0,0,0,0.25)] md:block"
-              style={{
-                background:
-                  "radial-gradient(ellipse at 82% 26%, oklch(0.47 0.19 " +
-                  anime.hue +
-                  ") 0%, transparent 38%), radial-gradient(ellipse at 66% 100%, oklch(0.27 0.16 " +
-                  (anime.hue + 28) +
-                  ") 0%, transparent 45%), linear-gradient(110deg, #100d1b 0%, #1b1428 54%, #0b0a14 100%)",
-              }}
-            >
-              {(usePosterAsBanner ? anime.posterUrl : anime.bannerUrl || anime.posterUrl) && (
-                <img
-                  src={usePosterAsBanner ? anime.posterUrl : anime.bannerUrl || anime.posterUrl}
-                  alt=""
-                  aria-hidden="true"
-                  fetchPriority="high"
-                  onError={() => {
-                    if (!usePosterAsBanner && anime.posterUrl && anime.posterUrl !== anime.bannerUrl) {
-                      setUsePosterAsBanner(true);
-                    }
-                  }}
-                  className="absolute inset-0 h-full w-full scale-105 object-cover object-center opacity-55 blur-[1px]"
+            <div className="hidden items-start gap-6 rounded-3xl border border-border bg-card/70 p-5 shadow-[0_18px_70px_rgba(0,0,0,0.25)] md:grid md:grid-cols-[minmax(220px,280px)_minmax(0,1fr)] lg:gap-8 lg:p-8">
+              <div className="mx-auto w-full max-w-[280px]">
+                <PosterArt
+                  anime={anime}
+                  className="aspect-[2/3] w-full rounded-2xl ring-1 ring-white/10 shadow-[0_12px_36px_rgba(0,0,0,0.3)]"
                 />
-              )}
-              <div
-                aria-hidden="true"
-                className="pointer-events-none absolute -right-8 -top-20 select-none font-display text-[27rem] leading-none opacity-[0.11] blur-[1px]"
-                style={{ color: "oklch(0.9 0.1 " + anime.hue + ")" }}
-              >
-                {anime.glyph}
               </div>
-              <div
-                aria-hidden="true"
-                className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#100d1b] via-[#100d1b]/90 to-transparent"
-              />
-              <div
-                aria-hidden="true"
-                className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#0b0a14]/65 via-transparent to-[#0b0a14]/10"
-              />
-              <div className="relative z-10 flex min-h-[390px] max-w-4xl flex-col items-start justify-center p-9 lg:p-12">
-                <div className="mb-3 flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-white/70">
+
+              <div className="min-w-0 py-1 lg:py-3">
+                <div className="mb-3 flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                   <span>{displayAnimeStatus(anime.status, language)}</span>
                   <span className="h-1 w-1 rounded-full bg-primary" />
                   <span>{anime.year || t("anime.yearUnknown")}</span>
                 </div>
-                <h1 id="anime-title-desktop" className="max-w-3xl text-4xl font-bold leading-tight text-white lg:text-5xl">
+                <h1 id="anime-title-desktop" className="max-w-4xl text-3xl font-bold leading-tight lg:text-5xl">
                   {displayAnimeTitle(anime, language)}
                 </h1>
-                <p className="mt-1 text-sm text-white/65 lg:text-base">{anime.original}</p>
+                <p className="mt-2 text-sm text-muted-foreground lg:text-base">{anime.original}</p>
 
                 <div className="mt-4 flex flex-wrap items-center gap-2">
                   {anime.rating !== null && (
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-black/25 px-3 py-1.5 text-sm font-semibold text-white backdrop-blur">
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background/70 px-3 py-1.5 text-sm font-semibold">
                       <Star className="h-4 w-4 fill-gold text-gold" />
                       {anime.rating.toFixed(1)}
                     </span>
                   )}
-                  <span className="rounded-full border border-white/10 bg-black/25 px-3 py-1.5 text-sm text-white/90 backdrop-blur">
+                  <span className="rounded-full border border-border bg-background/70 px-3 py-1.5 text-sm">
                     {anime.episodes > 0 ? anime.episodes + " " + t("anime.series") : t("anime.episodesUnknown")}
                   </span>
                   {anime.kind && (
-                    <span className="rounded-full border border-white/10 bg-black/25 px-3 py-1.5 text-sm text-white/90 backdrop-blur">
+                    <span className="rounded-full border border-border bg-background/70 px-3 py-1.5 text-sm">
                       {displayAnimeKind(anime.kind, language)}
                     </span>
                   )}
                   {anime.ageRating && (
-                    <span className="rounded-full border border-white/10 bg-black/25 px-3 py-1.5 text-sm text-white/90 backdrop-blur">
+                    <span className="rounded-full border border-border bg-background/70 px-3 py-1.5 text-sm">
                       {anime.ageRating}
                     </span>
                   )}
                   {anime.genres.map((genre) => (
-                    <span
-                      key={genre}
-                      className="rounded-full border border-white/10 bg-black/25 px-3 py-1.5 text-sm text-white/90 backdrop-blur"
-                    >
+                    <span key={genre} className="rounded-full border border-border bg-background/70 px-3 py-1.5 text-sm">
                       {displayGenre(genre, language)}
                     </span>
                   ))}
                 </div>
+
                 {(formatAnimeDate(anime.airedOn, language) || formatAnimeDate(anime.nextEpisodeAt, language, true)) && (
-                  <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-white/75">
+                  <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
                     {formatAnimeDate(anime.airedOn, language) && (
                       <span>{t("anime.releaseDate")}: {formatAnimeDate(anime.airedOn, language)}</span>
                     )}
@@ -328,7 +292,7 @@ function AnimeDetailPage() {
                   </div>
                 )}
 
-                <div className="mt-5 max-w-2xl">
+                <div className="mt-5 max-w-3xl">
                   {descriptionText("anime-description-desktop")}
                 </div>
                 <div className="mt-6 flex flex-wrap gap-3">
@@ -337,7 +301,7 @@ function AnimeDetailPage() {
                   {listButton}
                 </div>
                 {showListNote && (
-                  <p className="mt-3 text-xs text-white/60" aria-live="polite">
+                  <p className="mt-3 text-xs text-muted-foreground" aria-live="polite">
                     {t("anime.savedLocally")}
                   </p>
                 )}
