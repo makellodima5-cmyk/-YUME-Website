@@ -1,0 +1,17 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "yume-website",
+  "compatibility_date": "2026-10-20",
+  "compatibility_flags": ["nodejs_compat"],
+  "main": "@tanstack/react-start/server-entry",
+  "observability": {
+    "enabled": true
+  },
+  "d1_databases": [
+    {
+      "binding": "YUME_DB",
+      "database_name": "yume_db",
+      "database_id": "fb5ba87d-e921-4dde-829e-7b1bddcf123b"
+    }
+  ]
+}
