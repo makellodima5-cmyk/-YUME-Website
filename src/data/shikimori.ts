@@ -492,15 +492,19 @@ async function buildShikimoriCatalog(forceRefresh: boolean): Promise<CatalogResu
 }
 
 export const getShikimoriCatalog = createServerFn({ method: "GET" })
-  .validator((input: { forceRefresh?: boolean }) => ({
+  .validator((input: { forceRefresh?: boolean; progressOnly?: boolean }) => ({
     forceRefresh: input.forceRefresh === true,
+    progressOnly: input.progressOnly === true,
   }))
   .handler(async ({ data }) => {
-    const persistent = await getPersistentCatalog(async (cursor): Promise<CatalogSeedPageResult> => {
-      const request = seedRequestForCursor(cursor);
-      if (!request) return { items: [], error: null, done: true };
-      return fetchShikimoriAnimes(validateRequest(request));
-    });
+    const persistent = await getPersistentCatalog(
+      async (cursor): Promise<CatalogSeedPageResult> => {
+        const request = seedRequestForCursor(cursor);
+        if (!request) return { items: [], error: null, done: true };
+        return fetchShikimoriAnimes(validateRequest(request));
+      },
+      { progressOnly: data.progressOnly },
+    );
     if (persistent) return persistent;
     return buildShikimoriCatalog(data.forceRefresh);
   });
