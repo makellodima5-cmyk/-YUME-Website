@@ -69,7 +69,7 @@ export function CatalogFilters({
   });
 
   const panelPosition = placement === "home"
-    ? "fixed left-3 right-3 top-[calc(env(safe-area-inset-top)+76px)] z-[100] mx-auto max-h-[calc(100dvh-env(safe-area-inset-top)-92px)] overflow-y-auto sm:left-8 sm:right-auto sm:top-[calc(env(safe-area-inset-top)+76px)]"
+    ? "fixed left-3 right-3 top-[calc(env(safe-area-inset-top)+136px)] z-[100] mx-auto max-h-[calc(100dvh-env(safe-area-inset-top)-152px)] overflow-y-auto sm:left-8 sm:right-auto sm:top-[calc(env(safe-area-inset-top)+136px)]"
     : "absolute right-0 top-full z-40 mt-2 max-h-[calc(100dvh-180px)] overflow-y-auto";
 
   const panel = (
