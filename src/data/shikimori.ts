@@ -149,7 +149,7 @@ function mapAnime(item: ShikimoriGraphQLAnime): Anime {
     hue: safeHue,
     glyph: item.name?.slice(0, 1) || "Y",
     isNew: year > 0 && year >= new Date().getFullYear() - 1,
-    popular: rating >= 8.5,
+    popular: rating !== null && rating >= 8.5,
     posterUrl,
     bannerUrl,
     kind: mapKind(item.kind),
