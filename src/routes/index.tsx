@@ -48,6 +48,7 @@ export const Route = createFileRoute("/")({
       popular,
       recent,
       apiError: catalog.error,
+      catalogProgress: catalog.progress,
     };
   },
   component: Index,
@@ -102,8 +103,17 @@ function Index() {
     document.querySelector('meta[property="og:description"]')?.setAttribute("content", metadata.ogDescription);
   }, [language]);
   const { section } = Route.useSearch();
-  const { anime: loadedAnime, popular: popularAnime, recent: recentAnime, apiError } = Route.useLoaderData();
+  const {
+    anime: loadedAnime,
+    popular: initialPopularAnime,
+    recent: initialRecentAnime,
+    apiError,
+    catalogProgress: initialCatalogProgress,
+  } = Route.useLoaderData();
   const [catalogAnime, setCatalogAnime] = useState<Anime[]>(loadedAnime.slice(0, 1000));
+  const [popularAnime, setPopularAnime] = useState<Anime[]>(initialPopularAnime);
+  const [recentAnime, setRecentAnime] = useState<Anime[]>(initialRecentAnime);
+  const [catalogProgress, setCatalogProgress] = useState(initialCatalogProgress);
   const ANIME = catalogAnime;
   const [catalogLoadState, setCatalogLoadState] = useState<"idle" | "loading" | "loaded" | "error">("idle");
   const [catalogLoadError, setCatalogLoadError] = useState<string | null>(null);
