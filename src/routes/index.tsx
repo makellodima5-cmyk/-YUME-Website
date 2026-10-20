@@ -132,6 +132,7 @@ function Index() {
     let cancelled = false;
     let timeoutId: number | undefined;
     let progress = initialCatalogProgress;
+    let collectedItems = new Map(loadedAnime.map((anime) => [anime.id, anime]));
 
     if (progress.status === "ready" || progress.status === "partial") return;
 
@@ -158,16 +159,21 @@ function Index() {
         if (cancelled) return;
 
         try {
-          const result = await getShikimoriCatalog({ data: {} });
+          const result = await getShikimoriCatalog({ data: { progressOnly: true } });
           if (cancelled) return;
           progress = result.progress;
           setCatalogProgress(progress);
 
-          if (result.items.length > 0) {
-            const items = result.items.slice(0, 1000);
-            setCatalogAnime(items);
-            refreshDerivedLists(items);
+          if (progress.status === "ready" || progress.status === "partial") {
+            collectedItems = new Map(result.items.slice(0, 1000).map((anime) => [anime.id, anime]));
+          } else {
+            for (const anime of result.items) {
+              if (!collectedItems.has(anime.id)) collectedItems.set(anime.id, anime);
+            }
           }
+          const items = Array.from(collectedItems.values()).slice(0, 1000);
+          setCatalogAnime(items);
+          refreshDerivedLists(items);
 
           if (progress.status === "ready") {
             setCatalogLoadState("loaded");
@@ -191,7 +197,7 @@ function Index() {
       cancelled = true;
       if (timeoutId !== undefined) window.clearTimeout(timeoutId);
     };
-  }, [initialCatalogProgress.status]);
+  }, [initialCatalogProgress.status, loadedAnime]);
 
   const [query, setQuery] = useState("");
   const [submittedQuery, setSubmittedQuery] = useState("");
@@ -314,23 +320,21 @@ function Index() {
     catalogLoadStarted.current = true;
     setCatalogLoadState("loading");
     setCatalogLoadError(null);
-    getShikimoriCatalog({ data: { forceRefresh: catalogLoadAttempt > 0 } })
+    getShikimoriCatalog({ data: { forceRefresh: catalogLoadAttempt > 0, progressOnly: true } })
       .then((result) => {
         setCatalogProgress(result.progress);
         if (result.items.length > 0) {
-          const items = result.items.slice(0, 1000);
-          setCatalogAnime(items);
-          setPopularAnime(
-            [...items]
-              .filter((anime) => anime.rating !== null)
-              .sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1))
-              .slice(0, 50),
-          );
-          setRecentAnime(
-            [...items]
-              .sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? "") || b.year - a.year)
-              .slice(0, 50),
-          );
+          const isComplete = result.progress.status === "ready" || result.progress.status === "partial";
+          setCatalogAnime((currentItems) => {
+            const merged = new Map<string, Anime>();
+            if (!isComplete) {
+              for (const anime of currentItems) merged.set(anime.id, anime);
+            }
+            for (const anime of result.items.slice(0, 1000)) {
+              if (isComplete || !merged.has(anime.id)) merged.set(anime.id, anime);
+            }
+            return Array.from(merged.values()).slice(0, 1000);
+          });
         }
         const isInProgress = result.progress.status === "seeding" || result.progress.status === "cooldown";
         setCatalogLoadError(result.error);
