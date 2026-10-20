@@ -1,8 +1,8 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowDownWideNarrow, ChevronDown, ChevronRight, Search, SlidersHorizontal, X } from "lucide-react";
 import { COLLECTIONS, type Anime } from "@/data/anime";
-import { getShikimoriAnimes } from "@/data/shikimori";
+import { getShikimoriAnimes, getShikimoriCatalog } from "@/data/shikimori";
 import { Header, type View } from "@/components/yume/Header";
 import { AnimeCard } from "@/components/yume/Poster";
 import { CollectionsGrid, Grid, Hero, Row } from "@/components/yume/Sections";
@@ -78,13 +78,38 @@ function Index() {
   }, [language]);
   const { section } = Route.useSearch();
   const { anime: loadedAnime, popular: popularAnime, recent: recentAnime, apiError } = Route.useLoaderData();
-  const ANIME = loadedAnime;
+  const [catalogAnime, setCatalogAnime] = useState<Anime[]>(loadedAnime.slice(0, 1000));
+  const ANIME = catalogAnime;
+  const [catalogLoadState, setCatalogLoadState] = useState<"idle" | "loading" | "loaded" | "error">("idle");
+  const [catalogLoadError, setCatalogLoadError] = useState<string | null>(null);
+  const catalogLoadStarted = useRef(false);
+  const [catalogLoadAttempt, setCatalogLoadAttempt] = useState(0);
   const [view, setViewRaw] = useState<View>(section ?? "home");
 
   // Keep the selected section aligned with the URL, including browser Back/Forward.
   useEffect(() => {
     setViewRaw(section ?? "home");
   }, [section]);
+
+  // Load the capped 1,000-title catalog only when Catalog is opened.
+  // Searches and filters stay local and never query Shikimori by the typed title.
+  useEffect(() => {
+    if (view !== "catalog" || catalogLoadStarted.current) return;
+    catalogLoadStarted.current = true;
+    setCatalogLoadState("loading");
+    setCatalogLoadError(null);
+    getShikimoriCatalog()
+      .then((result) => {
+        if (result.items.length > 0) setCatalogAnime(result.items.slice(0, 1000));
+        setCatalogLoadError(result.error);
+        setCatalogLoadState(result.error ? "error" : "loaded");
+      })
+      .catch(() => {
+        setCatalogLoadError(t("source.catalogUnavailable"));
+        setCatalogLoadState("error");
+        catalogLoadStarted.current = false;
+      });
+  }, [view, catalogLoadAttempt]);
   const [query, setQuery] = useState("");
   const [submittedQuery, setSubmittedQuery] = useState("");
   const [catalogQuery, setCatalogQuery] = useState("");
@@ -94,8 +119,6 @@ function Index() {
   const [sortBy, setSortBy] = useState("rating");
   const [catalogPage, setCatalogPage] = useState(1);
   const [collection, setCollection] = useState<string | null>(null);
-  const [remoteSearch, setRemoteSearch] = useState<{ query: string; items: Anime[]; error: string | null } | null>(null);
-  const [searchLoading, setSearchLoading] = useState(false);
 
   const setView = (v: View) => {
     // Tapping Home is also a quick way out of search results: restore the default home state.
@@ -136,44 +159,35 @@ function Index() {
     () => Array.from(new Set(ANIME.flatMap((anime) => anime.genres))).sort((a, b) => a.localeCompare(b, "ru")),
     [ANIME],
   );
-  const searchText = view === "catalog" ? catalogQuery.trim() : view === "home" ? submittedQuery.trim() : "";
-  const isGenreSearch = Boolean(searchText) &&
-    availableGenres.some((genre) => genre.toLocaleLowerCase("ru") === searchText.toLocaleLowerCase("ru") || displayGenre(genre, language).toLocaleLowerCase("en") === searchText.toLocaleLowerCase("en"));
-  useEffect(() => {
-    if (!searchText || isGenreSearch) {
-      setRemoteSearch(null);
-      setSearchLoading(false);
-      return;
-    }
-    let cancelled = false;
-    setRemoteSearch(null);
-    setSearchLoading(true);
-    const timer = window.setTimeout(() => {
-      getShikimoriAnimes({ data: { page: 1, limit: 50, order: "ranked", search: searchText } })
-        .then((result) => {
-          if (!cancelled) setRemoteSearch({ query: searchText, items: result.items, error: result.error });
-        })
-        .catch(() => {
-          if (!cancelled) setRemoteSearch({ query: searchText, items: [], error: t("source.searchError") });
-        })
-        .finally(() => {
-          if (!cancelled) setSearchLoading(false);
-        });
-    }, 450);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
+  const availableStatuses = useMemo(() => {
+    const found = new Set(ANIME.map((anime) => anime.status));
+    const order = ["Онгоинг", "Анонс", "Вышел", "Неизвестно"];
+    return Array.from(found).sort((a, b) => order.indexOf(a) - order.indexOf(b));
+  }, [ANIME]);
+  const availableTypes = useMemo(
+    () => Array.from(new Set(ANIME.map((anime) => anime.kind?.trim() || (anime.episodes === 1 ? "Фильм" : "TV"))))
+      .filter(Boolean)
+      .sort((a, b) => a.localeCompare(b, "ru")),
+    [ANIME],
+  );
+  const availableAgeRatings = useMemo(() => {
+    const order = ["Без ограничений", "12+", "16+", "18+"];
+    return Array.from(new Set(ANIME.map((anime) => anime.ageRating).filter((value): value is string => Boolean(value))))
+      .sort((a, b) => order.indexOf(a) - order.indexOf(b));
+  }, [ANIME]);
+  const catalogYearRange = useMemo(() => {
+    const years = ANIME.map((anime) => anime.year).filter((year) => Number.isFinite(year) && year > 0);
+    return {
+      min: years.length ? Math.min(...years) : 1900,
+      max: years.length ? Math.max(...years) : new Date().getFullYear(),
     };
-  }, [searchText, view, isGenreSearch]);
-
-  const searchUniverse = searchText && !isGenreSearch
-    ? remoteSearch?.query === searchText ? remoteSearch.items : []
-    : ANIME;
+  }, [ANIME]);
+  const searchText = view === "catalog" ? catalogQuery.trim() : view === "home" ? submittedQuery.trim() : "";
   const catalogResults = useMemo(() => {
     const q = searchText.toLowerCase();
     const yearFrom = activeFilters.yearFrom.trim() ? Number(activeFilters.yearFrom) : null;
     const yearTo = activeFilters.yearTo.trim() ? Number(activeFilters.yearTo) : null;
-    const filtered = searchUniverse.filter((anime) => {
+    const filtered = ANIME.filter((anime) => {
       const matchesQuery = !q || anime.title.toLowerCase().includes(q) ||
         (anime.englishTitle ?? "").toLowerCase().includes(q) ||
         anime.original.toLowerCase().includes(q) ||
@@ -197,7 +211,7 @@ function Index() {
       if (sortBy === "title") return (language === "en" ? (a.englishTitle || a.original || a.title) : a.title).localeCompare(language === "en" ? (b.englishTitle || b.original || b.title) : b.title, language === "en" ? "en" : "ru");
       return (b.rating ?? -1) - (a.rating ?? -1);
     });
-  }, [searchText, searchUniverse, activeFilters, sortBy, language]);
+  }, [searchText, ANIME, activeFilters, sortBy, language]);
   const catalogPageSize = 20;
   const totalCatalogPages = Math.max(1, Math.ceil(catalogResults.length / catalogPageSize));
   const visibleCatalogResults = catalogResults.slice((catalogPage - 1) * catalogPageSize, catalogPage * catalogPageSize);
@@ -251,7 +265,7 @@ function Index() {
             <h1 className="text-xl font-semibold">{submittedQuery ? `${t("catalog.results")}: «${submittedQuery}»` : t("catalog.filterResults")} <span className="text-muted-foreground">· {catalogResults.length}</span></h1>
             <button onClick={() => { setQuery(""); setSubmittedQuery(""); setDraftFilters(EMPTY_CATALOG_FILTERS); setActiveFilters(EMPTY_CATALOG_FILTERS); setFiltersOpen(false); setCatalogPage(1); }} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"><X className="h-4 w-4" />{t("catalog.reset")}</button>
           </div>
-          <Grid items={catalogResults} onSelect={select} empty={searchLoading ? t("catalog.searchingTitle") : (remoteSearch?.query === submittedQuery.trim() && remoteSearch.error ? t("source.searchError") : t("catalog.noResultsFormal"))} />
+          <Grid items={catalogResults} onSelect={select} empty={t("catalog.noResultsFormal")} />
         </main>
       ) : view === "home" ? (
         <main className="pt-16">
@@ -290,20 +304,34 @@ function Index() {
         <main className="px-4 pt-36 md:px-10 md:pt-24">
           <h1 className="text-2xl font-bold md:text-3xl">{t("catalog.title")}</h1>
           <p className="mt-1 text-sm text-muted-foreground">{t("catalog.subtitle")}</p>
+          {catalogLoadState === "loaded" && (
+            <p className="mt-1 text-xs text-muted-foreground">{t("catalog.loadedCount")} <span className="font-semibold text-foreground">{ANIME.length} / 1 000</span></p>
+          )}
+          {catalogLoadState === "loading" && (
+            <div role="status" className="mt-4 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-muted-foreground">
+              {t("catalog.loading")} <span className="font-semibold text-foreground">{ANIME.length} / 1 000</span>
+            </div>
+          )}
+          {catalogLoadState === "error" && (
+            <div role="alert" className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-400/25 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
+              <span>{t("catalog.loadError")}</span>
+              <button type="button" onClick={() => { catalogLoadStarted.current = false; setCatalogLoadState("idle"); setCatalogLoadAttempt((value) => value + 1); }} className="rounded-lg border border-amber-100/20 px-3 py-1.5 font-semibold hover:bg-amber-100/10">{t("home.retry")}</button>
+            </div>
+          )}
           <div className="relative z-30 mt-5 max-w-xl">
             <div className="flex h-11 items-center rounded-xl border border-white/10 bg-[#171127]/75 shadow-lg shadow-black/10 backdrop-blur-xl focus-within:border-primary/60">
               <Search className="ml-3 h-4 w-4 shrink-0 text-muted-foreground" />
-              <input value={catalogQuery} onChange={(event) => { setCatalogQuery(event.target.value); setCatalogPage(1); }} placeholder={t("search.placeholder")} aria-label={t("catalog.search")} className="h-full min-w-0 flex-1 bg-transparent px-2.5 text-sm outline-none placeholder:text-muted-foreground" />
+              <input value={catalogQuery} onChange={(event) => { setCatalogQuery(event.target.value); setCatalogPage(1); }} disabled={catalogLoadState === "loading"} placeholder={t("search.placeholder")} aria-label={t("catalog.search")} className="h-full min-w-0 flex-1 bg-transparent px-2.5 text-sm outline-none placeholder:text-muted-foreground" />
               {catalogQuery && <button type="button" aria-label={t("search.clear")} onClick={() => { setCatalogQuery(""); setCatalogPage(1); }} className="rounded-full p-1.5 text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>}
-              <button type="button" onClick={() => { setDraftFilters({ ...activeFilters, genres: [...activeFilters.genres] }); setFiltersOpen((open) => !open); }} aria-label={t("filters.open")} aria-expanded={filtersOpen} data-filter-trigger className={`relative mr-1.5 flex h-8 w-9 shrink-0 items-center justify-center rounded-lg transition ${filtersOpen || activeFilterCount ? "bg-primary/20 text-primary" : "text-muted-foreground hover:bg-accent hover:text-foreground"}`}>
+              <button type="button" disabled={catalogLoadState === "loading"} onClick={() => { setDraftFilters({ ...activeFilters, genres: [...activeFilters.genres] }); setFiltersOpen((open) => !open); }} aria-label={t("filters.open")} aria-expanded={filtersOpen} data-filter-trigger className={`relative mr-1.5 flex h-8 w-9 shrink-0 items-center justify-center rounded-lg transition ${filtersOpen || activeFilterCount ? "bg-primary/20 text-primary" : "text-muted-foreground hover:bg-accent hover:text-foreground"}`}>
                 <SlidersHorizontal className="h-4 w-4" />
                 {activeFilterCount > 0 && <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-neon px-1 text-[10px] font-bold text-primary-foreground">{activeFilterCount}</span>}
               </button>
             </div>
-            <CatalogFilters open={filtersOpen} draft={draftFilters} setDraft={setDraftFilters} onApply={applyCatalogFilters} onReset={resetCatalogFilters} genres={availableGenres} />
+            <CatalogFilters open={filtersOpen && catalogLoadState !== "loading"} draft={draftFilters} setDraft={setDraftFilters} onApply={applyCatalogFilters} onReset={resetCatalogFilters} genres={availableGenres} statuses={availableStatuses} types={availableTypes} ageRatings={availableAgeRatings} yearMin={catalogYearRange.min} yearMax={catalogYearRange.max} />
           </div>
           <div className="mb-5 mt-7 flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm text-muted-foreground">{searchLoading ? t("catalog.searching") : <>{t("catalog.found")} <span className="font-semibold text-foreground">{catalogResults.length}</span></>}</p>
+            <p className="text-sm text-muted-foreground">{t("catalog.found")} <span className="font-semibold text-foreground">{catalogResults.length}</span></p>
             <label className="flex h-9 items-center gap-2 rounded-lg border border-border bg-secondary/80 px-3 text-sm">
               <ArrowDownWideNarrow className="h-4 w-4 text-muted-foreground" />
               <span className="text-muted-foreground max-sm:hidden">{t("catalog.sort")}</span>
@@ -313,7 +341,7 @@ function Index() {
               <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
             </label>
           </div>
-          <Grid items={visibleCatalogResults} onSelect={select} empty={searchLoading ? t("catalog.searchingTitle") : (ANIME.length === 0 && apiError ? t("source.catalogUnavailable") : (remoteSearch?.query === catalogQuery.trim() && remoteSearch.error ? t("source.searchError") : t("catalog.noResults")))} />
+          <Grid items={visibleCatalogResults} onSelect={select} empty={ANIME.length === 0 && (apiError || catalogLoadError) ? t("source.catalogUnavailable") : t("catalog.noResults")} />
           {catalogResults.length > 0 && <nav aria-label={t("catalog.pages")} className="mt-8 flex flex-wrap items-center justify-center gap-1.5">
             <button type="button" disabled={catalogPage === 1} onClick={() => { setCatalogPage((page) => Math.max(1, page - 1)); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="h-9 rounded-lg border border-border px-3 text-sm transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-35">{t("catalog.previous")}</button>
             {Array.from({ length: totalCatalogPages }, (_, index) => index + 1)
