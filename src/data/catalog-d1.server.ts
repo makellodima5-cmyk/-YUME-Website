@@ -159,13 +159,20 @@ function rowToAnime(row: AnimeRow): Anime {
     ? (row.status as Anime["status"])
     : "Неизвестно";
 
+  const rawYear = Number(row.year);
+  const year = Number.isInteger(rawYear) && rawYear > 0 ? rawYear : 0;
+  const episodes = Math.max(0, Math.floor(Number(row.episodes) || 0));
+  const rawRating = row.rating == null ? null : Number(row.rating);
+  const rating = rawRating !== null && Number.isFinite(rawRating) && rawRating > 0 && rawRating <= 10
+    ? rawRating
+    : null;
   const anime: Anime = {
     id: String(row.id),
     title: row.title,
     original: row.original_title,
-    year: Number(row.year) || 0,
-    episodes: Math.max(0, Number(row.episodes) || 0),
-    rating: row.rating == null ? null : Number(row.rating),
+    year,
+    episodes,
+    rating,
     genres: parseJsonArray(row.genres_json),
     status,
     description: row.description ?? "",
@@ -173,7 +180,7 @@ function rowToAnime(row: AnimeRow): Anime {
     glyph: row.glyph || "Y",
     isNew: isNewRelease({ status, airedOn: row.aired_on || undefined }),
     popular: Boolean(row.popular),
-    episodesAired: Math.max(0, Number(row.episodes_aired) || 0),
+    episodesAired: Math.max(0, Math.floor(Number(row.episodes_aired) || 0)),
     studios: parseJsonArray(row.studios_json),
   };
 
