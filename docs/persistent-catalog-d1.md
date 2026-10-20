@@ -4,15 +4,15 @@
 
 The repository declares the Worker configuration in `wrangler.jsonc`. It binds the existing D1 database `yume_db` (ID `fb5ba87d-e921-4dde-829e-7b1bddcf123b`) to the runtime name `YUME_DB`, which must match the binding used by the application.
 
-The Cloudflare Vite build produces a generated Worker configuration from this file. Do not edit the generated file in `dist/` by hand; edit `wrangler.jsonc` instead.
+The connected Cloudflare Workers & Pages Git integration builds changes from GitHub and is the intended production deployment path when changes are merged into `main`. The `Cloudflare Worker CI` workflow separately runs the automated test suite, builds the project and verifies that the generated Wrangler configuration contains this D1 binding. It deliberately does not run a second deployment in parallel with Cloudflare's native integration.
 
-For a manual deployment, run:
+For a manual deployment from an authenticated developer machine, run:
 
 ```sh
-npm run deploy:cloudflare
+bun run deploy:cloudflare
 ```
 
-The command requires Cloudflare Wrangler authentication. For GitHub Actions deployment, configure repository Actions secrets named `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. The workflow builds and checks the Cloudflare output on pull requests; it deploys from `main` only when both secrets are present. Never commit an API token.
+The command requires Wrangler authentication with the intended Cloudflare account. Never commit an API token to the repository.
 
 ## First initialization
 
@@ -29,7 +29,7 @@ The SQL schema is also tracked in `migrations/0001_create_anime_catalog.sql`. Th
 ## Important constraints
 
 - The catalog is capped at 1,000 records.
-- Search and filters operate on the records already stored in YUME; search terms are not sent to Shikimori.
-- The catalog is not considered live-configured until a Cloudflare deployment with the `YUME_DB` binding has completed and the first seed has succeeded.
+- Search and filters operate on records already stored in YUME; search terms are not sent to Shikimori.
+- The catalog is not considered live-configured until the Cloudflare deployment with the `YUME_DB` binding has completed and the first seed has succeeded.
 - The image files themselves are not stored in D1; YUME stores artwork URLs and the browser fetches images from their hosts.
 - A successful build verifies the Worker artifact and binding configuration, but it does not prove that the production D1 database is accessible or that the initial 1,000-record seed has completed. Confirm both in the deployed Worker logs after the first request.
