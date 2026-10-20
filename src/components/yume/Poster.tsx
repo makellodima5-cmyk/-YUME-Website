@@ -50,10 +50,12 @@ export function AnimeCard({ anime, onSelect }: { anime: Anime; onSelect: (a: Ani
     >
       <div className="relative aspect-[2/3] overflow-hidden rounded-xl ring-1 ring-border transition duration-300 group-hover:-translate-y-1 group-hover:shadow-neon group-focus-visible:ring-2 group-focus-visible:ring-ring">
         <PosterArt anime={anime} className="h-full w-full transition duration-500 group-hover:scale-105" />
-        <div className="absolute left-2 top-2 flex items-center gap-1 rounded-full glass px-2 py-0.5 text-xs font-semibold">
-          <Star className="h-3 w-3 fill-gold text-gold" />
-          {anime.rating.toFixed(1)}
-        </div>
+        {anime.rating !== null && (
+          <div className="absolute left-2 top-2 flex items-center gap-1 rounded-full glass px-2 py-0.5 text-xs font-semibold">
+            <Star className="h-3 w-3 fill-gold text-gold" />
+            {anime.rating.toFixed(1)}
+          </div>
+        )}
         {anime.isNew && (
           <div className="absolute right-2 top-2 rounded-full bg-neon px-2 py-0.5 text-[10px] font-bold uppercase text-primary-foreground">
             {t("anime.new")}
