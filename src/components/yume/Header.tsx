@@ -1,5 +1,5 @@
 import { useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
-import { Home, LayoutGrid, Library, User, Menu, X, Bell, Settings, Moon, Sun, ShieldCheck, Heart, Clock3, CalendarDays, Star } from "lucide-react";
+import { Home, LayoutGrid, Library, User, Menu, X, Bell, Settings, Moon, Sun, ShieldCheck, Heart, Clock3, Star } from "lucide-react";
 import { Logo } from "./Logo";
 import { useYumePreferences, type TranslationKey } from "@/data/preferences";
 
