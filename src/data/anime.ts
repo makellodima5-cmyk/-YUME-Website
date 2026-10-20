@@ -22,6 +22,7 @@ export type Anime = {
   episodesAired?: number;
   airedOn?: string;
   studios?: string[];
+  youtubeTrailerId?: string;
 };
 
 export const ANIME: Anime[] = [
