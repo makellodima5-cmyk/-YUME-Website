@@ -1,6 +1,6 @@
-import { useRef } from "react";
+import { useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
-import { Check, ChevronDown, SlidersHorizontal } from "lucide-react";
+import { Check, ChevronDown, SlidersHorizontal, X } from "lucide-react";
 import { ALL_GENRES } from "@/data/anime";
 import { useYumePreferences, displayGenre, displayAnimeKind, displayAnimeStatus } from "@/data/preferences";
 
@@ -31,6 +31,7 @@ type Props = {
   setDraft: (value: CatalogFiltersValue) => void;
   onApply: () => void;
   onReset: () => void;
+  onClose?: () => void;
   genres?: string[];
   statuses?: string[];
   types?: string[];
@@ -48,6 +49,7 @@ export function CatalogFilters({
   setDraft,
   onApply,
   onReset,
+  onClose,
   placement = "catalog",
   genres = ALL_GENRES,
   statuses = ["Вышел", "Онгоинг", "Анонс"],
@@ -58,6 +60,31 @@ export function CatalogFilters({
 }: Props) {
   const { t, language } = useYumePreferences();
   const panelRef = useRef<HTMLDivElement>(null);
+  const [positionStyle, setPositionStyle] = useState<CSSProperties>({});
+
+  // Capture the anchor's viewport coordinates once when the panel opens.
+  // Keep those coordinates as the page scrolls, rather than scrolling the panel
+  // together with the hero/catalog content.
+  useLayoutEffect(() => {
+    if (!open || typeof window === "undefined") return;
+    const trigger = document.querySelector<HTMLElement>('[data-filter-trigger][aria-expanded="true"]');
+    const anchor = trigger?.closest<HTMLElement>("[data-filter-anchor]") ?? trigger;
+    const rect = anchor?.getBoundingClientRect();
+    const viewportWidth = window.visualViewport?.width ?? window.innerWidth;
+    const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+    const safeTop = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--safe-area-inset-top")) || 0;
+    const width = Math.min(440, Math.max(240, viewportWidth - 24), rect?.width || 440);
+    const left = Math.max(12, Math.min(rect?.left ?? 12, viewportWidth - width - 12));
+    const requestedTop = rect ? rect.bottom + 8 : safeTop + 80;
+    const top = Math.max(safeTop + 8, Math.min(requestedTop, viewportHeight - 160));
+    setPositionStyle({
+      position: "fixed",
+      top,
+      left,
+      width,
+      maxHeight: Math.max(150, viewportHeight - top - 12),
+    });
+  }, [open, placement]);
 
   if (!open) return null;
 
@@ -68,14 +95,13 @@ export function CatalogFilters({
       : [...draft.genres, genre],
   });
 
-  const panelPosition = placement === "home"
-    ? "fixed left-3 right-3 top-[calc(env(safe-area-inset-top)+136px)] z-[100] mx-auto max-h-[calc(100dvh-env(safe-area-inset-top)-152px)] overflow-y-auto sm:left-8 sm:right-auto sm:top-[calc(env(safe-area-inset-top)+136px)]"
-    : "absolute right-0 top-full z-40 mt-2 max-h-[calc(100dvh-180px)] overflow-y-auto";
-
   const panel = (
-    <div ref={panelRef} className={`${panelPosition} w-[min(calc(100vw-1.5rem),440px)] rounded-2xl border border-border bg-popover p-3 text-popover-foreground shadow-2xl shadow-black/25 sm:p-4`} role="dialog" aria-label={t("filters.dialogLabel")} data-catalog-filter-panel>
-      <div className="mb-3 flex items-center justify-between">
+    <div ref={panelRef} style={positionStyle} className="fixed z-[100] overflow-y-auto overscroll-contain rounded-2xl border border-border bg-popover p-3 text-popover-foreground shadow-2xl shadow-black/25 sm:p-4" role="dialog" aria-label={t("filters.dialogLabel")} data-catalog-filter-panel>
+      <div className="mb-3 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-sm font-semibold"><SlidersHorizontal className="h-4 w-4 text-primary" /> {t("filters.title")}</div>
+        <button type="button" onClick={onClose} aria-label={t("nav.closeMenu")} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-accent hover:text-foreground">
+          <X className="h-4 w-4" />
+        </button>
       </div>
 
       <div className="mb-3">
@@ -121,10 +147,8 @@ export function CatalogFilters({
     </div>
   );
 
-  // The hero card clips artwork; move its filter panel outside that overflow context
-  // so the full genre menu remains visible on mobile Safari.
-  if (placement === "home" && typeof document !== "undefined") {
-    return createPortal(panel, document.body);
-  }
+  // Render both home and catalog filters at the document root to avoid clipping
+  // and to keep the panel at its captured viewport position during page scrolling.
+  if (typeof document !== "undefined") return createPortal(panel, document.body);
   return panel;
 }
