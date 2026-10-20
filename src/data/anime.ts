@@ -8,7 +8,7 @@ export type Anime = {
   episodes: number;
   rating: number | null;
   genres: string[];
-  status: "Онгоинг" | "Вышел" | "Анонс";
+  status: "Онгоинг" | "Вышел" | "Анонс" | "Неизвестно";
   description: string;
   hue: number; // poster gradient hue
   glyph: string; // kanji on poster
