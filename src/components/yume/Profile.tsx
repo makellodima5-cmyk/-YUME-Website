@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import type { Anime } from "@/data/anime";
 import { getShikimoriAnimes } from "@/data/shikimori";
-import { displayAnimeTitle, displayGenre, useYumePreferences } from "@/data/preferences";
+import { displayAnimeTitle, useYumePreferences } from "@/data/preferences";
 import { PosterArt } from "./Poster";
 import { Grid } from "./Sections";
 import {
