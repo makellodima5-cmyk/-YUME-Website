@@ -183,7 +183,7 @@ function Index() {
       const matchesStatus = activeFilters.status === "Любой" || anime.status === activeFilters.status;
       const matchesFrom = yearFrom === null || anime.year >= yearFrom;
       const matchesTo = yearTo === null || anime.year <= yearTo;
-      const matchesRating = anime.rating >= activeFilters.minRating;
+      const matchesRating = activeFilters.minRating === 0 || (anime.rating !== null && anime.rating >= activeFilters.minRating);
       const animeType = anime.kind || (anime.episodes === 1 ? "Фильм" : "TV");
       const matchesType = activeFilters.type === "Любой" || animeType === activeFilters.type;
       const ageRating = anime.ageRating;
@@ -192,10 +192,10 @@ function Index() {
         matchesRating && matchesType && matchesAge;
     });
     return filtered.sort((a, b) => {
-      if (sortBy === "newest") return b.year - a.year || b.rating - a.rating;
-      if (sortBy === "oldest") return a.year - b.year || b.rating - a.rating;
+      if (sortBy === "newest") return b.year - a.year || (b.rating ?? -1) - (a.rating ?? -1);
+      if (sortBy === "oldest") return a.year - b.year || (b.rating ?? -1) - (a.rating ?? -1);
       if (sortBy === "title") return (language === "en" ? (a.englishTitle || a.original || a.title) : a.title).localeCompare(language === "en" ? (b.englishTitle || b.original || b.title) : b.title, language === "en" ? "en" : "ru");
-      return b.rating - a.rating;
+      return (b.rating ?? -1) - (a.rating ?? -1);
     });
   }, [searchText, searchUniverse, activeFilters, sortBy, language]);
   const catalogPageSize = 20;
@@ -223,11 +223,11 @@ function Index() {
   const activeCollection = COLLECTIONS.find((c) => c.id === collection);
   const activeCollectionAnime = activeCollection
     ? ANIME.filter((anime) => activeCollection.genres.some((genre) => anime.genres.includes(genre)))
-        .sort((a, b) => b.rating - a.rating)
+        .sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1))
     : [];
   const popularCards = (popularAnime.length ? popularAnime : ANIME)
-    .filter((anime) => anime.rating > 0)
-    .sort((a, b) => b.rating - a.rating)
+    .filter((anime) => anime.rating !== null)
+    .sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1))
     .slice(0, 12);
   const newReleaseCards = (recentAnime.length ? recentAnime : ANIME.filter((anime) => anime.isNew || anime.status === "Онгоинг"))
     .slice()
