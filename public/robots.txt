@@ -1,2 +1,4 @@
 User-agent: *
 Allow: /
+
+Sitemap: https://yume-website-kappa.vercel.app/sitemap.xml
