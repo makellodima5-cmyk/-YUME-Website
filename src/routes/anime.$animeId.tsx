@@ -92,6 +92,7 @@ function AnimeDetailPage() {
   const [inList, setInList] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
   const [showListNote, setShowListNote] = useState(false);
+  const [watchMode, setWatchMode] = useState<"trailer" | "episodes">("trailer");
 
   useEffect(() => {
     if (anime) document.title = displayAnimeTitle(anime, language) + (language === "en" ? " — watch anime | YUME" : " — смотреть аниме | YUME");
@@ -388,8 +389,35 @@ function AnimeDetailPage() {
               </span>
             </div>
 
+            <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label={language === "en" ? "Viewing mode" : "Режим просмотра"}>
+              <button
+                type="button"
+                onClick={() => setWatchMode("trailer")}
+                aria-pressed={watchMode === "trailer"}
+                className={"rounded-full border px-4 py-2 text-sm font-semibold transition " + (watchMode === "trailer" ? "border-primary/60 bg-secondary text-foreground shadow-[0_0_18px_rgba(207,95,255,0.12)]" : "border-border bg-card text-muted-foreground hover:bg-accent hover:text-foreground")}
+              >
+                {language === "en" ? "Trailer" : "Трейлер"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setWatchMode("episodes")}
+                aria-pressed={watchMode === "episodes"}
+                className={"rounded-full border px-4 py-2 text-sm font-semibold transition " + (watchMode === "episodes" ? "border-primary/60 bg-secondary text-foreground" : "border-border bg-card text-muted-foreground hover:bg-accent hover:text-foreground")}
+              >
+                {language === "en" ? "Watch anime" : "Смотреть аниме"}
+              </button>
+            </div>
             <div className="mx-auto w-full max-w-6xl min-w-0">
-              {anime.youtubeTrailerId ? (
+              {watchMode === "episodes" ? (
+                <div className="relative mx-auto flex aspect-video w-full min-w-0 flex-col items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-[#080710] p-5 text-center sm:min-h-[300px] lg:min-h-[420px]" style={{ background: "radial-gradient(ellipse at 50% 40%, oklch(0.19 0.08 " + anime.hue + ") 0%, #080710 63%)" }}>
+                  <div aria-hidden="true" className="mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-primary/35 bg-primary/10 text-primary">
+                    <CirclePlay className="h-9 w-9" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-white">{language === "en" ? "Episode player is not connected yet" : "Плеер для серий пока не подключён"}</h3>
+                  <p className="mt-2 max-w-md text-sm leading-relaxed text-white/60">{language === "en" ? "This viewing mode is prepared for the future player. No fake playback is started." : "Этот режим подготовлен для будущего плеера. Воспроизведение не имитируется."}</p>
+                  <button type="button" onClick={() => setWatchMode("trailer")} className="mt-5 rounded-full border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/10">{language === "en" ? "Back to trailer" : "Вернуться к трейлеру"}</button>
+                </div>
+              ) : anime.youtubeTrailerId ? (
                 <div className="relative mx-auto aspect-video w-full min-w-0 overflow-hidden rounded-2xl border border-white/10 bg-[#080710] shadow-2xl">
                   <iframe
                     title={displayAnimeTitle(anime, language) + " — " + t("anime.trailerTitle")}
