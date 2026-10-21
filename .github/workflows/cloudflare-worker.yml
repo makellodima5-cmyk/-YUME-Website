@@ -32,6 +32,9 @@ jobs:
       - name: Run automated tests
         run: bun run test
 
+      - name: Run lint
+        run: bun run lint
+
       - name: Build Cloudflare Worker
         run: bun run build
 
