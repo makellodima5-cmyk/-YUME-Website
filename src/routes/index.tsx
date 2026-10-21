@@ -423,29 +423,27 @@ function Index() {
       });
   }, [needsFullCatalog, catalogLoadAttempt, catalogLoadState, t]);
   const writeCatalogUrl = (overrides: { q?: string; page?: number; sort?: string; genres?: string; status?: string; from?: number; to?: number; rating?: number; kind?: string; age?: string } = {}) => {
-    const filters = overrides.genres !== undefined || overrides.status !== undefined || overrides.from !== undefined || overrides.to !== undefined || overrides.rating !== undefined || overrides.kind !== undefined || overrides.age !== undefined
-      ? overrides
-      : {
-          genres: activeFilters.genres.join(",") || undefined,
-          status: activeFilters.status !== EMPTY_CATALOG_FILTERS.status ? activeFilters.status : undefined,
-          from: activeFilters.yearFrom.trim() ? Number(activeFilters.yearFrom) : undefined,
-          to: activeFilters.yearTo.trim() ? Number(activeFilters.yearTo) : undefined,
-          rating: activeFilters.minRating || undefined,
-          kind: activeFilters.type !== EMPTY_CATALOG_FILTERS.type ? activeFilters.type : undefined,
-          age: activeFilters.ageRating !== EMPTY_CATALOG_FILTERS.ageRating ? activeFilters.ageRating : undefined,
-        };
+    const has = (key: keyof typeof overrides) => Object.prototype.hasOwnProperty.call(overrides, key);
+    const genres = has("genres") ? overrides.genres : activeFilters.genres.join(",") || undefined;
+    const status = has("status") ? overrides.status : activeFilters.status !== EMPTY_CATALOG_FILTERS.status ? activeFilters.status : undefined;
+    const from = has("from") ? overrides.from : activeFilters.yearFrom.trim() ? Number(activeFilters.yearFrom) : undefined;
+    const to = has("to") ? overrides.to : activeFilters.yearTo.trim() ? Number(activeFilters.yearTo) : undefined;
+    const rating = has("rating") ? overrides.rating : activeFilters.minRating || undefined;
+    const kind = has("kind") ? overrides.kind : activeFilters.type !== EMPTY_CATALOG_FILTERS.type ? activeFilters.type : undefined;
+    const age = has("age") ? overrides.age : activeFilters.ageRating !== EMPTY_CATALOG_FILTERS.ageRating ? activeFilters.ageRating : undefined;
+    const q = has("q") ? overrides.q : view === "catalog" ? catalogQuery.trim() || undefined : view === "home" ? submittedQuery.trim() || undefined : undefined;
     void navigate({ to: "/", replace: true, search: {
       section: view,
-      q: overrides.q ?? (view === "catalog" ? catalogQuery.trim() : view === "home" ? submittedQuery.trim() : undefined) || undefined,
+      q: q || undefined,
       page: overrides.page ?? catalogPage,
-      sort: overrides.sort ?? (sortBy !== "rating" ? sortBy : undefined),
-      genres: filters.genres || undefined,
-      status: filters.status || undefined,
-      from: filters.from || undefined,
-      to: filters.to || undefined,
-      rating: filters.rating || undefined,
-      kind: filters.kind || undefined,
-      age: filters.age || undefined,
+      sort: has("sort") ? overrides.sort : sortBy !== "rating" ? sortBy : undefined,
+      genres: genres || undefined,
+      status: status || undefined,
+      from: from || undefined,
+      to: to || undefined,
+      rating: rating || undefined,
+      kind: kind || undefined,
+      age: age || undefined,
     } });
   };
   const submitHomeSearch = () => {
