@@ -42,6 +42,7 @@ jobs:
           src/data/profile-storage.ts
           src/routes/__root.tsx
           src/components/yume/AnimeModal.tsx
+          src/components/yume/Profile.tsx
           src/routes/index.tsx
           'src/routes/anime.$animeId.tsx'
           'src/routes/sitemap[.]xml.ts'
