@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { mapAnime, retryAfterMilliseconds, validateRequest, youtubeVideoId } from "@/data/shikimori";
+import {
+  mapAnime,
+  parseShikimoriResponse,
+  retryAfterMilliseconds,
+  validateRequest,
+  youtubeVideoId,
+} from "@/data/shikimori";
 
 describe("Shikimori request validation", () => {
   it("clamps page and limit and falls back from unsupported query options", () => {
@@ -22,6 +28,34 @@ describe("Shikimori request validation", () => {
     expect(retryAfterMilliseconds("")).toBeNull();
     expect(retryAfterMilliseconds("not a date")).toBeNull();
     expect(retryAfterMilliseconds(new Date(Date.now() + 5000).toUTCString())).toBeGreaterThan(0);
+  });
+});
+
+describe("Shikimori GraphQL responses", () => {
+  it("treats a valid empty response as an empty result, not an exception", () => {
+    expect(parseShikimoriResponse({ data: { animes: [] } })).toEqual({ items: [], error: null });
+    expect(parseShikimoriResponse({ data: { animes: null } })).toEqual({ items: [], error: null });
+    expect(parseShikimoriResponse({})).toEqual({ items: [], error: null });
+  });
+
+  it("returns upstream GraphQL errors without leaking partial items", () => {
+    expect(parseShikimoriResponse({
+      data: { animes: [{ id: "1", name: "partial" }] },
+      errors: [{ message: "Rate limit" }, { message: "Unavailable" }],
+    })).toEqual({ items: [], error: "Rate limit; Unavailable" });
+  });
+
+  it("filters excluded hentai genres from catalog results", () => {
+    const result = parseShikimoriResponse({
+      data: {
+        animes: [
+          { id: "1", name: "Allowed", genres: [{ id: "1", name: "Drama", russian: "Драма", kind: "genre" }] },
+          { id: "2", name: "Excluded", genres: [{ id: "2", name: "Hentai", russian: "Хентай", kind: "genre" }] },
+        ],
+      },
+    });
+    expect(result.error).toBeNull();
+    expect(result.items.map((anime) => anime.id)).toEqual(["1"]);
   });
 });
 
