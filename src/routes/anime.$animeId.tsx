@@ -133,7 +133,7 @@ function AnimeDetailPage() {
           setView={navigateToSection}
           onProfile={() => navigateToSection("profile")}
         />
-        <main className="px-4 pt-28 md:px-10 md:pt-32">
+        <main id="main-content" className="px-4 pt-28 md:px-10 md:pt-32">
           <div className="mx-auto max-w-3xl rounded-3xl border border-border bg-card p-8 text-center">
             <h1 className="text-2xl font-bold">{t("anime.notFound")}</h1>
             <p className="mt-2 text-sm text-muted-foreground">
@@ -235,7 +235,7 @@ function AnimeDetailPage() {
         onProfile={() => navigateToSection("profile")}
       />
 
-      <main className="px-4 pt-24 md:px-10 md:pt-28">
+      <main id="main-content" className="px-4 pt-24 md:px-10 md:pt-28">
         <div className="mx-auto max-w-screen-2xl">
           <button
             type="button"
