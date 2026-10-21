@@ -5,6 +5,7 @@ import { COLLECTIONS, type Anime } from "@/data/anime";
 import { getShikimoriCatalog } from "@/data/shikimori";
 import { getExactReleaseDate, isNewRelease, isUpcomingAnnouncement } from "@/data/anime-sections";
 import { Header, type View } from "@/components/yume/Header";
+import { AuthPage } from "@/components/yume/AuthPage";
 import { AnimeCard } from "@/components/yume/Poster";
 import { CollectionsGrid, Grid, Hero, Row } from "@/components/yume/Sections";
 import { CatalogFilters, EMPTY_CATALOG_FILTERS, type CatalogFiltersValue } from "@/components/yume/CatalogFilters";
@@ -488,8 +489,8 @@ function Index() {
   const visibleAiringAnime = airingAnime.slice((airingPage - 1) * catalogPageSize, airingPage * catalogPageSize);
   return (
     <div className="min-h-screen pb-8">
-      <Header view={view} setView={setView} onProfile={() => setView("profile")} />
-      {apiError && (
+      <Header view={view} setView={setView} onProfile={() => setView("login")} />
+      {apiError && !["login", "register", "privacy-policy"].includes(view) && (
         <div role="alert" className="mx-4 mt-20 rounded-xl border border-amber-400/25 bg-amber-400/10 px-4 py-3 text-sm text-amber-100 md:mx-10">
           {t("source.errorBanner")}
         </div>
@@ -515,6 +516,13 @@ function Index() {
             </>
           )}
         </main>
+      ) : view === "login" || view === "register" ? (
+        <AuthPage
+          mode={view}
+          language={language}
+          onModeChange={(mode) => setView(mode)}
+          onPrivacy={() => setView("privacy-policy")}
+        />
       ) : view === "home" ? (
         <main id="main-content" className="pt-16">
           <Hero onCatalog={() => setView("catalog")} onRandom={random} query={query} setQuery={setQuery} onSubmitSearch={submitHomeSearch} filtersOpen={filtersOpen && (!needsFullCatalog || catalogLoadState === "loaded" || catalogLoadState === "error")} setFiltersOpen={setFiltersOpen} draftFilters={draftFilters} setDraftFilters={setDraftFilters} onApplyFilters={applyCatalogFilters} onResetFilters={resetCatalogFilters} activeFilterCount={activeFilterCount} genres={availableGenres} statuses={availableStatuses} types={availableTypes} ageRatings={availableAgeRatings} yearMin={catalogYearRange.min} yearMax={catalogYearRange.max} />
@@ -713,13 +721,15 @@ function Index() {
         <Profile key="watchlist" initialPanel="watchlist" animeList={ANIME} onSelect={select} onCatalog={() => setView("catalog")} />
       ) : view === "privacy" ? (
         <Profile key="privacy" initialPanel="documents" animeList={ANIME} onSelect={select} onCatalog={() => setView("catalog")} />
+      ) : view === "privacy-policy" ? (
+        <Profile key="privacy-policy" initialPanel="privacy" animeList={ANIME} onSelect={select} onCatalog={() => setView("catalog")} />
       ) : view === "history" ? (
         <main id="main-content" className="px-4 pt-24 md:px-10 md:pt-24">
           <h1 className="mb-3 text-2xl font-bold md:text-3xl">{t("history.title")}</h1>
           <p className="rounded-2xl border border-dashed border-border bg-card/40 px-5 py-8 text-sm text-muted-foreground">{t("history.empty")}</p>
         </main>
       ) : null}
-      <footer className="mt-16 px-4 text-center text-xs text-muted-foreground md:px-10">{t("footer.source")}</footer>
+      {!["login", "register"].includes(view) && <footer className="mt-16 px-4 text-center text-xs text-muted-foreground md:px-10">{t("footer.source")}</footer>}
     </div>
   );
 }
