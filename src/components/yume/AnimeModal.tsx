@@ -50,7 +50,7 @@ export function AnimeModal({ anime, note, onClose }: { anime: Anime | null; note
   if (!anime) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-background/80 backdrop-blur-sm md:items-center" onClick={onClose} role="presentation">
-      <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="anime-modal-title" onClick={(e) => e.stopPropagation()} className="relative w-full max-w-3xl overflow-hidden rounded-t-3xl bg-popover ring-1 ring-border animate-in fade-in slide-in-from-bottom-4 md:rounded-3xl">
+      <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="anime-modal-title" onClick={(e) => e.stopPropagation()} className="relative max-h-[calc(100dvh-1rem)] w-full max-w-3xl overflow-x-hidden overflow-y-auto rounded-t-3xl bg-popover ring-1 ring-border animate-in fade-in slide-in-from-bottom-4 md:rounded-3xl">
         <button onClick={onClose} aria-label="Закрыть" className="absolute right-4 top-4 z-10 rounded-full glass p-2 ring-1 ring-border hover:bg-accent">
           <X className="h-4 w-4" />
         </button>
