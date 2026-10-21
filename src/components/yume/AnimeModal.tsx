@@ -1,21 +1,56 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Bookmark, Play, Star, X } from "lucide-react";
 import type { Anime } from "@/data/anime";
 import { PosterArt } from "./Poster";
 
 export function AnimeModal({ anime, note, onClose }: { anime: Anime | null; note?: string | undefined; onClose: () => void }) {
   const [msg, setMsg] = useState<string | null>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const restoreFocusRef = useRef<HTMLElement | null>(null);
   useEffect(() => {
     setMsg(null);
     if (!anime) return;
-    const k = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", k);
-    return () => window.removeEventListener("keydown", k);
+
+    restoreFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const focusableSelector = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+    const focusableElements = () => Array.from(
+      dialogRef.current?.querySelectorAll<HTMLElement>(focusableSelector) ?? [],
+    );
+    (focusableElements()[0] ?? dialogRef.current)?.focus();
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+        return;
+      }
+      if (event.key !== "Tab") return;
+
+      const elements = focusableElements();
+      const first = elements[0];
+      const last = elements[elements.length - 1];
+      if (!first || !last) {
+        event.preventDefault();
+        dialogRef.current?.focus();
+      } else if (event.shiftKey && (document.activeElement === first || document.activeElement === dialogRef.current)) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      restoreFocusRef.current?.focus();
+      restoreFocusRef.current = null;
+    };
   }, [anime, onClose]);
   if (!anime) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-background/80 backdrop-blur-sm md:items-center" onClick={onClose} role="dialog" aria-modal="true" aria-label={anime.title}>
-      <div onClick={(e) => e.stopPropagation()} className="relative w-full max-w-3xl overflow-hidden rounded-t-3xl bg-popover ring-1 ring-border animate-in fade-in slide-in-from-bottom-4 md:rounded-3xl">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-background/80 backdrop-blur-sm md:items-center" onClick={onClose} role="presentation">
+      <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="anime-modal-title" onClick={(e) => e.stopPropagation()} className="relative w-full max-w-3xl overflow-hidden rounded-t-3xl bg-popover ring-1 ring-border animate-in fade-in slide-in-from-bottom-4 md:rounded-3xl">
         <button onClick={onClose} aria-label="Закрыть" className="absolute right-4 top-4 z-10 rounded-full glass p-2 ring-1 ring-border hover:bg-accent">
           <X className="h-4 w-4" />
         </button>
@@ -23,7 +58,7 @@ export function AnimeModal({ anime, note, onClose }: { anime: Anime | null; note
           <PosterArt anime={anime} className="mx-auto aspect-[2/3] w-40 shrink-0 rounded-xl ring-1 ring-border md:w-52" />
           <div className="flex-1">
             {note && <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-magenta">{note}</div>}
-            <h2 className="text-2xl font-bold">{anime.title}</h2>
+            <h2 id="anime-modal-title" className="break-words text-2xl font-bold">{anime.title}</h2>
             <div className="text-sm text-muted-foreground">{anime.original}</div>
             <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
               <span className="flex items-center gap-1 rounded-full bg-secondary px-2.5 py-1 font-semibold"><Star className="h-3 w-3 fill-gold text-gold" />{anime.rating.toFixed(1)}</span>
@@ -43,7 +78,7 @@ export function AnimeModal({ anime, note, onClose }: { anime: Anime | null; note
                 <Bookmark className="h-4 w-4" /> В список
               </button>
             </div>
-            {msg && <div className="mt-4 rounded-xl bg-accent/60 px-4 py-2.5 text-sm">{msg}</div>}
+            {msg && <div className="mt-4 rounded-xl bg-accent/60 px-4 py-2.5 text-sm" role="status" aria-live="polite">{msg}</div>}
           </div>
         </div>
       </div>
