@@ -12,7 +12,8 @@ import { useEffect, useState, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
-import { YumePreferencesProvider } from "@/data/preferences";
+import { YumePreferencesProvider, useYumePreferences } from "@/data/preferences";
+import { DEFAULT_META_DESCRIPTION, SITE_NAME } from "@/data/seo";
 
 type InterfaceLanguage = "ru" | "en";
 
@@ -100,8 +101,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "YUME" },
-      { name: "description", content: "YUME — аниме-платформа" },
+      { title: "YUME — смотри аниме онлайн" },
+      { name: "description", content: DEFAULT_META_DESCRIPTION },
+      { property: "og:site_name", content: SITE_NAME },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
@@ -136,6 +140,23 @@ function RootShell({ children }: { children: ReactNode }) {
   );
 }
 
+function DocumentLanguageSync() {
+  const { language } = useYumePreferences();
+  useEffect(() => {
+    document.documentElement.lang = language;
+  }, [language]);
+  return null;
+}
+
+function SkipToContent() {
+  const { language } = useYumePreferences();
+  return (
+    <a className="skip-to-content" href="#main-content">
+      {language === "en" ? "Skip to main content" : "Перейти к основному содержимому"}
+    </a>
+  );
+}
+
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
@@ -143,6 +164,8 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <YumePreferencesProvider>
+        <DocumentLanguageSync />
+        <SkipToContent />
         <Outlet />
       </YumePreferencesProvider>
     </QueryClientProvider>
