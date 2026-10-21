@@ -133,9 +133,6 @@ export function AuthPage({ mode, language, onModeChange, onPrivacy }: Props) {
             </>
           ) : (
             <>
-              <div className="my-5 flex items-center gap-3 text-xs text-muted-foreground">
-                <span className="h-px flex-1 bg-border" /><span>{copy.or}</span><span className="h-px flex-1 bg-border" />
-              </div>
               <form onSubmit={submitRegistration} className="space-y-5">
                 <fieldset>
                   <legend className="mb-1.5 flex items-center gap-2 text-sm font-semibold">
@@ -147,11 +144,23 @@ export function AuthPage({ mode, language, onModeChange, onPrivacy }: Props) {
                       <option value="">{copy.day}</option>
                       {Array.from({ length: daysInMonth }, (_, index) => index + 1).map((value) => <option key={value} value={value}>{value}</option>)}
                     </select>
-                    <select required aria-label={copy.month} value={month} onChange={(event) => { setMonth(event.target.value); setRegistrationMessage(""); }} className="h-11 min-w-0 rounded-xl border border-border bg-background px-2 text-sm text-foreground outline-none focus:border-primary">
+                    <select required aria-label={copy.month} value={month} onChange={(event) => {
+                        const nextMonth = event.target.value;
+                        const maxDay = nextMonth && year ? new Date(Number(year), Number(nextMonth), 0).getDate() : 31;
+                        if (day && Number(day) > maxDay) setDay("");
+                        setMonth(nextMonth);
+                        setRegistrationMessage("");
+                      }} className="h-11 min-w-0 rounded-xl border border-border bg-background px-2 text-sm text-foreground outline-none focus:border-primary">
                       <option value="">{copy.month}</option>
                       {months.map((value, index) => <option key={value} value={index + 1}>{value}</option>)}
                     </select>
-                    <select required aria-label={copy.year} value={year} onChange={(event) => { setYear(event.target.value); setRegistrationMessage(""); }} className="h-11 min-w-0 rounded-xl border border-border bg-background px-2 text-sm text-foreground outline-none focus:border-primary">
+                    <select required aria-label={copy.year} value={year} onChange={(event) => {
+                        const nextYear = event.target.value;
+                        const maxDay = month && nextYear ? new Date(Number(nextYear), Number(month), 0).getDate() : 31;
+                        if (day && Number(day) > maxDay) setDay("");
+                        setYear(nextYear);
+                        setRegistrationMessage("");
+                      }} className="h-11 min-w-0 rounded-xl border border-border bg-background px-2 text-sm text-foreground outline-none focus:border-primary">
                       <option value="">{copy.year}</option>
                       {years.map((value) => <option key={value} value={value}>{value}</option>)}
                     </select>
