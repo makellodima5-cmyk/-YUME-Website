@@ -16,6 +16,7 @@ import { Header, type View } from "@/components/yume/Header";
 import { AnimeCard, PosterArt } from "@/components/yume/Poster";
 import { useYumePreferences, displayAnimeTitle, displayAnimeStatus, displayGenre, displayAnimeKind } from "@/data/preferences";
 import { FAVORITES_STORAGE_KEY, readSavedAnimeIds, toggleSavedAnimeId, WATCHLIST_STORAGE_KEY } from "@/data/profile-storage";
+import { absoluteImageUrl, canonicalUrl, sanitizeMetaDescription } from "@/data/seo";
 
 function formatAnimeDate(value: string | undefined, language: "ru" | "en", includeTime = false): string | null {
   if (!value) return null;
@@ -67,16 +68,26 @@ export const Route = createFileRoute("/anime/$animeId")({
   },
   head: ({ loaderData }) => {
     const anime = loaderData?.anime;
+    const title = anime ? `${anime.title} — смотреть аниме | YUME` : "Аниме не найдено | YUME";
+    const description = sanitizeMetaDescription(
+      anime?.description,
+      anime ? `Смотри ${anime.title} на YUME — информация, рейтинг, жанры и трейлер аниме.` : "Это аниме не найдено. Открой каталог YUME, чтобы найти другие тайтлы.",
+    );
+    const image = absoluteImageUrl(anime?.bannerUrl ?? anime?.posterUrl);
+    const canonical = anime ? canonicalUrl(`/anime/${encodeURIComponent(anime.id)}`) : canonicalUrl("/");
     return {
       meta: [
-        { title: anime ? anime.title + " — смотреть аниме | YUME" : "Аниме не найдено | YUME" },
-        {
-          name: "description",
-          content: anime
-            ? anime.description
-            : "Anime page not found. Open the YUME catalog.",
-        },
+        { title },
+        { name: "description", content: description },
+        { property: "og:title", content: title },
+        { property: "og:description", content: description },
+        { property: "og:type", content: "video.tv_show" },
+        { property: "og:url", content: canonical },
+        ...(image ? [{ property: "og:image", content: image }, { name: "twitter:image", content: image }] : []),
+        { name: "twitter:card", content: image ? "summary_large_image" : "summary" },
+        { name: "robots", content: anime ? "index,follow" : "noindex,follow" },
       ],
+      links: [{ rel: "canonical", href: canonical }],
     };
   },
   component: AnimeDetailPage,
@@ -250,7 +261,7 @@ function AnimeDetailPage() {
                   <span className="h-1 w-1 rounded-full bg-primary" />
                   <span>{anime.year || t("anime.yearUnknown")}</span>
                 </div>
-                <h1 id="anime-title-desktop" className="max-w-4xl text-3xl font-bold leading-tight lg:text-5xl">
+                <h1 id="anime-title-desktop" className="max-w-4xl break-words text-3xl font-bold leading-tight lg:text-5xl">
                   {displayAnimeTitle(anime, language)}
                 </h1>
                 <p className="mt-2 text-sm text-muted-foreground lg:text-base">{anime.original}</p>
@@ -318,7 +329,7 @@ function AnimeDetailPage() {
                   <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-primary">
                     {displayAnimeStatus(anime.status, language)} · {anime.year || t("anime.yearUnknown")}
                   </div>
-                  <h1 id="anime-title-mobile" className="text-2xl font-bold leading-tight">
+                  <h1 id="anime-title-mobile" className="break-words text-2xl font-bold leading-tight">
                     {displayAnimeTitle(anime, language)}
                   </h1>
                   <p className="mt-1 break-words text-xs text-muted-foreground">{anime.original}</p>
