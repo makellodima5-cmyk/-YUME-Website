@@ -11,6 +11,13 @@ import { CatalogFilters, EMPTY_CATALOG_FILTERS, type CatalogFiltersValue } from 
 import { Profile } from "@/components/yume/Profile";
 import { useYumePreferences, displayGenre, type TranslationKey } from "@/data/preferences";
 
+const parseSearchNumber = (value: unknown): number | undefined => {
+  if (typeof value !== "string" && typeof value !== "number") return undefined;
+  if (typeof value === "string" && !value.trim()) return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+};
+
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
@@ -24,13 +31,13 @@ export const Route = createFileRoute("/")({
   }),
   validateSearch: (search: Record<string, unknown>): { section?: View; q?: string; page?: number; sort?: string; genres?: string; status?: string; from?: number; to?: number; rating?: number; kind?: string; age?: string } => ({
     q: typeof search.q === "string" ? search.q.slice(0, 120) : undefined,
-    page: typeof search.page === "number" && Number.isInteger(search.page) && search.page > 0 ? Math.min(search.page, 10000) : undefined,
+    page: (() => { const value = parseSearchNumber(search.page); return value !== undefined && Number.isInteger(value) && value > 0 ? Math.min(value, 10000) : undefined; })(),
     sort: typeof search.sort === "string" && ["rating", "newest", "oldest", "title"].includes(search.sort) ? search.sort : undefined,
     genres: typeof search.genres === "string" ? search.genres.slice(0, 500) : undefined,
     status: typeof search.status === "string" && ["Любой", "Онгоинг", "Анонс", "Вышел", "Неизвестно"].includes(search.status) ? search.status : undefined,
-    from: typeof search.from === "number" && Number.isInteger(search.from) ? Math.max(1900, Math.min(search.from, 2100)) : undefined,
-    to: typeof search.to === "number" && Number.isInteger(search.to) ? Math.max(1900, Math.min(search.to, 2100)) : undefined,
-    rating: typeof search.rating === "number" && Number.isFinite(search.rating) ? Math.max(0, Math.min(search.rating, 10)) : undefined,
+    from: (() => { const value = parseSearchNumber(search.from); return value !== undefined && Number.isInteger(value) ? Math.max(1900, Math.min(value, 2100)) : undefined; })(),
+    to: (() => { const value = parseSearchNumber(search.to); return value !== undefined && Number.isInteger(value) ? Math.max(1900, Math.min(value, 2100)) : undefined; })(),
+    rating: (() => { const value = parseSearchNumber(search.rating); return value !== undefined ? Math.max(0, Math.min(value, 9)) : undefined; })(),
     kind: typeof search.kind === "string" ? search.kind.slice(0, 80) : undefined,
     age: typeof search.age === "string" ? search.age.slice(0, 30) : undefined,
     section:
@@ -698,7 +705,7 @@ function Index() {
               )}
               <Grid items={visibleCatalogResults} onSelect={select} empty={ANIME.length === 0 && (apiError || catalogLoadError) ? t("source.catalogUnavailable") : t("catalog.noResults")} />
               {catalogResults.length > 0 && <nav aria-label={t("catalog.pages")} className="mt-8 flex flex-wrap items-center justify-center gap-1.5">
-                <button type="button" disabled={catalogPage === 1} onClick={() => { setCatalogPage((page) => { const next = Math.max(1, page - 1); writeCatalogUrl({ page: next }); return next; }); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="h-9 rounded-lg border border-border px-3 text-sm transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-35">{t("catalog.previous")}</button>
+                <button type="button" disabled={catalogPage === 1} onClick={() => { const next = Math.max(1, catalogPage - 1); setCatalogPage(next); writeCatalogUrl({ page: next }); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="h-9 rounded-lg border border-border px-3 text-sm transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-35">{t("catalog.previous")}</button>
                 {Array.from({ length: totalCatalogPages }, (_, index) => index + 1)
                   .filter((page) => page === 1 || page === totalCatalogPages || Math.abs(page - catalogPage) <= 1)
                   .reduce<(number | "ellipsis")[]>((pages, page, index, visible) => {
@@ -709,7 +716,7 @@ function Index() {
                   .map((page, index) => page === "ellipsis"
                     ? <span key={`ellipsis-${index}`} className="px-1 text-muted-foreground">…</span>
                     : <button key={page} type="button" aria-current={catalogPage === page ? "page" : undefined} onClick={() => { setCatalogPage(page); writeCatalogUrl({ page }); window.scrollTo({ top: 0, behavior: "smooth" }); }} className={`h-9 min-w-9 rounded-lg border px-3 text-sm transition ${catalogPage === page ? "border-primary/70 bg-primary/20 text-foreground" : "border-border hover:bg-accent"}`}>{page}</button>)}
-                <button type="button" disabled={catalogPage === totalCatalogPages} onClick={() => { setCatalogPage((page) => { const next = Math.min(totalCatalogPages, page + 1); writeCatalogUrl({ page: next }); return next; }); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="h-9 rounded-lg border border-border px-3 text-sm transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-35">{t("catalog.next")}</button>
+                <button type="button" disabled={catalogPage === totalCatalogPages} onClick={() => { const next = Math.min(totalCatalogPages, catalogPage + 1); setCatalogPage(next); writeCatalogUrl({ page: next }); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="h-9 rounded-lg border border-border px-3 text-sm transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-35">{t("catalog.next")}</button>
               </nav>}
             </>
           )}
