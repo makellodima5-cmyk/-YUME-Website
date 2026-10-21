@@ -12,7 +12,7 @@ const SHIKIMORI_429_COOLDOWN_MS = 60 * 1000;
 const SEED_REQUEST_DELAY_MS = 1250;
 const MAX_SEED_REQUESTS = 20 + (500 - 11 + 1);
 
-function retryAfterMilliseconds(header: string | null): number | null {
+export function retryAfterMilliseconds(header: string | null): number | null {
   if (!header?.trim()) return null;
   const seconds = Number(header.trim());
   if (Number.isFinite(seconds) && seconds >= 0) return Math.max(1000, Math.ceil(seconds * 1000));
@@ -70,6 +70,19 @@ type GraphQLResponse = {
   data?: { animes?: ShikimoriGraphQLAnime[] | null };
   errors?: { message?: string }[];
 };
+
+export function parseShikimoriResponse(payload: GraphQLResponse): { items: Anime[]; error: string | null } {
+  if (payload.errors?.length) {
+    return {
+      items: [],
+      error: payload.errors.map((error) => error.message).filter(Boolean).join("; ") || "Shikimori GraphQL error",
+    };
+  }
+  return {
+    items: (payload.data?.animes ?? []).filter((item) => !hasExcludedGenre(item)).map(mapAnime),
+    error: null,
+  };
+}
 
 const EXCLUDED_GENRE_NAMES = new Set(["хентай", "hentai"]);
 
@@ -174,7 +187,7 @@ function mapAgeRating(value: string | null | undefined): string | undefined {
   }
 }
 
-function youtubeVideoId(value: string | null | undefined): string | undefined {
+export function youtubeVideoId(value: string | null | undefined): string | undefined {
   if (!value?.trim()) return undefined;
   try {
     const url = new URL(value.trim());
@@ -212,7 +225,7 @@ function findYouTubeTrailerId(videos: ShikimoriGraphQLVideo[] | null | undefined
   return candidates[0]?.id;
 }
 
-function mapAnime(item: ShikimoriGraphQLAnime): Anime {
+export function mapAnime(item: ShikimoriGraphQLAnime): Anime {
   const rawYear = Number(item.airedOn?.year ?? item.releasedOn?.year ?? 0);
   const year = Number.isInteger(rawYear) && rawYear > 0 ? rawYear : 0;
   const score = item.score == null || item.score === "" ? null : Number(item.score);
@@ -271,7 +284,7 @@ function mapAnime(item: ShikimoriGraphQLAnime): Anime {
   };
 }
 
-function validateRequest(input: ShikimoriRequest): ShikimoriRequest {
+export function validateRequest(input: ShikimoriRequest): ShikimoriRequest {
   const limit = Math.min(50, Math.max(1, Math.floor(Number(input.limit ?? 50) || 50)));
   const page = Math.min(500, Math.max(1, Math.floor(Number(input.page ?? 1) || 1)));
   const allowedOrders = ["ranked", "popularity", "aired_on", "updated_at_desc", "created_at_desc"];
@@ -350,13 +363,9 @@ async function fetchShikimoriAnimes(data: ShikimoriRequest) {
     }
 
     const payload = (await response.json()) as GraphQLResponse;
-    if (payload.errors?.length) {
-      throw new Error(payload.errors.map((error) => error.message).filter(Boolean).join("; "));
-    }
-
-    const items = (payload.data?.animes ?? [])
-      .filter((item) => !hasExcludedGenre(item))
-      .map(mapAnime);
+    const parsed = parseShikimoriResponse(payload);
+    if (parsed.error) throw new Error(parsed.error);
+    const items = parsed.items;
     responseCache.set(key, { expiresAt: Date.now() + CACHE_TTL_MS, items });
     if (responseCache.size > 160) {
       const now = Date.now();

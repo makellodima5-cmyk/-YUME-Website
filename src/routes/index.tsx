@@ -10,13 +10,8 @@ import { CollectionsGrid, Grid, Hero, Row } from "@/components/yume/Sections";
 import { CatalogFilters, EMPTY_CATALOG_FILTERS, type CatalogFiltersValue } from "@/components/yume/CatalogFilters";
 import { Profile } from "@/components/yume/Profile";
 import { useYumePreferences, displayGenre, type TranslationKey } from "@/data/preferences";
-
-const parseSearchNumber = (value: unknown): number | undefined => {
-  if (typeof value !== "string" && typeof value !== "number") return undefined;
-  if (typeof value === "string" && !value.trim()) return undefined;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : undefined;
-};
+import { filterAndSortCatalog, getCatalogPageCount, paginateCatalog } from "@/data/catalog-utils";
+import { validateCatalogSearch } from "@/data/catalog-search";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -29,23 +24,7 @@ export const Route = createFileRoute("/")({
       { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
-  validateSearch: (search: Record<string, unknown>): { section?: View; q?: string; page?: number; sort?: string; genres?: string; status?: string; from?: number; to?: number; rating?: number; kind?: string; age?: string } => ({
-    q: typeof search.q === "string" ? search.q.slice(0, 120) : undefined,
-    page: (() => { const value = parseSearchNumber(search.page); return value !== undefined && Number.isInteger(value) && value > 0 ? Math.min(value, 10000) : undefined; })(),
-    sort: typeof search.sort === "string" && ["rating", "newest", "oldest", "title"].includes(search.sort) ? search.sort : undefined,
-    genres: typeof search.genres === "string" ? search.genres.slice(0, 500) : undefined,
-    status: typeof search.status === "string" && ["Любой", "Онгоинг", "Анонс", "Вышел", "Неизвестно"].includes(search.status) ? search.status : undefined,
-    from: (() => { const value = parseSearchNumber(search.from); return value !== undefined && Number.isInteger(value) ? Math.max(1900, Math.min(value, 2100)) : undefined; })(),
-    to: (() => { const value = parseSearchNumber(search.to); return value !== undefined && Number.isInteger(value) ? Math.max(1900, Math.min(value, 2100)) : undefined; })(),
-    rating: (() => { const value = parseSearchNumber(search.rating); return value !== undefined ? Math.max(0, Math.min(value, 9)) : undefined; })(),
-    kind: typeof search.kind === "string" ? search.kind.slice(0, 80) : undefined,
-    age: typeof search.age === "string" ? search.age.slice(0, 30) : undefined,
-    section:
-      typeof search.section === "string" &&
-      ["home", "catalog", "collections", "profile", "popular", "new-releases", "announcements", "airing", "favorites", "watchlist", "history", "privacy"].includes(search.section)
-        ? (search.section as View)
-        : undefined,
-  }),
+  validateSearch: validateCatalogSearch,
   loader: async () => {
     // One server-side catalog source powers the homepage as well as the full catalog.
     // When D1 is bound, this reads the persistent records instead of querying Shikimori
@@ -356,38 +335,13 @@ function Index() {
     };
   }, [ANIME]);
   const searchText = view === "catalog" ? catalogQuery.trim() : view === "home" ? submittedQuery.trim() : "";
-  const catalogResults = useMemo(() => {
-    const q = searchText.toLowerCase();
-    const yearFrom = activeFilters.yearFrom.trim() ? Number(activeFilters.yearFrom) : null;
-    const yearTo = activeFilters.yearTo.trim() ? Number(activeFilters.yearTo) : null;
-    const filtered = ANIME.filter((anime) => {
-      const matchesQuery = !q || anime.title.toLowerCase().includes(q) ||
-        (anime.englishTitle ?? "").toLowerCase().includes(q) ||
-        anime.original.toLowerCase().includes(q) ||
-        anime.genres.some((item) => item.toLowerCase().includes(q) || displayGenre(item, language).toLowerCase().includes(q));
-      const matchesGenres = activeFilters.genres.length === 0 ||
-        activeFilters.genres.some((item) => anime.genres.includes(item));
-      const matchesStatus = activeFilters.status === "Любой" || anime.status === activeFilters.status;
-      const matchesFrom = yearFrom === null || anime.year >= yearFrom;
-      const matchesTo = yearTo === null || anime.year <= yearTo;
-      const matchesRating = activeFilters.minRating === 0 || (anime.rating !== null && anime.rating >= activeFilters.minRating);
-      const animeType = anime.kind || (anime.episodes === 1 ? "Фильм" : "TV");
-      const matchesType = activeFilters.type === "Любой" || animeType === activeFilters.type;
-      const ageRating = anime.ageRating;
-      const matchesAge = activeFilters.ageRating === "Любой" || ageRating === activeFilters.ageRating;
-      return matchesQuery && matchesGenres && matchesStatus && matchesFrom && matchesTo &&
-        matchesRating && matchesType && matchesAge;
-    });
-    return filtered.sort((a, b) => {
-      if (sortBy === "newest") return b.year - a.year || (b.rating ?? -1) - (a.rating ?? -1);
-      if (sortBy === "oldest") return a.year - b.year || (b.rating ?? -1) - (a.rating ?? -1);
-      if (sortBy === "title") return (language === "en" ? (a.englishTitle || a.original || a.title) : a.title).localeCompare(language === "en" ? (b.englishTitle || b.original || b.title) : b.title, language === "en" ? "en" : "ru");
-      return (b.rating ?? -1) - (a.rating ?? -1);
-    });
-  }, [searchText, ANIME, activeFilters, sortBy, language]);
+  const catalogResults = useMemo(
+    () => filterAndSortCatalog(ANIME, searchText, activeFilters, sortBy, language, displayGenre),
+    [searchText, activeFilters, sortBy, language],
+  );
   const catalogPageSize = 20;
-  const totalCatalogPages = Math.max(1, Math.ceil(catalogResults.length / catalogPageSize));
-  const visibleCatalogResults = catalogResults.slice((catalogPage - 1) * catalogPageSize, catalogPage * catalogPageSize);
+  const totalCatalogPages = getCatalogPageCount(catalogResults.length, catalogPageSize);
+  const visibleCatalogResults = paginateCatalog(catalogResults, catalogPage, catalogPageSize);
   const activeFilterCount = activeFilters.genres.length +
     Number(activeFilters.status !== "Любой") + Number(activeFilters.yearFrom !== "") +
     Number(activeFilters.yearTo !== "") + Number(activeFilters.minRating > 0) +

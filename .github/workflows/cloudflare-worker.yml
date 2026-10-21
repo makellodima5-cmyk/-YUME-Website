@@ -32,6 +32,20 @@ jobs:
       - name: Run automated tests
         run: bun run test
 
+      - name: Lint changed catalog, storage, and source-data modules
+        run: >-
+          bunx eslint
+          src/data/catalog-utils.ts
+          src/data/catalog-search.ts
+          src/data/shikimori.ts
+          src/data/profile-storage.ts
+          src/routes/index.tsx
+          src/test/catalog-utils.test.ts
+          src/test/catalog-search.test.ts
+          src/test/profile-storage.test.ts
+          src/test/shikimori.test.ts
+          --rule 'prettier/prettier: off'
+
       - name: Build Cloudflare Worker
         run: bun run build
 
