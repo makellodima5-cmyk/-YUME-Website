@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { getShikimoriCatalog } from "@/data/shikimori";
-import { canonicalUrl, SITE_ORIGIN } from "@/data/seo";
+import { canonicalUrl } from "@/data/seo";
 
 function xmlEscape(value: string): string {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
