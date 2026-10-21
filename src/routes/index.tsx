@@ -22,7 +22,17 @@ export const Route = createFileRoute("/")({
       { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
-  validateSearch: (search: Record<string, unknown>): { section?: View } => ({
+  validateSearch: (search: Record<string, unknown>): { section?: View; q?: string; page?: number; sort?: string; genres?: string; status?: string; from?: number; to?: number; rating?: number; kind?: string; age?: string } => ({
+    q: typeof search.q === "string" ? search.q.slice(0, 120) : undefined,
+    page: typeof search.page === "number" && Number.isInteger(search.page) && search.page > 0 ? Math.min(search.page, 10000) : undefined,
+    sort: typeof search.sort === "string" && ["rating", "newest", "oldest", "title"].includes(search.sort) ? search.sort : undefined,
+    genres: typeof search.genres === "string" ? search.genres.slice(0, 500) : undefined,
+    status: typeof search.status === "string" && ["Любой", "Онгоинг", "Анонс", "Вышел", "Неизвестно"].includes(search.status) ? search.status : undefined,
+    from: typeof search.from === "number" && Number.isInteger(search.from) ? Math.max(1900, Math.min(search.from, 2100)) : undefined,
+    to: typeof search.to === "number" && Number.isInteger(search.to) ? Math.max(1900, Math.min(search.to, 2100)) : undefined,
+    rating: typeof search.rating === "number" && Number.isFinite(search.rating) ? Math.max(0, Math.min(search.rating, 10)) : undefined,
+    kind: typeof search.kind === "string" ? search.kind.slice(0, 80) : undefined,
+    age: typeof search.age === "string" ? search.age.slice(0, 30) : undefined,
     section:
       typeof search.section === "string" &&
       ["home", "catalog", "collections", "profile", "popular", "new-releases", "announcements", "airing", "favorites", "watchlist", "history", "privacy"].includes(search.section)
@@ -141,7 +151,7 @@ function Index() {
     document.querySelector('meta[property="og:title"]')?.setAttribute("content", metadata.ogTitle);
     document.querySelector('meta[property="og:description"]')?.setAttribute("content", metadata.ogDescription);
   }, [language]);
-  const { section } = Route.useSearch();
+  const { section, q: urlQuery, page: urlPage, sort: urlSort, genres: urlGenres, status: urlStatus, from: urlFrom, to: urlTo, rating: urlRating, kind: urlKind, age: urlAge } = Route.useSearch();
   const {
     anime: loadedAnime,
     popular: initialPopularAnime,
@@ -161,7 +171,25 @@ function Index() {
   // Keep the selected section aligned with the URL, including browser Back/Forward.
   useEffect(() => {
     setViewRaw(section ?? "home");
-  }, [section]);
+    const restoredQuery = urlQuery ?? "";
+    setQuery(restoredQuery);
+    setSubmittedQuery(restoredQuery);
+    setCatalogQuery(restoredQuery);
+    const restoredFilters: CatalogFiltersValue = {
+      ...EMPTY_CATALOG_FILTERS,
+      genres: (urlGenres ?? "").split(",").filter(Boolean).slice(0, 20),
+      status: urlStatus ?? EMPTY_CATALOG_FILTERS.status,
+      yearFrom: urlFrom === undefined ? "" : String(urlFrom),
+      yearTo: urlTo === undefined ? "" : String(urlTo),
+      minRating: urlRating ?? 0,
+      type: urlKind ?? EMPTY_CATALOG_FILTERS.type,
+      ageRating: urlAge ?? EMPTY_CATALOG_FILTERS.ageRating,
+    };
+    setDraftFilters(restoredFilters);
+    setActiveFilters(restoredFilters);
+    setSortBy(urlSort ?? "rating");
+    setCatalogPage(urlPage ?? 1);
+  }, [section, urlQuery, urlPage, urlSort, urlGenres, urlStatus, urlFrom, urlTo, urlRating, urlKind, urlAge]);
 
   // Continue a partial D1 seed from the persisted cursor without requiring a reload.
   // Each call fetches at most one 50-title page; cooldown responses are not retried early.
@@ -230,14 +258,24 @@ function Index() {
     };
   }, [initialCatalogProgress.status, loadedAnime]);
 
-  const [query, setQuery] = useState("");
-  const [submittedQuery, setSubmittedQuery] = useState("");
-  const [catalogQuery, setCatalogQuery] = useState("");
+  const [query, setQuery] = useState(urlQuery ?? "");
+  const [submittedQuery, setSubmittedQuery] = useState(urlQuery ?? "");
+  const [catalogQuery, setCatalogQuery] = useState(urlQuery ?? "");
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [draftFilters, setDraftFilters] = useState<CatalogFiltersValue>(EMPTY_CATALOG_FILTERS);
-  const [activeFilters, setActiveFilters] = useState<CatalogFiltersValue>(EMPTY_CATALOG_FILTERS);
-  const [sortBy, setSortBy] = useState("rating");
-  const [catalogPage, setCatalogPage] = useState(1);
+  const filtersFromUrl: CatalogFiltersValue = {
+    ...EMPTY_CATALOG_FILTERS,
+    genres: (urlGenres ?? "").split(",").filter(Boolean).slice(0, 20),
+    status: urlStatus ?? EMPTY_CATALOG_FILTERS.status,
+    yearFrom: urlFrom === undefined ? "" : String(urlFrom),
+    yearTo: urlTo === undefined ? "" : String(urlTo),
+    minRating: urlRating ?? 0,
+    type: urlKind ?? EMPTY_CATALOG_FILTERS.type,
+    ageRating: urlAge ?? EMPTY_CATALOG_FILTERS.ageRating,
+  };
+  const [draftFilters, setDraftFilters] = useState<CatalogFiltersValue>(filtersFromUrl);
+  const [activeFilters, setActiveFilters] = useState<CatalogFiltersValue>(filtersFromUrl);
+  const [sortBy, setSortBy] = useState(urlSort ?? "rating");
+  const [catalogPage, setCatalogPage] = useState(urlPage ?? 1);
   const [popularPage, setPopularPage] = useState(1);
   const [newReleasesPage, setNewReleasesPage] = useState(1);
   const [announcementsPage, setAnnouncementsPage] = useState(1);
@@ -268,7 +306,7 @@ function Index() {
     if (v === "announcements") setAnnouncementsPage(1);
     if (v === "airing") setAiringPage(1);
     // Persist the selected section in the URL so refreshing the page keeps the same view.
-    navigate({ to: "/", search: { section: v } });
+    navigate({ to: "/", search: { section: v, q: undefined, page: undefined, sort: undefined, genres: undefined, status: undefined, from: undefined, to: undefined, rating: undefined, kind: undefined, age: undefined } });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
   const select = (anime: Anime) =>
@@ -384,19 +422,50 @@ function Index() {
         setCatalogLoadState("error");
       });
   }, [needsFullCatalog, catalogLoadAttempt, catalogLoadState, t]);
+  const writeCatalogUrl = (overrides: { q?: string; page?: number; sort?: string; genres?: string; status?: string; from?: number; to?: number; rating?: number; kind?: string; age?: string } = {}) => {
+    const filters = overrides.genres !== undefined || overrides.status !== undefined || overrides.from !== undefined || overrides.to !== undefined || overrides.rating !== undefined || overrides.kind !== undefined || overrides.age !== undefined
+      ? overrides
+      : {
+          genres: activeFilters.genres.join(",") || undefined,
+          status: activeFilters.status !== EMPTY_CATALOG_FILTERS.status ? activeFilters.status : undefined,
+          from: activeFilters.yearFrom.trim() ? Number(activeFilters.yearFrom) : undefined,
+          to: activeFilters.yearTo.trim() ? Number(activeFilters.yearTo) : undefined,
+          rating: activeFilters.minRating || undefined,
+          kind: activeFilters.type !== EMPTY_CATALOG_FILTERS.type ? activeFilters.type : undefined,
+          age: activeFilters.ageRating !== EMPTY_CATALOG_FILTERS.ageRating ? activeFilters.ageRating : undefined,
+        };
+    void navigate({ to: "/", replace: true, search: {
+      section: view,
+      q: overrides.q ?? (view === "catalog" ? catalogQuery.trim() : view === "home" ? submittedQuery.trim() : undefined) || undefined,
+      page: overrides.page ?? catalogPage,
+      sort: overrides.sort ?? (sortBy !== "rating" ? sortBy : undefined),
+      genres: filters.genres || undefined,
+      status: filters.status || undefined,
+      from: filters.from || undefined,
+      to: filters.to || undefined,
+      rating: filters.rating || undefined,
+      kind: filters.kind || undefined,
+      age: filters.age || undefined,
+    } });
+  };
   const submitHomeSearch = () => {
-    setSubmittedQuery(query.trim());
+    const nextQuery = query.trim();
+    setSubmittedQuery(nextQuery);
     setCatalogPage(1);
+    writeCatalogUrl({ q: nextQuery || undefined, page: 1 });
   };
   const applyCatalogFilters = () => {
-    setActiveFilters({ ...draftFilters, genres: [...draftFilters.genres] });
+    const next = { ...draftFilters, genres: [...draftFilters.genres] };
+    setActiveFilters(next);
     setCatalogPage(1);
     setFiltersOpen(false);
+    writeCatalogUrl({ page: 1, genres: next.genres.join(",") || undefined, status: next.status !== EMPTY_CATALOG_FILTERS.status ? next.status : undefined, from: next.yearFrom.trim() ? Number(next.yearFrom) : undefined, to: next.yearTo.trim() ? Number(next.yearTo) : undefined, rating: next.minRating || undefined, kind: next.type !== EMPTY_CATALOG_FILTERS.type ? next.type : undefined, age: next.ageRating !== EMPTY_CATALOG_FILTERS.ageRating ? next.ageRating : undefined });
   };
   const resetCatalogFilters = () => {
     setDraftFilters(EMPTY_CATALOG_FILTERS);
     setActiveFilters(EMPTY_CATALOG_FILTERS);
     setCatalogPage(1);
+    writeCatalogUrl({ page: 1, genres: undefined, status: undefined, from: undefined, to: undefined, rating: undefined, kind: undefined, age: undefined });
   };
   const activeCollection = COLLECTIONS.find((c) => c.id === collection);
   const activeCollectionAnime = activeCollection
@@ -600,8 +669,8 @@ function Index() {
           <div data-filter-anchor className="relative z-30 mt-5 max-w-xl">
             <div className="flex h-11 items-center rounded-xl border border-white/10 bg-[#171127]/75 shadow-lg shadow-black/10 backdrop-blur-xl focus-within:border-primary/60">
               <Search className="ml-3 h-4 w-4 shrink-0 text-muted-foreground" />
-              <input value={catalogQuery} onChange={(event) => { setCatalogQuery(event.target.value); setCatalogPage(1); }} disabled={needsFullCatalog && catalogLoadState !== "loaded" && catalogLoadState !== "error"} placeholder={t("search.placeholder")} aria-label={t("catalog.search")} className="h-full min-w-0 flex-1 bg-transparent px-2.5 text-sm outline-none placeholder:text-muted-foreground" />
-              {catalogQuery && <button type="button" aria-label={t("search.clear")} onClick={() => { setCatalogQuery(""); setCatalogPage(1); }} className="rounded-full p-1.5 text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>}
+              <input value={catalogQuery} onChange={(event) => { const value = event.target.value; setCatalogQuery(value); setCatalogPage(1); writeCatalogUrl({ q: value.trim() || undefined, page: 1 }); }} disabled={needsFullCatalog && catalogLoadState !== "loaded" && catalogLoadState !== "error"} placeholder={t("search.placeholder")} aria-label={t("catalog.search")} className="h-full min-w-0 flex-1 bg-transparent px-2.5 text-sm outline-none placeholder:text-muted-foreground" />
+              {catalogQuery && <button type="button" aria-label={t("search.clear")} onClick={() => { setCatalogQuery(""); setCatalogPage(1); writeCatalogUrl({ q: undefined, page: 1 }); }} className="rounded-full p-1.5 text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>}
               <button type="button" disabled={needsFullCatalog && catalogLoadState !== "loaded" && catalogLoadState !== "error"} onClick={() => { setDraftFilters({ ...activeFilters, genres: [...activeFilters.genres] }); setFiltersOpen((open) => !open); }} aria-label={t("filters.open")} aria-expanded={filtersOpen} data-filter-trigger className={`relative mr-1.5 flex h-8 w-9 shrink-0 items-center justify-center rounded-lg transition ${filtersOpen || activeFilterCount ? "bg-primary/20 text-primary" : "text-muted-foreground hover:bg-accent hover:text-foreground"}`}>
                 <SlidersHorizontal className="h-4 w-4" />
                 {activeFilterCount > 0 && <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-neon px-1 text-[10px] font-bold text-primary-foreground">{activeFilterCount}</span>}
@@ -613,7 +682,7 @@ function Index() {
             <label className="flex h-9 items-center gap-2 rounded-lg border border-border bg-secondary/80 px-3 text-sm">
               <ArrowDownWideNarrow className="h-4 w-4 text-muted-foreground" />
               <span className="text-muted-foreground max-sm:hidden">{t("catalog.sort")}</span>
-              <select value={sortBy} onChange={(event) => { setSortBy(event.target.value); setCatalogPage(1); }} aria-label={t("catalog.sort")} className="max-w-[145px] bg-transparent text-sm outline-none">
+              <select value={sortBy} onChange={(event) => { const value = event.target.value; setSortBy(value); setCatalogPage(1); writeCatalogUrl({ sort: value === "rating" ? undefined : value, page: 1 }); }} aria-label={t("catalog.sort")} className="max-w-[145px] bg-transparent text-sm outline-none">
                 <option value="rating">{t("catalog.sortRating")}</option><option value="newest">{t("catalog.sortNewest")}</option><option value="oldest">{t("catalog.sortOldest")}</option><option value="title">{t("catalog.sortTitle")}</option>
               </select>
               <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
@@ -631,7 +700,7 @@ function Index() {
               )}
               <Grid items={visibleCatalogResults} onSelect={select} empty={ANIME.length === 0 && (apiError || catalogLoadError) ? t("source.catalogUnavailable") : t("catalog.noResults")} />
               {catalogResults.length > 0 && <nav aria-label={t("catalog.pages")} className="mt-8 flex flex-wrap items-center justify-center gap-1.5">
-                <button type="button" disabled={catalogPage === 1} onClick={() => { setCatalogPage((page) => Math.max(1, page - 1)); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="h-9 rounded-lg border border-border px-3 text-sm transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-35">{t("catalog.previous")}</button>
+                <button type="button" disabled={catalogPage === 1} onClick={() => { setCatalogPage((page) => { const next = Math.max(1, page - 1); writeCatalogUrl({ page: next }); return next; }); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="h-9 rounded-lg border border-border px-3 text-sm transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-35">{t("catalog.previous")}</button>
                 {Array.from({ length: totalCatalogPages }, (_, index) => index + 1)
                   .filter((page) => page === 1 || page === totalCatalogPages || Math.abs(page - catalogPage) <= 1)
                   .reduce<(number | "ellipsis")[]>((pages, page, index, visible) => {
@@ -641,8 +710,8 @@ function Index() {
                   }, [])
                   .map((page, index) => page === "ellipsis"
                     ? <span key={`ellipsis-${index}`} className="px-1 text-muted-foreground">…</span>
-                    : <button key={page} type="button" aria-current={catalogPage === page ? "page" : undefined} onClick={() => { setCatalogPage(page); window.scrollTo({ top: 0, behavior: "smooth" }); }} className={`h-9 min-w-9 rounded-lg border px-3 text-sm transition ${catalogPage === page ? "border-primary/70 bg-primary/20 text-foreground" : "border-border hover:bg-accent"}`}>{page}</button>)}
-                <button type="button" disabled={catalogPage === totalCatalogPages} onClick={() => { setCatalogPage((page) => Math.min(totalCatalogPages, page + 1)); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="h-9 rounded-lg border border-border px-3 text-sm transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-35">{t("catalog.next")}</button>
+                    : <button key={page} type="button" aria-current={catalogPage === page ? "page" : undefined} onClick={() => { setCatalogPage(page); writeCatalogUrl({ page }); window.scrollTo({ top: 0, behavior: "smooth" }); }} className={`h-9 min-w-9 rounded-lg border px-3 text-sm transition ${catalogPage === page ? "border-primary/70 bg-primary/20 text-foreground" : "border-border hover:bg-accent"}`}>{page}</button>)}
+                <button type="button" disabled={catalogPage === totalCatalogPages} onClick={() => { setCatalogPage((page) => { const next = Math.min(totalCatalogPages, page + 1); writeCatalogUrl({ page: next }); return next; }); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="h-9 rounded-lg border border-border px-3 text-sm transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-35">{t("catalog.next")}</button>
               </nav>}
             </>
           )}
