@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
-import { Home, LayoutGrid, Library, User, Menu, X, Bell, Moon, Sun, ShieldCheck, Heart, Clock3, Star, Languages, Bookmark, Megaphone, Radio, Sparkles } from "lucide-react";
+import { Home, LayoutGrid, Library, User, Menu, X, Bell, Moon, Sun, ShieldCheck, Heart, Clock3, Star, Languages, Bookmark, Megaphone, Radio, Sparkles, LogIn } from "lucide-react";
 import { Logo } from "./Logo";
 import { useYumePreferences } from "@/data/preferences";
 
-export type View = "home" | "catalog" | "collections" | "profile" | "popular" | "new-releases" | "announcements" | "airing" | "favorites" | "watchlist" | "history" | "privacy";
+export type View = "home" | "catalog" | "collections" | "profile" | "popular" | "new-releases" | "announcements" | "airing" | "favorites" | "watchlist" | "history" | "privacy" | "privacy-policy" | "login" | "register";
 
 export const NAV: { id: View; label: string; icon: typeof Home }[] = [
   { id: "home", label: "Главная", icon: Home },
@@ -113,10 +113,21 @@ export function Header({ view, setView, onProfile }: Props) {
               <Bell className="h-5 w-5" />
               <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-primary" />
             </button>
+            {view !== "login" && view !== "register" && (
+              <button
+                type="button"
+                onClick={() => setView("login")}
+                aria-label={language === "ru" ? "Войти" : "Sign in"}
+                className="flex h-9 items-center gap-1 rounded-full border border-primary/35 bg-primary/10 px-2 text-xs font-semibold text-foreground transition hover:bg-primary/20 sm:h-10 sm:gap-1.5 sm:px-3 sm:text-sm"
+              >
+                <LogIn className="hidden h-4 w-4 sm:block" />
+                <span>{language === "ru" ? "Войти" : "Sign in"}</span>
+              </button>
+            )}
             <button
               type="button"
               onClick={onProfile}
-              aria-label={t("nav.profileButton")}
+              aria-label={t("nav.profileButton")
               className="flex h-10 w-10 items-center justify-center rounded-full border border-primary/20 bg-primary/10 text-foreground transition hover:bg-primary/20"
             >
               <User className="h-5 w-5" />
