@@ -35,8 +35,7 @@ export const Route = createFileRoute("/sitemap.xml")({
         return new Response(sitemap, {
           headers: {
             "Content-Type": "application/xml; charset=utf-8",
-            "Cache-Control": "public, max-age=1800, stale-while-revalidate=86400",
-            "X-Robots-Tag": "noindex",
+            "Cache-Control": "public, max-age=300, stale-while-revalidate=3600",
           },
         });
       },
