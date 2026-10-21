@@ -127,7 +127,7 @@ export function Header({ view, setView, onProfile }: Props) {
             <button
               type="button"
               onClick={onProfile}
-              aria-label={t("nav.profileButton")
+              aria-label={t("nav.profileButton")}
               className="flex h-10 w-10 items-center justify-center rounded-full border border-primary/20 bg-primary/10 text-foreground transition hover:bg-primary/20"
             >
               <User className="h-5 w-5" />
