@@ -12,7 +12,8 @@ import { useEffect, useState, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
-import { YumePreferencesProvider } from "@/data/preferences";
+import { YumePreferencesProvider, useYumePreferences } from "@/data/preferences";
+import { DEFAULT_META_DESCRIPTION, SITE_NAME } from "@/data/seo";
 
 type InterfaceLanguage = "ru" | "en";
 
@@ -36,7 +37,7 @@ function useStoredInterfaceLanguage(): InterfaceLanguage {
 function NotFoundComponent() {
   const language = useStoredInterfaceLanguage();
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+    <main id="main-content" className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
         <h1 className="text-7xl font-bold text-foreground">404</h1>
         <h2 className="mt-4 text-xl font-semibold text-foreground">{language === "en" ? "Page not found" : "Страница не найдена"}</h2>
@@ -52,7 +53,7 @@ function NotFoundComponent() {
           </Link>
         </div>
       </div>
-    </div>
+    </main>
   );
 }
 
@@ -65,7 +66,7 @@ function ErrorComponent({ error, reset }: ErrorComponentProps) {
   }, [error]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+    <main id="main-content" className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
         <h1 className="text-xl font-semibold tracking-tight text-foreground">
           {language === "en" ? "This page didn't load" : "Страница не загрузилась"}
@@ -91,7 +92,7 @@ function ErrorComponent({ error, reset }: ErrorComponentProps) {
           </a>
         </div>
       </div>
-    </div>
+    </main>
   );
 }
 
@@ -100,8 +101,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "YUME" },
-      { name: "description", content: "YUME — аниме-платформа" },
+      { title: "YUME — смотри аниме онлайн" },
+      { name: "description", content: DEFAULT_META_DESCRIPTION },
+      { property: "og:site_name", content: SITE_NAME },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
@@ -136,6 +140,23 @@ function RootShell({ children }: { children: ReactNode }) {
   );
 }
 
+function DocumentLanguageSync() {
+  const { language } = useYumePreferences();
+  useEffect(() => {
+    document.documentElement.lang = language;
+  }, [language]);
+  return null;
+}
+
+function SkipToContent() {
+  const { language } = useYumePreferences();
+  return (
+    <a className="skip-to-content" href="#main-content">
+      {language === "en" ? "Skip to main content" : "Перейти к основному содержимому"}
+    </a>
+  );
+}
+
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
@@ -143,6 +164,8 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <YumePreferencesProvider>
+        <DocumentLanguageSync />
+        <SkipToContent />
         <Outlet />
       </YumePreferencesProvider>
     </QueryClientProvider>

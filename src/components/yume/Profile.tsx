@@ -225,7 +225,7 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
   );
 
   return (
-    <main className="px-4 pb-12 pt-28 md:px-10 md:pb-16 md:pt-28">
+    <main id="main-content" className="px-4 pb-12 pt-28 md:px-10 md:pb-16 md:pt-28">
       <div className="mx-auto max-w-6xl">
         {panel === "overview" ? (
           <>

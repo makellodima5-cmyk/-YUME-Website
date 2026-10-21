@@ -224,6 +224,8 @@ const RU = {
   "settings.clearGenres": "Сбросить выбор",
   "settings.genresSaved": "Предпочтения сохранены на этом устройстве.",
   "settings.genreCount": "Выбрано жанров:",
+  "history.title": "История просмотров",
+  "history.empty": "Здесь появятся аниме, которые вы начали, но ещё не досмотрели. После подключения плеера YUME сможет сохранять просмотренные серии и место остановки. Пока история не сохраняет прогресс.",
 
 } as const;
 
@@ -445,6 +447,8 @@ const EN: Record<TranslationKey, string> = {
   "settings.clearGenres": "Clear selection",
   "settings.genresSaved": "Preferences are saved on this device.",
   "settings.genreCount": "Selected genres:",
+  "history.title": "Watch history",
+  "history.empty": "Anime you started but have not finished will appear here. Once the episode player is available, YUME can save watched episodes and where you stopped. Progress is not saved yet.",
 };
 
 const TRANSLATIONS: Record<Language, Record<TranslationKey, string>> = {
