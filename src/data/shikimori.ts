@@ -71,6 +71,19 @@ type GraphQLResponse = {
   errors?: { message?: string }[];
 };
 
+export function parseShikimoriResponse(payload: GraphQLResponse): { items: Anime[]; error: string | null } {
+  if (payload.errors?.length) {
+    return {
+      items: [],
+      error: payload.errors.map((error) => error.message).filter(Boolean).join("; ") || "Shikimori GraphQL error",
+    };
+  }
+  return {
+    items: (payload.data?.animes ?? []).filter((item) => !hasExcludedGenre(item)).map(mapAnime),
+    error: null,
+  };
+}
+
 const EXCLUDED_GENRE_NAMES = new Set(["хентай", "hentai"]);
 
 function hasExcludedGenre(item: ShikimoriGraphQLAnime): boolean {
@@ -350,13 +363,9 @@ async function fetchShikimoriAnimes(data: ShikimoriRequest) {
     }
 
     const payload = (await response.json()) as GraphQLResponse;
-    if (payload.errors?.length) {
-      throw new Error(payload.errors.map((error) => error.message).filter(Boolean).join("; "));
-    }
-
-    const items = (payload.data?.animes ?? [])
-      .filter((item) => !hasExcludedGenre(item))
-      .map(mapAnime);
+    const parsed = parseShikimoriResponse(payload);
+    if (parsed.error) throw new Error(parsed.error);
+    const items = parsed.items;
     responseCache.set(key, { expiresAt: Date.now() + CACHE_TTL_MS, items });
     if (responseCache.size > 160) {
       const now = Date.now();
