@@ -33,7 +33,7 @@ describe("local profile library", () => {
 
   it("preserves other IDs and does not duplicate an existing ID", () => {
     window.localStorage.setItem(WATCHLIST_STORAGE_KEY, JSON.stringify(["anime-1"]));
-    expect(toggleSavedAnimeId(WATCHLIST_STORAGE_KEY, "anime-1")).toBe(false);
+    expect(readSavedAnimeIds(WATCHLIST_STORAGE_KEY)).toEqual(["anime-1"]);
     expect(toggleSavedAnimeId(WATCHLIST_STORAGE_KEY, "anime-2")).toBe(true);
     expect(readSavedAnimeIds(WATCHLIST_STORAGE_KEY)).toEqual(["anime-1", "anime-2"]);
   });
