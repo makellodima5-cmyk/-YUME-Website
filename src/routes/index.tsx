@@ -10,6 +10,7 @@ import { CollectionsGrid, Grid, Hero, Row } from "@/components/yume/Sections";
 import { CatalogFilters, EMPTY_CATALOG_FILTERS, type CatalogFiltersValue } from "@/components/yume/CatalogFilters";
 import { Profile } from "@/components/yume/Profile";
 import { useYumePreferences, displayGenre, type TranslationKey } from "@/data/preferences";
+import { filterAndSortCatalog, getCatalogPageCount, paginateCatalog } from "@/data/catalog-utils";
 
 const parseSearchNumber = (value: unknown): number | undefined => {
   if (typeof value !== "string" && typeof value !== "number") return undefined;
@@ -356,38 +357,13 @@ function Index() {
     };
   }, [ANIME]);
   const searchText = view === "catalog" ? catalogQuery.trim() : view === "home" ? submittedQuery.trim() : "";
-  const catalogResults = useMemo(() => {
-    const q = searchText.toLowerCase();
-    const yearFrom = activeFilters.yearFrom.trim() ? Number(activeFilters.yearFrom) : null;
-    const yearTo = activeFilters.yearTo.trim() ? Number(activeFilters.yearTo) : null;
-    const filtered = ANIME.filter((anime) => {
-      const matchesQuery = !q || anime.title.toLowerCase().includes(q) ||
-        (anime.englishTitle ?? "").toLowerCase().includes(q) ||
-        anime.original.toLowerCase().includes(q) ||
-        anime.genres.some((item) => item.toLowerCase().includes(q) || displayGenre(item, language).toLowerCase().includes(q));
-      const matchesGenres = activeFilters.genres.length === 0 ||
-        activeFilters.genres.some((item) => anime.genres.includes(item));
-      const matchesStatus = activeFilters.status === "Любой" || anime.status === activeFilters.status;
-      const matchesFrom = yearFrom === null || anime.year >= yearFrom;
-      const matchesTo = yearTo === null || anime.year <= yearTo;
-      const matchesRating = activeFilters.minRating === 0 || (anime.rating !== null && anime.rating >= activeFilters.minRating);
-      const animeType = anime.kind || (anime.episodes === 1 ? "Фильм" : "TV");
-      const matchesType = activeFilters.type === "Любой" || animeType === activeFilters.type;
-      const ageRating = anime.ageRating;
-      const matchesAge = activeFilters.ageRating === "Любой" || ageRating === activeFilters.ageRating;
-      return matchesQuery && matchesGenres && matchesStatus && matchesFrom && matchesTo &&
-        matchesRating && matchesType && matchesAge;
-    });
-    return filtered.sort((a, b) => {
-      if (sortBy === "newest") return b.year - a.year || (b.rating ?? -1) - (a.rating ?? -1);
-      if (sortBy === "oldest") return a.year - b.year || (b.rating ?? -1) - (a.rating ?? -1);
-      if (sortBy === "title") return (language === "en" ? (a.englishTitle || a.original || a.title) : a.title).localeCompare(language === "en" ? (b.englishTitle || b.original || b.title) : b.title, language === "en" ? "en" : "ru");
-      return (b.rating ?? -1) - (a.rating ?? -1);
-    });
-  }, [searchText, ANIME, activeFilters, sortBy, language]);
+  const catalogResults = useMemo(
+    () => filterAndSortCatalog(ANIME, searchText, activeFilters, sortBy, language, displayGenre),
+    [searchText, activeFilters, sortBy, language],
+  );
   const catalogPageSize = 20;
-  const totalCatalogPages = Math.max(1, Math.ceil(catalogResults.length / catalogPageSize));
-  const visibleCatalogResults = catalogResults.slice((catalogPage - 1) * catalogPageSize, catalogPage * catalogPageSize);
+  const totalCatalogPages = getCatalogPageCount(catalogResults.length, catalogPageSize);
+  const visibleCatalogResults = paginateCatalog(catalogResults, catalogPage, catalogPageSize);
   const activeFilterCount = activeFilters.genres.length +
     Number(activeFilters.status !== "Любой") + Number(activeFilters.yearFrom !== "") +
     Number(activeFilters.yearTo !== "") + Number(activeFilters.minRating > 0) +
