@@ -2,14 +2,14 @@ import { describe, expect, it } from "vitest";
 import { absoluteImageUrl, canonicalUrl, sanitizeMetaDescription } from "@/data/seo";
 
 describe("SEO helpers", () => {
-  it("uses the verified site origin and canonicalizes internal paths without query or hash", () => {
-    expect(canonicalUrl("/")).toBe("https://yume-website-kappa.vercel.app/");
+  it("uses the current Cloudflare origin and canonicalizes internal paths without query or hash", () => {
+    expect(canonicalUrl("/")).toBe("https://yume-website.yumesupport833.workers.dev/");
     expect(canonicalUrl("/anime/123?ref=search#details")).toBe(
-      "https://yume-website-kappa.vercel.app/anime/123",
+      "https://yume-website.yumesupport833.workers.dev/anime/123",
     );
-    expect(canonicalUrl("anime/123")).toBe("https://yume-website-kappa.vercel.app/anime/123");
+    expect(canonicalUrl("anime/123")).toBe("https://yume-website.yumesupport833.workers.dev/anime/123");
     expect(canonicalUrl("//evil.example/path")).toBe(
-      "https://yume-website-kappa.vercel.app/evil.example/path",
+      "https://yume-website.yumesupport833.workers.dev/evil.example/path",
     );
   });
 
@@ -24,7 +24,7 @@ describe("SEO helpers", () => {
 
   it("returns only valid HTTP(S) image URLs as absolute URLs", () => {
     expect(absoluteImageUrl("/assets/cover.webp")).toBe(
-      "https://yume-website-kappa.vercel.app/assets/cover.webp",
+      "https://yume-website.yumesupport833.workers.dev/assets/cover.webp",
     );
     expect(absoluteImageUrl("https://cdn.example/cover.webp")).toBe("https://cdn.example/cover.webp");
     expect(absoluteImageUrl("javascript:alert(1)")).toBeUndefined();
