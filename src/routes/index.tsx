@@ -11,13 +11,7 @@ import { CatalogFilters, EMPTY_CATALOG_FILTERS, type CatalogFiltersValue } from 
 import { Profile } from "@/components/yume/Profile";
 import { useYumePreferences, displayGenre, type TranslationKey } from "@/data/preferences";
 import { filterAndSortCatalog, getCatalogPageCount, paginateCatalog } from "@/data/catalog-utils";
-
-const parseSearchNumber = (value: unknown): number | undefined => {
-  if (typeof value !== "string" && typeof value !== "number") return undefined;
-  if (typeof value === "string" && !value.trim()) return undefined;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : undefined;
-};
+import { validateCatalogSearch } from "@/data/catalog-search";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -30,23 +24,7 @@ export const Route = createFileRoute("/")({
       { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
-  validateSearch: (search: Record<string, unknown>): { section?: View; q?: string; page?: number; sort?: string; genres?: string; status?: string; from?: number; to?: number; rating?: number; kind?: string; age?: string } => ({
-    q: typeof search.q === "string" ? search.q.slice(0, 120) : undefined,
-    page: (() => { const value = parseSearchNumber(search.page); return value !== undefined && Number.isInteger(value) && value > 0 ? Math.min(value, 10000) : undefined; })(),
-    sort: typeof search.sort === "string" && ["rating", "newest", "oldest", "title"].includes(search.sort) ? search.sort : undefined,
-    genres: typeof search.genres === "string" ? search.genres.slice(0, 500) : undefined,
-    status: typeof search.status === "string" && ["Любой", "Онгоинг", "Анонс", "Вышел", "Неизвестно"].includes(search.status) ? search.status : undefined,
-    from: (() => { const value = parseSearchNumber(search.from); return value !== undefined && Number.isInteger(value) ? Math.max(1900, Math.min(value, 2100)) : undefined; })(),
-    to: (() => { const value = parseSearchNumber(search.to); return value !== undefined && Number.isInteger(value) ? Math.max(1900, Math.min(value, 2100)) : undefined; })(),
-    rating: (() => { const value = parseSearchNumber(search.rating); return value !== undefined ? Math.max(0, Math.min(value, 9)) : undefined; })(),
-    kind: typeof search.kind === "string" ? search.kind.slice(0, 80) : undefined,
-    age: typeof search.age === "string" ? search.age.slice(0, 30) : undefined,
-    section:
-      typeof search.section === "string" &&
-      ["home", "catalog", "collections", "profile", "popular", "new-releases", "announcements", "airing", "favorites", "watchlist", "history", "privacy"].includes(search.section)
-        ? (search.section as View)
-        : undefined,
-  }),
+  validateSearch: validateCatalogSearch,
   loader: async () => {
     // One server-side catalog source powers the homepage as well as the full catalog.
     // When D1 is bound, this reads the persistent records instead of querying Shikimori
