@@ -21,7 +21,16 @@ describe("catalog filtering and sorting", () => {
   });
 
   it("combines genre, status, year, rating, type, and age filters", () => {
-    const result = filterAndSortCatalog(ANIME, "", filters({
+    const fixture = {
+      ...ANIME[0]!,
+      genres: ["Экшен"],
+      status: "Онгоинг" as const,
+      year: 2026,
+      rating: 9,
+      kind: "TV",
+      ageRating: "12+",
+    };
+    const result = filterAndSortCatalog([fixture], "", filters({
       genres: ["Экшен"],
       status: "Онгоинг",
       yearFrom: "2026",
@@ -30,8 +39,7 @@ describe("catalog filtering and sorting", () => {
       type: "TV",
       ageRating: "12+",
     }), "rating", "ru", translateGenre);
-    expect(result.every((a) => a.genres.includes("Экшен") && a.status === "Онгоинг" && a.year === 2026 &&
-      (a.rating ?? -1) >= 8.5 && (a.kind || (a.episodes === 1 ? "Фильм" : "TV")) === "TV" && a.ageRating === "12+")).toBe(true);
+    expect(result).toEqual([fixture]);
   });
 
   it("excludes unknown ratings when a minimum rating is selected", () => {
