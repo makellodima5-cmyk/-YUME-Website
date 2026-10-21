@@ -518,6 +518,7 @@ function Index() {
         </main>
       ) : view === "login" || view === "register" ? (
         <AuthPage
+          key={view}
           mode={view}
           language={language}
           onModeChange={(mode) => setView(mode)}
