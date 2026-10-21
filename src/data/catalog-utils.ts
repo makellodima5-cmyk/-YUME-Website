@@ -56,6 +56,7 @@ export function paginateCatalog<T>(items: T[], page: number, pageSize: number): 
 }
 
 export function getCatalogPageCount(totalItems: number, pageSize: number): number {
-  if (!Number.isFinite(pageSize) || pageSize < 1) return 1;
-  return Math.max(1, Math.ceil(Math.max(0, totalItems) / Math.floor(pageSize)));
+  const size = Math.floor(pageSize);
+  if (!Number.isFinite(pageSize) || size < 1) return 1;
+  return Math.max(1, Math.ceil(Math.max(0, totalItems) / size));
 }
