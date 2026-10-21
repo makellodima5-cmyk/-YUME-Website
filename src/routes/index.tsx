@@ -12,18 +12,32 @@ import { Profile } from "@/components/yume/Profile";
 import { useYumePreferences, displayGenre, type TranslationKey } from "@/data/preferences";
 import { filterAndSortCatalog, getCatalogPageCount, paginateCatalog } from "@/data/catalog-utils";
 import { validateCatalogSearch } from "@/data/catalog-search";
+import homeSocialImage from "@/assets/yume-hero-desktop-new.png.PNG";
+import { absoluteImageUrl, canonicalUrl } from "@/data/seo";
 
 export const Route = createFileRoute("/")({
-  head: () => ({
-    meta: [
-      { title: "YUME — смотри аниме онлайн" },
-      { name: "description", content: "YUME — каталог аниме, тематические подборки и рейтинг лучших тайтлов." },
-      { property: "og:title", content: "YUME — больше чем аниме" },
-      { property: "og:description", content: "Открой свой мир в YUME: популярное, новинки и подборки." },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary_large_image" },
-    ],
-  }),
+  head: () => {
+    const image = absoluteImageUrl(homeSocialImage);
+    return {
+      meta: [
+        { title: "YUME — смотри аниме онлайн" },
+        {
+          name: "description",
+          content: "YUME — каталог аниме с рейтингами, новинками и тематическими подборками.",
+        },
+        { property: "og:title", content: "YUME — больше чем аниме" },
+        {
+          property: "og:description",
+          content: "Открой свой мир в YUME: популярное, новинки и подборки.",
+        },
+        { property: "og:type", content: "website" },
+        { property: "og:url", content: canonicalUrl("/") },
+        ...(image ? [{ property: "og:image", content: image }, { name: "twitter:image", content: image }] : []),
+        { name: "twitter:card", content: "summary_large_image" },
+      ],
+      links: [{ rel: "canonical", href: canonicalUrl("/") }],
+    };
+  },
   validateSearch: validateCatalogSearch,
   loader: async () => {
     // One server-side catalog source powers the homepage as well as the full catalog.
