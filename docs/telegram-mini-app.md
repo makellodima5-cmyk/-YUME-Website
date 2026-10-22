@@ -2,11 +2,11 @@
 
 ## Current implementation
 
-The Telegram Web App SDK is loaded by the root document. The client bridge calls `ready()` and `expand()`, and synchronizes Telegram viewport and safe-area values with CSS custom properties.
+The Telegram Web App SDK is loaded by the root document. The client bridge calls `ready()` and `expand()`, and synchronizes Telegram viewport and safe-area values with CSS custom properties. In Telegram, the website sign-in button and VK ID / Yandex ID sign-in and registration screens are hidden; attempts to open those sections return to the home screen. Website authentication remains unchanged outside Telegram.
 
 The server endpoint `POST /api/telegram/init-data` validates the raw `Telegram.WebApp.initData` payload using Telegram's HMAC-SHA-256 algorithm. It rejects malformed payloads, duplicate query keys, invalid signatures, missing user identity, and authentication data older than five minutes (with a 30-second future-clock tolerance).
 
-**This endpoint validates identity data only. It does not create a YUME account, issue a session, or grant access to protected data.** Do not treat `initDataUnsafe` or a client-supplied Telegram user ID as authentication.
+**Important current limitation:** this endpoint validates identity data only. It does not yet create a YUME account, issue a session, or grant access to protected data. Hiding the old sign-in screens is a UI change, not a completed Telegram account/session integration. Do not treat `initDataUnsafe` or a client-supplied Telegram user ID as authentication.
 
 ## Required secret
 
