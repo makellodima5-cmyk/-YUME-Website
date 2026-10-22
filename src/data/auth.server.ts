@@ -61,10 +61,10 @@ async function ensureSchema(db: AuthDatabase): Promise<void> {
   const columns = await (db.prepare("PRAGMA table_info(yume_users)") as DbStatementWithAll).all<{ name: string }>();
   const names = new Set(columns.results.map((column) => column.name));
   if (!names.has("user_agreement_accepted_at")) {
-    await db.prepare("ALTER TABLE yume_users ADD COLUMN user_agreement_accepted_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP").run();
+    await db.prepare("ALTER TABLE yume_users ADD COLUMN user_agreement_accepted_at TEXT").run();
   }
   if (!names.has("user_agreement_version")) {
-    await db.prepare("ALTER TABLE yume_users ADD COLUMN user_agreement_version TEXT NOT NULL DEFAULT '2026-10-22'").run();
+    await db.prepare("ALTER TABLE yume_users ADD COLUMN user_agreement_version TEXT").run();
   }
 }
 
