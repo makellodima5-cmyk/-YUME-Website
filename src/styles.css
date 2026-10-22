@@ -323,3 +323,9 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Telegram Mini App viewport support. The existing YUME design tokens stay unchanged. */
+html.telegram-mini-app,
+html.telegram-mini-app body {
+  min-height: var(--yume-tg-viewport-height, 100vh);
+}
