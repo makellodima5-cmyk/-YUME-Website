@@ -3,7 +3,7 @@ import { Home, LayoutGrid, Library, User, Menu, X, Bell, Moon, Sun, ShieldCheck,
 import { Logo } from "./Logo";
 import { useYumePreferences } from "@/data/preferences";
 
-export type View = "home" | "catalog" | "collections" | "profile" | "popular" | "new-releases" | "announcements" | "airing" | "favorites" | "watchlist" | "history" | "privacy" | "privacy-policy" | "login" | "register";
+export type View = "home" | "catalog" | "collections" | "profile" | "popular" | "new-releases" | "announcements" | "airing" | "favorites" | "watchlist" | "history" | "privacy" | "privacy-policy" | "login" | "register" | "rules" | "rights";
 
 export const NAV: { id: View; label: string; icon: typeof Home }[] = [
   { id: "home", label: "Главная", icon: Home },
