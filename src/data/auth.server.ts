@@ -266,6 +266,10 @@ async function startAuthorization(request: Request, provider: Provider, flow: Au
   const authorizeUrl = new URL(provider === "vk" ? "https://id.vk.ru/authorize" : "https://oauth.yandex.ru/authorize");
   authorizeUrl.searchParams.set("response_type", "code");
   authorizeUrl.searchParams.set("client_id", provider === "vk" ? String(env.VKID_CLIENT_ID) : String(env.YANDEX_CLIENT_ID));
+  if (provider === "vk") {
+    authorizeUrl.searchParams.set("app_id", String(env.VKID_CLIENT_ID));
+    authorizeUrl.searchParams.set("sdk_type", "vkid");
+  }
   authorizeUrl.searchParams.set("redirect_uri", uri);
   authorizeUrl.searchParams.set("state", state.state);
   authorizeUrl.searchParams.set("code_challenge", challenge);
