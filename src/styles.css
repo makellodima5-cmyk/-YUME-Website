@@ -288,6 +288,13 @@ body {
   outline-offset: 3px;
 }
 
+/* The hero search already indicates focus on its rounded container. Avoid a second rectangular outline around the text input on mobile. */
+[data-filter-anchor] input:focus-visible {
+  outline: none !important;
+  outline-offset: 0 !important;
+  box-shadow: none !important;
+}
+
 .skip-to-content {
   position: fixed;
   z-index: 200;
