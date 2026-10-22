@@ -168,6 +168,24 @@ function Index() {
   const catalogLoadStarted = useRef(false);
   const [catalogLoadAttempt, setCatalogLoadAttempt] = useState(0);
   const [view, setViewRaw] = useState<View>(section ?? "home");
+  const [cookieNoticeAcknowledged, setCookieNoticeAcknowledged] = useState(true);
+
+  useEffect(() => {
+    try {
+      setCookieNoticeAcknowledged(window.localStorage.getItem("yume-cookie-notice-acknowledged") === "true");
+    } catch {
+      setCookieNoticeAcknowledged(false);
+    }
+  }, []);
+
+  const acknowledgeCookieNotice = () => {
+    try {
+      window.localStorage.setItem("yume-cookie-notice-acknowledged", "true");
+    } catch {
+      // The notice can still be dismissed for the current page when storage is unavailable.
+    }
+    setCookieNoticeAcknowledged(true);
+  };
 
   // Keep the selected section aligned with the URL, including browser Back/Forward.
   useEffect(() => {
@@ -490,6 +508,30 @@ function Index() {
   return (
     <div className="min-h-screen pb-8">
       <Header view={view} setView={setView} onProfile={() => setView("login")} />
+      {view === "home" && !cookieNoticeAcknowledged && (
+        <aside
+          aria-label="Уведомление об использовании cookie"
+          className="fixed inset-x-3 bottom-3 z-[60] mx-auto flex max-w-5xl flex-col gap-3 rounded-2xl border border-primary/25 bg-background/95 p-4 shadow-2xl backdrop-blur-md sm:inset-x-5 sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:px-6 sm:py-4"
+        >
+          <p className="max-w-3xl text-sm leading-relaxed text-foreground/90">
+            Продолжая пользоваться сайтом вы соглашаетесь с{" "}
+            <button
+              type="button"
+              onClick={() => setView("privacy-policy")}
+              className="inline cursor-pointer text-primary underline decoration-primary/70 underline-offset-4 transition-colors hover:text-primary/80"
+            >
+              политикой в отношении обработки персональных данных и использованием куки
+            </button>
+          </p>
+          <button
+            type="button"
+            onClick={acknowledgeCookieNotice}
+            className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-xl bg-primary px-6 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          >
+            Хорошо
+          </button>
+        </aside>
+      )}
       {apiError && !["login", "register", "privacy-policy"].includes(view) && (
         <div role="alert" className="mx-4 mt-20 rounded-xl border border-amber-400/25 bg-amber-400/10 px-4 py-3 text-sm text-amber-100 md:mx-10">
           {t("source.errorBanner")}
