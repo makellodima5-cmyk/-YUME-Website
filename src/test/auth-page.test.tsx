@@ -20,7 +20,7 @@ describe("AuthPage registration gating", () => {
       connectedProvider: null,
     });
 
-    render(<AuthPage mode="register" language="ru" onModeChange={vi.fn()} onPrivacy={vi.fn()} />);
+    render(<AuthPage mode="register" language="ru" onModeChange={vi.fn()} onPrivacy={vi.fn()} onAgreement={vi.fn()} />);
 
     const registerButton = screen.getByRole("button", { name: "Зарегистрироваться" });
     await waitFor(() => expect(screen.getByRole("button", { name: /Продолжить через VK ID/ })).toBeDisabled());
