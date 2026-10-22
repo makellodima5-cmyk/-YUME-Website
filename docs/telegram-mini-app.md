@@ -2,7 +2,7 @@
 
 ## Current implementation
 
-The Telegram Web App SDK is loaded by the root document. The client bridge calls `ready()` and `expand()`, and synchronizes Telegram viewport and safe-area values with CSS custom properties. In Telegram, the website sign-in button and VK ID / Yandex ID sign-in and registration screens are hidden; attempts to open those sections return to the home screen. Website authentication remains unchanged outside Telegram.
+The Telegram Web App SDK is loaded by the root document. The client bridge calls `ready()` and `expand()`, and synchronizes Telegram viewport and safe-area values with CSS custom properties. VK ID and Yandex ID authentication endpoints and UI have been removed. YUME account sign-in and creation are available only inside the Telegram Mini App; a browser opened outside Telegram can browse the catalog without the removed website login flow.
 
 The `/api/telegram/init-data` endpoint validates the raw `Telegram.WebApp.initData` payload using Telegram's HMAC-SHA-256 algorithm and rejects malformed payloads, duplicate query keys, invalid signatures, missing user identity, and authentication data older than five minutes (with a 30-second future-clock tolerance).
 
@@ -13,7 +13,7 @@ The `/api/telegram/init-data` endpoint validates the raw `Telegram.WebApp.initDa
 - On consent, the server creates a YUME account keyed by the verified Telegram ID and records the consent timestamp and policy version. The account stores Telegram profile fields and does not require a date of birth.
 - Sessions use the existing `__Host-yume-session` HttpOnly, Secure, SameSite=Lax cookie and store only a SHA-256 token hash in D1. Sessions expire after 30 days.
 - `GET /api/telegram/init-data` checks the current session; `DELETE /api/telegram/init-data` revokes it and clears the cookie.
-- Migration `0003_add_telegram_accounts.sql` expands the provider schema and preserves existing VK/Yandex accounts and sessions.
+- Migration `0005_telegram_only_accounts.sql` makes Telegram the only supported identity provider, removes the legacy date-of-birth field, and retains only verified Telegram accounts and their sessions.
 
 ## Required server secrets
 
@@ -21,7 +21,7 @@ Configure `TELEGRAM_BOT_TOKEN` and `YUME_AUTH_SESSION_SECRET` in the deployment 
 
 ## Deployment and verification
 
-Apply the D1 migration before enabling Telegram account creation. Run automated tests, lint, and the Cloudflare Worker build in CI. The account/session implementation must be exercised against the target D1 database before production use. Existing VK ID and Yandex ID website flows are intentionally retained outside Telegram.
+Apply the D1 migration before enabling Telegram account creation. Run automated tests, lint, and the Cloudflare Worker build in CI. Apply the pending migrations to the configured remote D1 database before production use. No Telegram bot webhook is required for Mini App `initData` authentication; webhook and `/start` welcome-message behavior can be added separately when the bot flow is designed.
 
 ## Account-owned favorites and watchlist
 

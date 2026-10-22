@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
-import { Home, LayoutGrid, Library, User, Menu, X, Bell, Moon, Sun, ShieldCheck, Heart, Clock3, Star, Languages, Bookmark, Megaphone, Radio, Sparkles, LogIn } from "lucide-react";
+import { Home, LayoutGrid, Library, User, Menu, X, Bell, Moon, Sun, ShieldCheck, Heart, Clock3, Star, Languages, Bookmark, Megaphone, Radio, Sparkles } from "lucide-react"
 import { Logo } from "./Logo";
 import { useYumePreferences } from "@/data/preferences";
 
-export type View = "home" | "catalog" | "collections" | "profile" | "popular" | "new-releases" | "announcements" | "airing" | "favorites" | "watchlist" | "history" | "privacy" | "privacy-policy" | "login" | "register" | "rules" | "rights";
+export type View = "home" | "catalog" | "collections" | "profile" | "popular" | "new-releases" | "announcements" | "airing" | "favorites" | "watchlist" | "history" | "privacy" | "privacy-policy" | "rules" | "rights";
 
 export const NAV: { id: View; label: string; icon: typeof Home }[] = [
   { id: "home", label: "Главная", icon: Home },
@@ -15,10 +15,9 @@ type Props = {
   view: View;
   setView: (v: View) => void;
   onProfile: () => void;
-  isTelegramMiniApp?: boolean;
 };
 
-export function Header({ view, setView, onProfile, isTelegramMiniApp = false }: Props) {
+export function Header({ view, setView, onProfile }: Props) {
   const { t, theme, setTheme, language, setLanguage } = useYumePreferences();
   const [menuOpen, setMenuOpen] = useState(false);
   // Keep primary navigation labels directly tied to the active language.
@@ -114,17 +113,6 @@ export function Header({ view, setView, onProfile, isTelegramMiniApp = false }: 
               <Bell className="h-5 w-5" />
               <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-primary" />
             </button>
-            {!isTelegramMiniApp && view !== "login" && view !== "register" && (
-              <button
-                type="button"
-                onClick={() => setView("login")}
-                aria-label={language === "ru" ? "Войти" : "Sign in"}
-                className="flex h-9 items-center gap-1 rounded-full border border-primary/35 bg-primary/10 px-2 text-xs font-semibold text-foreground transition hover:bg-primary/20 sm:h-10 sm:gap-1.5 sm:px-3 sm:text-sm"
-              >
-                <LogIn className="hidden h-4 w-4 sm:block" />
-                <span>{language === "ru" ? "Войти" : "Sign in"}</span>
-              </button>
-            )}
             <button
               type="button"
               onClick={onProfile}

@@ -5,7 +5,6 @@ import { COLLECTIONS, type Anime } from "@/data/anime";
 import { getShikimoriCatalog } from "@/data/shikimori";
 import { getExactReleaseDate, isNewRelease, isUpcomingAnnouncement } from "@/data/anime-sections";
 import { Header, type View } from "@/components/yume/Header";
-import { AuthPage } from "@/components/yume/AuthPage";
 import { AnimeCard } from "@/components/yume/Poster";
 import { CollectionsGrid, Grid, Hero, Row } from "@/components/yume/Sections";
 import { CatalogFilters, EMPTY_CATALOG_FILTERS, type CatalogFiltersValue } from "@/components/yume/CatalogFilters";
@@ -416,8 +415,6 @@ function Index() {
   const [collection, setCollection] = useState<string | null>(null);
 
   const setView = (v: View) => {
-    // Telegram Mini Apps use Telegram identity, not the website OAuth screens.
-    if (isTelegramMiniApp && (v === "login" || v === "register")) v = "home";
     // Tapping Home is also a quick way out of search results: restore the default home state.
     if (v === "home") {
       setQuery("");
@@ -444,12 +441,6 @@ function Index() {
     navigate({ to: "/", search: { section: v, q: undefined, page: undefined, sort: undefined, genres: undefined, status: undefined, from: undefined, to: undefined, rating: undefined, kind: undefined, age: undefined } });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
-  useEffect(() => {
-    if (isTelegramMiniApp && (section === "login" || section === "register")) {
-      setView("home");
-    }
-  }, [isTelegramMiniApp, section]);
-
   const select = (anime: Anime) =>
     navigate({ to: "/anime/$animeId", params: { animeId: anime.id } });
   const random = () => {
@@ -629,7 +620,7 @@ function Index() {
   const visibleAiringAnime = airingAnime.slice((airingPage - 1) * catalogPageSize, airingPage * catalogPageSize);
   return (
     <div className="min-h-screen pb-8">
-      <Header view={view} setView={setView} isTelegramMiniApp={isTelegramMiniApp} onProfile={() => setView(isTelegramMiniApp ? "profile" : "login")} />
+      <Header view={view} setView={setView} onProfile={() => setView("profile")} />
       {isTelegramMiniApp && telegramConsentRequired && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-background/85 px-4 py-6 backdrop-blur-md" role="dialog" aria-modal="true" aria-labelledby="telegram-consent-title">
           <section className="w-full max-w-md rounded-3xl border border-border bg-card p-6 shadow-2xl sm:p-8">
@@ -681,7 +672,7 @@ function Index() {
           </button>
         </aside>
       )}
-      {apiError && !["login", "register", "privacy-policy"].includes(view) && (
+      {apiError && view !== "privacy-policy" && (
         <div role="alert" className="mx-4 mt-20 rounded-xl border border-amber-400/25 bg-amber-400/10 px-4 py-3 text-sm text-amber-100 md:mx-10">
           {t("source.errorBanner")}
         </div>
@@ -707,14 +698,6 @@ function Index() {
             </>
           )}
         </main>
-      ) : (view === "login" || view === "register") && !isTelegramMiniApp ? (
-        <AuthPage
-          key={view}
-          mode={view}
-          language={language}
-          onModeChange={(mode) => setView(mode)}
-          onPrivacy={() => setView("privacy-policy")}
-        />
       ) : view === "home" ? (
         <main id="main-content" className="pt-16">
           <Hero onCatalog={() => setView("catalog")} onRandom={random} query={query} setQuery={setQuery} onSubmitSearch={submitHomeSearch} filtersOpen={filtersOpen && (!needsFullCatalog || catalogLoadState === "loaded" || catalogLoadState === "error")} setFiltersOpen={setFiltersOpen} draftFilters={draftFilters} setDraftFilters={setDraftFilters} onApplyFilters={applyCatalogFilters} onResetFilters={resetCatalogFilters} activeFilterCount={activeFilterCount} genres={availableGenres} statuses={availableStatuses} types={availableTypes} ageRatings={availableAgeRatings} yearMin={catalogYearRange.min} yearMax={catalogYearRange.max} />

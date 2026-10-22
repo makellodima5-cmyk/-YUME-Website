@@ -8,10 +8,10 @@ import { validateCatalogSearch } from "@/data/catalog-search";
 // Match routes without running loaders or rendering: loaders may need a server or
 // network the test run lacks, and jsdom never loads the stylesheets React waits on.
 describe("App routing", () => {
-  it("accepts login, registration, and direct privacy-policy views", () => {
-    expect(validateCatalogSearch({ section: "login" }).section).toBe("login");
-    expect(validateCatalogSearch({ section: "register" }).section).toBe("register");
+  it("accepts a direct privacy-policy view and rejects removed auth views", () => {
     expect(validateCatalogSearch({ section: "privacy-policy" }).section).toBe("privacy-policy");
+    expect(validateCatalogSearch({ section: "login" }).section).toBeUndefined();
+    expect(validateCatalogSearch({ section: "register" }).section).toBeUndefined();
   });
 
   it("matches a page for / instead of falling back to not found", () => {

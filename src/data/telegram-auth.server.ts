@@ -92,9 +92,12 @@ function jsonResponse(payload: unknown, status = 200, cookies: string[] = []): R
 
 async function ensureSchema(db: TelegramDatabase): Promise<void> {
   const existing = await db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'yume_users'").first<{ sql: string }>();
+  // The nullable date field is a temporary compatibility bridge for older migration history.
+  // Migration 0005 removes it from the final schema.
+  const createTelegramUsersTable = "CREATE TABLE IF NOT EXISTS yume_users (id TEXT PRIMARY KEY NOT NULL, provider TEXT NOT NULL CHECK (provider = 'telegram'), provider_user_id TEXT NOT NULL, telegram_user_id TEXT UNIQUE, telegram_first_name TEXT, telegram_last_name TEXT, telegram_username TEXT, telegram_language_code TEXT, birth_date TEXT, privacy_consent_at TEXT NOT NULL, privacy_policy_version TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, UNIQUE (provider, provider_user_id))";
   if (!existing) {
     await db.batch([
-      db.prepare("CREATE TABLE IF NOT EXISTS yume_users (id TEXT PRIMARY KEY NOT NULL, provider TEXT NOT NULL CHECK (provider IN ('vk', 'yandex', 'telegram')), provider_user_id TEXT NOT NULL, telegram_user_id TEXT UNIQUE, telegram_first_name TEXT, telegram_last_name TEXT, telegram_username TEXT, telegram_language_code TEXT, birth_date TEXT, privacy_consent_at TEXT NOT NULL, privacy_policy_version TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, UNIQUE (provider, provider_user_id))"),
+      db.prepare(createTelegramUsersTable),
       db.prepare("CREATE TABLE IF NOT EXISTS yume_sessions (token_hash TEXT PRIMARY KEY NOT NULL, user_id TEXT NOT NULL REFERENCES yume_users(id) ON DELETE CASCADE, expires_at INTEGER NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)"),
       db.prepare("CREATE INDEX IF NOT EXISTS idx_yume_sessions_expiry ON yume_sessions(expires_at)"),
     ]);
@@ -102,12 +105,12 @@ async function ensureSchema(db: TelegramDatabase): Promise<void> {
   }
 
   if (!existing.sql.includes("telegram_user_id")) {
-    // Rebuild the identity table while preserving existing VK/Yandex accounts and active sessions.
+    // Convert the old identity table to Telegram-only; legacy-provider accounts/sessions are not carried over.
     await db.batch([
-      db.prepare("CREATE TABLE yume_users_new (id TEXT PRIMARY KEY NOT NULL, provider TEXT NOT NULL CHECK (provider IN ('vk', 'yandex', 'telegram')), provider_user_id TEXT NOT NULL, telegram_user_id TEXT UNIQUE, telegram_first_name TEXT, telegram_last_name TEXT, telegram_username TEXT, telegram_language_code TEXT, birth_date TEXT, privacy_consent_at TEXT NOT NULL, privacy_policy_version TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, UNIQUE (provider, provider_user_id))"),
-      db.prepare("INSERT INTO yume_users_new (id, provider, provider_user_id, birth_date, privacy_consent_at, privacy_policy_version, created_at) SELECT id, provider, provider_user_id, birth_date, privacy_consent_at, privacy_policy_version, created_at FROM yume_users"),
+      db.prepare("CREATE TABLE yume_users_new (id TEXT PRIMARY KEY NOT NULL, provider TEXT NOT NULL CHECK (provider = 'telegram'), provider_user_id TEXT NOT NULL, telegram_user_id TEXT UNIQUE, telegram_first_name TEXT, telegram_last_name TEXT, telegram_username TEXT, telegram_language_code TEXT, birth_date TEXT, privacy_consent_at TEXT NOT NULL, privacy_policy_version TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, UNIQUE (provider, provider_user_id))"),
+      db.prepare("INSERT INTO yume_users_new (id, provider, provider_user_id, birth_date, privacy_consent_at, privacy_policy_version, created_at) SELECT id, provider, provider_user_id, birth_date, privacy_consent_at, privacy_policy_version, created_at FROM yume_users WHERE provider = 'telegram'"),
       db.prepare("CREATE TABLE yume_sessions_new (token_hash TEXT PRIMARY KEY NOT NULL, user_id TEXT NOT NULL REFERENCES yume_users_new(id) ON DELETE CASCADE, expires_at INTEGER NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)"),
-      db.prepare("INSERT INTO yume_sessions_new (token_hash, user_id, expires_at, created_at) SELECT token_hash, user_id, expires_at, created_at FROM yume_sessions"),
+      db.prepare("INSERT INTO yume_sessions_new (token_hash, user_id, expires_at, created_at) SELECT s.token_hash, s.user_id, s.expires_at, s.created_at FROM yume_sessions s JOIN yume_users_new u ON u.id = s.user_id"),
       db.prepare("DROP TABLE yume_sessions"),
       db.prepare("DROP TABLE yume_users"),
       db.prepare("ALTER TABLE yume_users_new RENAME TO yume_users"),
