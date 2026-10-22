@@ -513,15 +513,16 @@ function Index() {
           aria-label="Уведомление об использовании cookie"
           className="fixed inset-x-3 bottom-3 z-[60] mx-auto flex max-w-5xl flex-col gap-3 rounded-2xl border border-primary/25 bg-background/95 p-4 shadow-2xl backdrop-blur-md sm:inset-x-5 sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:px-6 sm:py-4"
         >
-          <p className="max-w-3xl text-sm leading-relaxed text-foreground/90">
-            Продолжая пользоваться сайтом вы соглашаетесь с{" "}
+          <p className="max-w-3xl text-center text-sm leading-relaxed text-foreground/90 sm:text-left">
+            Мы используем cookie. Продолжая пользоваться сайтом, вы соглашаетесь с{" "}
             <button
               type="button"
               onClick={() => setView("privacy-policy")}
               className="inline cursor-pointer text-primary underline decoration-primary/70 underline-offset-4 transition-colors hover:text-primary/80"
             >
-              политикой в отношении обработки персональных данных и использованием куки
+              политикой конфиденциальности
             </button>
+            .
           </p>
           <button
             type="button"
