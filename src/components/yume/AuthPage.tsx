@@ -182,7 +182,7 @@ export function AuthPage({ mode, language, onModeChange, onPrivacy }: Props) {
     setAuthBusyProvider(provider);
     setAuthMessage("");
     setRegistrationMessage("");
-    const url = "/api/auth/" + provider + "?action=start&flow=" + mode;
+    const url = "/api/auth/" + provider + "?flow=" + mode;
     window.location.assign(url);
   };
 
