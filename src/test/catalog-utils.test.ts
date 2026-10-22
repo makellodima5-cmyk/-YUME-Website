@@ -35,7 +35,7 @@ describe("catalog filtering and sorting", () => {
       status: "Онгоинг",
       yearFrom: "2026",
       yearTo: "2026",
-      minRating: 8.5,
+      minRating: 9,
       type: "TV",
       ageRating: "12+",
     }), "rating", "ru", translateGenre);
