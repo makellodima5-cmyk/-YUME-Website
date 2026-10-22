@@ -18,6 +18,7 @@ export interface TelegramWebApp {
   contentSafeAreaInset?: { top?: number; right?: number; bottom?: number; left?: number };
   ready(): void;
   expand(): void;
+  disableVerticalSwipes?(): void;
   onEvent?(eventType: string, eventHandler: () => void): void;
   offEvent?(eventType: string, eventHandler: () => void): void;
 }
@@ -59,6 +60,9 @@ export function initializeTelegramMiniApp(): (() => void) | undefined {
   // ready() hides Telegram's loading placeholder; expand() requests the available height.
   webApp.ready();
   webApp.expand();
+  // Prevent Telegram's vertical swipe gesture from collapsing the Mini App while
+  // the user scrolls the page. Older Telegram clients may not expose this method.
+  webApp.disableVerticalSwipes?.();
   setInsetVariables(webApp);
 
   const refreshViewport = () => setInsetVariables(webApp);
