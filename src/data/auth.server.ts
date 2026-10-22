@@ -83,7 +83,7 @@ function publicOrigin(request: Request, env: AuthEnvironment): string {
 function redirectUri(request: Request, env: AuthEnvironment, provider: Provider): string {
   const configured = provider === "vk" ? env.VKID_REDIRECT_URI : env.YANDEX_REDIRECT_URI;
   if (typeof configured === "string" && configured.trim()) return configured.trim();
-  return publicOrigin(request, env) + "/api/auth/" + provider + "?action=callback";
+  return publicOrigin(request, env) + "/api/auth/" + provider + "/callback";
 }
 function base64UrlEncode(bytes: Uint8Array): string {
   let binary = "";
@@ -294,15 +294,14 @@ async function completeAuthorization(request: Request, provider: Provider): Prom
 
 export async function handleProviderAuth(request: Request, providerParam: string): Promise<Response> {
   if (!isProvider(providerParam)) return jsonResponse({ error: "unknown_provider" }, 404);
-  const url = new URL(request.url);
-  const action = url.searchParams.get("action") ?? "start";
-  if (action === "start") {
-    const flow = url.searchParams.get("flow");
-    if (!isFlow(flow)) return jsonResponse({ error: "invalid_flow" }, 400);
-    return startAuthorization(request, providerParam, flow);
-  }
-  if (action === "callback") return completeAuthorization(request, providerParam);
-  return jsonResponse({ error: "unknown_action" }, 400);
+  const flow = new URL(request.url).searchParams.get("flow");
+  if (!isFlow(flow)) return jsonResponse({ error: "invalid_flow" }, 400);
+  return startAuthorization(request, providerParam, flow);
+}
+
+export async function handleProviderCallback(request: Request, providerParam: string): Promise<Response> {
+  if (!isProvider(providerParam)) return jsonResponse({ error: "unknown_provider" }, 404);
+  return completeAuthorization(request, providerParam);
 }
 
 export async function handleAuthStatus(request: Request): Promise<Response> {
