@@ -10,6 +10,7 @@ import { AnimeCard } from "@/components/yume/Poster";
 import { CollectionsGrid, Grid, Hero, Row } from "@/components/yume/Sections";
 import { CatalogFilters, EMPTY_CATALOG_FILTERS, type CatalogFiltersValue } from "@/components/yume/CatalogFilters";
 import { Profile } from "@/components/yume/Profile";
+import { Footer } from "@/components/yume/Footer";
 import { useYumePreferences, displayGenre, type TranslationKey } from "@/data/preferences";
 import { filterAndSortCatalog, getCatalogPageCount, paginateCatalog } from "@/data/catalog-utils";
 import { validateCatalogSearch } from "@/data/catalog-search";
@@ -779,20 +780,8 @@ function Index() {
           <p className="rounded-2xl border border-dashed border-border bg-card/40 px-5 py-8 text-sm text-muted-foreground">{t("history.empty")}</p>
         </main>
       ) : null}
-      {!["profile", "privacy-policy"].includes(view) && (
-        <footer className="mt-16 border-t border-border/70 bg-card/20 px-4 pb-8 pt-7 md:px-10 md:pt-8">
-          <div className="mx-auto flex max-w-6xl flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-            <div className="min-w-0">
-              <p className="font-display text-sm font-bold tracking-wide text-foreground">YUME</p>
-              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{t("footer.source")}</p>
-            </div>
-            <nav aria-label={language === "en" ? "Legal information" : "Правовая информация"} className="flex flex-wrap gap-x-5 gap-y-2 text-xs sm:justify-end sm:text-sm">
-              <button type="button" onClick={() => setView("privacy-policy")} className="text-muted-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:ring-offset-background">{language === "en" ? "Privacy policy" : "Политика конфиденциальности"}</button>
-              <button type="button" onClick={() => setView("rights")} className="text-muted-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:ring-offset-background">{language === "en" ? "For copyright holders" : "Для правообладателей"}</button>
-              <button type="button" onClick={() => setView("rules")} className="text-muted-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:ring-offset-background">{language === "en" ? "Site rules" : "Правила сайта"}</button>
-            </nav>
-          </div>
-        </footer>
+      {!["profile", "favorites", "watchlist", "privacy", "privacy-policy", "rules", "rights"].includes(view) && (
+        <Footer onNavigate={setView} />
       )}
     </div>
   );

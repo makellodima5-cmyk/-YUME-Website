@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { getShikimoriAnimes } from "@/data/shikimori";
 import { Header, type View } from "@/components/yume/Header";
+import { Footer } from "@/components/yume/Footer";
 import { AnimeCard, PosterArt } from "@/components/yume/Poster";
 import { useYumePreferences, displayAnimeTitle, displayAnimeStatus, displayGenre, displayAnimeKind } from "@/data/preferences";
 import { FAVORITES_STORAGE_KEY, readSavedAnimeIds, toggleSavedAnimeId, WATCHLIST_STORAGE_KEY } from "@/data/profile-storage";
@@ -478,9 +479,7 @@ function AnimeDetailPage() {
         </div>
       </main>
 
-      <footer className="mt-16 px-4 text-center text-xs text-muted-foreground md:px-10">
-        {t("footer.source")}
-      </footer>
+      <Footer onNavigate={navigateToSection} />
 
     </div>
   );
