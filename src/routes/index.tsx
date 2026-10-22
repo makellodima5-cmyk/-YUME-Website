@@ -187,7 +187,7 @@ function HomeQuickControls({ onProfile }: { onProfile: () => void }) {
           <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${openMenu === "language" ? "rotate-180" : ""}`} />
         </button>
         {openMenu === "language" && (
-          <div role="listbox" aria-label={t("settings.language")} className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-50 overflow-hidden rounded-2xl border border-primary/45 bg-[#0c0a12]/[.98] p-1.5 shadow-2xl backdrop-blur-xl">
+          <div role="listbox" aria-label={t("settings.language")} className="absolute left-0 top-[calc(100%+0.5rem)] z-50 min-w-[9.5rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-border bg-popover p-1.5 text-popover-foreground shadow-2xl backdrop-blur-xl">
             {languageOptions.map((option) => (
               <button
                 key={option.value}
@@ -195,10 +195,10 @@ function HomeQuickControls({ onProfile }: { onProfile: () => void }) {
                 role="option"
                 aria-selected={language === option.value}
                 onClick={() => { setLanguage(option.value); setOpenMenu(null); }}
-                className={`flex w-full items-center gap-2 rounded-xl px-2 py-2.5 text-left text-xs transition sm:text-sm ${language === option.value ? "bg-primary/20 text-foreground" : "text-foreground/85 hover:bg-white/[.06]"}`}
+                className={`flex w-full items-center gap-2 whitespace-nowrap rounded-xl px-2 py-2.5 text-left text-xs transition sm:text-sm ${language === option.value ? "bg-primary/20 text-popover-foreground" : "text-popover-foreground/85 hover:bg-accent/70"}`}
               >
                 <span aria-hidden="true">{option.flag}</span>
-                <span className="min-w-0 flex-1">{option.label}</span>
+                <span className="min-w-0 flex-1 whitespace-nowrap">{option.label}</span>
                 <span className={`h-3.5 w-3.5 shrink-0 rounded-full border ${language === option.value ? "border-primary bg-primary shadow-[inset_0_0_0_3px_#171020]" : "border-muted-foreground/60"}`} />
               </button>
             ))}
@@ -219,7 +219,7 @@ function HomeQuickControls({ onProfile }: { onProfile: () => void }) {
           <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${openMenu === "theme" ? "rotate-180" : ""}`} />
         </button>
         {openMenu === "theme" && (
-          <div role="listbox" aria-label={t("settings.theme")} className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-50 overflow-hidden rounded-2xl border border-primary/45 bg-[#0c0a12]/[.98] p-1.5 shadow-2xl backdrop-blur-xl">
+          <div role="listbox" aria-label={t("settings.theme")} className="absolute right-0 top-[calc(100%+0.5rem)] z-50 min-w-[13rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-border bg-popover p-1.5 text-popover-foreground shadow-2xl backdrop-blur-xl">
             {themeOptions.map((option) => {
               const Icon = option.icon;
               return (
@@ -229,7 +229,7 @@ function HomeQuickControls({ onProfile }: { onProfile: () => void }) {
                   role="option"
                   aria-selected={theme === option.value}
                   onClick={() => { setTheme(option.value); setOpenMenu(null); }}
-                  className={`flex w-full items-center gap-2 rounded-xl px-2 py-2.5 text-left text-xs transition sm:text-sm ${theme === option.value ? "bg-primary/20 text-foreground" : "text-foreground/85 hover:bg-white/[.06]"}`}
+                  className={`flex w-full items-center gap-2 whitespace-nowrap rounded-xl px-2 py-2.5 text-left text-xs transition sm:text-sm ${theme === option.value ? "bg-primary/20 text-popover-foreground" : "text-popover-foreground/85 hover:bg-accent/70"}`}
                 >
                   <Icon className="h-4 w-4 shrink-0" />
                   <span className="min-w-0 flex-1">{option.label}</span>
