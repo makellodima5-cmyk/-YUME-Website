@@ -285,6 +285,11 @@ function Index() {
   const [telegramConsentPending, setTelegramConsentPending] = useState(false);
   const [telegramConsentSubmitting, setTelegramConsentSubmitting] = useState(false);
   const [telegramAuthError, setTelegramAuthError] = useState("");
+  const [adminCheckVersion, setAdminCheckVersion] = useState(0);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [adminStats, setAdminStats] = useState<{ total: number; pending: number; checked: number; found: number; missing: number } | null>(null);
+  const [adminRunning, setAdminRunning] = useState(false);
+  const [adminMessage, setAdminMessage] = useState("");
   const [cookieNoticeAcknowledged, setCookieNoticeAcknowledged] = useState(true);
 
   useEffect(() => {
@@ -639,6 +644,28 @@ function Index() {
   return (
     <div className="min-h-screen pb-8">
       <Header view={view} setView={setView} onProfile={() => setView("profile")} />
+      {isAdmin && (
+        <section className="mx-4 mb-4 mt-20 rounded-2xl border border-primary/30 bg-card p-4 shadow-lg md:mx-10" aria-label="Администрирование">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="h-5 w-5 text-primary" />
+            <h2 className="text-lg font-semibold">{language === "ru" ? "Администрирование" : "Administration"}</h2>
+          </div>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {language === "ru" ? "Обновление трейлеров для аниме, уже сохранённых в каталоге. Данные остальных полей не изменяются." : "Update trailers for anime already stored in the catalog. Other fields will not be changed."}
+          </p>
+          <div className="mt-3 grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
+            <div className="rounded-xl bg-background/70 p-3"><span className="block text-muted-foreground">{language === "ru" ? "Без трейлера" : "Missing trailers"}</span><strong>{adminStats?.missing ?? "—"}</strong></div>
+            <div className="rounded-xl bg-background/70 p-3"><span className="block text-muted-foreground">{language === "ru" ? "Проверено" : "Checked"}</span><strong>{adminStats?.checked ?? 0}</strong></div>
+            <div className="rounded-xl bg-background/70 p-3"><span className="block text-muted-foreground">{language === "ru" ? "Найдено трейлеров" : "Trailers found"}</span><strong>{adminStats?.found ?? 0}</strong></div>
+            <div className="rounded-xl bg-background/70 p-3"><span className="block text-muted-foreground">{language === "ru" ? "В очереди" : "Queue"}</span><strong>{adminStats?.pending ?? 0}</strong></div>
+          </div>
+          <button type="button" onClick={runTrailerUpdate} disabled={adminRunning || adminStats?.missing === 0} className="mt-4 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition hover:brightness-110 disabled:cursor-wait disabled:opacity-50">
+            <ShieldCheck className="h-4 w-4" />
+            {adminRunning ? (language === "ru" ? "Обновление…" : "Updating…") : (language === "ru" ? "Обновить трейлеры" : "Update trailers")}
+          </button>
+          {adminMessage && <p className="mt-3 text-sm text-muted-foreground" role="status">{adminMessage}</p>}
+        </section>
+      )}
       {isTelegramMiniApp && telegramConsentRequired && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-background/85 px-4 py-6 backdrop-blur-md" role="dialog" aria-modal="true" aria-labelledby="telegram-consent-title">
           <section className="w-full max-w-md rounded-3xl border border-border bg-card p-6 shadow-2xl sm:p-8">
