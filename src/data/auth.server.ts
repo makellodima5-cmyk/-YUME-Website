@@ -188,7 +188,7 @@ async function providerIdentity(request: Request, env: AuthEnvironment, state: O
       state: state.state,
       device_id: callbackDeviceId,
     });
-    const tokenResponse = await fetch("https://id.vk.com/oauth2/auth?" + params.toString(), {
+    const tokenResponse = await fetch("https://id.vk.ru/oauth2/auth?" + params.toString(), {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({ code }),
@@ -197,7 +197,7 @@ async function providerIdentity(request: Request, env: AuthEnvironment, state: O
     const accessToken = textValue(tokenPayload.access_token);
     if (!tokenResponse.ok || !accessToken || (tokenPayload.state && tokenPayload.state !== state.state)) throw new Error("VK_ID_TOKEN_EXCHANGE_FAILED");
 
-    const infoUrl = new URL("https://id.vk.com/oauth2/user_info");
+    const infoUrl = new URL("https://id.vk.ru/oauth2/user_info");
     infoUrl.searchParams.set("client_id", clientId);
     const infoResponse = await fetch(infoUrl, {
       method: "POST",
@@ -263,7 +263,7 @@ async function startAuthorization(request: Request, provider: Provider, flow: Au
   };
   const challenge = await pkceChallenge(state.verifier);
   const uri = redirectUri(request, env, provider);
-  const authorizeUrl = new URL(provider === "vk" ? "https://id.vk.com/authorize" : "https://oauth.yandex.ru/authorize");
+  const authorizeUrl = new URL(provider === "vk" ? "https://id.vk.ru/authorize" : "https://oauth.yandex.ru/authorize");
   authorizeUrl.searchParams.set("response_type", "code");
   authorizeUrl.searchParams.set("client_id", provider === "vk" ? String(env.VKID_CLIENT_ID) : String(env.YANDEX_CLIENT_ID));
   authorizeUrl.searchParams.set("redirect_uri", uri);
