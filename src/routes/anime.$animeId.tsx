@@ -11,7 +11,7 @@ import {
   Play,
   Star,
 } from "lucide-react";
-import { getShikimoriAnimes, getShikimoriCatalog } from "@/data/shikimori";
+import { getShikimoriCatalog } from "@/data/shikimori";
 import { Header, type View } from "@/components/yume/Header";
 import { Footer } from "@/components/yume/Footer";
 import { AnimeCard, PosterArt } from "@/components/yume/Poster";
@@ -45,27 +45,12 @@ function formatAnimeDate(value: string | undefined, language: "ru" | "en", inclu
 }
 
 export const Route = createFileRoute("/anime/$animeId")({
-  loader: async ({ params }) => {
-    const isShikimoriId = /^\d+$/.test(params.animeId);
-    if (!isShikimoriId) {
-      const catalog = await getShikimoriAnimes({ data: { page: 1, limit: 50, order: "ranked" } });
-      return {
-        anime: null,
-        relatedAnime: catalog.items,
-        apiError: catalog.error,
-      };
-    }
-
-    // Prefer the direct Shikimori detail response for videos and fresh metadata,
-    // but fall back to the persistent D1 catalog if Shikimori is rate-limited or
-    // temporarily unavailable. A title already shown in YUME should not become
-    // an "Anime not found" page just because the detail endpoint failed.
-    const [detail, catalog] = await Promise.all([
-      getShikimoriAnimes({ data: { ids: params.animeId, limit: 1, order: "ranked", includeVideos: true } }),
-      getShikimoriCatalog({ data: {} }),
-    ]);
-    const anime = detail.items[0] ?? catalog.items.find((item) => item.id === params.animeId) ?? null;
+  loader: async ({ p  loader: async ({ params }) => {
+    // D1 is the source of truth for all user-facing anime pages. Never fetch
+    // an individual title from Shikimori during normal navigation.
+    const catalog = await getShikimoriCatalog({ data: {} });
     const pool = catalog.items;
+    const anime = pool.find((item) => item.id === params.animeId) ?? null;
     const relatedAnime = anime
       ? pool
           .filter((item) => item.id !== anime.id)
@@ -76,9 +61,8 @@ export const Route = createFileRoute("/anime/$animeId")({
           })
           .slice(0, 6)
       : pool.slice(0, 6);
-    return { anime, relatedAnime, apiError: anime ? null : detail.error ?? catalog.error };
-  },
-  head: ({ loaderData }) => {
+    return { anime, relatedAnime, apiError: catalog.error };
+  },ta }) => {
     const anime = loaderData?.anime;
     const title = anime ? `${anime.title} — смотреть аниме | YUME` : "Аниме не найдено | YUME";
     const description = sanitizeMetaDescription(
