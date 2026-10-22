@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { validateTelegramInitData } from "@/data/telegram-auth.server";
+import { validateTelegramInitData } from "@/data/telegram-init-data";
 
 const BOT_TOKEN = "test-bot-token-for-signature-tests";
 
