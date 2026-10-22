@@ -4,6 +4,8 @@
 
 ## Документы
 
+- launch/fact-register.md — подтверждённые сведения владельца, проверенные факты кода, целевые решения и блокеры.
+
 - legal/privacy-policy-draft.md — рабочий проект политики под целевую конфигурацию; финализировать после ответов в launch/decisions-needed.md.
 - legal/user-agreement-draft.md — черновик соглашения.
 - legal/personal-data-consent-draft.md — отдельный шаблон согласия, цель и основание требуют согласования.
