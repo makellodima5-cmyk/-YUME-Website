@@ -40,6 +40,13 @@ jobs:
           src/data/seo.ts
           src/data/shikimori.ts
           src/data/profile-storage.ts
+          src/data/auth.server.ts
+          src/components/yume/AuthPage.tsx
+          'src/routes/api.auth.$provider.ts'
+          'src/routes/api.auth.$provider.callback.ts'
+          src/routes/api.auth.status.ts
+          src/routes/api.auth.register.ts
+          src/test/auth-page.test.tsx
           src/routes/__root.tsx
           src/components/yume/AnimeModal.tsx
           src/components/yume/Profile.tsx
