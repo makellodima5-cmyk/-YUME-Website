@@ -66,6 +66,10 @@ describe("Shikimori video URL validation", () => {
     expect(youtubeVideoId("https://youtube.com/embed/dQw4w9WgXcQ")).toBe("dQw4w9WgXcQ");
   });
 
+  it("requests video fields when the admin catalog seed opts in", () => {
+    expect(validateRequest({ includeVideos: true }).includeVideos).toBe(true);
+  });
+
   it("maps a Shikimori video as a trailer when it has a valid YouTube ID", () => {
     const mapped = mapAnime({
       id: "42",
