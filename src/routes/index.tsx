@@ -174,7 +174,6 @@ function Index() {
   const [telegramConsentRequired, setTelegramConsentRequired] = useState(false);
   const [telegramConsentSubmitting, setTelegramConsentSubmitting] = useState(false);
   const [telegramAuthError, setTelegramAuthError] = useState("");
-  const [telegramUserName, setTelegramUserName] = useState("");
   const [cookieNoticeAcknowledged, setCookieNoticeAcknowledged] = useState(true);
 
   useEffect(() => {
@@ -212,7 +211,6 @@ function Index() {
           : "Telegram sign-in failed. Please reopen the app.");
         return;
       }
-      setTelegramUserName(result.user?.firstName ?? "");
       setTelegramAuthError("");
       setTelegramConsentRequired(false);
     }).catch(() => {
@@ -254,7 +252,6 @@ function Index() {
           : "Could not create your account. Please try again.");
         return;
       }
-      setTelegramUserName(result.user?.firstName ?? "");
       setTelegramConsentRequired(false);
     } catch {
       setTelegramAuthError(language === "ru"
@@ -611,7 +608,7 @@ function Index() {
               {language === "ru"
                 ? "Чтобы создать аккаунт и сохранять твои данные, YUME будет обрабатывать Telegram ID и имя профиля в соответствии с "
                 : "To create your account and save your data, YUME will process your Telegram ID and profile name under the "}
-              <button type="button" onClick={() => setView("privacy-policy")} className="font-semibold text-primary underline underline-offset-4">
+              <button type="button" onClick={() => { setTelegramConsentRequired(false); setView("privacy-policy"); }} className="font-semibold text-primary underline underline-offset-4">
                 {language === "ru" ? "Политикой конфиденциальности" : "Privacy Policy"}
               </button>.
             </p>
