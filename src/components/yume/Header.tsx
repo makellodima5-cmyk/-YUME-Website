@@ -95,15 +95,15 @@ export function Header({ view, setView, onProfile }: Props) {
             aria-label={menuOpen ? t("nav.closeMenu") : t("nav.openMenu")}
             aria-expanded={menuOpen}
             aria-controls="yume-navigation-drawer"
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-foreground transition hover:bg-primary/10"
+            className="mt-5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-foreground transition hover:bg-primary/10"
           >
             {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
-          <button type="button" onClick={() => goToView("home")} aria-label={t("nav.home")} className="shrink-0">
+          <button type="button" onClick={() => goToView("home")} aria-label={t("nav.home")} className="mt-5 shrink-0">
             <Logo />
           </button>
           <div className="hidden min-w-0 flex-1 md:block" />
-          <div className="ml-auto flex items-center gap-1 sm:gap-2">
+          <div className="ml-auto mt-5 flex items-center gap-1 sm:gap-2">
             <button
               type="button"
               aria-label={t("nav.notifications")}
