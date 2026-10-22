@@ -164,11 +164,11 @@ function HomeQuickControls({ onProfile }: { onProfile: () => void }) {
   ];
 
   return (
-    <div ref={rootRef} className="relative z-30 mx-4 my-3 grid grid-cols-3 gap-2 md:mx-10 md:gap-3">
+    <div ref={rootRef} className="relative z-30 mx-4 my-3 grid grid-cols-3 items-start gap-2 md:mx-10 md:gap-3">
       <button
         type="button"
         onClick={onProfile}
-        className="flex min-h-12 items-center justify-center gap-2 rounded-full border border-primary/35 bg-card/80 px-2 text-sm font-medium text-foreground shadow-[0_4px_18px_rgba(156,92,255,0.08)] transition hover:border-primary/70 hover:bg-accent/70 sm:text-base"
+        className="flex min-h-12 w-full items-center justify-center gap-2 whitespace-nowrap rounded-full border border-primary/35 bg-card/80 px-2 text-sm font-medium text-foreground shadow-[0_4px_18px_rgba(156,92,255,0.08)] transition hover:border-primary/70 hover:bg-accent/70 sm:text-base"
       >
         <UserRound className="h-4 w-4 shrink-0 sm:h-5 sm:w-5" />
         <span>{t("nav.profileButton")}</span>
@@ -180,10 +180,10 @@ function HomeQuickControls({ onProfile }: { onProfile: () => void }) {
           aria-haspopup="listbox"
           aria-expanded={openMenu === "language"}
           onClick={() => setOpenMenu((current) => current === "language" ? null : "language")}
-          className={`flex min-h-12 w-full items-center justify-center gap-2 rounded-full border px-2 text-sm font-medium transition sm:text-base ${openMenu === "language" ? "border-primary bg-accent/70 shadow-neon" : "border-primary/35 bg-card/80 hover:border-primary/70 hover:bg-accent/70"}`}
+          className={`flex min-h-12 w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-full border px-2 text-sm font-medium transition sm:gap-2 sm:text-base ${openMenu === "language" ? "border-primary bg-accent/70 shadow-neon" : "border-primary/35 bg-card/80 hover:border-primary/70 hover:bg-accent/70"}`}
         >
           <Globe className="h-4 w-4 shrink-0 sm:h-5 sm:w-5" />
-          <span>{t("settings.language")}</span>
+          <span className="whitespace-nowrap">{language === "ru" ? "Язык" : "Language"}</span>
           <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${openMenu === "language" ? "rotate-180" : ""}`} />
         </button>
         {openMenu === "language" && (
@@ -212,10 +212,10 @@ function HomeQuickControls({ onProfile }: { onProfile: () => void }) {
           aria-haspopup="listbox"
           aria-expanded={openMenu === "theme"}
           onClick={() => setOpenMenu((current) => current === "theme" ? null : "theme")}
-          className={`flex min-h-12 w-full items-center justify-center gap-1.5 rounded-full border px-2 text-xs font-medium transition sm:gap-2 sm:text-sm ${openMenu === "theme" ? "border-primary bg-accent/70 shadow-neon" : "border-primary/35 bg-card/80 hover:border-primary/70 hover:bg-accent/70"}`}
+          className={`flex min-h-12 w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-full border px-2 text-sm font-medium transition sm:gap-2 sm:text-base ${openMenu === "theme" ? "border-primary bg-accent/70 shadow-neon" : "border-primary/35 bg-card/80 hover:border-primary/70 hover:bg-accent/70"}`}
         >
           {theme === "light" ? <Sun className="h-4 w-4 shrink-0 sm:h-5 sm:w-5" /> : theme === "system" ? <Monitor className="h-4 w-4 shrink-0 sm:h-5 sm:w-5" /> : <Moon className="h-4 w-4 shrink-0 sm:h-5 sm:w-5" />}
-          <span className="truncate">{t("settings.theme")}</span>
+          <span className="whitespace-nowrap">{language === "ru" ? "Тема" : "Theme"}</span>
           <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${openMenu === "theme" ? "rotate-180" : ""}`} />
         </button>
         {openMenu === "theme" && (
