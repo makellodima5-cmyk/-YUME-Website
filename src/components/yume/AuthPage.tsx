@@ -210,7 +210,7 @@ export function AuthPage({ mode, language, onModeChange, onPrivacy }: Props) {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ birthDate, privacyConsent: consentAccepted }),
+        body: JSON.stringify({ birthDate, privacyConsent: consentAccepted, userAgreementAccepted: true }),
       });
       const result = await response.json().catch(() => ({})) as { success?: boolean; error?: string };
       if (!response.ok || result.success !== true) {
@@ -219,6 +219,8 @@ export function AuthPage({ mode, language, onModeChange, onPrivacy }: Props) {
           setRegistrationMessage(copy.providerAuthRequired);
         } else if (result.error === "privacy_consent_required") {
           setRegistrationMessage(copy.privacyConsentRequired);
+        } else if (result.error === "user_agreement_acceptance_required") {
+          setRegistrationMessage(copy.registrationFailed);
         } else if (result.error === "invalid_birth_date") {
           setRegistrationMessage(copy.invalidBirthday);
         } else if (result.error === "auth_not_configured" || result.error === "auth_database_unavailable") {
