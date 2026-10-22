@@ -217,7 +217,7 @@ function findYouTubeTrailerId(videos: ShikimoriGraphQLVideo[] | null | undefined
       const kind = (video.kind ?? "").toLocaleLowerCase();
       const name = (video.name ?? "").toLocaleLowerCase();
       const isTrailerKind = kind === "pv" || kind === "character_trailer";
-      const isTrailerName = /trailer|preview|\\bpv\\b|промо|трейлер|тизер|予告/i.test(name);
+      const isTrailerName = /trailer|preview|\bpv\b|промо|трейлер|тизер|予告/i.test(name);
       const priority = isTrailerKind ? 0 : isTrailerName ? 1 : 2;
       // Shikimori metadata for video kind/name is not always consistent.
       // Prefer explicit trailers, but retain valid YouTube videos as a fallback.
