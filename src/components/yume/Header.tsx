@@ -15,9 +15,10 @@ type Props = {
   view: View;
   setView: (v: View) => void;
   onProfile: () => void;
+  isTelegramMiniApp?: boolean;
 };
 
-export function Header({ view, setView, onProfile }: Props) {
+export function Header({ view, setView, onProfile, isTelegramMiniApp = false }: Props) {
   const { t, theme, setTheme, language, setLanguage } = useYumePreferences();
   const [menuOpen, setMenuOpen] = useState(false);
   // Keep primary navigation labels directly tied to the active language.
@@ -113,7 +114,7 @@ export function Header({ view, setView, onProfile }: Props) {
               <Bell className="h-5 w-5" />
               <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-primary" />
             </button>
-            {view !== "login" && view !== "register" && (
+            {!isTelegramMiniApp && view !== "login" && view !== "register" && (
               <button
                 type="button"
                 onClick={() => setView("login")}
