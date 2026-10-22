@@ -277,7 +277,7 @@ function makeProgress(
  */
 export async function getPersistentCatalog(
   fetchSeedPage: (cursor: number) => Promise<CatalogSeedPageResult>,
-  options: { progressOnly?: boolean } = {},
+  options: { progressOnly?: boolean; allowImport?: boolean } = {},
 ): Promise<CatalogResult | null> {
   const db = database();
   if (!db) {
@@ -311,14 +311,22 @@ export async function getPersistentCatalog(
       return { items: await readRows(db), error: null, progress: makeProgress("ready", imported) };
     }
 
-    if (!state) {
-      await db.batch([
-        putMeta(db, "catalog_state", "seeding"),
-        putMeta(db, "catalog_cursor", "0"),
-        putMeta(db, "catalog_failures", "0"),
-        putMeta(db, "catalog_resume_at", "0"),
-      ]);
-      state = "seeding";
+    // User-facing requests never initialize or advance the upstream import.
+    // If D1 has no rows yet, return an empty catalogue until an administrator starts seeding.
+    if (!state || imported === 0) {
+      return {
+        items: [],
+        error: "Каталог ещё не загружен. Импорт должен быть запущен администратором.",
+        progress: makeProgress("partial", imported),
+      };
+    }
+
+    if (!options.allowImport) {
+      return {
+        items: options.progressOnly ? [] : await readRows(db),
+        error: null,
+        progress: makeProgress(state === "partial" ? "partial" : "ready", imported),
+      };
     }
 
     const now = Date.now();
