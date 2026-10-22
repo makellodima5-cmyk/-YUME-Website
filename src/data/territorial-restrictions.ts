@@ -21,7 +21,8 @@ const ruRestrictedIdSet: ReadonlySet<string> = new Set(RU_RESTRICTED_ANIME_IDS);
 export function normalizeCountryCode(country: unknown): string | null {
   if (typeof country !== "string") return null;
   const normalized = country.trim().toUpperCase();
-  return /^[A-Z]{2}$/.test(normalized) ? normalized : null;
+  if (!/^[A-Z]{2}$/.test(normalized) || normalized === "XX" || normalized === "T1") return null;
+  return normalized;
 }
 
 /**
