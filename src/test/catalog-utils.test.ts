@@ -42,22 +42,19 @@ describe("catalog filtering and sorting", () => {
     expect(result).toEqual([fixture]);
   });
 
-  it("treats the rating filter as a numeric minimum, not a digit/text match", () => {
+  it("matches the selected rating exactly, not every rating above it or titles containing that digit", () => {
     const items = [
       { ...ANIME[0]!, id: "rating-1", rating: 1 },
       { ...ANIME[1]!, id: "rating-4", rating: 4.5 },
       { ...ANIME[2]!, id: "rating-9", rating: 9 },
-      { ...ANIME[3]!, id: "rating-null", rating: null },
+      { ...ANIME[3]!, id: "rating-1-5", rating: 1.5 },
+      { ...ANIME[0]!, id: "rating-null", rating: null },
     ];
     expect(filterAndSortCatalog(items, "", filters({ minRating: 1 }), "rating", "ru", translateGenre).map((a) => a.id))
-      .toEqual(["rating-9", "rating-4", "rating-1"]);
-    expect(filterAndSortCatalog(items, "", filters({ minRating: 5 }), "rating", "ru", translateGenre).map((a) => a.id))
-      .toEqual(["rating-9"]);
-  });
-
-  it("excludes unknown ratings when a minimum rating is selected", () => {
-    const result = filterAndSortCatalog([{ ...ANIME[0]!, rating: null }], "", filters({ minRating: 1 }), "rating", "ru", translateGenre);
-    expect(result).toEqual([]);
+      .toEqual(["rating-1"]);
+    expect(filterAndSortCatalog(items, "", filters({ minRating: 4.5 }), "rating", "ru", translateGenre).map((a) => a.id))
+      .toEqual(["rating-4"]);
+    expect(filterAndSortCatalog(items, "", filters(), "rating", "ru", translateGenre)).toHaveLength(items.length);
   });
 
   it("sorts newest, oldest, title, and rating without mutating the input", () => {
