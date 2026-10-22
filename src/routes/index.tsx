@@ -779,7 +779,7 @@ function Index() {
           <p className="rounded-2xl border border-dashed border-border bg-card/40 px-5 py-8 text-sm text-muted-foreground">{t("history.empty")}</p>
         </main>
       ) : null}
-      {!["profile", "favorites", "watchlist", "privacy", "privacy-policy", "rules", "rights"].includes(view) && (
+      {!["profile", "privacy-policy"].includes(view) && (
         <footer className="mt-16 border-t border-border/70 bg-card/20 px-4 pb-8 pt-7 md:px-10 md:pt-8">
           <div className="mx-auto flex max-w-6xl flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
