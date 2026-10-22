@@ -13,9 +13,10 @@ type Props = {
   language: "ru" | "en";
   onModeChange: (mode: AuthMode) => void;
   onPrivacy: () => void;
+  onAgreement: () => void;
 };
 
-export function AuthPage({ mode, language, onModeChange, onPrivacy }: Props) {
+export function AuthPage({ mode, language, onModeChange, onPrivacy, onAgreement }: Props) {
   const isRu = language === "ru";
   const currentYear = new Date().getFullYear();
   const [day, setDay] = useState("");
@@ -57,7 +58,9 @@ export function AuthPage({ mode, language, onModeChange, onPrivacy }: Props) {
         consentSuffix: " на обработку моих персональных данных.",
         privacy: "Политикой конфиденциальности",
         registerUnavailable: "Регистрация пока недоступна. Подключение аккаунтов будет выполнено позже.",
-        cookieNotice: "Регистрируясь, вы соглашаетесь с Пользовательским соглашением и с использованием необходимых файлов cookie для работы сайта.",
+        cookieNoticePrefix: "Регистрируясь, вы соглашаетесь с ",
+        userAgreement: "Пользовательским соглашением",
+        cookieNoticeSuffix: " и с использованием необходимых файлов cookie для работы сайта.",
         loginPolicy: "Политика конфиденциальности",
         providerSetupNotice: "Чтобы зарегистрироваться, сначала подключи VK ID или Яндекс ID. Без подтверждённой авторизации аккаунт не создаётся.",
         connectedNotice: "Авторизация подтверждена через ",
@@ -98,7 +101,9 @@ export function AuthPage({ mode, language, onModeChange, onPrivacy }: Props) {
         consentSuffix: " for the processing of my personal data.",
         privacy: "Privacy Policy",
         registerUnavailable: "Registration is not available yet. Account sign-in will be connected later.",
-        cookieNotice: "By registering, you agree to the User Agreement and to the use of essential cookies needed for the site to work.",
+        cookieNoticePrefix: "By registering, you agree to the ",
+        userAgreement: "User Agreement",
+        cookieNoticeSuffix: " and to the use of essential cookies needed for the site to work.",
         loginPolicy: "Privacy Policy",
         providerSetupNotice: "To register, first connect VK ID or Yandex ID. An account cannot be created without verified provider authentication.",
         connectedNotice: "Authentication confirmed through ",
@@ -357,7 +362,7 @@ export function AuthPage({ mode, language, onModeChange, onPrivacy }: Props) {
                   <button type="submit" disabled={!validBirthday || !consentAccepted || !connectedProvider || authChecking || registrationSubmitting || registrationCompleted} className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-bold text-primary-foreground shadow-[0_8px_26px_rgba(155,92,255,0.2)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none">
                     {registrationSubmitting ? copy.checking : registrationCompleted ? copy.registered : copy.register}
                   </button>
-                  <p className="mt-2 text-center text-[10px] leading-relaxed text-muted-foreground">{copy.cookieNotice}</p>
+                  <p className="mt-2 text-center text-[10px] leading-relaxed text-muted-foreground">{copy.cookieNoticePrefix}<button type="button" onClick={onAgreement} className="underline decoration-border underline-offset-2 transition hover:text-primary">{copy.userAgreement}</button>{copy.cookieNoticeSuffix}</p>
                 </div>
 
                 {(registrationMessage || authMessage) && <p role="status" className="rounded-xl border border-primary/20 bg-primary/10 px-3 py-2 text-xs leading-relaxed text-muted-foreground">{registrationMessage || authMessage}</p>}
