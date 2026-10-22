@@ -255,7 +255,7 @@ function Index() {
       });
       const result = await response.json().catch(() => ({})) as {
         authenticated?: boolean;
-        user?: { firstName?: string };
+        user?: { id?: string; firstName?: string };
       };
       if (!response.ok || result.authenticated !== true) {
         setTelegramAuthError(language === "ru"

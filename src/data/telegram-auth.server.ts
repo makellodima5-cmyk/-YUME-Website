@@ -274,7 +274,7 @@ export async function handleTelegramLibrary(request: Request): Promise<Response>
     const animeId = input?.animeId;
     const saved = input?.saved;
     if ((listType !== "favorite" && listType !== "watchlist") ||
-        typeof animeId !== "string" || !/^\\d{1,12}$/.test(animeId) ||
+        typeof animeId !== "string" || !/^\d{1,12}$/.test(animeId) ||
         typeof saved !== "boolean") {
       return jsonResponse({ error: "invalid_library_item" }, 400);
     }
