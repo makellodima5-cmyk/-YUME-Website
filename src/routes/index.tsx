@@ -16,6 +16,7 @@ import { filterAndSortCatalog, getCatalogPageCount, paginateCatalog } from "@/da
 import { validateCatalogSearch } from "@/data/catalog-search";
 import homeSocialImage from "@/assets/yume-hero-desktop-new.png.PNG";
 import { absoluteImageUrl, canonicalUrl } from "@/data/seo";
+import { getTelegramWebApp } from "@/lib/telegram-mini-app";
 
 export const Route = createFileRoute("/")({
   head: () => {
@@ -169,7 +170,12 @@ function Index() {
   const catalogLoadStarted = useRef(false);
   const [catalogLoadAttempt, setCatalogLoadAttempt] = useState(0);
   const [view, setViewRaw] = useState<View>(section ?? "home");
+  const [isTelegramMiniApp, setIsTelegramMiniApp] = useState(false);
   const [cookieNoticeAcknowledged, setCookieNoticeAcknowledged] = useState(true);
+
+  useEffect(() => {
+    setIsTelegramMiniApp(Boolean(getTelegramWebApp()?.initData));
+  }, []);
 
   useEffect(() => {
     try {
@@ -303,6 +309,8 @@ function Index() {
   const [collection, setCollection] = useState<string | null>(null);
 
   const setView = (v: View) => {
+    // Telegram Mini Apps use Telegram identity, not the website OAuth screens.
+    if (isTelegramMiniApp && (v === "login" || v === "register")) v = "home";
     // Tapping Home is also a quick way out of search results: restore the default home state.
     if (v === "home") {
       setQuery("");
@@ -329,6 +337,12 @@ function Index() {
     navigate({ to: "/", search: { section: v, q: undefined, page: undefined, sort: undefined, genres: undefined, status: undefined, from: undefined, to: undefined, rating: undefined, kind: undefined, age: undefined } });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
+  useEffect(() => {
+    if (isTelegramMiniApp && (section === "login" || section === "register")) {
+      setView("home");
+    }
+  }, [isTelegramMiniApp, section]);
+
   const select = (anime: Anime) =>
     navigate({ to: "/anime/$animeId", params: { animeId: anime.id } });
   const random = () => {
@@ -508,7 +522,7 @@ function Index() {
   const visibleAiringAnime = airingAnime.slice((airingPage - 1) * catalogPageSize, airingPage * catalogPageSize);
   return (
     <div className="min-h-screen pb-8">
-      <Header view={view} setView={setView} onProfile={() => setView("login")} />
+      <Header view={view} setView={setView} isTelegramMiniApp={isTelegramMiniApp} onProfile={() => setView(isTelegramMiniApp ? "profile" : "login")} />
       {view === "home" && !cookieNoticeAcknowledged && (
         <aside
           aria-label="Уведомление об использовании cookie"
@@ -562,7 +576,7 @@ function Index() {
             </>
           )}
         </main>
-      ) : view === "login" || view === "register" ? (
+      ) : (view === "login" || view === "register") && !isTelegramMiniApp ? (
         <AuthPage
           key={view}
           mode={view}
