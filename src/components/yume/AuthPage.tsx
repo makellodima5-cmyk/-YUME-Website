@@ -3,6 +3,9 @@ import { CalendarDays, CheckCircle2, LogIn, ShieldCheck, UserRound } from "lucid
 
 type AuthMode = "login" | "register";
 type Provider = "vk" | "yandex";
+type RegistrationDraft = { day: string; month: string; year: string; consentAccepted: boolean; savedAt: number };
+const REGISTRATION_DRAFT_KEY = "yume-registration-draft-v1";
+const REGISTRATION_DRAFT_TTL_MS = 10 * 60 * 1000;
 type AuthStatusResponse = {
   providers?: { vk?: boolean; yandex?: boolean };
   connectedProvider?: Provider | null;
@@ -13,9 +16,10 @@ type Props = {
   language: "ru" | "en";
   onModeChange: (mode: AuthMode) => void;
   onPrivacy: () => void;
+  onAgreement: () => void;
 };
 
-export function AuthPage({ mode, language, onModeChange, onPrivacy }: Props) {
+export function AuthPage({ mode, language, onModeChange, onPrivacy, onAgreement }: Props) {
   const isRu = language === "ru";
   const currentYear = new Date().getFullYear();
   const [day, setDay] = useState("");
@@ -57,7 +61,9 @@ export function AuthPage({ mode, language, onModeChange, onPrivacy }: Props) {
         consentSuffix: " на обработку моих персональных данных.",
         privacy: "Политикой конфиденциальности",
         registerUnavailable: "Регистрация пока недоступна. Подключение аккаунтов будет выполнено позже.",
-        cookieNotice: "Регистрируясь, вы соглашаетесь с Пользовательским соглашением и с использованием необходимых файлов cookie для работы сайта.",
+        cookieNoticePrefix: "Регистрируясь, вы соглашаетесь с ",
+        userAgreement: "Пользовательским соглашением",
+        cookieNoticeSuffix: " и с использованием необходимых файлов cookie для работы сайта.",
         loginPolicy: "Политика конфиденциальности",
         providerSetupNotice: "Чтобы зарегистрироваться, сначала подключи VK ID или Яндекс ID. Без подтверждённой авторизации аккаунт не создаётся.",
         connectedNotice: "Авторизация подтверждена через ",
@@ -98,7 +104,9 @@ export function AuthPage({ mode, language, onModeChange, onPrivacy }: Props) {
         consentSuffix: " for the processing of my personal data.",
         privacy: "Privacy Policy",
         registerUnavailable: "Registration is not available yet. Account sign-in will be connected later.",
-        cookieNotice: "By registering, you agree to the User Agreement and to the use of essential cookies needed for the site to work.",
+        cookieNoticePrefix: "By registering, you agree to the ",
+        userAgreement: "User Agreement",
+        cookieNoticeSuffix: " and to the use of essential cookies needed for the site to work.",
         loginPolicy: "Privacy Policy",
         providerSetupNotice: "To register, first connect VK ID or Yandex ID. An account cannot be created without verified provider authentication.",
         connectedNotice: "Authentication confirmed through ",
@@ -163,6 +171,30 @@ export function AuthPage({ mode, language, onModeChange, onPrivacy }: Props) {
   }, []);
 
   useEffect(() => {
+    if (mode !== "register") return;
+    try {
+      const raw = window.sessionStorage.getItem(REGISTRATION_DRAFT_KEY);
+      if (!raw) return;
+      window.sessionStorage.removeItem(REGISTRATION_DRAFT_KEY);
+      const draft = JSON.parse(raw) as Partial<RegistrationDraft>;
+      if (
+        typeof draft.savedAt !== "number"
+        || Date.now() - draft.savedAt > REGISTRATION_DRAFT_TTL_MS
+        || Date.now() < draft.savedAt
+        || typeof draft.day !== "string"
+        || typeof draft.month !== "string"
+        || typeof draft.year !== "string"
+      ) return;
+      setDay(draft.day);
+      setMonth(draft.month);
+      setYear(draft.year);
+      setConsentAccepted(draft.consentAccepted === true);
+    } catch {
+      try { window.sessionStorage.removeItem(REGISTRATION_DRAFT_KEY); } catch { /* Ignore unavailable storage. */ }
+    }
+  }, [mode]);
+
+  useEffect(() => {
     const result = new URLSearchParams(window.location.search).get("auth_result");
     if (!result) return;
     const messages: Record<string, string> = {
@@ -179,6 +211,14 @@ export function AuthPage({ mode, language, onModeChange, onPrivacy }: Props) {
 
   const startProviderAuth = (provider: Provider) => {
     if (!providerAvailability[provider] || authChecking || authBusyProvider) return;
+    if (mode === "register") {
+      const draft: RegistrationDraft = { day, month, year, consentAccepted, savedAt: Date.now() };
+      try {
+        window.sessionStorage.setItem(REGISTRATION_DRAFT_KEY, JSON.stringify(draft));
+      } catch {
+        // OAuth still works if sessionStorage is unavailable; the user can re-enter the form.
+      }
+    }
     setAuthBusyProvider(provider);
     setAuthMessage("");
     setRegistrationMessage("");
@@ -210,7 +250,7 @@ export function AuthPage({ mode, language, onModeChange, onPrivacy }: Props) {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ birthDate, privacyConsent: consentAccepted }),
+        body: JSON.stringify({ birthDate, privacyConsent: consentAccepted, userAgreementAccepted: true }),
       });
       const result = await response.json().catch(() => ({})) as { success?: boolean; error?: string };
       if (!response.ok || result.success !== true) {
@@ -219,6 +259,8 @@ export function AuthPage({ mode, language, onModeChange, onPrivacy }: Props) {
           setRegistrationMessage(copy.providerAuthRequired);
         } else if (result.error === "privacy_consent_required") {
           setRegistrationMessage(copy.privacyConsentRequired);
+        } else if (result.error === "user_agreement_acceptance_required") {
+          setRegistrationMessage(copy.registrationFailed);
         } else if (result.error === "invalid_birth_date") {
           setRegistrationMessage(copy.invalidBirthday);
         } else if (result.error === "auth_not_configured" || result.error === "auth_database_unavailable") {
@@ -355,7 +397,7 @@ export function AuthPage({ mode, language, onModeChange, onPrivacy }: Props) {
                   <button type="submit" disabled={!validBirthday || !consentAccepted || !connectedProvider || authChecking || registrationSubmitting || registrationCompleted} className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-bold text-primary-foreground shadow-[0_8px_26px_rgba(155,92,255,0.2)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none">
                     {registrationSubmitting ? copy.checking : registrationCompleted ? copy.registered : copy.register}
                   </button>
-                  <p className="mt-2 text-center text-[10px] leading-relaxed text-muted-foreground">{copy.cookieNotice}</p>
+                  <p className="mt-2 text-center text-[10px] leading-relaxed text-muted-foreground">{copy.cookieNoticePrefix}<button type="button" onClick={onAgreement} className="underline decoration-border underline-offset-2 transition hover:text-primary">{copy.userAgreement}</button>{copy.cookieNoticeSuffix}</p>
                 </div>
 
                 {(registrationMessage || authMessage) && <p role="status" className="rounded-xl border border-primary/20 bg-primary/10 px-3 py-2 text-xs leading-relaxed text-muted-foreground">{registrationMessage || authMessage}</p>}
