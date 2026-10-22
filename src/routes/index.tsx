@@ -43,9 +43,7 @@ export const Route = createFileRoute("/")({
   },
   validateSearch: validateCatalogSearch,
   loader: async () => {
-    // One server-side catalog source powers the homepage as well as the full catalog.
-    // When D1 is bound, this reads the persistent records instead of querying Shikimori
-    // for popular/recent lists on every page visit.
+    // User-facing catalogue reads only the persistent D1 dataset.
     const catalog = await getShikimoriCatalog({ data: {} });
     const items = catalog.items;
     const popular = [...items]
@@ -435,72 +433,7 @@ function Index() {
     setCatalogPage(urlPage ?? 1);
   }, [section, urlQuery, urlPage, urlSort, urlGenres, urlStatus, urlFrom, urlTo, urlRating, urlKind, urlAge]);
 
-  // Continue a partial D1 seed from the persisted cursor without requiring a reload.
-  // Each call fetches at most one 50-title page; cooldown responses are not retried early.
-  useEffect(() => {
-    let cancelled = false;
-    let timeoutId: number | undefined;
-    let progress = initialCatalogProgress;
-    let collectedItems = new Map(loadedAnime.map((anime) => [anime.id, anime]));
-
-    if (progress.status === "ready" || progress.status === "partial") return;
-
-    const refreshDerivedLists = (items: Anime[]) => {
-      setPopularAnime(
-        [...items]
-          .filter((anime) => anime.rating !== null)
-          .sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1)),
-      );
-    };
-
-    async function continueImport() {
-      while (!cancelled && progress.status !== "ready" && progress.status !== "partial") {
-        const waitMs = Math.max(750, progress.retryAfterMs ?? 1250);
-        await new Promise<void>((resolve) => {
-          timeoutId = window.setTimeout(resolve, Math.min(waitMs, 2_147_000_000));
-        });
-        if (cancelled) return;
-
-        try {
-          const result = await getShikimoriCatalog({ data: { progressOnly: true } });
-          if (cancelled) return;
-          progress = result.progress;
-          setCatalogProgress(progress);
-
-          if (progress.status === "ready" || progress.status === "partial") {
-            collectedItems = new Map(result.items.slice(0, 1000).map((anime) => [anime.id, anime]));
-          } else {
-            for (const anime of result.items) {
-              if (!collectedItems.has(anime.id)) collectedItems.set(anime.id, anime);
-            }
-          }
-          const items = Array.from(collectedItems.values()).slice(0, 1000);
-          setCatalogAnime(items);
-          refreshDerivedLists(items);
-
-          if (progress.status === "ready") {
-            setCatalogLoadState("loaded");
-            setCatalogLoadError(null);
-          } else if (progress.status === "partial") {
-            setCatalogLoadState("error");
-            setCatalogLoadError(result.error);
-          } else {
-            setCatalogLoadState("loading");
-            setCatalogLoadError(null);
-          }
-        } catch {
-          progress = { ...progress, status: "cooldown", retryAfterMs: 5000 };
-          setCatalogProgress(progress);
-        }
-      }
-    }
-
-    void continueImport();
-    return () => {
-      cancelled = true;
-      if (timeoutId !== undefined) window.clearTimeout(timeoutId);
-    };
-  }, [initialCatalogProgress.status, loadedAnime]);
+  // Catalog seeding/expansion is an explicit admin operation, not a user-page side effect.
 
   const [query, setQuery] = useState(urlQuery ?? "");
   const [submittedQuery, setSubmittedQuery] = useState(urlQuery ?? "");
@@ -595,7 +528,7 @@ function Index() {
   const searchText = view === "catalog" ? catalogQuery.trim() : view === "home" ? submittedQuery.trim() : "";
   const catalogResults = useMemo(
     () => filterAndSortCatalog(ANIME, searchText, activeFilters, sortBy, language, displayGenre),
-    [searchText, activeFilters, sortBy, language],
+    [ANIME, searchText, activeFilters, sortBy, language],
   );
   const catalogPageSize = 20;
   const totalCatalogPages = getCatalogPageCount(catalogResults.length, catalogPageSize);
@@ -607,40 +540,13 @@ function Index() {
   const searching = view === "home" && (submittedQuery.length > 0 || activeFilterCount > 0);
   const needsFullCatalog = ["catalog", "popular", "new-releases", "announcements", "airing"].includes(view) ||
     (view === "home" && (Boolean(submittedQuery.trim()) || activeFilterCount > 0 || filtersOpen));
-  // Any search/filter view must use the same capped local catalog of up to 1,000 titles.
-  // Never send the user's typed query to Shikimori.
+  // Searches and filters operate on the dataset returned from D1.
+  // Do not poll Shikimori or trigger imports during normal user navigation.
   useEffect(() => {
-    if (!needsFullCatalog || catalogLoadStarted.current ||
-        catalogLoadState === "loaded" || catalogLoadState === "error") return;
+    setCatalogLoadState(apiError ? "error" : "loaded");
+    setCatalogLoadError(apiError);
+  }, [apiError]);
 
-    catalogLoadStarted.current = true;
-    setCatalogLoadState("loading");
-    setCatalogLoadError(null);
-    getShikimoriCatalog({ data: { forceRefresh: catalogLoadAttempt > 0, progressOnly: true } })
-      .then((result) => {
-        setCatalogProgress(result.progress);
-        if (result.items.length > 0) {
-          const isComplete = result.progress.status === "ready" || result.progress.status === "partial";
-          setCatalogAnime((currentItems) => {
-            const merged = new Map<string, Anime>();
-            if (!isComplete) {
-              for (const anime of currentItems) merged.set(anime.id, anime);
-            }
-            for (const anime of result.items.slice(0, 1000)) {
-              if (isComplete || !merged.has(anime.id)) merged.set(anime.id, anime);
-            }
-            return Array.from(merged.values()).slice(0, 1000);
-          });
-        }
-        const isInProgress = result.progress.status === "seeding" || result.progress.status === "cooldown";
-        setCatalogLoadError(result.error);
-        setCatalogLoadState(isInProgress ? "loading" : result.error ? "error" : "loaded");
-      })
-      .catch(() => {
-        setCatalogLoadError(t("source.catalogUnavailable"));
-        setCatalogLoadState("error");
-      });
-  }, [needsFullCatalog, catalogLoadAttempt, catalogLoadState, t]);
   const writeCatalogUrl = (overrides: { q?: string; page?: number; sort?: string; genres?: string; status?: string; from?: number; to?: number; rating?: number; kind?: string; age?: string } = {}) => {
     const has = (key: keyof typeof overrides) => Object.prototype.hasOwnProperty.call(overrides, key);
     const genres = has("genres") ? overrides.genres : activeFilters.genres.join(",") || undefined;
