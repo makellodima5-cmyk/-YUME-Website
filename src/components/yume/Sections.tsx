@@ -83,7 +83,7 @@ export function Hero({
             onKeyDown={(e) => { if (e.key === "Enter") onSubmitSearch(); }}
             placeholder={t("search.placeholder")}
             aria-label={t("search.anime")}
-            className="h-full min-w-0 flex-1 bg-transparent px-2.5 text-sm text-white outline-none placeholder:text-white/70"
+            className="h-full min-w-0 flex-1 appearance-none bg-transparent px-2.5 text-sm text-white outline-none ring-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 placeholder:text-white/70"
           />
           {query && <button type="button" aria-label={t("search.clear")} onClick={() => setQuery("")} className="rounded-full p-1.5 text-white/70 hover:text-white"><X className="h-4 w-4" /></button>}
           <button type="button" onClick={() => setFiltersOpen(!filtersOpen)} aria-label={t("filters.open")} aria-expanded={filtersOpen} data-filter-trigger className={`relative mr-1.5 flex h-8 w-9 shrink-0 items-center justify-center rounded-lg transition ${filtersOpen || activeFilterCount ? "bg-white/20 text-white" : "text-white/75 hover:bg-white/15 hover:text-white"}`}>
