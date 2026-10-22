@@ -45,9 +45,9 @@ function formatAnimeDate(value: string | undefined, language: "ru" | "en", inclu
 }
 
 export const Route = createFileRoute("/anime/$animeId")({
-  loader: async ({ p  loader: async ({ params }) => {
-    // D1 is the source of truth for all user-facing anime pages. Never fetch
-    // an individual title from Shikimori during normal navigation.
+  loader: async ({ params }) => {
+    // D1 is the source of truth for all user-facing anime pages.
+    // Normal navigation only reads saved rows; no direct Shikimori detail request.
     const catalog = await getShikimoriCatalog({ data: {} });
     const pool = catalog.items;
     const anime = pool.find((item) => item.id === params.animeId) ?? null;
@@ -62,7 +62,8 @@ export const Route = createFileRoute("/anime/$animeId")({
           .slice(0, 6)
       : pool.slice(0, 6);
     return { anime, relatedAnime, apiError: catalog.error };
-  },ta }) => {
+  },
+  head: ({ loaderData }) => {
     const anime = loaderData?.anime;
     const title = anime ? `${anime.title} — смотреть аниме | YUME` : "Аниме не найдено | YUME";
     const description = sanitizeMetaDescription(
