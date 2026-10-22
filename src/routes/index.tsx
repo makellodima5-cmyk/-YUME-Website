@@ -770,13 +770,31 @@ function Index() {
         <Profile key="privacy" initialPanel="documents" animeList={ANIME} onSelect={select} onCatalog={() => setView("catalog")} />
       ) : view === "privacy-policy" ? (
         <Profile key="privacy-policy" initialPanel="privacy" animeList={ANIME} onSelect={select} onCatalog={() => setView("catalog")} />
+      ) : view === "rules" ? (
+        <Profile key="rules" initialPanel="rules" animeList={ANIME} onSelect={select} onCatalog={() => setView("catalog")} />
+      ) : view === "rights" ? (
+        <Profile key="rights" initialPanel="rights" animeList={ANIME} onSelect={select} onCatalog={() => setView("catalog")} />
       ) : view === "history" ? (
         <main id="main-content" className="px-4 pt-24 md:px-10 md:pt-24">
           <h1 className="mb-3 text-2xl font-bold md:text-3xl">{t("history.title")}</h1>
           <p className="rounded-2xl border border-dashed border-border bg-card/40 px-5 py-8 text-sm text-muted-foreground">{t("history.empty")}</p>
         </main>
       ) : null}
-      {!["login", "register"].includes(view) && <footer className="mt-16 px-4 text-center text-xs text-muted-foreground md:px-10">{t("footer.source")}</footer>}
+      {!["profile", "favorites", "watchlist", "privacy", "privacy-policy", "rules", "rights"].includes(view) && (
+        <footer className="mt-16 border-t border-border/70 bg-card/20 px-4 pb-8 pt-7 md:px-10 md:pt-8">
+          <div className="mx-auto flex max-w-6xl flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <p className="font-display text-sm font-bold tracking-wide text-foreground">YUME</p>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{t("footer.source")}</p>
+            </div>
+            <nav aria-label={language === "en" ? "Legal information" : "Правовая информация"} className="flex flex-wrap gap-x-5 gap-y-2 text-xs sm:justify-end sm:text-sm">
+              <button type="button" onClick={() => setView("privacy-policy")} className="text-muted-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:ring-offset-background">{language === "en" ? "Privacy policy" : "Политика конфиденциальности"}</button>
+              <button type="button" onClick={() => setView("rights")} className="text-muted-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:ring-offset-background">{language === "en" ? "For copyright holders" : "Для правообладателей"}</button>
+              <button type="button" onClick={() => setView("rules")} className="text-muted-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:ring-offset-background">{language === "en" ? "Site rules" : "Правила сайта"}</button>
+            </nav>
+          </div>
+        </footer>
+      )}
     </div>
   );
 }
