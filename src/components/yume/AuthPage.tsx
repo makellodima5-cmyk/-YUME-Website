@@ -16,6 +16,8 @@ export function AuthPage({ mode, language, onModeChange, onPrivacy }: Props) {
   const [month, setMonth] = useState("");
   const [year, setYear] = useState("");
   const [consentAccepted, setConsentAccepted] = useState(false);
+  // Real OAuth is intentionally not connected yet. This stays false until a provider callback is verified server-side.
+  const [providerConnected] = useState(false);
   const [registrationMessage, setRegistrationMessage] = useState("");
 
   const copy = isRu
@@ -40,8 +42,8 @@ export function AuthPage({ mode, language, onModeChange, onPrivacy }: Props) {
         consentPrefix: "Я согласен с ",
         consentSuffix: " на обработку моих персональных данных.",
         privacy: "Политикой конфиденциальности",
-        registerUnavailable: "Регистрация пока недоступна. Подключение аккаунтов будет выполнено позже.",
-        cookieNotice: "Регистрируясь, вы соглашаетесь с использованием необходимых файлов cookie для работы сайта.",
+        registerUnavailable: "Регистрация пока недоступна. Подключение VK ID или Яндекс ID будет выполнено позже.",
+        cookieNotice: "Нажимая «Зарегистрироваться», вы соглашаетесь с Пользовательским соглашением и использованием необходимых файлов cookie для работы сайта.",
         loginPolicy: "Политика конфиденциальности",
       }
     : {
@@ -65,8 +67,8 @@ export function AuthPage({ mode, language, onModeChange, onPrivacy }: Props) {
         consentPrefix: "I agree to the ",
         consentSuffix: " for the processing of my personal data.",
         privacy: "Privacy Policy",
-        registerUnavailable: "Registration is not available yet. Account sign-in will be connected later.",
-        cookieNotice: "By registering, you agree to the use of essential cookies needed for the site to work.",
+        registerUnavailable: "Registration is not available yet. VK ID or Yandex ID sign-in will be connected later.",
+        cookieNotice: "By clicking “Create an account”, you agree to the User Agreement and the use of essential cookies needed for the site to work.",
         loginPolicy: "Privacy Policy",
       };
 
@@ -87,7 +89,7 @@ export function AuthPage({ mode, language, onModeChange, onPrivacy }: Props) {
 
   const submitRegistration = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!validBirthday || !consentAccepted) return;
+    if (!validBirthday || !consentAccepted || !providerConnected) return;
     setRegistrationMessage(copy.registerUnavailable);
   };
 
@@ -177,10 +179,11 @@ export function AuthPage({ mode, language, onModeChange, onPrivacy }: Props) {
                 </div>
 
                 <div>
-                  <button type="submit" disabled={!validBirthday || !consentAccepted} className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-bold text-primary-foreground shadow-[0_8px_26px_rgba(155,92,255,0.2)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none">
+                  <button type="submit" disabled={!validBirthday || !consentAccepted || !providerConnected} className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-bold text-primary-foreground shadow-[0_8px_26px_rgba(155,92,255,0.2)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none">
                     {copy.register}
                   </button>
                   <p className="mt-2 text-center text-[10px] leading-relaxed text-muted-foreground">{copy.cookieNotice}</p>
+                  {!providerConnected && mode === "register" && <p className="mt-2 text-center text-xs leading-relaxed text-muted-foreground">{isRu ? "Чтобы зарегистрироваться, потребуется подтвердить аккаунт через VK ID или Яндекс ID. Подключение пока недоступно." : "To register, you will need to verify your account through VK ID or Yandex ID. Provider sign-in is not available yet."}</p>}
                 </div>
 
                 {registrationMessage && <p role="status" className="rounded-xl border border-primary/20 bg-primary/10 px-3 py-2 text-xs leading-relaxed text-muted-foreground">{registrationMessage}</p>}
