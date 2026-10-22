@@ -116,6 +116,7 @@ const ANIME_FIELDS = [
   "nextEpisodeAt",
   "rating",
   "studios { name }",
+  ANIME_VIDEO_FIELDS,
 ].join(" ");
 
 function cleanDescription(value: string | null | undefined): string {
@@ -217,12 +218,14 @@ function findYouTubeTrailerId(videos: ShikimoriGraphQLVideo[] | null | undefined
       const kind = (video.kind ?? "").toLocaleLowerCase();
       const name = (video.name ?? "").toLocaleLowerCase();
       const isTrailerKind = kind === "pv" || kind === "character_trailer";
-      const isTrailerName = /trailer|preview|\bpv\b|промо|трейлер|тизер|予告/i.test(name);
+      const isTrailerName = /trailer|preview|\\bpv\\b|промо|трейлер|тизер|予告/i.test(name);
       const priority = isTrailerKind ? 0 : isTrailerName ? 1 : 2;
-      return id && (isTrailerKind || isTrailerName) ? { id, priority } : null;
+      // Shikimori metadata for video kind/name is not always consistent.
+      // Prefer explicit trailers, but retain valid YouTube videos as a fallback.
+      return id ? { id, priority, isTrailer: isTrailerKind || isTrailerName } : null;
     })
-    .filter((value): value is { id: string; priority: number } => value !== null)
-    .sort((a, b) => a.priority - b.priority);
+    .filter((value): value is { id: string; priority: number; isTrailer: boolean } => value !== null)
+    .sort((a, b) => Number(b.isTrailer) - Number(a.isTrailer) || a.priority - b.priority);
   return candidates[0]?.id;
 }
 
