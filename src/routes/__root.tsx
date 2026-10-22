@@ -101,7 +101,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   head: () => ({
     meta: [
       { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
+      { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
       { title: "YUME — смотри аниме онлайн" },
       { name: "description", content: DEFAULT_META_DESCRIPTION },
       { property: "og:site_name", content: SITE_NAME },
