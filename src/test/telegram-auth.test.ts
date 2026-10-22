@@ -5,7 +5,7 @@ const BOT_TOKEN = "test-bot-token-for-signature-tests";
 
 async function signInitData(fields: Record<string, string>, token = BOT_TOKEN): Promise<string> {
   const checkString = Object.entries(fields)
-    .sort(([left], [right]) => left.localeCompare(right))
+    .sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0)
     .map(([key, value]) => key + "=" + value)
     .join("\n");
   const encoder = new TextEncoder();
