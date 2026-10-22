@@ -5,6 +5,8 @@ CREATE TABLE IF NOT EXISTS yume_users (
   birth_date TEXT NOT NULL,
   privacy_consent_at TEXT NOT NULL,
   privacy_policy_version TEXT NOT NULL,
+  user_agreement_accepted_at TEXT NOT NULL,
+  user_agreement_version TEXT NOT NULL,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   UNIQUE (provider, provider_user_id)
 );
