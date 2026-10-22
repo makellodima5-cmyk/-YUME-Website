@@ -522,5 +522,11 @@ export const getShikimoriCatalog = createServerFn({ method: "GET" })
       { progressOnly: data.progressOnly },
     );
     if (persistent) return filterCatalogForCurrentRequest(persistent);
-    return filterCatalogForCurrentRequest(await buildShikimoriCatalog(data.forceRefresh));
+    // With no D1 binding, fail closed instead of making user requests fall back
+    // to a live Shikimori catalog query. Imports must use an admin-only process.
+    return {
+      items: [],
+      error: "Каталог недоступен: база данных D1 не подключена.",
+      progress: makeCatalogProgress("partial", 0),
+    };
   });
