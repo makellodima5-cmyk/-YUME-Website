@@ -931,28 +931,27 @@ function Index() {
           <div className="mx-auto max-w-5xl">
             <h1 className="mb-2 text-2xl font-bold md:text-3xl">{language === "ru" ? "Панель администратора" : "Admin panel"}</h1>
             <p className="mb-6 text-sm text-muted-foreground">{language === "ru" ? "Управление функциями и обслуживанием YUME." : "Manage YUME features and maintenance."}</p>
-            {isAdmin ? (      {isAdmin && (
-        <section className="mx-auto mt-6 w-full max-w-5xl rounded-2xl border border-primary/30 bg-card p-4 shadow-lg" aria-label="Панель администратора">
-          <div className="flex items-center gap-2">
-            <ShieldCheck className="h-5 w-5 text-primary" />
-            <h2 className="text-lg font-semibold">{language === "ru" ? "Панель администратора" : "Admin panel"}</h2>
-          </div>
-          <p className="mt-2 text-sm text-muted-foreground">
-            {language === "ru" ? "Обновление трейлеров для аниме, уже сохранённых в каталоге. Данные остальных полей не изменяются." : "Update trailers for anime already stored in the catalog. Other fields will not be changed."}
-          </p>
-          <div className="mt-3 grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
-            <div className="rounded-xl bg-background/70 p-3"><span className="block text-muted-foreground">{language === "ru" ? "Без трейлера" : "Missing trailers"}</span><strong>{adminStats?.missing ?? "—"}</strong></div>
-            <div className="rounded-xl bg-background/70 p-3"><span className="block text-muted-foreground">{language === "ru" ? "Проверено" : "Checked"}</span><strong>{adminStats?.checked ?? 0}</strong></div>
-            <div className="rounded-xl bg-background/70 p-3"><span className="block text-muted-foreground">{language === "ru" ? "Найдено трейлеров" : "Trailers found"}</span><strong>{adminStats?.found ?? 0}</strong></div>
-            <div className="rounded-xl bg-background/70 p-3"><span className="block text-muted-foreground">{language === "ru" ? "В очереди" : "Queue"}</span><strong>{adminStats?.pending ?? 0}</strong></div>
-          </div>
-          <button type="button" onClick={runTrailerUpdate} disabled={adminRunning || adminStats?.missing === 0 || ((adminStats?.total ?? 0) > 0 && adminStats?.pending === 0)} className="mt-4 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition hover:brightness-110 disabled:cursor-wait disabled:opacity-50">
-            <ShieldCheck className="h-4 w-4" />
-            {adminRunning ? (language === "ru" ? "Обновление…" : "Updating…") : (language === "ru" ? "Обновить трейлеры" : "Update trailers")}
-          </button>
-          {adminMessage && <p className="mt-3 text-sm text-muted-foreground" role="status">{adminMessage}</p>}
-        </section>
-      )}
+            {isAdmin ? (
+              <section className="rounded-2xl border border-primary/30 bg-card p-4 shadow-lg" aria-label="Панель администратора">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="h-5 w-5 text-primary" />
+                  <h2 className="text-lg font-semibold">{language === "ru" ? "Обновление трейлеров" : "Trailer updates"}</h2>
+                </div>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  {language === "ru" ? "Обновление трейлеров для аниме, уже сохранённых в каталоге. Данные остальных полей не изменяются." : "Update trailers for anime already stored in the catalog. Other fields will not be changed."}
+                </p>
+                <div className="mt-3 grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
+                  <div className="rounded-xl bg-background/70 p-3"><span className="block text-muted-foreground">{language === "ru" ? "Без трейлера" : "Missing trailers"}</span><strong>{adminStats?.missing ?? "—"}</strong></div>
+                  <div className="rounded-xl bg-background/70 p-3"><span className="block text-muted-foreground">{language === "ru" ? "Проверено" : "Checked"}</span><strong>{adminStats?.checked ?? 0}</strong></div>
+                  <div className="rounded-xl bg-background/70 p-3"><span className="block text-muted-foreground">{language === "ru" ? "Найдено трейлеров" : "Trailers found"}</span><strong>{adminStats?.found ?? 0}</strong></div>
+                  <div className="rounded-xl bg-background/70 p-3"><span className="block text-muted-foreground">{language === "ru" ? "В очереди" : "Queue"}</span><strong>{adminStats?.pending ?? 0}</strong></div>
+                </div>
+                <button type="button" onClick={runTrailerUpdate} disabled={adminRunning || adminStats?.missing === 0 || ((adminStats?.total ?? 0) > 0 && adminStats?.pending === 0)} className="mt-4 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition hover:brightness-110 disabled:cursor-wait disabled:opacity-50">
+                  <ShieldCheck className="h-4 w-4" />
+                  {adminRunning ? (language === "ru" ? "Обновление…" : "Updating…") : (language === "ru" ? "Обновить трейлеры" : "Update trailers")}
+                </button>
+                {adminMessage && <p className="mt-3 text-sm text-muted-foreground" role="status">{adminMessage}</p>}
+              </section>
             ) : (
               <p role="alert" className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm">{language === "ru" ? "Доступ запрещён. Войди через Telegram под аккаунтом администратора." : "Access denied. Sign in with the administrator Telegram account."}</p>
             )}
