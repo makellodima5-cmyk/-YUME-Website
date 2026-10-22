@@ -9,10 +9,10 @@
 - \`YUME_AUTH_SESSION_SECRET\` — секрет подписи OAuth-state и временного подтверждения провайдера. Не менее 32 случайных символов.
 - \`YUME_PUBLIC_ORIGIN\` — публичный HTTPS origin сайта без пути, например \`https://your-domain.example\`.
 - \`VKID_CLIENT_ID\` — ID приложения VK ID.
-- \`VKID_REDIRECT_URI\` — точный callback URL, зарегистрированный в приложении VK ID: \`https://your-domain.example/api/auth/vk?action=callback\`.
+- \`VKID_REDIRECT_URI\` — точный callback URL, зарегистрированный в приложении VK ID: \`https://your-domain.example/api/auth/vk/callback\`.
 - \`YANDEX_CLIENT_ID\` — ID приложения Яндекс OAuth.
 - \`YANDEX_CLIENT_SECRET\` — секрет приложения Яндекс OAuth.
-- \`YANDEX_REDIRECT_URI\` — точный callback URL, зарегистрированный в приложении Яндекс OAuth: \`https://your-domain.example/api/auth/yandex?action=callback\`.
+- \`YANDEX_REDIRECT_URI\` — точный callback URL, зарегистрированный в приложении Яндекс OAuth: \`https://your-domain.example/api/auth/yandex/callback\`.
 
 Замените \`your-domain.example\` на фактический домен YUME. Если используются разные домены Preview и Production, для каждого окружения должны быть согласованы свои зарегистрированные callback URL и конфигурация.
 
