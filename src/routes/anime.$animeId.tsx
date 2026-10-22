@@ -16,7 +16,14 @@ import { Header, type View } from "@/components/yume/Header";
 import { Footer } from "@/components/yume/Footer";
 import { AnimeCard, PosterArt } from "@/components/yume/Poster";
 import { useYumePreferences, displayAnimeTitle, displayAnimeStatus, displayGenre, displayAnimeKind } from "@/data/preferences";
-import { FAVORITES_STORAGE_KEY, readSavedAnimeIds, toggleSavedAnimeId, WATCHLIST_STORAGE_KEY } from "@/data/profile-storage";
+import {
+  FAVORITES_STORAGE_KEY,
+  PROFILE_SYNC_ERROR_EVENT,
+  PROFILE_UPDATED_EVENT,
+  readSavedAnimeIds,
+  toggleSavedAnimeId,
+  WATCHLIST_STORAGE_KEY,
+} from "@/data/profile-storage";
 import { absoluteImageUrl, canonicalUrl, sanitizeMetaDescription } from "@/data/seo";
 
 function formatAnimeDate(value: string | undefined, language: "ru" | "en", includeTime = false): string | null {
@@ -104,6 +111,7 @@ function AnimeDetailPage() {
   const [inList, setInList] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
   const [showListNote, setShowListNote] = useState(false);
+  const [saveSyncError, setSaveSyncError] = useState(false);
   const [watchMode, setWatchMode] = useState<"trailer" | "episodes">("trailer");
 
   useEffect(() => {
@@ -116,6 +124,23 @@ function AnimeDetailPage() {
     setIsFavorite(readSavedAnimeIds(FAVORITES_STORAGE_KEY).includes(animeId));
     setShowListNote(false);
     window.scrollTo({ top: 0, behavior: "auto" });
+  }, [animeId]);
+
+  useEffect(() => {
+    const syncSavedButtons = () => {
+      setInList(readSavedAnimeIds(WATCHLIST_STORAGE_KEY).includes(animeId));
+      setIsFavorite(readSavedAnimeIds(FAVORITES_STORAGE_KEY).includes(animeId));
+    };
+    const onSyncError = () => {
+      setSaveSyncError(true);
+      setShowListNote(true);
+    };
+    window.addEventListener(PROFILE_UPDATED_EVENT, syncSavedButtons);
+    window.addEventListener(PROFILE_SYNC_ERROR_EVENT, onSyncError);
+    return () => {
+      window.removeEventListener(PROFILE_UPDATED_EVENT, syncSavedButtons);
+      window.removeEventListener(PROFILE_SYNC_ERROR_EVENT, onSyncError);
+    };
   }, [animeId]);
 
   const navigateToSection = (view: View) => {
@@ -202,6 +227,7 @@ function AnimeDetailPage() {
     <button
       type="button"
       onClick={() => {
+        setSaveSyncError(false);
         setIsFavorite(toggleSavedAnimeId(FAVORITES_STORAGE_KEY, anime.id));
         setShowListNote(true);
       }}
@@ -217,6 +243,7 @@ function AnimeDetailPage() {
     <button
       type="button"
       onClick={() => {
+        setSaveSyncError(false);
         setInList(toggleSavedAnimeId(WATCHLIST_STORAGE_KEY, anime.id));
         setShowListNote(true);
       }}
@@ -315,7 +342,11 @@ function AnimeDetailPage() {
                 </div>
                 {showListNote && (
                   <p className="mt-3 text-xs text-muted-foreground" aria-live="polite">
-                    {t("anime.savedLocally")}
+                    {saveSyncError
+                      ? (language === "ru"
+                        ? "Не удалось синхронизировать список с аккаунтом. Проверь соединение и повтори действие."
+                        : "Could not sync this list to your account. Check your connection and try again.")
+                      : t("anime.savedLocally")}
                   </p>
                 )}
               </div>
@@ -374,7 +405,11 @@ function AnimeDetailPage() {
                 {descriptionText("anime-description-mobile")}
                 {showListNote && (
                   <p className="mt-3 text-xs text-muted-foreground" aria-live="polite">
-                    {t("anime.savedLocally")}
+                    {saveSyncError
+                      ? (language === "ru"
+                        ? "Не удалось синхронизировать список с аккаунтом. Проверь соединение и повтори действие."
+                        : "Could not sync this list to your account. Check your connection and try again.")
+                      : t("anime.savedLocally")}
                   </p>
                 )}
               </div>

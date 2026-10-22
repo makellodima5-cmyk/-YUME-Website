@@ -22,3 +22,12 @@ Configure `TELEGRAM_BOT_TOKEN` and `YUME_AUTH_SESSION_SECRET` in the deployment 
 ## Deployment and verification
 
 Apply the D1 migration before enabling Telegram account creation. Run automated tests, lint, and the Cloudflare Worker build in CI. The account/session implementation must be exercised against the target D1 database before production use. Existing VK ID and Yandex ID website flows are intentionally retained outside Telegram.
+
+## Account-owned favorites and watchlist
+
+- Favorites and the “Want to watch” list are stored in D1 table `yume_saved_anime`, associated with the authenticated Telegram YUME account, not just with the current browser.
+- `GET /api/telegram/library` reads the current account's lists. `POST /api/telegram/library` supports a one-time merge of previous browser lists and idempotent add/remove operations. Requests require a valid Telegram session cookie; mutations also reject cross-origin requests.
+- The API validates numeric anime IDs and limits each list to 500 IDs. The client refreshes lists from D1 after sign-in and updates local browser storage as a cache.
+- At first successful sign-in on each browser, any existing local lists are merged once into the account. A per-account marker prevents stale local data from being re-imported on every launch, which avoids bringing back items removed on another device.
+- Migration `0004_add_saved_anime_library.sql` creates the saved-list table and index. Apply migrations `0003` and `0004` to the production D1 database before launch. The endpoint also ensures the table exists as a safe fallback.
+- Outside Telegram, existing website lists remain browser-local. Server-side syncing currently applies to Telegram accounts only.

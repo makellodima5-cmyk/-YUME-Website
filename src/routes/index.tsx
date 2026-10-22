@@ -17,6 +17,7 @@ import { validateCatalogSearch } from "@/data/catalog-search";
 import homeSocialImage from "@/assets/yume-hero-desktop-new.png.PNG";
 import { absoluteImageUrl, canonicalUrl } from "@/data/seo";
 import { getTelegramWebApp } from "@/lib/telegram-mini-app";
+import { syncTelegramLibrary } from "@/data/profile-storage";
 
 export const Route = createFileRoute("/")({
   head: () => {
@@ -198,7 +199,7 @@ function Index() {
       const result = await response.json().catch(() => ({})) as {
         authenticated?: boolean;
         error?: string;
-        user?: { firstName?: string };
+        user?: { id?: string; firstName?: string };
       };
       if (cancelled) return;
       if (response.status === 428 && result.error === "consent_required") {
@@ -211,6 +212,16 @@ function Index() {
           : "Telegram sign-in failed. Please reopen the app.");
         return;
       }
+      try {
+        if (!result.user?.id) throw new Error("Missing Telegram account ID");
+        await syncTelegramLibrary(result.user.id);
+      } catch {
+        if (!cancelled) setTelegramAuthError(language === "ru"
+          ? "Вход выполнен, но не удалось синхронизировать списки с аккаунтом. Проверь соединение и обнови приложение."
+          : "Signed in, but could not sync your lists to the account. Check your connection and reload the app.");
+        return;
+      }
+      if (cancelled) return;
       setTelegramAuthError("");
       setTelegramConsentRequired(false);
     }).catch(() => {
@@ -250,6 +261,15 @@ function Index() {
         setTelegramAuthError(language === "ru"
           ? "Не удалось создать аккаунт. Попробуй ещё раз."
           : "Could not create your account. Please try again.");
+        return;
+      }
+      try {
+        if (!result.user?.id) throw new Error("Missing Telegram account ID");
+        await syncTelegramLibrary(result.user.id);
+      } catch {
+        setTelegramAuthError(language === "ru"
+          ? "Аккаунт создан, но не удалось синхронизировать списки. Проверь соединение и обнови приложение."
+          : "Account created, but could not sync your lists. Check your connection and reload the app.");
         return;
       }
       setTelegramConsentRequired(false);

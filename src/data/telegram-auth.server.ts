@@ -1,5 +1,6 @@
 import { env as cloudflareEnv } from "cloudflare:workers";
 import { validateTelegramInitData, type TelegramValidatedUser } from "@/data/telegram-init-data";
+import { normalizeSavedAnimeIds } from "@/data/telegram-library.shared";
 
 type TelegramEnvironment = Record<string, unknown> & {
   TELEGRAM_BOT_TOKEN?: string;
@@ -10,6 +11,7 @@ type DbStatement = {
   bind(...values: unknown[]): DbStatement;
   first<T = Record<string, unknown>>(): Promise<T | null>;
   run(): Promise<{ meta?: { changes?: number } }>;
+  all<T = Record<string, unknown>>(): Promise<{ results: T[] }>;
 };
 type TelegramDatabase = { prepare(sql: string): DbStatement; batch(statements: DbStatement[]): Promise<unknown[]> };
 type UserRow = {
@@ -155,6 +157,140 @@ async function upsertTelegramUser(db: TelegramDatabase, user: TelegramValidatedU
       .bind(user.firstName, user.lastName ?? null, user.username ?? null, user.languageCode ?? null, telegramId).run();
   }
   return findTelegramUser(db, user.id);
+}
+
+
+const MAX_LIBRARY_BODY_CHARS = 64_000;
+
+async function ensureSavedAnimeSchema(db: TelegramDatabase): Promise<void> {
+  await db.batch([
+    db.prepare("CREATE TABLE IF NOT EXISTS yume_saved_anime (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT NOT NULL REFERENCES yume_users(id) ON DELETE CASCADE, list_type TEXT NOT NULL CHECK (list_type IN ('favorite', 'watchlist')), anime_id TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, UNIQUE (user_id, list_type, anime_id))"),
+    db.prepare("CREATE INDEX IF NOT EXISTS idx_yume_saved_anime_user_list ON yume_saved_anime (user_id, list_type, created_at)"),
+  ]);
+}
+
+type SavedListType = "favorite" | "watchlist";
+
+type SavedAnimeRow = { anime_id: string };
+type AuthenticatedSessionRow = { user_id: string; expires_at: number };
+
+function isSameOriginRequest(request: Request): boolean {
+  const origin = request.headers.get("origin");
+  if (origin) {
+    try {
+      return new URL(origin).origin === new URL(request.url).origin;
+    } catch {
+      return false;
+    }
+  }
+  return request.headers.get("sec-fetch-site") !== "cross-site";
+}
+
+async function authenticatedTelegramUserId(request: Request, db: TelegramDatabase): Promise<string | null> {
+  const token = readCookie(request, SESSION_COOKIE);
+  if (!token) return null;
+  const tokenHash = await sha256Hex(token);
+  const session = await db.prepare(
+    "SELECT s.user_id, s.expires_at FROM yume_sessions s JOIN yume_users u ON u.id = s.user_id WHERE s.token_hash = ? AND u.provider = 'telegram'",
+  ).bind(tokenHash).first<AuthenticatedSessionRow>();
+  if (!session || session.expires_at <= Date.now()) {
+    if (session) await db.prepare("DELETE FROM yume_sessions WHERE token_hash = ?").bind(tokenHash).run();
+    return null;
+  }
+  return session.user_id;
+}
+
+async function readSavedLibrary(db: TelegramDatabase, userId: string): Promise<{ favoriteIds: string[]; watchlistIds: string[] }> {
+  const [favorites, watchlist] = await Promise.all([
+    db.prepare("SELECT anime_id FROM yume_saved_anime WHERE user_id = ? AND list_type = 'favorite' ORDER BY created_at, id")
+      .bind(userId).all<SavedAnimeRow>(),
+    db.prepare("SELECT anime_id FROM yume_saved_anime WHERE user_id = ? AND list_type = 'watchlist' ORDER BY created_at, id")
+      .bind(userId).all<SavedAnimeRow>(),
+  ]);
+  return {
+    favoriteIds: favorites.results.map((row) => row.anime_id),
+    watchlistIds: watchlist.results.map((row) => row.anime_id),
+  };
+}
+
+async function mergeSavedIds(db: TelegramDatabase, userId: string, listType: SavedListType, ids: string[]): Promise<void> {
+  for (let start = 0; start < ids.length; start += 100) {
+    const statements = ids.slice(start, start + 100).map((animeId) =>
+      db.prepare("INSERT OR IGNORE INTO yume_saved_anime (user_id, list_type, anime_id) VALUES (?, ?, ?)")
+        .bind(userId, listType, animeId),
+    );
+    if (statements.length > 0) await db.batch(statements);
+  }
+}
+
+/** Account-owned saved lists, protected by the Telegram session cookie. */
+export async function handleTelegramLibrary(request: Request): Promise<Response> {
+  if (request.method !== "GET" && request.method !== "POST") {
+    return jsonResponse({ error: "method_not_allowed" }, 405);
+  }
+  if (request.method === "POST" && !isSameOriginRequest(request)) {
+    return jsonResponse({ error: "cross_origin_request" }, 403);
+  }
+
+  let input: Record<string, unknown> | null = null;
+  if (request.method === "POST") {
+    try {
+      const raw = await request.text();
+      if (raw.length > MAX_LIBRARY_BODY_CHARS) return jsonResponse({ error: "request_too_large" }, 413);
+      const parsed: unknown = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        return jsonResponse({ error: "invalid_request" }, 400);
+      }
+      input = parsed as Record<string, unknown>;
+    } catch {
+      return jsonResponse({ error: "invalid_request" }, 400);
+    }
+  }
+
+  const env = environment();
+  const db = database(env);
+  if (!db) return jsonResponse({ error: "library_database_unavailable" }, 503);
+
+  try {
+    await ensureSchema(db);
+    await ensureSavedAnimeSchema(db);
+    const userId = await authenticatedTelegramUserId(request, db);
+    if (!userId) return jsonResponse({ authenticated: false, error: "authentication_required" }, 401);
+
+    if (request.method === "GET") {
+      return jsonResponse({ authenticated: true, ...(await readSavedLibrary(db, userId)) });
+    }
+
+    if (input?.mode === "merge") {
+      const favoriteIds = normalizeSavedAnimeIds(input.favoriteIds);
+      const watchlistIds = normalizeSavedAnimeIds(input.watchlistIds);
+      if (!favoriteIds || !watchlistIds) return jsonResponse({ error: "invalid_library" }, 400);
+      await mergeSavedIds(db, userId, "favorite", favoriteIds);
+      await mergeSavedIds(db, userId, "watchlist", watchlistIds);
+      return jsonResponse({ authenticated: true, ...(await readSavedLibrary(db, userId)) });
+    }
+
+    const listType = input?.list;
+    const animeId = input?.animeId;
+    const saved = input?.saved;
+    if ((listType !== "favorite" && listType !== "watchlist") ||
+        typeof animeId !== "string" || !/^\\d{1,12}$/.test(animeId) ||
+        typeof saved !== "boolean") {
+      return jsonResponse({ error: "invalid_library_item" }, 400);
+    }
+
+    if (saved) {
+      await db.prepare("INSERT OR IGNORE INTO yume_saved_anime (user_id, list_type, anime_id) VALUES (?, ?, ?)")
+        .bind(userId, listType, animeId).run();
+    } else {
+      await db.prepare("DELETE FROM yume_saved_anime WHERE user_id = ? AND list_type = ? AND anime_id = ?")
+        .bind(userId, listType, animeId).run();
+    }
+    return jsonResponse({ authenticated: true, ...(await readSavedLibrary(db, userId)) });
+  } catch (error) {
+    console.error("[YUME] Telegram library request failed:", error);
+    return jsonResponse({ error: "library_unavailable" }, 503);
+  }
 }
 
 export async function handleTelegramSession(request: Request): Promise<Response> {

@@ -15,6 +15,7 @@ import type { Anime } from "@/data/anime";
 import { getShikimoriAnimes } from "@/data/shikimori";
 import { displayAnimeTitle, useYumePreferences } from "@/data/preferences";
 import { PosterArt } from "./Poster";
+import { getTelegramWebApp } from "@/lib/telegram-mini-app";
 import { Grid } from "./Sections";
 import {
   FAVORITES_STORAGE_KEY,
@@ -44,8 +45,12 @@ type Props = {
 export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overview" }: Props) {
   const { t, language } = useYumePreferences();
   const [panel, setPanel] = useState<ProfilePanel>(initialPanel);
+  const [isTelegramMiniApp, setIsTelegramMiniApp] = useState(false);
 
   useEffect(() => setPanel(initialPanel), [initialPanel]);
+  useEffect(() => {
+    setIsTelegramMiniApp(Boolean(getTelegramWebApp()?.initData));
+  }, []);
   const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
   const [watchlistIds, setWatchlistIds] = useState<string[]>([]);
   const [savedAnime, setSavedAnime] = useState<Anime[]>([]);
@@ -263,7 +268,7 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
                 </button>
               </div>
             </div>
-            <p className="mt-3 text-xs leading-relaxed text-muted-foreground">{t("profile.localLibraryNotice")}</p>
+            {!isTelegramMiniApp && <p className="mt-3 text-xs leading-relaxed text-muted-foreground">{t("profile.localLibraryNotice")}</p>}
 
             <section className="mt-8">
               <div className="mb-3 flex items-end justify-between gap-3">
