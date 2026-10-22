@@ -24,9 +24,6 @@ describe("territorial anime restrictions", () => {
   });
 
   it("does not remove unrelated titles", () => {
-    expect(filterAnimeForCountry(sampleAnime, "RU")).not.toContainEqual(
-      expect.objectContaining({ id: "99999" }),
-    );
     expect(filterAnimeForCountry(sampleAnime, "RU")).toContainEqual(
       expect.objectContaining({ id: "99999", title: "Regular title" }),
     );
