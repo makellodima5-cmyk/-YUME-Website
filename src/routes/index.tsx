@@ -171,11 +171,57 @@ function Index() {
   const [catalogLoadAttempt, setCatalogLoadAttempt] = useState(0);
   const [view, setViewRaw] = useState<View>(section ?? "home");
   const [isTelegramMiniApp, setIsTelegramMiniApp] = useState(false);
+  const [telegramConsentRequired, setTelegramConsentRequired] = useState(false);
+  const [telegramConsentSubmitting, setTelegramConsentSubmitting] = useState(false);
+  const [telegramAuthError, setTelegramAuthError] = useState("");
+  const [telegramUserName, setTelegramUserName] = useState("");
   const [cookieNoticeAcknowledged, setCookieNoticeAcknowledged] = useState(true);
 
   useEffect(() => {
     setIsTelegramMiniApp(Boolean(getTelegramWebApp()?.initData));
   }, []);
+
+  useEffect(() => {
+    if (!isTelegramMiniApp) return;
+    const initData = getTelegramWebApp()?.initData;
+    if (!initData) {
+      setTelegramAuthError(language === "ru" ? "Открой YUME через Telegram, чтобы войти в аккаунт." : "Open YUME through Telegram to sign in.");
+      return;
+    }
+    let cancelled = false;
+    fetch("/api/telegram/init-data", {
+      method: "POST",
+      credentials: "same-origin",
+      cache: "no-store",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ initData, privacyConsent: false }),
+    }).then(async (response) => {
+      const result = await response.json().catch(() => ({})) as {
+        authenticated?: boolean;
+        error?: string;
+        user?: { firstName?: string };
+      };
+      if (cancelled) return;
+      if (response.status === 428 && result.error === "consent_required") {
+        setTelegramConsentRequired(true);
+        return;
+      }
+      if (!response.ok || result.authenticated !== true) {
+        setTelegramAuthError(language === "ru"
+          ? "Не удалось войти через Telegram. Попробуй открыть приложение ещё раз."
+          : "Telegram sign-in failed. Please reopen the app.");
+        return;
+      }
+      setTelegramUserName(result.user?.firstName ?? "");
+      setTelegramAuthError("");
+      setTelegramConsentRequired(false);
+    }).catch(() => {
+      if (!cancelled) setTelegramAuthError(language === "ru"
+        ? "Не удалось связаться с сервером авторизации."
+        : "Could not reach the authentication server.");
+    });
+    return () => { cancelled = true; };
+  }, [isTelegramMiniApp, language]);
 
   useEffect(() => {
     try {
@@ -184,6 +230,40 @@ function Index() {
       setCookieNoticeAcknowledged(false);
     }
   }, []);
+
+  const acceptTelegramConsent = async () => {
+    const initData = getTelegramWebApp()?.initData;
+    if (!initData || telegramConsentSubmitting) return;
+    setTelegramConsentSubmitting(true);
+    setTelegramAuthError("");
+    try {
+      const response = await fetch("/api/telegram/init-data", {
+        method: "POST",
+        credentials: "same-origin",
+        cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ initData, privacyConsent: true }),
+      });
+      const result = await response.json().catch(() => ({})) as {
+        authenticated?: boolean;
+        user?: { firstName?: string };
+      };
+      if (!response.ok || result.authenticated !== true) {
+        setTelegramAuthError(language === "ru"
+          ? "Не удалось создать аккаунт. Попробуй ещё раз."
+          : "Could not create your account. Please try again.");
+        return;
+      }
+      setTelegramUserName(result.user?.firstName ?? "");
+      setTelegramConsentRequired(false);
+    } catch {
+      setTelegramAuthError(language === "ru"
+        ? "Не удалось связаться с сервером авторизации."
+        : "Could not reach the authentication server.");
+    } finally {
+      setTelegramConsentSubmitting(false);
+    }
+  };
 
   const acknowledgeCookieNotice = () => {
     try {
@@ -523,7 +603,31 @@ function Index() {
   return (
     <div className="min-h-screen pb-8">
       <Header view={view} setView={setView} isTelegramMiniApp={isTelegramMiniApp} onProfile={() => setView(isTelegramMiniApp ? "profile" : "login")} />
-      {view === "home" && !cookieNoticeAcknowledged && (
+      {isTelegramMiniApp && telegramConsentRequired && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-background/85 px-4 py-6 backdrop-blur-md" role="dialog" aria-modal="true" aria-labelledby="telegram-consent-title">
+          <section className="w-full max-w-md rounded-3xl border border-border bg-card p-6 shadow-2xl sm:p-8">
+            <h2 id="telegram-consent-title" className="text-xl font-bold">{language === "ru" ? "Добро пожаловать в YUME" : "Welcome to YUME"}</h2>
+            <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+              {language === "ru"
+                ? "Чтобы создать аккаунт и сохранять твои данные, YUME будет обрабатывать Telegram ID и имя профиля в соответствии с "
+                : "To create your account and save your data, YUME will process your Telegram ID and profile name under the "}
+              <button type="button" onClick={() => setView("privacy-policy")} className="font-semibold text-primary underline underline-offset-4">
+                {language === "ru" ? "Политикой конфиденциальности" : "Privacy Policy"}
+              </button>.
+            </p>
+            {telegramAuthError && <p role="alert" className="mt-3 rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs leading-relaxed text-foreground">{telegramAuthError}</p>}
+            <button type="button" onClick={acceptTelegramConsent} disabled={telegramConsentSubmitting} className="mt-5 flex min-h-12 w-full items-center justify-center rounded-xl bg-primary px-4 py-3 text-sm font-bold text-primary-foreground transition hover:brightness-110 disabled:cursor-wait disabled:opacity-60">
+              {telegramConsentSubmitting
+                ? (language === "ru" ? "Создаём аккаунт…" : "Creating account…")
+                : (language === "ru" ? "Согласен и продолжить" : "Agree and continue")}
+            </button>
+          </section>
+        </div>
+      )}
+      {isTelegramMiniApp && telegramAuthError && !telegramConsentRequired && (
+        <div role="alert" className="fixed inset-x-3 bottom-3 z-[70] mx-auto max-w-lg rounded-xl border border-destructive/30 bg-background/95 px-4 py-3 text-sm text-foreground shadow-xl">{telegramAuthError}</div>
+      )}
+      {view === "home" && !isTelegramMiniApp && !cookieNoticeAcknowledged && (
         <aside
           aria-label="Уведомление об использовании cookie"
           className="fixed inset-x-3 bottom-3 z-[60] mx-auto flex max-w-5xl flex-col gap-3 rounded-2xl border border-primary/25 bg-background/95 p-4 shadow-2xl backdrop-blur-md sm:inset-x-5 sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:px-6 sm:py-4"
