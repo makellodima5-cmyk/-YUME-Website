@@ -119,15 +119,18 @@ export function toggleSavedAnimeId(key: string, animeId: string): boolean {
   const next = alreadySaved
     ? current.filter((id) => id !== animeId)
     : [...current, animeId];
+  let localStorageWritten = false;
   try {
     window.localStorage.setItem(key, JSON.stringify(next));
+    localStorageWritten = true;
     notifyProfileUpdated();
   } catch {
     // A network save is still attempted below in Telegram even when local storage is full.
   }
 
   const listType = listTypeForKey(key);
-  if (listType && isTelegramContext() && /^\d{1,12}$/.test(animeId)) {
+  const canSyncToTelegram = Boolean(listType && isTelegramContext() && /^\d{1,12}$/.test(animeId));
+  if (canSyncToTelegram && listType) {
     telegramMutationQueue = telegramMutationQueue
       .then(async () => {
         const response = await fetch(TELEGRAM_LIBRARY_ENDPOINT, {
@@ -149,6 +152,7 @@ export function toggleSavedAnimeId(key: string, animeId: string): boolean {
         window.dispatchEvent(new Event(PROFILE_SYNC_ERROR_EVENT));
       });
   }
+  if (!localStorageWritten && !canSyncToTelegram) return alreadySaved;
   return !alreadySaved;
 }
 
