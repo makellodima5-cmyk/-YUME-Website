@@ -7,8 +7,8 @@ type CloudflareRequest = Request & {
   };
 };
 
-type CatalogWithItems<T> = T & {
-  items: Array<{ id: string }>;
+type CatalogWithItems<TItem extends { id: string }> = {
+  items: TItem[];
 };
 
 /**
@@ -16,9 +16,10 @@ type CatalogWithItems<T> = T & {
  * regain a restricted title. Cloudflare's request.cf.country is preferred; the
  * CF-IPCountry header is a fallback when the IP Geolocation header is enabled.
  */
-export function filterCatalogForCurrentRequest<T extends CatalogWithItems<unknown>>(
-  result: T,
-): T {
+export function filterCatalogForCurrentRequest<
+  TItem extends { id: string },
+  T extends CatalogWithItems<TItem>,
+>(result: T): T {
   const request = getRequest() as CloudflareRequest;
   const country = request.cf?.country ?? getRequestHeader("cf-ipcountry");
 
@@ -28,5 +29,5 @@ export function filterCatalogForCurrentRequest<T extends CatalogWithItems<unknow
   return {
     ...result,
     items: filterAnimeForCountry(result.items, country),
-  };
+  } as T;
 }
