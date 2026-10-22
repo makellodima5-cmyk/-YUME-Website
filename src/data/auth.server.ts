@@ -78,7 +78,13 @@ function sessionSecret(env: AuthEnvironment): string | null {
   return typeof value === "string" && value.length >= 32 ? value : null;
 }
 function providerConfigured(env: AuthEnvironment, provider: Provider): boolean {
-  if (!sessionSecret(env)) return false;
+  if (!sessionSecret(env) || typeof env.YUME_PUBLIC_ORIGIN !== "string") return false;
+  try {
+    const origin = new URL(env.YUME_PUBLIC_ORIGIN);
+    if (origin.protocol !== "https:" || origin.origin !== env.YUME_PUBLIC_ORIGIN.trim()) return false;
+  } catch {
+    return false;
+  }
   if (provider === "vk") return typeof env.VKID_CLIENT_ID === "string" && env.VKID_CLIENT_ID.length > 0;
   return typeof env.YANDEX_CLIENT_ID === "string" && env.YANDEX_CLIENT_ID.length > 0
     && typeof env.YANDEX_CLIENT_SECRET === "string" && env.YANDEX_CLIENT_SECRET.length > 0;
