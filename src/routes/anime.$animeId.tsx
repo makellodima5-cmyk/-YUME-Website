@@ -11,7 +11,7 @@ import {
   Play,
   Star,
 } from "lucide-react";
-import { getShikimoriAnimes } from "@/data/shikimori";
+import { getShikimoriAnimes, getShikimoriCatalog } from "@/data/shikimori";
 import { Header, type View } from "@/components/yume/Header";
 import { Footer } from "@/components/yume/Footer";
 import { AnimeCard, PosterArt } from "@/components/yume/Poster";
@@ -56,11 +56,15 @@ export const Route = createFileRoute("/anime/$animeId")({
       };
     }
 
+    // Prefer the direct Shikimori detail response for videos and fresh metadata,
+    // but fall back to the persistent D1 catalog if Shikimori is rate-limited or
+    // temporarily unavailable. A title already shown in YUME should not become
+    // an "Anime not found" page just because the detail endpoint failed.
     const [detail, catalog] = await Promise.all([
       getShikimoriAnimes({ data: { ids: params.animeId, limit: 1, order: "ranked", includeVideos: true } }),
-      getShikimoriAnimes({ data: { page: 1, limit: 50, order: "ranked" } }),
+      getShikimoriCatalog({ data: {} }),
     ]);
-    const anime = detail.items[0] ?? null;
+    const anime = detail.items[0] ?? catalog.items.find((item) => item.id === params.animeId) ?? null;
     const pool = catalog.items;
     const relatedAnime = anime
       ? pool
@@ -72,7 +76,7 @@ export const Route = createFileRoute("/anime/$animeId")({
           })
           .slice(0, 6)
       : pool.slice(0, 6);
-    return { anime, relatedAnime, apiError: detail.error };
+    return { anime, relatedAnime, apiError: anime ? null : detail.error ?? catalog.error };
   },
   head: ({ loaderData }) => {
     const anime = loaderData?.anime;
