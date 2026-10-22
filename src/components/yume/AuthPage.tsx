@@ -3,6 +3,9 @@ import { CalendarDays, CheckCircle2, LogIn, ShieldCheck, UserRound } from "lucid
 
 type AuthMode = "login" | "register";
 type Provider = "vk" | "yandex";
+type RegistrationDraft = { day: string; month: string; year: string; consentAccepted: boolean; savedAt: number };
+const REGISTRATION_DRAFT_KEY = "yume-registration-draft-v1";
+const REGISTRATION_DRAFT_TTL_MS = 10 * 60 * 1000;
 type AuthStatusResponse = {
   providers?: { vk?: boolean; yandex?: boolean };
   connectedProvider?: Provider | null;
@@ -168,6 +171,30 @@ export function AuthPage({ mode, language, onModeChange, onPrivacy, onAgreement 
   }, []);
 
   useEffect(() => {
+    if (mode !== "register") return;
+    try {
+      const raw = window.sessionStorage.getItem(REGISTRATION_DRAFT_KEY);
+      if (!raw) return;
+      window.sessionStorage.removeItem(REGISTRATION_DRAFT_KEY);
+      const draft = JSON.parse(raw) as Partial<RegistrationDraft>;
+      if (
+        typeof draft.savedAt !== "number"
+        || Date.now() - draft.savedAt > REGISTRATION_DRAFT_TTL_MS
+        || Date.now() < draft.savedAt
+        || typeof draft.day !== "string"
+        || typeof draft.month !== "string"
+        || typeof draft.year !== "string"
+      ) return;
+      setDay(draft.day);
+      setMonth(draft.month);
+      setYear(draft.year);
+      setConsentAccepted(draft.consentAccepted === true);
+    } catch {
+      try { window.sessionStorage.removeItem(REGISTRATION_DRAFT_KEY); } catch { /* Ignore unavailable storage. */ }
+    }
+  }, [mode]);
+
+  useEffect(() => {
     const result = new URLSearchParams(window.location.search).get("auth_result");
     if (!result) return;
     const messages: Record<string, string> = {
@@ -184,6 +211,14 @@ export function AuthPage({ mode, language, onModeChange, onPrivacy, onAgreement 
 
   const startProviderAuth = (provider: Provider) => {
     if (!providerAvailability[provider] || authChecking || authBusyProvider) return;
+    if (mode === "register") {
+      const draft: RegistrationDraft = { day, month, year, consentAccepted, savedAt: Date.now() };
+      try {
+        window.sessionStorage.setItem(REGISTRATION_DRAFT_KEY, JSON.stringify(draft));
+      } catch {
+        // OAuth still works if sessionStorage is unavailable; the user can re-enter the form.
+      }
+    }
     setAuthBusyProvider(provider);
     setAuthMessage("");
     setRegistrationMessage("");
