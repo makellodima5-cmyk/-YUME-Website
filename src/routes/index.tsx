@@ -643,7 +643,7 @@ function Index() {
   const visibleAiringAnime = airingAnime.slice((airingPage - 1) * catalogPageSize, airingPage * catalogPageSize);
   return (
     <div className="min-h-screen pb-8">
-      <Header view={view} setView={setView} onProfile={() => setView("profile")} />
+      <Header view={view} setView={setView} onProfile={() => setView("profile")} isAdmin={isAdmin} />
       {isTelegramMiniApp && telegramConsentRequired && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-background/85 px-4 py-6 backdrop-blur-md" role="dialog" aria-modal="true" aria-labelledby="telegram-consent-title">
           <section className="w-full max-w-md rounded-3xl border border-border bg-card p-6 shadow-2xl sm:p-8">
