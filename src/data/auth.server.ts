@@ -17,8 +17,10 @@ type DbStatement = {
   first<T = Record<string, unknown>>(): Promise<T | null>;
   run(): Promise<{ meta?: { changes?: number } }>;
 };
-type AuthDatabase = { prepare(sql: string): DbStatement; batch(statements: DbStatement[]): Promise<unknown[]> };
-type OAuthState = { provider: Provider; flow: AuthFlow; state: string; verifier: string; deviceId: string; issuedAt: number };
+type AuthDatabase = { prepare(sql: string): DbStatement; batch(statements: DbStatement[]): Promise<unknown[]>; };
+type DbRows<T> = { results: T[] };
+type DbStatementWithAll = DbStatement & { all<T = Record<string, unknown>>(): Promise<DbRows<T>> };
+type OAuthState = { provider: Provider; flow: AuthFlow; state: string; verifier: string; issuedAt: number };
 type PendingIdentity = { provider: Provider; subject: string; issuedAt: number };
 type ProviderIdentity = { provider: Provider; subject: string };
 type ProviderRow = { id: string };
@@ -29,6 +31,7 @@ const SESSION_COOKIE = "__Host-yume-session";
 const OAUTH_TTL_SECONDS = 10 * 60;
 const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
 const PRIVACY_POLICY_VERSION = "2026-10-22";
+const USER_AGREEMENT_VERSION = "2026-10-22";
 const encoder = new TextEncoder();
 type RuntimeGlobal = typeof globalThis & { __YUME_RUNTIME_ENV__?: unknown };
 
@@ -49,10 +52,20 @@ function database(env: AuthEnvironment): AuthDatabase | null {
 
 async function ensureSchema(db: AuthDatabase): Promise<void> {
   await db.batch([
-    db.prepare("CREATE TABLE IF NOT EXISTS yume_users (id TEXT PRIMARY KEY NOT NULL, provider TEXT NOT NULL CHECK (provider IN ('vk', 'yandex')), provider_user_id TEXT NOT NULL, birth_date TEXT NOT NULL, privacy_consent_at TEXT NOT NULL, privacy_policy_version TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, UNIQUE (provider, provider_user_id))"),
+    db.prepare("CREATE TABLE IF NOT EXISTS yume_users (id TEXT PRIMARY KEY NOT NULL, provider TEXT NOT NULL CHECK (provider IN ('vk', 'yandex')), provider_user_id TEXT NOT NULL, birth_date TEXT NOT NULL, privacy_consent_at TEXT NOT NULL, privacy_policy_version TEXT NOT NULL, user_agreement_accepted_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, user_agreement_version TEXT NOT NULL DEFAULT '2026-10-22', created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, UNIQUE (provider, provider_user_id))"),
     db.prepare("CREATE TABLE IF NOT EXISTS yume_sessions (token_hash TEXT PRIMARY KEY NOT NULL, user_id TEXT NOT NULL REFERENCES yume_users(id) ON DELETE CASCADE, expires_at INTEGER NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)"),
     db.prepare("CREATE INDEX IF NOT EXISTS idx_yume_sessions_expiry ON yume_sessions(expires_at)"),
   ]);
+
+  // Keep compatibility with a table created by an earlier preview of this branch.
+  const columns = await (db.prepare("PRAGMA table_info(yume_users)") as DbStatementWithAll).all<{ name: string }>();
+  const names = new Set(columns.results.map((column) => column.name));
+  if (!names.has("user_agreement_accepted_at")) {
+    await db.prepare("ALTER TABLE yume_users ADD COLUMN user_agreement_accepted_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP").run();
+  }
+  if (!names.has("user_agreement_version")) {
+    await db.prepare("ALTER TABLE yume_users ADD COLUMN user_agreement_version TEXT NOT NULL DEFAULT '2026-10-22'").run();
+  }
 }
 
 function providerLabel(provider: Provider): string {
@@ -159,18 +172,21 @@ function textValue(...values: unknown[]): string | null {
   return null;
 }
 
-async function providerIdentity(request: Request, env: AuthEnvironment, state: OAuthState, code: string): Promise<ProviderIdentity> {
+async function providerIdentity(request: Request, env: AuthEnvironment, state: OAuthState, code: string, callbackDeviceId: string | null): Promise<ProviderIdentity> {
   const clientId = state.provider === "vk" ? String(env.VKID_CLIENT_ID ?? "") : String(env.YANDEX_CLIENT_ID ?? "");
   const callback = redirectUri(request, env, state.provider);
 
   if (state.provider === "vk") {
+    if (!callbackDeviceId || callbackDeviceId.length < 6 || callbackDeviceId.length > 50 || !/^[\x20-\x7e]+$/.test(callbackDeviceId)) {
+      throw new Error("VK_ID_DEVICE_ID_MISSING");
+    }
     const params = new URLSearchParams({
       grant_type: "authorization_code",
       redirect_uri: callback,
       client_id: clientId,
       code_verifier: state.verifier,
       state: state.state,
-      device_id: state.deviceId,
+      device_id: callbackDeviceId,
     });
     const tokenResponse = await fetch("https://id.vk.com/oauth2/auth?" + params.toString(), {
       method: "POST",
@@ -243,7 +259,6 @@ async function startAuthorization(request: Request, provider: Provider, flow: Au
     flow,
     state: randomToken(24),
     verifier: randomToken(48),
-    deviceId: crypto.randomUUID(),
     issuedAt: Date.now(),
   };
   const challenge = await pkceChallenge(state.verifier);
@@ -273,7 +288,7 @@ async function completeAuthorization(request: Request, provider: Provider): Prom
   if (url.searchParams.get("state") !== state.state) return redirect(screenUrl(request, env, state.flow, "oauth_state_mismatch"), clearState);
   if (url.searchParams.has("error") || !url.searchParams.get("code")) return redirect(screenUrl(request, env, state.flow, "oauth_cancelled"), clearState);
   try {
-    const identity = await providerIdentity(request, env, state, url.searchParams.get("code")!);
+    const identity = await providerIdentity(request, env, state, url.searchParams.get("code")!, url.searchParams.get("device_id"));
     const db = database(env);
     if (!db) throw new Error("AUTH_DATABASE_UNAVAILABLE");
     await ensureSchema(db);
@@ -346,6 +361,7 @@ export async function handleRegistration(request: Request): Promise<Response> {
     return jsonResponse({ error: "invalid_request" }, 400);
   }
   if (body.privacyConsent !== true) return jsonResponse({ error: "privacy_consent_required" }, 400);
+  if (body.userAgreementAccepted !== true) return jsonResponse({ error: "user_agreement_acceptance_required" }, 400);
   if (!validBirthDate(body.birthDate)) return jsonResponse({ error: "invalid_birth_date" }, 400);
   const db = database(env);
   if (!db) return jsonResponse({ error: "auth_database_unavailable" }, 503);
@@ -355,8 +371,9 @@ export async function handleRegistration(request: Request): Promise<Response> {
     let row = await existingUser(db, pending);
     if (!row) {
       const id = crypto.randomUUID();
-      await db.prepare("INSERT OR IGNORE INTO yume_users (id, provider, provider_user_id, birth_date, privacy_consent_at, privacy_policy_version) VALUES (?, ?, ?, ?, ?, ?)")
-        .bind(id, pending.provider, pending.subject, body.birthDate, new Date().toISOString(), PRIVACY_POLICY_VERSION).run();
+      const acceptedAt = new Date().toISOString();
+      await db.prepare("INSERT OR IGNORE INTO yume_users (id, provider, provider_user_id, birth_date, privacy_consent_at, privacy_policy_version, user_agreement_accepted_at, user_agreement_version) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+        .bind(id, pending.provider, pending.subject, body.birthDate, acceptedAt, PRIVACY_POLICY_VERSION, acceptedAt, USER_AGREEMENT_VERSION).run();
       row = await existingUser(db, pending);
     }
     if (!row) throw new Error("USER_INSERT_FAILED");
