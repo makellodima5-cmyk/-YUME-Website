@@ -161,10 +161,7 @@ export async function handleAdminTrailers(request: Request): Promise<Response> {
     if (body.action === "start") {
       const counts = await queueCounts(db);
       if (counts.pending > 0) return json({ isAdmin: true, ...counts, message: "Обработка уже начата." });
-      await db.batch([
-        db.prepare("DELETE FROM anime_trailer_update_queue"),
-        db.prepare("INSERT INTO anime_trailer_update_queue (anime_id, status) SELECT id, 'pending' FROM anime_catalog WHERE youtube_trailer_id IS NULL OR youtube_trailer_id = ''"),
-      ]);
+      await db.prepare("INSERT OR IGNORE INTO anime_trailer_update_queue (anime_id, status) SELECT id, 'pending' FROM anime_catalog WHERE youtube_trailer_id IS NULL OR youtube_trailer_id = ''").run();
       return json({ isAdmin: true, ...(await queueCounts(db)), message: "Очередь обновления создана." });
     }
     if (body.action !== "step") return json({ error: "invalid_action" }, 400);
