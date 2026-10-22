@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import type { Anime } from "@/data/anime";
 import { isNewRelease } from "@/data/anime-sections";
 import { getPersistentCatalog, type CatalogResult, type CatalogSeedPageResult } from "@/data/catalog-d1.server";
+import { filterCatalogForCurrentRequest } from "@/data/territorial-restrictions.server";
 
 const API_URL = "https://shikimori.io/api/graphql";
 const CACHE_TTL_MS = 5 * 60 * 1000;
@@ -390,7 +391,7 @@ async function fetchShikimoriAnimes(data: ShikimoriRequest) {
 }
 export const getShikimoriAnimes = createServerFn({ method: "GET" })
   .validator((input: ShikimoriRequest) => validateRequest(input))
-  .handler(async ({ data }) => fetchShikimoriAnimes(data));
+  .handler(async ({ data }) => filterCatalogForCurrentRequest(await fetchShikimoriAnimes(data)));
 
 const CATALOG_LIMIT = 1000;
 const CATALOG_CACHE_TTL_MS = 30 * 60 * 1000;
@@ -520,6 +521,6 @@ export const getShikimoriCatalog = createServerFn({ method: "GET" })
       },
       { progressOnly: data.progressOnly },
     );
-    if (persistent) return persistent;
-    return buildShikimoriCatalog(data.forceRefresh);
+    if (persistent) return filterCatalogForCurrentRequest(persistent);
+    return filterCatalogForCurrentRequest(await buildShikimoriCatalog(data.forceRefresh));
   });
