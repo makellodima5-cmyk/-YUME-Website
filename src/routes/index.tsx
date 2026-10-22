@@ -568,6 +568,7 @@ function Index() {
           language={language}
           onModeChange={(mode) => setView(mode)}
           onPrivacy={() => setView("privacy-policy")}
+          onAgreement={() => setView("privacy")}
         />
       ) : view === "home" ? (
         <main id="main-content" className="pt-16">
