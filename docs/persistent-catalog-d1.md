@@ -1,5 +1,7 @@
 # YUME persistent anime catalog (Cloudflare D1)
 
+> **Статус документа:** описывает действующую историческую конфигурацию Cloudflare Workers + D1, а не целевую инфраструктуру. Для планируемого VPS Beget данные из D1 не экспортируются: см. [план миграции](migration/cloudflare-to-beget-vps.md). До переключения production этот документ сохраняет ценность как описание текущего способа работы.
+
 ## Worker and database configuration
 
 The repository declares the Worker configuration in `wrangler.jsonc`. It binds the existing D1 database `yume_db` (ID `fb5ba87d-e921-4dde-829e-7b1bddcf123b`) to the runtime name `YUME_DB`, which must match the binding used by the application.
