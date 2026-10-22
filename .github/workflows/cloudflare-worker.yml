@@ -73,7 +73,7 @@ jobs:
           const binding = (config.d1_databases ?? []).find(
             (item) => item.binding === "YUME_DB"
               && item.database_name === "yume_db"
-              && item.database_id === "fb5ba87d-e921-4dde-829e-7b1bddcf123b",
+              && item.database_id === "29aea579-e316-413f-922b-44c17b12f45a",
           );
           if (!binding) {
             throw new Error("Generated Worker config does not contain the expected YUME_DB binding.");
