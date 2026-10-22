@@ -173,6 +173,7 @@ function Index() {
   const [view, setViewRaw] = useState<View>(section ?? "home");
   const [isTelegramMiniApp, setIsTelegramMiniApp] = useState(false);
   const [telegramConsentRequired, setTelegramConsentRequired] = useState(false);
+  const [telegramConsentPending, setTelegramConsentPending] = useState(false);
   const [telegramConsentSubmitting, setTelegramConsentSubmitting] = useState(false);
   const [telegramAuthError, setTelegramAuthError] = useState("");
   const [cookieNoticeAcknowledged, setCookieNoticeAcknowledged] = useState(true);
@@ -203,6 +204,7 @@ function Index() {
       };
       if (cancelled) return;
       if (response.status === 428 && result.error === "consent_required") {
+        setTelegramConsentPending(true);
         setTelegramConsentRequired(true);
         return;
       }
@@ -223,6 +225,7 @@ function Index() {
       }
       if (cancelled) return;
       setTelegramAuthError("");
+      setTelegramConsentPending(false);
       setTelegramConsentRequired(false);
     }).catch(() => {
       if (!cancelled) setTelegramAuthError(language === "ru"
@@ -231,6 +234,12 @@ function Index() {
     });
     return () => { cancelled = true; };
   }, [isTelegramMiniApp, language]);
+
+  useEffect(() => {
+    if (isTelegramMiniApp && telegramConsentPending && view !== "privacy-policy") {
+      setTelegramConsentRequired(true);
+    }
+  }, [isTelegramMiniApp, telegramConsentPending, view]);
 
   useEffect(() => {
     try {
@@ -272,6 +281,7 @@ function Index() {
           : "Account created, but could not sync your lists. Check your connection and reload the app.");
         return;
       }
+      setTelegramConsentPending(false);
       setTelegramConsentRequired(false);
     } catch {
       setTelegramAuthError(language === "ru"
@@ -628,7 +638,7 @@ function Index() {
               {language === "ru"
                 ? "Чтобы создать аккаунт и сохранять твои данные, YUME будет обрабатывать Telegram ID и имя профиля в соответствии с "
                 : "To create your account and save your data, YUME will process your Telegram ID and profile name under the "}
-              <button type="button" onClick={() => { setTelegramConsentRequired(false); setView("privacy-policy"); }} className="font-semibold text-primary underline underline-offset-4">
+              <button type="button" onClick={() => { setTelegramConsentPending(true); setTelegramConsentRequired(false); setView("privacy-policy"); }} className="font-semibold text-primary underline underline-offset-4">
                 {language === "ru" ? "Политикой конфиденциальности" : "Privacy Policy"}
               </button>.
             </p>
