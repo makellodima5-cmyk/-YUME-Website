@@ -39,7 +39,7 @@ export function AuthPage({ mode, language, onModeChange, onPrivacy }: Props) {
         registerSubtitle: "Создай аккаунт, чтобы продолжить в YUME",
         vk: "Продолжить через VK ID",
         yandex: "Продолжить через Яндекс ID",
-        notConfigured: "Не настроено",
+        notConfigured: "Скоро",
         connected: "Подключён",
         checking: "Проверяем…",
         or: "или",
@@ -80,7 +80,7 @@ export function AuthPage({ mode, language, onModeChange, onPrivacy }: Props) {
         registerSubtitle: "Create an account to continue with YUME",
         vk: "Continue with VK ID",
         yandex: "Continue with Yandex ID",
-        notConfigured: "Not configured",
+        notConfigured: "Coming soon",
         connected: "Connected",
         checking: "Checking…",
         or: "or",
@@ -239,16 +239,15 @@ export function AuthPage({ mode, language, onModeChange, onPrivacy }: Props) {
   };
 
   const providerButton = (label: string, brand: Provider) => {
-    const ready = providerAvailability[brand];
     const selected = connectedProvider === brand;
-    const statusLabel = authChecking ? copy.checking : selected ? copy.connected : ready ? null : copy.notConfigured;
+    const statusLabel = selected ? copy.connected : copy.notConfigured;
     return (
       <button
         key={brand}
         type="button"
-        disabled={!ready || authChecking || authBusyProvider !== null || registrationCompleted}
-        onClick={() => startProviderAuth(brand)}
-        className="flex min-h-12 w-full items-center gap-3 rounded-xl border border-border bg-secondary/60 px-4 text-left text-sm font-semibold text-foreground transition hover:border-primary/35 hover:bg-accent/70 disabled:cursor-not-allowed disabled:opacity-60"
+        disabled
+        aria-disabled="true"
+        className="flex min-h-12 w-full items-center gap-3 rounded-xl border border-border bg-secondary/60 px-4 text-left text-sm font-semibold text-foreground opacity-60 cursor-not-allowed"
       >
         <span className={brand === "vk" ? "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#0077FF]/15 text-xs font-extrabold text-[#4C9AFF]" : "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#FC3F1D]/15 text-sm font-extrabold text-[#FC5A3D]"}>
           {brand === "vk" ? "VK" : "Я"}
