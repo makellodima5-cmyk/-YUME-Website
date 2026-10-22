@@ -312,7 +312,7 @@ export async function getPersistentCatalog(
     }
 
     // User-facing requests never initialize or advance the upstream import.
-    // If D1 has no rows yet, return an empty catalogue until an administrator starts seeding.
+    // With existing rows and no explicit allowImport flag, stay strictly read-only.
     if (!state || imported === 0) {
       return {
         items: [],
@@ -325,7 +325,7 @@ export async function getPersistentCatalog(
       return {
         items: options.progressOnly ? [] : await readRows(db),
         error: null,
-        progress: makeProgress(state === "partial" ? "partial" : "ready", imported),
+        progress: makeProgress("ready", imported),
       };
     }
 
