@@ -37,18 +37,18 @@ YUME — веб-каталог аниме с метаданными Shikimori. �
 
 Требуется Bun и подходящая версия Node.js.
 
-\`\`\`bash
+```bash
 bun install --frozen-lockfile
 bun run dev
-\`\`\`
+```
 
 ## Проверки
 
-\`\`\`bash
+```bash
 bun run test
 bun run lint
 bun run build
-\`\`\`
+```
 
 Успешный CI не равен подтверждённому production-деплою. Перед релизом нужно проверить целевую инфраструктуру и публичный домен.
 
