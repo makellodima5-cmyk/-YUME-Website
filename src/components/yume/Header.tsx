@@ -3,7 +3,7 @@ import { Home, LayoutGrid, Library, User, Menu, X, Bell, Moon, Sun, ShieldCheck,
 import { Logo } from "./Logo";
 import { useYumePreferences } from "@/data/preferences";
 
-export type View = "home" | "catalog" | "collections" | "profile" | "popular" | "new-releases" | "announcements" | "airing" | "favorites" | "watchlist" | "history" | "privacy" | "privacy-policy" | "rules" | "rights";
+export type View = "home" | "admin" | "catalog" | "collections" | "profile" | "popular" | "new-releases" | "announcements" | "airing" | "favorites" | "watchlist" | "history" | "privacy" | "privacy-policy" | "rules" | "rights";
 
 export const NAV: { id: View; label: string; icon: typeof Home }[] = [
   { id: "home", label: "Главная", icon: Home },
@@ -15,9 +15,10 @@ type Props = {
   view: View;
   setView: (v: View) => void;
   onProfile: () => void;
+  isAdmin?: boolean;
 };
 
-export function Header({ view, setView, onProfile }: Props) {
+export function Header({ view, setView, onProfile, isAdmin = false }: Props) {
   const { t, theme, setTheme, language, setLanguage } = useYumePreferences();
   const [menuOpen, setMenuOpen] = useState(false);
   // Keep primary navigation labels directly tied to the active language.
@@ -25,6 +26,7 @@ export function Header({ view, setView, onProfile }: Props) {
   const navigationText = language === "ru"
     ? {
         menuTitle: "Навигация",
+        adminPanel: "Панель администратора",
         main: "Основная навигация",
         home: "Главная",
         catalog: "Каталог",
@@ -42,6 +44,7 @@ export function Header({ view, setView, onProfile }: Props) {
       }
     : {
         menuTitle: "Navigation",
+        adminPanel: "Admin panel",
         main: "Main navigation",
         home: "Home",
         catalog: "Catalog",
@@ -168,6 +171,7 @@ export function Header({ view, setView, onProfile }: Props) {
                   </button>
                 );
               })}
+              {isAdmin && <button type="button" onClick={() => goToView("admin")} aria-current={view === "admin" ? "page" : undefined} className={navButtonClass(view === "admin")}><ShieldCheck className="h-5 w-5 shrink-0" /><span>{navigationText.adminPanel}</span></button>}
               <button type="button" onClick={() => goToView("popular")} className={navButtonClass(view === "popular")}>
                 <Star className="h-5 w-5 shrink-0" /><span>{navigationText.popular}</span>
               </button>
