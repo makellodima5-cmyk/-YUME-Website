@@ -1,6 +1,6 @@
 import { env as cloudflareEnv } from "cloudflare:workers";
 import { validateTelegramInitData, type TelegramValidatedUser } from "@/data/telegram-init-data";
-import { normalizeSavedAnimeIds } from "@/data/telegram-library.shared";
+import { MAX_SAVED_ANIME_IDS, normalizeSavedAnimeIds } from "@/data/telegram-library.shared";
 
 type TelegramEnvironment = Record<string, unknown> & {
   TELEGRAM_BOT_TOKEN?: string;
@@ -265,6 +265,11 @@ export async function handleTelegramLibrary(request: Request): Promise<Response>
       const favoriteIds = normalizeSavedAnimeIds(input.favoriteIds);
       const watchlistIds = normalizeSavedAnimeIds(input.watchlistIds);
       if (!favoriteIds || !watchlistIds) return jsonResponse({ error: "invalid_library" }, 400);
+      const currentLibrary = await readSavedLibrary(db, userId);
+      if (new Set([...currentLibrary.favoriteIds, ...favoriteIds]).size > MAX_SAVED_ANIME_IDS ||
+          new Set([...currentLibrary.watchlistIds, ...watchlistIds]).size > MAX_SAVED_ANIME_IDS) {
+        return jsonResponse({ error: "library_limit_reached", limit: MAX_SAVED_ANIME_IDS }, 409);
+      }
       await mergeSavedIds(db, userId, "favorite", favoriteIds);
       await mergeSavedIds(db, userId, "watchlist", watchlistIds);
       return jsonResponse({ authenticated: true, ...(await readSavedLibrary(db, userId)) });
@@ -280,8 +285,17 @@ export async function handleTelegramLibrary(request: Request): Promise<Response>
     }
 
     if (saved) {
-      await db.prepare("INSERT OR IGNORE INTO yume_saved_anime (user_id, list_type, anime_id) VALUES (?, ?, ?)")
-        .bind(userId, listType, animeId).run();
+      const existing = await db.prepare("SELECT 1 AS found FROM yume_saved_anime WHERE user_id = ? AND list_type = ? AND anime_id = ?")
+        .bind(userId, listType, animeId).first<{ found: number }>();
+      if (!existing) {
+        const count = await db.prepare("SELECT COUNT(*) AS count FROM yume_saved_anime WHERE user_id = ? AND list_type = ?")
+          .bind(userId, listType).first<{ count: number }>();
+        if ((count?.count ?? 0) >= MAX_SAVED_ANIME_IDS) {
+          return jsonResponse({ error: "library_limit_reached", limit: MAX_SAVED_ANIME_IDS }, 409);
+        }
+        await db.prepare("INSERT OR IGNORE INTO yume_saved_anime (user_id, list_type, anime_id) VALUES (?, ?, ?)")
+          .bind(userId, listType, animeId).run();
+      }
     } else {
       await db.prepare("DELETE FROM yume_saved_anime WHERE user_id = ? AND list_type = ? AND anime_id = ?")
         .bind(userId, listType, animeId).run();

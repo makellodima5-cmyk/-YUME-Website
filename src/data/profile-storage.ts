@@ -89,8 +89,12 @@ export async function syncTelegramLibrary(accountId: string): Promise<void> {
     return;
   }
 
-  const favoriteIds = normalizeSavedAnimeIds(readSavedAnimeIds(FAVORITES_STORAGE_KEY)) ?? [];
-  const watchlistIds = normalizeSavedAnimeIds(readSavedAnimeIds(WATCHLIST_STORAGE_KEY)) ?? [];
+  const localFavorites = Array.from(new Set(readSavedAnimeIds(FAVORITES_STORAGE_KEY).filter((id) => /^\d{1,12}$/.test(id))));
+  const favoriteIds = normalizeSavedAnimeIds(localFavorites);
+  if (!favoriteIds) throw new Error("Local favorites exceed the supported account-library limit");
+  const localWatchlist = Array.from(new Set(readSavedAnimeIds(WATCHLIST_STORAGE_KEY).filter((id) => /^\d{1,12}$/.test(id))));
+  const watchlistIds = normalizeSavedAnimeIds(localWatchlist);
+  if (!watchlistIds) throw new Error("Local watchlist exceeds the supported account-library limit");
   const response = await fetch(TELEGRAM_LIBRARY_ENDPOINT, {
     method: "POST",
     credentials: "same-origin",
