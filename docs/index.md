@@ -12,6 +12,7 @@
 - technical/browser-storage-and-third-party-services.md — хранилища браузера и сторонние сервисы.
 - monetization/advertising-blocks.md — статус будущей рекламы.
 - launch/launch-checklist.md — блокирующие условия публичного запуска.
+- launch/audit-findings.md — ревизия фактов, пробелов и вопросов перед запуском.
 - project-status.md — актуальное состояние функций.
 
 ## Текущий статус
