@@ -116,7 +116,6 @@ const ANIME_FIELDS = [
   "nextEpisodeAt",
   "rating",
   "studios { name }",
-  ANIME_VIDEO_FIELDS,
 ].join(" ");
 
 function cleanDescription(value: string | null | undefined): string {
@@ -520,7 +519,8 @@ export const getShikimoriCatalog = createServerFn({ method: "GET" })
       async (cursor): Promise<CatalogSeedPageResult> => {
         const request = seedRequestForCursor(cursor);
         if (!request) return { items: [], error: null, done: true };
-        return fetchShikimoriAnimes(validateRequest(request));
+        // Trailer metadata is imported with catalog rows as part of the admin-only seed.
+        return fetchShikimoriAnimes(validateRequest({ ...request, includeVideos: true }));
       },
       { progressOnly: data.progressOnly },
     );
