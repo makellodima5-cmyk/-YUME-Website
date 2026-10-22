@@ -31,8 +31,8 @@ describe("territorial anime restrictions", () => {
 
   it("handles missing or special country values without misclassifying them as Russia", () => {
     expect(normalizeCountryCode(undefined)).toBeNull();
-    expect(normalizeCountryCode("XX")).toBe("XX");
-    expect(normalizeCountryCode("T1")).toBe("T1");
+    expect(normalizeCountryCode("XX")).toBeNull();
+    expect(normalizeCountryCode("T1")).toBeNull();
     expect(filterAnimeForCountry(sampleAnime, undefined)).toEqual(sampleAnime);
     expect(filterAnimeForCountry(sampleAnime, "T1")).toEqual(sampleAnime);
   });
