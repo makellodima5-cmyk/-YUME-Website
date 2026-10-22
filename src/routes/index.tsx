@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowDownWideNarrow, ChevronDown, ChevronRight, Search, SlidersHorizontal, X } from "lucide-react";
+import { ArrowDownWideNarrow, ChevronDown, ChevronRight, Search, SlidersHorizontal, X, UserRound, Globe, Sun, Moon, Monitor } from "lucide-react";
 import { COLLECTIONS, type Anime } from "@/data/anime";
 import { getShikimoriCatalog } from "@/data/shikimori";
 import { getExactReleaseDate, isNewRelease, isUpcomingAnnouncement } from "@/data/anime-sections";
@@ -132,6 +132,118 @@ function PageNavigation({
     </nav>
   );
 }
+function HomeQuickControls({ onProfile }: { onProfile: () => void }) {
+  const { t, language, setLanguage, theme, setTheme } = useYumePreferences();
+  const [openMenu, setOpenMenu] = useState<"language" | "theme" | null>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!openMenu) return;
+    const closeOnOutside = (event: PointerEvent) => {
+      if (event.target instanceof Node && !rootRef.current?.contains(event.target)) setOpenMenu(null);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpenMenu(null);
+    };
+    document.addEventListener("pointerdown", closeOnOutside);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutside);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [openMenu]);
+
+  const languageOptions = [
+    { value: "ru" as const, label: "Русский", flag: "🇷🇺" },
+    { value: "en" as const, label: "English", flag: "🇬🇧" },
+  ];
+  const themeOptions = [
+    { value: "light" as const, label: t("settings.light"), icon: Sun },
+    { value: "dark" as const, label: t("settings.dark"), icon: Moon },
+    { value: "system" as const, label: t("settings.system"), icon: Monitor },
+  ];
+
+  return (
+    <div ref={rootRef} className="relative z-30 mx-4 my-3 grid grid-cols-3 gap-2 md:mx-10 md:gap-3">
+      <button
+        type="button"
+        onClick={onProfile}
+        className="flex min-h-12 items-center justify-center gap-2 rounded-full border border-primary/35 bg-card/80 px-2 text-sm font-medium text-foreground shadow-[0_4px_18px_rgba(156,92,255,0.08)] transition hover:border-primary/70 hover:bg-accent/70 sm:text-base"
+      >
+        <UserRound className="h-4 w-4 shrink-0 sm:h-5 sm:w-5" />
+        <span>{t("nav.profileButton")}</span>
+      </button>
+
+      <div className="relative min-w-0">
+        <button
+          type="button"
+          aria-haspopup="listbox"
+          aria-expanded={openMenu === "language"}
+          onClick={() => setOpenMenu((current) => current === "language" ? null : "language")}
+          className={`flex min-h-12 w-full items-center justify-center gap-2 rounded-full border px-2 text-sm font-medium transition sm:text-base ${openMenu === "language" ? "border-primary bg-accent/70 shadow-neon" : "border-primary/35 bg-card/80 hover:border-primary/70 hover:bg-accent/70"}`}
+        >
+          <Globe className="h-4 w-4 shrink-0 sm:h-5 sm:w-5" />
+          <span>{t("settings.language")}</span>
+          <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${openMenu === "language" ? "rotate-180" : ""}`} />
+        </button>
+        {openMenu === "language" && (
+          <div role="listbox" aria-label={t("settings.language")} className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-50 overflow-hidden rounded-2xl border border-primary/45 bg-[#0c0a12]/[.98] p-1.5 shadow-2xl backdrop-blur-xl">
+            {languageOptions.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                role="option"
+                aria-selected={language === option.value}
+                onClick={() => { setLanguage(option.value); setOpenMenu(null); }}
+                className={`flex w-full items-center gap-2 rounded-xl px-2 py-2.5 text-left text-xs transition sm:text-sm ${language === option.value ? "bg-primary/20 text-foreground" : "text-foreground/85 hover:bg-white/[.06]"}`}
+              >
+                <span aria-hidden="true">{option.flag}</span>
+                <span className="min-w-0 flex-1">{option.label}</span>
+                <span className={`h-3.5 w-3.5 shrink-0 rounded-full border ${language === option.value ? "border-primary bg-primary shadow-[inset_0_0_0_3px_#171020]" : "border-muted-foreground/60"}`} />
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="relative min-w-0">
+        <button
+          type="button"
+          aria-haspopup="listbox"
+          aria-expanded={openMenu === "theme"}
+          onClick={() => setOpenMenu((current) => current === "theme" ? null : "theme")}
+          className={`flex min-h-12 w-full items-center justify-center gap-1.5 rounded-full border px-2 text-xs font-medium transition sm:gap-2 sm:text-sm ${openMenu === "theme" ? "border-primary bg-accent/70 shadow-neon" : "border-primary/35 bg-card/80 hover:border-primary/70 hover:bg-accent/70"}`}
+        >
+          {theme === "light" ? <Sun className="h-4 w-4 shrink-0 sm:h-5 sm:w-5" /> : theme === "system" ? <Monitor className="h-4 w-4 shrink-0 sm:h-5 sm:w-5" /> : <Moon className="h-4 w-4 shrink-0 sm:h-5 sm:w-5" />}
+          <span className="truncate">{t("settings.theme")}</span>
+          <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${openMenu === "theme" ? "rotate-180" : ""}`} />
+        </button>
+        {openMenu === "theme" && (
+          <div role="listbox" aria-label={t("settings.theme")} className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-50 overflow-hidden rounded-2xl border border-primary/45 bg-[#0c0a12]/[.98] p-1.5 shadow-2xl backdrop-blur-xl">
+            {themeOptions.map((option) => {
+              const Icon = option.icon;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  role="option"
+                  aria-selected={theme === option.value}
+                  onClick={() => { setTheme(option.value); setOpenMenu(null); }}
+                  className={`flex w-full items-center gap-2 rounded-xl px-2 py-2.5 text-left text-xs transition sm:text-sm ${theme === option.value ? "bg-primary/20 text-foreground" : "text-foreground/85 hover:bg-white/[.06]"}`}
+                >
+                  <Icon className="h-4 w-4 shrink-0" />
+                  <span className="min-w-0 flex-1">{option.label}</span>
+                  <span className={`h-3.5 w-3.5 shrink-0 rounded-full border ${theme === option.value ? "border-primary bg-primary shadow-[inset_0_0_0_3px_#171020]" : "border-muted-foreground/60"}`} />
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function Index() {
   const { t, language } = useYumePreferences();
   const navigate = useNavigate();
@@ -701,6 +813,7 @@ function Index() {
       ) : view === "home" ? (
         <main id="main-content" className="pt-16">
           <Hero onCatalog={() => setView("catalog")} onRandom={random} query={query} setQuery={setQuery} onSubmitSearch={submitHomeSearch} filtersOpen={filtersOpen && (!needsFullCatalog || catalogLoadState === "loaded" || catalogLoadState === "error")} setFiltersOpen={setFiltersOpen} draftFilters={draftFilters} setDraftFilters={setDraftFilters} onApplyFilters={applyCatalogFilters} onResetFilters={resetCatalogFilters} activeFilterCount={activeFilterCount} genres={availableGenres} statuses={availableStatuses} types={availableTypes} ageRatings={availableAgeRatings} yearMin={catalogYearRange.min} yearMax={catalogYearRange.max} />
+          <HomeQuickControls onProfile={() => setView("profile")} />
           <div className="home-content-world mt-1 pb-12">
             <div className="relative z-10">
               {ANIME.length === 0 ? (
