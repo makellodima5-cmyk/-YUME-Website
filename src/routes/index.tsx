@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowDownWideNarrow, ChevronDown, ChevronRight, Search, SlidersHorizontal, X, UserRound, Globe, Sun, Moon, Monitor } from "lucide-react";
+import { ArrowDownWideNarrow, ChevronDown, ChevronRight, Search, SlidersHorizontal, X, UserRound, Globe, Sun, Moon, Monitor, ShieldCheck } from "lucide-react";
 import { COLLECTIONS, type Anime } from "@/data/anime";
 import { getShikimoriCatalog } from "@/data/shikimori";
 import { getExactReleaseDate, isNewRelease, isUpcomingAnnouncement } from "@/data/anime-sections";
@@ -659,7 +659,7 @@ function Index() {
             <div className="rounded-xl bg-background/70 p-3"><span className="block text-muted-foreground">{language === "ru" ? "Найдено трейлеров" : "Trailers found"}</span><strong>{adminStats?.found ?? 0}</strong></div>
             <div className="rounded-xl bg-background/70 p-3"><span className="block text-muted-foreground">{language === "ru" ? "В очереди" : "Queue"}</span><strong>{adminStats?.pending ?? 0}</strong></div>
           </div>
-          <button type="button" onClick={runTrailerUpdate} disabled={adminRunning || adminStats?.missing === 0} className="mt-4 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition hover:brightness-110 disabled:cursor-wait disabled:opacity-50">
+          <button type="button" onClick={runTrailerUpdate} disabled={adminRunning || adminStats?.missing === 0 || ((adminStats?.total ?? 0) > 0 && adminStats?.pending === 0)} className="mt-4 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition hover:brightness-110 disabled:cursor-wait disabled:opacity-50">
             <ShieldCheck className="h-4 w-4" />
             {adminRunning ? (language === "ru" ? "Обновление…" : "Updating…") : (language === "ru" ? "Обновить трейлеры" : "Update trailers")}
           </button>
