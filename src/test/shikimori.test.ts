@@ -66,6 +66,15 @@ describe("Shikimori video URL validation", () => {
     expect(youtubeVideoId("https://youtube.com/embed/dQw4w9WgXcQ")).toBe("dQw4w9WgXcQ");
   });
 
+  it("maps a Shikimori video as a trailer when it has a valid YouTube ID", () => {
+    const mapped = mapAnime({
+      id: "42",
+      name: "Anime",
+      videos: [{ id: 7, url: "https://youtube.com/watch?v=dQw4w9WgXcQ", name: "Main video", kind: "other" }],
+    });
+    expect(mapped.youtubeTrailerId).toBe("dQw4w9WgXcQ");
+  });
+
   it("rejects non-YouTube hosts and malformed IDs", () => {
     expect(youtubeVideoId("https://example.com/watch?v=dQw4w9WgXcQ")).toBeUndefined();
     expect(youtubeVideoId("javascript:alert(1)")).toBeUndefined();
