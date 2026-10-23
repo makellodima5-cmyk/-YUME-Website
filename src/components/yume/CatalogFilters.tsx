@@ -62,9 +62,9 @@ export function CatalogFilters({
   const panelRef = useRef<HTMLDivElement>(null);
   const [positionStyle, setPositionStyle] = useState<CSSProperties>({});
 
-  // Capture the anchor's viewport coordinates once when the panel opens.
-  // Keep those coordinates as the page scrolls, rather than scrolling the panel
-  // together with the hero/catalog content.
+  // Capture the panel's document coordinates once when it opens.
+  // It then scrolls naturally with the page instead of staying fixed to the
+  // viewport or following the user during scrolling.
   useLayoutEffect(() => {
     if (!open || typeof window === "undefined") return;
     const trigger = document.querySelector<HTMLElement>('[data-filter-trigger][aria-expanded="true"]');
@@ -73,18 +73,16 @@ export function CatalogFilters({
     const triggerRect = trigger?.getBoundingClientRect();
     const viewportWidth = window.visualViewport?.width ?? window.innerWidth;
     const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
-    const safeTop = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--safe-area-inset-top")) || 0;
+    const scrollX = window.scrollX;
+    const scrollY = window.scrollY;
     const width = Math.min(440, Math.max(240, viewportWidth - 24));
-    const left = Math.max(12, Math.min(rect?.left ?? 12, viewportWidth - width - 12));
-    // Anchor the panel to the filter control, then freeze that viewport coordinate.
-    // The portal to document.body prevents transformed/overflowing hero containers
-    // from turning fixed positioning into page-relative positioning.
-    const requestedTop = triggerRect ? triggerRect.bottom + 8 : rect ? rect.bottom + 8 : safeTop + 80;
-    const top = Math.max(safeTop + 8, Math.min(requestedTop, viewportHeight - 160));
+    const viewportLeft = Math.max(12, Math.min(rect?.left ?? 12, viewportWidth - width - 12));
+    const viewportTop = triggerRect ? triggerRect.bottom + 8 : rect ? rect.bottom + 8 : 80;
+    const top = Math.max(8, Math.min(viewportTop, viewportHeight - 160));
     setPositionStyle({
-      position: "fixed",
-      top,
-      left,
+      position: "absolute",
+      top: top + scrollY,
+      left: viewportLeft + scrollX,
       width,
       maxHeight: Math.max(150, viewportHeight - top - 12),
     });
@@ -100,7 +98,7 @@ export function CatalogFilters({
   });
 
   const panel = (
-    <div ref={panelRef} style={positionStyle} className="fixed z-[100] overflow-y-auto overscroll-contain rounded-2xl border border-border bg-popover p-3 text-popover-foreground shadow-2xl shadow-black/25 sm:p-4" role="dialog" aria-label={t("filters.dialogLabel")} data-catalog-filter-panel>
+    <div ref={panelRef} style={positionStyle} className="z-[100] overflow-y-auto overscroll-contain rounded-2xl border border-border bg-popover p-3 text-popover-foreground shadow-2xl shadow-black/25 sm:p-4" role="dialog" aria-label={t("filters.dialogLabel")} data-catalog-filter-panel>
       <div className="mb-3 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-sm font-semibold"><SlidersHorizontal className="h-4 w-4 text-primary" /> {t("filters.title")}</div>
         <button type="button" onClick={onClose} aria-label={t("filters.close")} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-accent hover:text-foreground">
@@ -151,8 +149,8 @@ export function CatalogFilters({
     </div>
   );
 
-  // Render both home and catalog filters at the document root to avoid clipping
-  // and to keep the panel at its captured viewport position during page scrolling.
+  // Render both home and catalog filters at the document root to avoid clipping.
+  // Its captured document coordinates make it scroll with the page.
   if (typeof document !== "undefined") return createPortal(panel, document.body);
   return panel;
 }
