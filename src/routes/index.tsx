@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowDownWideNarrow, ChevronDown, ChevronRight, Search, SlidersHorizontal, X, UserRound, Globe, Sun, Moon, Monitor, ShieldCheck } from "lucide-react";
+import { ArrowDownWideNarrow, ChevronDown, ChevronRight, Search, SlidersHorizontal, X, UserRound, Globe, Sun, Moon, Monitor, ShieldCheck, Play, ListChecks, CircleCheck, Clock3, ChartNoAxesCombined, Database, Settings, History, Download } from "lucide-react";
 import { COLLECTIONS, type Anime } from "@/data/anime";
 import { getShikimoriCatalog } from "@/data/shikimori";
 import { getExactReleaseDate, isNewRelease, isUpcomingAnnouncement } from "@/data/anime-sections";
@@ -308,6 +308,10 @@ function Index() {
   const [maintenanceBusy, setMaintenanceBusy] = useState(false);
   const [maintenanceMessage, setMaintenanceMessage] = useState("");
   const [expandedAdminSections, setExpandedAdminSections] = useState({import:true,quality:false,maintenance:false,audit:false,trailers:false});
+  const [analyticsData, setAnalyticsData] = useState<{periods:{hours:{visits:number;visitors:number};week:{visits:number;visitors:number};month:{visits:number;visitors:number};all:{visits:number;visitors:number}};daily:{date:string;visits:number;visitors:number}[];updatedAt:string}|null>(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [analyticsError, setAnalyticsError] = useState("");
+  const [analyticsOpen, setAnalyticsOpen] = useState(false);
   const [cookieNoticeAcknowledged, setCookieNoticeAcknowledged] = useState(true);
 
   useEffect(() => {
@@ -411,6 +415,28 @@ function Index() {
       });
     return () => { cancelled = true; };
   }, [isTelegramMiniApp, telegramAuthReady, telegramConsentRequired, telegramConsentPending]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || view === "admin") return;
+    const path = window.location.pathname;
+    fetch("/api/analytics", {method:"POST", credentials:"same-origin", keepalive:true, headers:{"Content-Type":"application/json"}, body:JSON.stringify({path})}).catch(() => {});
+  }, [view]);
+
+  useEffect(() => {
+    if (!isAdmin || !analyticsOpen) return;
+    let cancelled = false;
+    setAnalyticsLoading(true);
+    setAnalyticsError("");
+    fetch("/api/analytics", {credentials:"same-origin",cache:"no-store"})
+      .then(async response => {
+        const result = await response.json().catch(() => ({})) as {ok?:boolean;analytics?:typeof analyticsData;error?:string};
+        if (!response.ok || !result.analytics) throw new Error(result.error || (language==="ru"?"Не удалось загрузить аналитику.":"Could not load analytics."));
+        if (!cancelled) setAnalyticsData(result.analytics);
+      })
+      .catch(error => {if(!cancelled)setAnalyticsError(error instanceof Error?error.message:"Analytics request failed.");})
+      .finally(()=>{if(!cancelled)setAnalyticsLoading(false);});
+    return () => {cancelled=true;};
+  }, [isAdmin,analyticsOpen,language]);
 
   useEffect(() => {
     if (isTelegramMiniApp && telegramConsentPending && view !== "privacy-policy") {
@@ -1142,23 +1168,41 @@ function Index() {
             ) : isAdmin ? (
               <>
               <section className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4" aria-label={language === "ru" ? "Ключевые показатели" : "Key metrics"}>
-                <article className="rounded-xl border border-border bg-card/60 p-3">
-                  <p className="text-xs text-muted-foreground">{language === "ru" ? "Без трейлера" : "Missing trailers"}</p>
-                  <p className="mt-1 text-xl font-semibold tabular-nums">{adminStats ? adminStats.missing.toLocaleString(language === "ru" ? "ru-RU" : "en-US") : "—"}</p>
-                </article>
-                <article className="rounded-xl border border-border bg-card/60 p-3">
-                  <p className="text-xs text-muted-foreground">{language === "ru" ? "Проверено" : "Checked"}</p>
-                  <p className="mt-1 text-xl font-semibold tabular-nums">{adminStats ? adminStats.checked.toLocaleString(language === "ru" ? "ru-RU" : "en-US") : "—"}</p>
-                </article>
-                <article className="rounded-xl border border-border bg-card/60 p-3">
-                  <p className="text-xs text-muted-foreground">{language === "ru" ? "Найдено трейлеров" : "Trailers found"}</p>
-                  <p className="mt-1 text-xl font-semibold tabular-nums">{adminStats ? adminStats.found.toLocaleString(language === "ru" ? "ru-RU" : "en-US") : "—"}</p>
-                </article>
-                <article className="rounded-xl border border-border bg-card/60 p-3">
-                  <p className="text-xs text-muted-foreground">{language === "ru" ? "Очередь" : "Queue"}</p>
-                  <p className="mt-1 text-xl font-semibold tabular-nums">{adminStats ? adminStats.pending.toLocaleString(language === "ru" ? "ru-RU" : "en-US") : "—"}</p>
-                </article>
+                <button type="button" onClick={() => setExpandedAdminSections(s=>({...s,trailers:true}))} className="rounded-xl border border-[#493044] bg-[#100B13] p-3 text-left transition hover:border-[#FF3D91]">
+                  <span className="flex items-center gap-2 text-xs text-[#D3C3D7]"><Play className="h-5 w-5 fill-[#FF3D91] text-[#FF3D91]"/>{language==="ru"?"Без трейлера":"Missing trailers"}</span>
+                  <span className="mt-1 block text-xl font-bold tabular-nums text-[#FF3D91]">{adminStats ? adminStats.missing.toLocaleString(language==="ru"?"ru-RU":"en-US") : "—"}</span>
+                </button>
+                <button type="button" onClick={() => setExpandedAdminSections(s=>({...s,trailers:true}))} className="rounded-xl border border-[#263C50] bg-[#0B111A] p-3 text-left transition hover:border-[#4FC8F3]">
+                  <span className="flex items-center gap-2 text-xs text-[#C3D3E1]"><ListChecks className="h-5 w-5 text-[#4FC8F3]"/>{language==="ru"?"Проверено":"Checked"}</span>
+                  <span className="mt-1 block text-xl font-bold tabular-nums text-[#B8D7FF]">{adminStats ? adminStats.checked.toLocaleString(language==="ru"?"ru-RU":"en-US") : "—"}</span>
+                </button>
+                <button type="button" onClick={() => setExpandedAdminSections(s=>({...s,trailers:true}))} className="rounded-xl border border-[#21483B] bg-[#091611] p-3 text-left transition hover:border-[#36EBA6]">
+                  <span className="flex items-center gap-2 text-xs text-[#C3D8D0]"><CircleCheck className="h-5 w-5 fill-[#36EBA6] text-[#36EBA6]"/>{language==="ru"?"Найдено трейлеров":"Trailers found"}</span>
+                  <span className="mt-1 block text-xl font-bold tabular-nums text-[#36EBA6]">{adminStats ? adminStats.found.toLocaleString(language==="ru"?"ru-RU":"en-US") : "—"}</span>
+                </button>
+                <button type="button" onClick={() => setExpandedAdminSections(s=>({...s,trailers:true}))} className="rounded-xl border border-[#493A27] bg-[#171108] p-3 text-left transition hover:border-[#FFAA43]">
+                  <span className="flex items-center gap-2 text-xs text-[#D9C9B3]"><Clock3 className="h-5 w-5 text-[#FFAA43]"/>{language==="ru"?"Очередь":"Queue"}</span>
+                  <span className="mt-1 block text-xl font-bold tabular-nums text-[#FFAA43]">{adminStats ? adminStats.pending.toLocaleString(language==="ru"?"ru-RU":"en-US") : "—"}</span>
+                </button>
               </section>
+              <details open={analyticsOpen} onToggle={event=>setAnalyticsOpen(event.currentTarget.open)} className="group mb-3 overflow-hidden rounded-2xl border border-[#57317A] bg-[#0D0A14]" aria-label={language==="ru"?"Посещаемость YUME":"YUME visits analytics"}>
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 hover:bg-[#171020] [&::-webkit-details-marker]:hidden">
+                  <span className="flex min-w-0 items-center gap-2.5"><ChartNoAxesCombined className="h-6 w-6 shrink-0 text-[#BE65FF]"/><span className="min-w-0"><span className="block font-semibold text-[#F8F4FF]">{language==="ru"?"Посещаемость YUME":"YUME visits"}</span><span className="mt-0.5 block text-xs text-[#A89CB8]">{language==="ru"?"24 часа: ":"24 hours: "}{analyticsData?.periods.hours.visits.toLocaleString() ?? "—"} · {language==="ru"?"7 дней: ":"7 days: "}{analyticsData?.periods.week.visits.toLocaleString() ?? "—"}</span></span></span>
+                  <ChevronDown className="h-4 w-4 shrink-0 text-[#BE65FF] transition-transform group-open:rotate-180"/>
+                </summary>
+                <div className="border-t border-[#392649] p-3 sm:p-4">
+                  {analyticsLoading && <p className="mb-3 text-xs text-[#A89CB8]" role="status">{language==="ru"?"Загружаем статистику…":"Loading analytics…"}</p>}
+                  {analyticsError && <p className="mb-3 rounded-lg border border-red-900 p-2.5 text-xs text-red-300" role="alert">{analyticsError}</p>}
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    {([{key:"hours",label:language==="ru"?"За 24 часа":"Last 24 hours"},{key:"week",label:language==="ru"?"За 7 дней":"Last 7 days"},{key:"month",label:language==="ru"?"За 30 дней":"Last 30 days"},{key:"all",label:language==="ru"?"За всё время":"All time"}] as const).map(period=><div key={period.key} className="rounded-xl border border-[#35283F] bg-[#08070D] p-3"><span className="block text-xs text-[#AAA1B8]">{period.label}</span><strong className="mt-1 block text-xl tabular-nums text-[#C46AFF]">{analyticsData?.periods[period.key].visits.toLocaleString(language==="ru"?"ru-RU":"en-US") ?? "—"}</strong><span className="mt-1 block text-[11px] text-[#8D819B]">{language==="ru"?"уникальных: ":"unique: "}{analyticsData?.periods[period.key].visitors.toLocaleString(language==="ru"?"ru-RU":"en-US") ?? "—"}</span></div>)}
+                  </div>
+                  <div className="mt-4">
+                    <div className="mb-2 flex items-center justify-between gap-2"><span className="text-sm font-medium text-[#D9C8E8]">{language==="ru"?"Посещения за 7 дней":"Visits over 7 days"}</span><button type="button" disabled={analyticsLoading} onClick={()=>{setAnalyticsOpen(false);requestAnimationFrame(()=>setAnalyticsOpen(true));}} className="text-xs text-[#C46AFF]">{language==="ru"?"Обновить":"Refresh"}</button></div>
+                    {analyticsData?.daily.length ? <div className="flex h-24 items-end gap-1.5 rounded-lg bg-[#08070D] px-2 pt-3">{analyticsData.daily.map(day=><div key={day.date} className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1"><div title={day.date+": "+day.visits} className="w-full max-w-8 rounded-t-md bg-gradient-to-t from-[#8B35D6] to-[#D08AFF]" style={{height:Math.max(4,day.visits/Math.max(1,...analyticsData.daily.map(d=>d.visits))*100)+"%"}}/><span className="text-[9px] text-[#8D819B]">{day.date.slice(5)}</span></div>)}</div> : <p className="rounded-lg bg-[#08070D] p-4 text-xs text-[#8D819B]">{language==="ru"?"Данные появятся после первых посещений с включённой аналитикой.":"Data will appear after the first visits are recorded."}</p>}
+                  </div>
+                  <p className="mt-3 text-[11px] text-[#8D819B]">{language==="ru"?"Посещения сайта; уникальные посетители оцениваются по псевдонимному хешу IP и браузера.":"Page visits; unique visitors are estimated using a pseudonymous IP/browser hash."}</p>
+                </div>
+              </details>
               <section className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-card/50 px-3 py-2.5" aria-label={language === "ru" ? "Состояние операций" : "Operations status"}>
                 <span className="text-sm font-medium">{language === "ru" ? "Состояние операций" : "Operations status"}</span>
                 <span className={`inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-xs font-medium ${(adminRunning || adminImportRunning) ? "border-primary/40 bg-primary/10 text-primary" : (adminMessage || adminImportMessage) ? "border-amber-500/40 bg-amber-500/10 text-amber-600" : "border-border bg-background/60 text-muted-foreground"}`}>
