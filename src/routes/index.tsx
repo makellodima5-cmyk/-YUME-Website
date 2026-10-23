@@ -1168,20 +1168,20 @@ function Index() {
             ) : isAdmin ? (
               <>
               <section className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4" aria-label={language === "ru" ? "Ключевые показатели" : "Key metrics"}>
-                <button type="button" onClick={() => setExpandedAdminSections(s=>({...s,trailers:true}))} className="rounded-xl border border-[#493044] bg-[#100B13] p-3 text-left transition hover:border-[#FF3D91]">
-                  <span className="flex items-center gap-2.5"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#2B1424]"><Play className="h-5 w-5 fill-[#FF3D91] text-[#FF3D91]"/></span><span className="text-xs text-[#D3C3D7]">{language==="ru"?"Без трейлера":"Missing trailers"}</span></span>
+                <button type="button" onClick={() => setExpandedAdminSections(s=>({...s,trailers:true}))} className="rounded-xl border border-[#382D46] bg-[#0C0C16] p-3 text-left transition hover:border-[#6A527A]">
+                  <span className="flex items-center gap-2.5"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#271024]"><Play className="h-5 w-5 fill-[#FF3D91] text-[#FF3D91]"/></span><span className="text-xs text-[#D3C3D7]">{language==="ru"?"Без трейлера":"Missing trailers"}</span></span>
                   <span className="mt-1 block text-xl font-bold tabular-nums text-[#FF3D91]">{adminStats ? adminStats.missing.toLocaleString(language==="ru"?"ru-RU":"en-US") : "—"}</span>
                 </button>
-                <button type="button" onClick={() => setExpandedAdminSections(s=>({...s,trailers:true}))} className="rounded-xl border border-[#263C50] bg-[#0B111A] p-3 text-left transition hover:border-[#4FC8F3]">
-                  <span className="flex items-center gap-2.5"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#102638]"><ListChecks className="h-5 w-5 text-[#4FC8F3]"/></span><span className="text-xs text-[#C3D3E1]">{language==="ru"?"Проверено":"Checked"}</span></span>
+                <button type="button" onClick={() => setExpandedAdminSections(s=>({...s,trailers:true}))} className="rounded-xl border border-[#382D46] bg-[#0C0C16] p-3 text-left transition hover:border-[#6A527A]">
+                  <span className="flex items-center gap-2.5"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#0C1F3D]"><ListChecks className="h-5 w-5 text-[#4FC8F3]"/></span><span className="text-xs text-[#C3D3E1]">{language==="ru"?"Проверено":"Checked"}</span></span>
                   <span className="mt-1 block text-xl font-bold tabular-nums text-[#B8D7FF]">{adminStats ? adminStats.checked.toLocaleString(language==="ru"?"ru-RU":"en-US") : "—"}</span>
                 </button>
-                <button type="button" onClick={() => setExpandedAdminSections(s=>({...s,trailers:true}))} className="rounded-xl border border-[#21483B] bg-[#091611] p-3 text-left transition hover:border-[#36EBA6]">
-                  <span className="flex items-center gap-2.5"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#0E2B21]"><CircleCheck className="h-5 w-5 fill-[#36EBA6] text-[#36EBA6]"/></span><span className="text-xs text-[#C3D8D0]">{language==="ru"?"Найдено трейлеров":"Trailers found"}</span></span>
+                <button type="button" onClick={() => setExpandedAdminSections(s=>({...s,trailers:true}))} className="rounded-xl border border-[#382D46] bg-[#0C0C16] p-3 text-left transition hover:border-[#6A527A]">
+                  <span className="flex items-center gap-2.5"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#0D2621]"><CircleCheck className="h-5 w-5 fill-[#36EBA6] text-[#36EBA6]"/></span><span className="text-xs text-[#C3D8D0]">{language==="ru"?"Найдено трейлеров":"Trailers found"}</span></span>
                   <span className="mt-1 block text-xl font-bold tabular-nums text-[#36EBA6]">{adminStats ? adminStats.found.toLocaleString(language==="ru"?"ru-RU":"en-US") : "—"}</span>
                 </button>
-                <button type="button" onClick={() => setExpandedAdminSections(s=>({...s,trailers:true}))} className="rounded-xl border border-[#493A27] bg-[#171108] p-3 text-left transition hover:border-[#FFAA43]">
-                  <span className="flex items-center gap-2.5"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#332313]"><Clock3 className="h-5 w-5 text-[#FFAA43]"/></span><span className="text-xs text-[#D9C9B3]">{language==="ru"?"Очередь":"Queue"}</span></span>
+                <button type="button" onClick={() => setExpandedAdminSections(s=>({...s,trailers:true}))} className="rounded-xl border border-[#382D46] bg-[#0C0C16] p-3 text-left transition hover:border-[#6A527A]">
+                  <span className="flex items-center gap-2.5"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#251A18]"><Clock3 className="h-5 w-5 text-[#FFAA43]"/></span><span className="text-xs text-[#D9C9B3]">{language==="ru"?"Очередь":"Queue"}</span></span>
                   <span className="mt-1 block text-xl font-bold tabular-nums text-[#FFAA43]">{adminStats ? adminStats.pending.toLocaleString(language==="ru"?"ru-RU":"en-US") : "—"}</span>
                 </button>
               </section>
@@ -1223,7 +1223,7 @@ function Index() {
                       <span className="mb-1 block text-xs text-muted-foreground">{language === "ru" ? "Количество новых записей (1–500)" : "Number of new records (1–500)"}</span>
                       <input type="number" min={1} max={500} step={1} value={adminImportTarget} onChange={event => setAdminImportTarget(event.target.value)} disabled={adminImportRunning || adminImport.state === "running"} className="h-10 w-full rounded-xl border border-[#453452] bg-[#050408] px-3 text-[#FFFFFF] focus:border-[#BE65FF] focus:outline-none focus:ring-1 focus:ring-[#BE65FF]" />
                     </label>
-                    <button type="button" onClick={runCatalogImport} disabled={adminImportRunning || (adminImport.state !== "running" && (!Number.isInteger(Number(adminImportTarget)) || Number(adminImportTarget)<1 || Number(adminImportTarget)>500))} className="self-end rounded-xl bg-gradient-to-r from-[#A83BFA] to-[#8D37F5] px-4 py-2.5 text-sm font-semibold text-white shadow-[0_0_16px_rgba(155,65,245,0.18)] transition hover:brightness-110 disabled:cursor-wait disabled:opacity-50">
+                    <button type="button" onClick={runCatalogImport} disabled={adminImportRunning || (adminImport.state !== "running" && (!Number.isInteger(Number(adminImportTarget)) || Number(adminImportTarget)<1 || Number(adminImportTarget)>500))} className="self-end rounded-xl bg-gradient-to-r from-[#AC4EFC] to-[#8736FA] px-4 py-2.5 text-sm font-semibold text-white shadow-[0_0_16px_rgba(155,65,245,0.18)] transition hover:brightness-110 disabled:cursor-wait disabled:opacity-50">
                       {adminImportRunning ? (language === "ru" ? "Импорт…" : "Importing…") : adminImport.state === "running" ? (language === "ru" ? "Продолжить импорт" : "Resume import") : (language === "ru" ? "Начать импорт" : "Start import")}
                     </button>
                   </div>
@@ -1309,7 +1309,7 @@ function Index() {
                     <div className="rounded-lg border border-[#21483B] bg-[#08070D] p-2.5"><span className="block text-xs text-[#A89CB8]">{language === "ru" ? "Найдено" : "Found"}</span><strong className="tabular-nums text-[#36EBA6]">{adminStats?.found ?? 0}</strong></div>
                     <div className="rounded-lg border border-[#493A27] bg-[#08070D] p-2.5"><span className="block text-xs text-[#A89CB8]">{language === "ru" ? "Очередь" : "Queue"}</span><strong className="tabular-nums text-[#FFAA43]">{adminStats?.pending ?? 0}</strong></div>
                   </div>
-                  <button type="button" onClick={runTrailerUpdate} disabled={adminRunning || adminStats?.missing === 0} className="mt-3 flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#A83BFA] to-[#8D37F5] px-4 py-2.5 text-sm font-semibold text-white shadow-[0_0_16px_rgba(155,65,245,0.18)] transition hover:brightness-110 disabled:cursor-wait disabled:opacity-50">
+                  <button type="button" onClick={runTrailerUpdate} disabled={adminRunning || adminStats?.missing === 0} className="mt-3 flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#AC4EFC] to-[#8736FA] px-4 py-2.5 text-sm font-semibold text-white shadow-[0_0_16px_rgba(155,65,245,0.18)] transition hover:brightness-110 disabled:cursor-wait disabled:opacity-50">
                     <ShieldCheck className="h-4 w-4" />
                     {adminRunning ? (language === "ru" ? "Обновление…" : "Updating…") : (language === "ru" ? "Обновить трейлеры" : "Update trailers")}
                   </button>
