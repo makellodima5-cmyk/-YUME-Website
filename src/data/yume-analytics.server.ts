@@ -151,15 +151,53 @@ async function makeMetrics(db: DB, now: Date) {
   };
 }
 const ANALYTICS_METRICS_CACHE_TTL_MS = 30_000;
+const ANALYTICS_EDGE_CACHE_KEY = "https://yume-analytics-cache.internal/v1/metrics";
 type AnalyticsMetrics = Awaited<ReturnType<typeof makeMetrics>>;
+type AnalyticsCachePayload = { cachedAt: number; value: AnalyticsMetrics };
+type AnalyticsWorkerCache = {
+  match(request: Request): Promise<Response | undefined>;
+  put(request: Request, response: Response): Promise<void>;
+};
+type AnalyticsCacheGlobals = typeof globalThis & { caches?: { default?: AnalyticsWorkerCache } };
 let analyticsMetricsCache: { expiresAt: number; value: AnalyticsMetrics } | null = null;
+
+function analyticsEdgeCache(): AnalyticsWorkerCache | null {
+  try { return (globalThis as AnalyticsCacheGlobals).caches?.default ?? null; } catch { return null; }
+}
 
 async function cachedMetrics(db: DB): Promise<AnalyticsMetrics> {
   if (analyticsMetricsCache && analyticsMetricsCache.expiresAt > Date.now()) {
     return analyticsMetricsCache.value;
   }
+  analyticsMetricsCache = null;
+  const edge = analyticsEdgeCache();
+  if (edge) {
+    try {
+      const response = await edge.match(new Request(ANALYTICS_EDGE_CACHE_KEY));
+      if (response?.ok) {
+        const payload = await response.json() as AnalyticsCachePayload;
+        if (Number.isFinite(payload.cachedAt) && Date.now() - payload.cachedAt < ANALYTICS_METRICS_CACHE_TTL_MS &&
+            payload.value?.periods && Array.isArray(payload.value.daily)) {
+          analyticsMetricsCache = { expiresAt: payload.cachedAt + ANALYTICS_METRICS_CACHE_TTL_MS, value: payload.value };
+          return payload.value;
+        }
+      }
+    } catch {
+      // Continue with D1 if the regional cache is unavailable.
+    }
+  }
   const value = await makeMetrics(db, new Date());
-  analyticsMetricsCache = { value, expiresAt: Date.now() + ANALYTICS_METRICS_CACHE_TTL_MS };
+  const cachedAt = Date.now();
+  analyticsMetricsCache = { value, expiresAt: cachedAt + ANALYTICS_METRICS_CACHE_TTL_MS };
+  if (edge) {
+    try {
+      await edge.put(new Request(ANALYTICS_EDGE_CACHE_KEY), new Response(JSON.stringify({ cachedAt, value } satisfies AnalyticsCachePayload), {
+        headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "public, max-age=30" },
+      }));
+    } catch {
+      // This cache is an optimization only; D1 remains the source of truth.
+    }
+  }
   return value;
 }
 
