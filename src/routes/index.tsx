@@ -340,7 +340,9 @@ function Index() {
   const [adminMessage, setAdminMessage] = useState("");
   const [notificationReadIds, setNotificationReadIds] = useState<string[]>([]);
   const [notificationDismissedIds, setNotificationDismissedIds] = useState<string[]>([]);
-  const notificationPointerStart = useRef<{ id: string; x: number; y: number; pointerId: number } | null>(null);
+  const notificationPointerStart = useRef<{ id: string; x: number; y: number; pointerId: number; startOffset: number } | null>(null);
+  const [notificationSwipe, setNotificationSwipe] = useState<{ id: string; offset: number; dragging: boolean } | null>(null);
+  const [expandedNotificationIds, setExpandedNotificationIds] = useState<string[]>([]);
   const [notificationStateLoaded, setNotificationStateLoaded] = useState(false);
   const [notificationRemoteAccount, setNotificationRemoteAccount] = useState(false);
   const [notificationActionBusy, setNotificationActionBusy] = useState(false);
@@ -655,24 +657,49 @@ function Index() {
 
   const handleNotificationPointerDown = (notificationId: string, event: React.PointerEvent<HTMLElement>) => {
     if (event.pointerType === "mouse" || !event.isPrimary || notificationActionBusy) return;
+    const startOffset = notificationSwipe?.id === notificationId ? notificationSwipe.offset : 0;
     notificationPointerStart.current = {
       id: notificationId,
       x: event.clientX,
       y: event.clientY,
       pointerId: event.pointerId,
+      startOffset,
     };
+  };
+
+  const handleNotificationPointerMove = (notificationId: string, event: React.PointerEvent<HTMLElement>) => {
+    const start = notificationPointerStart.current;
+    if (!start || start.id !== notificationId || start.pointerId !== event.pointerId) return;
+    const deltaX = event.clientX - start.x;
+    const deltaY = event.clientY - start.y;
+    if (Math.abs(deltaX) < 5 || Math.abs(deltaX) < Math.abs(deltaY) * 1.15) return;
+    const offset = Math.max(-112, Math.min(0, start.startOffset + deltaX));
+    setNotificationSwipe({ id: notificationId, offset, dragging: true });
   };
 
   const handleNotificationPointerUp = (notificationId: string, event: React.PointerEvent<HTMLElement>) => {
     const start = notificationPointerStart.current;
     notificationPointerStart.current = null;
     if (!start || start.id !== notificationId || start.pointerId !== event.pointerId) return;
-
     const deltaX = event.clientX - start.x;
     const deltaY = event.clientY - start.y;
-    // Swipe left, but ignore ordinary vertical scrolling or small taps.
-    if (deltaX <= -56 && Math.abs(deltaX) > Math.abs(deltaY) * 1.25) {
-      void dismissNotification(notificationId);
+    if (Math.abs(deltaX) > Math.abs(deltaY) * 1.15 && deltaX < -8) {
+      const offset = notificationSwipe?.id === notificationId
+        ? notificationSwipe.offset
+        : Math.max(-112, start.startOffset + deltaX);
+      setNotificationSwipe(offset <= -78 ? { id: notificationId, offset: -112, dragging: false } : null);
+    } else if (start.startOffset < 0) {
+      setNotificationSwipe(null);
+    }
+  };
+
+  const toggleNotificationExpanded = (notificationId: string) => {
+    setExpandedNotificationIds((current) => current.includes(notificationId)
+      ? current.filter((id) => id !== notificationId)
+      : [...current, notificationId]);
+    setNotificationReadIds((current) => current.includes(notificationId) ? current : [...current, notificationId]);
+    if (!notificationRemoteAccount) {
+      saveLocalNotificationIds([...readLocalNotificationIds(), notificationId]);
     }
   };
 
@@ -1243,20 +1270,47 @@ function Index() {
               <div className="space-y-3">
                 {USER_NOTIFICATIONS.filter((item) => !notificationDismissedIds.includes(item.id)).map((item) => {
                   const unread = !notificationReadIds.includes(item.id);
+                  const expanded = expandedNotificationIds.includes(item.id);
+                  const swipeOffset = notificationSwipe?.id === item.id ? notificationSwipe.offset : 0;
+                  const isDragging = notificationSwipe?.id === item.id && notificationSwipe.dragging;
                   return (
-                    <article key={item.id} onPointerDown={(event) => handleNotificationPointerDown(item.id, event)} onPointerUp={(event) => handleNotificationPointerUp(item.id, event)} onPointerCancel={() => { notificationPointerStart.current = null; }} style={{ touchAction: "pan-y" }} className={`relative overflow-hidden rounded-2xl border bg-card/50 p-4 sm:p-5 transition-transform duration-200 ${unread ? "border-red-500/35 shadow-[0_0_18px_rgba(239,68,68,0.06)]" : "border-border"}`}>
-                      <div className="flex items-start gap-3 pl-1">
-                        <div className="mt-0.5 grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-primary/20 bg-primary/10 text-primary"><Sparkles className="h-5 w-5" /></div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <h2 className="font-semibold leading-snug text-foreground">{item.title[language]}</h2>
-                            {unread && <span className="inline-flex items-center gap-1 rounded-full bg-red-500/10 px-2 py-0.5 text-[11px] font-semibold text-red-400"><span className="h-1.5 w-1.5 rounded-full bg-red-500" />{language === "ru" ? "Новое" : "New"}</span>}
+                    <article key={item.id} className={`relative overflow-hidden rounded-2xl border bg-card/50 ${unread ? "border-red-500/35 shadow-[0_0_18px_rgba(239,68,68,0.06)]" : "border-border"}`}>
+                      <div className="absolute inset-y-0 right-0 flex w-28 items-center justify-center bg-red-600 text-white">
+                        <button type="button" onClick={() => { setNotificationSwipe(null); void dismissNotification(item.id); }} aria-label={language === "ru" ? "Удалить уведомление" : "Delete notification"} className="flex h-full w-full flex-col items-center justify-center gap-1 font-semibold transition hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white">
+                          <X className="h-5 w-5" />
+                          <span className="text-xs">{language === "ru" ? "Удалить" : "Delete"}</span>
+                        </button>
+                      </div>
+                      <div
+                        onPointerDown={(event) => handleNotificationPointerDown(item.id, event)}
+                        onPointerMove={(event) => handleNotificationPointerMove(item.id, event)}
+                        onPointerUp={(event) => handleNotificationPointerUp(item.id, event)}
+                        onPointerCancel={() => { notificationPointerStart.current = null; setNotificationSwipe(null); }}
+                        style={{ transform: `translateX(${swipeOffset}px)`, transition: isDragging ? "none" : "transform 240ms cubic-bezier(0.22, 1, 0.36, 1)", touchAction: "pan-y" }}
+                        className="relative z-10 bg-card/95 p-4 sm:p-5"
+                      >
+                        <button type="button" onClick={() => toggleNotificationExpanded(item.id)} aria-expanded={expanded} className="flex w-full items-start gap-3 text-left">
+                          <div className="mt-0.5 grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-primary/20 bg-primary/10 text-primary"><Sparkles className="h-5 w-5" /></div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h2 className="font-semibold leading-snug text-foreground">{item.title[language]}</h2>
+                              {unread && <span className="inline-flex items-center gap-1 rounded-full bg-red-500/10 px-2 py-0.5 text-[11px] font-semibold text-red-400"><span className="h-1.5 w-1.5 rounded-full bg-red-500" />{language === "ru" ? "Новое" : "New"}</span>}
+                            </div>
+                            <p className="mt-1 text-xs text-muted-foreground">{new Date(item.publishedAt).toLocaleDateString(language === "ru" ? "ru-RU" : "en-US", { day: "numeric", month: "long", year: "numeric" })}</p>
+                            {!expanded && <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-muted-foreground">{item.description[language]}</p>}
                           </div>
-                          <p className="mt-1 text-xs text-muted-foreground">{new Date(item.publishedAt).toLocaleDateString(language === "ru" ? "ru-RU" : "en-US", { day: "numeric", month: "long", year: "numeric" })}</p>
-                          <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-foreground/85">{item.description[language]}</p>
-                          <p className="mt-3 text-[11px] text-muted-foreground sm:hidden">{language === "ru" ? "Смахни влево, чтобы удалить" : "Swipe left to dismiss"}</p>
+                          <ChevronDown className={`mt-1 h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 ${expanded ? "rotate-180" : ""}`} />
+                        </button>
+                        <div className={`grid transition-[grid-template-rows,opacity] duration-300 ease-out ${expanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}>
+                          <div className="overflow-hidden">
+                            <p className="whitespace-pre-line pl-[52px] pt-3 text-sm leading-relaxed text-foreground/85">{item.description[language]}</p>
+                            <div className="flex justify-end pl-[52px] pt-3">
+                              <button type="button" onClick={() => { setNotificationSwipe(null); void dismissNotification(item.id); }} className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-muted-foreground transition hover:bg-red-500/10 hover:text-red-400">
+                                <X className="h-3.5 w-3.5" />{language === "ru" ? "Удалить уведомление" : "Delete notification"}
+                              </button>
+                            </div>
+                          </div>
                         </div>
-                        <button type="button" onClick={() => void dismissNotification(item.id)} aria-label={language === "ru" ? "Удалить уведомление" : "Dismiss notification"} className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-muted-foreground transition hover:bg-red-500/10 hover:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><X className="h-4 w-4" /></button>
                       </div>
                     </article>
                   );
