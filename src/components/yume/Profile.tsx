@@ -325,7 +325,7 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
                       <Bookmark className="h-5 w-5 sm:h-6 sm:w-6" strokeWidth={1.9} />
                     </span>
                     <span className="min-w-0">
-                      <span className="block text-xl font-bold tabular-nums text-white sm:text-2xl">{watchlist.length}</span>
+                      <span className="block text-lg font-bold tabular-nums text-white sm:text-xl">{watchlist.length}</span>
                       <span className="mt-0.5 block text-[11px] leading-snug text-white/65 sm:text-sm">{t("profile.watchlistCount")}</span>
                     </span>
                   </button>
