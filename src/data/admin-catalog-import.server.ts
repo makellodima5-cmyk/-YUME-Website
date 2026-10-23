@@ -167,7 +167,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
       const state = await getMeta(db,"admin_import_state");
       if (state !== "running") return json({isAdmin:true,...await snapshot(db),message:"Нет активного импорта."},409);
       const resumeAt = Number(await getMeta(db,"admin_import_resume_at") ?? "0");
-      if (resumeAt > Date.now()) return json({isAdmin:true,...await snapshot(db),retryAfterMs:resumeAt-Date.now()});
+      if (resumeAt > Date.now()) return json({isAdmin:true,...await snapshot(db),retryAfterMs:resumeAt-Date.now(),error:"Источник временно на паузе. Повтори запрос позже."},503);
       const stats = await snapshot(db);
       if (stats.added >= stats.target || stats.cursor > 500) {
         await db.batch([setMeta(db,"admin_import_state",stats.added >= stats.target ? "completed" : "partial")]);
@@ -185,7 +185,6 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
         return json({isAdmin:true,...await snapshot(db),message:"Источник не вернул записи; импорт остановлен."});
       }
       let added = stats.added, skipped = stats.skipped, incompleteCount = stats.incomplete;
-      const statements: Statement[] = [];
       const currentCount = await db.prepare("SELECT COUNT(*) AS count FROM anime_catalog").first<{count:number}>();
       let position = Number(currentCount?.count ?? 0);
       for (const sourceItem of source) {
