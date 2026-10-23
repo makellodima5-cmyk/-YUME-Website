@@ -1287,7 +1287,7 @@ function Index() {
                         onPointerUp={(event) => handleNotificationPointerUp(item.id, event)}
                         onPointerCancel={() => { notificationPointerStart.current = null; setNotificationSwipe(null); }}
                         style={{ transform: `translateX(${swipeOffset}px)`, transition: isDragging ? "none" : "transform 240ms cubic-bezier(0.22, 1, 0.36, 1)", touchAction: "pan-y" }}
-                        className="relative z-10 bg-card/95 p-4 sm:p-5"
+                        className="relative z-10 bg-background p-4 sm:p-5"
                       >
                         <button type="button" onClick={() => toggleNotificationExpanded(item.id)} aria-expanded={expanded} className="flex w-full items-start gap-3 text-left">
                           <div className="mt-0.5 grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-primary/20 bg-primary/10 text-primary"><Sparkles className="h-5 w-5" /></div>
