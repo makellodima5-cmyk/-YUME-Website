@@ -270,7 +270,7 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
                 <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-[#10071b]/80 to-transparent" />
               </div>
 
-              <div className="relative -mt-6 rounded-t-[22px] bg-gradient-to-b from-[#1b0d2b]/72 via-[#140a20]/82 to-[#0d0916]/92 px-3 pb-3 pt-0 sm:px-5 sm:pb-5">
+              <div className="relative -mt-6 rounded-[20px] bg-gradient-to-b from-[#1b0d2b]/42 via-[#140a20]/52 to-[#0d0916]/72 px-3 pb-3 pt-0 sm:px-5 sm:pb-5">
                 <div className="flex min-w-0 items-end gap-3 sm:gap-4">
                   <div className="relative -mt-8 h-[78px] w-[78px] shrink-0 overflow-hidden rounded-full border-[2.5px] border-[#d98aff] bg-[#21102f] shadow-[0_0_20px_rgba(206,100,255,0.3)] sm:-mt-11 sm:h-28 sm:w-28">
                     {telegramUser?.photo_url ? (
