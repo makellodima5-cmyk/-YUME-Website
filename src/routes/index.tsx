@@ -1169,19 +1169,19 @@ function Index() {
               <>
               <section className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4" aria-label={language === "ru" ? "Ключевые показатели" : "Key metrics"}>
                 <button type="button" onClick={() => setExpandedAdminSections(s=>({...s,trailers:true}))} className="rounded-xl border border-[#493044] bg-[#100B13] p-3 text-left transition hover:border-[#FF3D91]">
-                  <span className="flex items-center gap-2 text-xs text-[#D3C3D7]"><Play className="h-5 w-5 fill-[#FF3D91] text-[#FF3D91]"/>{language==="ru"?"Без трейлера":"Missing trailers"}</span>
+                  <span className="flex items-center gap-2.5"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#2B1424]"><Play className="h-5 w-5 fill-[#FF3D91] text-[#FF3D91]"/></span><span className="text-xs text-[#D3C3D7]">{language==="ru"?"Без трейлера":"Missing trailers"}</span></span>
                   <span className="mt-1 block text-xl font-bold tabular-nums text-[#FF3D91]">{adminStats ? adminStats.missing.toLocaleString(language==="ru"?"ru-RU":"en-US") : "—"}</span>
                 </button>
                 <button type="button" onClick={() => setExpandedAdminSections(s=>({...s,trailers:true}))} className="rounded-xl border border-[#263C50] bg-[#0B111A] p-3 text-left transition hover:border-[#4FC8F3]">
-                  <span className="flex items-center gap-2 text-xs text-[#C3D3E1]"><ListChecks className="h-5 w-5 text-[#4FC8F3]"/>{language==="ru"?"Проверено":"Checked"}</span>
+                  <span className="flex items-center gap-2.5"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#102638]"><ListChecks className="h-5 w-5 text-[#4FC8F3]"/></span><span className="text-xs text-[#C3D3E1]">{language==="ru"?"Проверено":"Checked"}</span></span>
                   <span className="mt-1 block text-xl font-bold tabular-nums text-[#B8D7FF]">{adminStats ? adminStats.checked.toLocaleString(language==="ru"?"ru-RU":"en-US") : "—"}</span>
                 </button>
                 <button type="button" onClick={() => setExpandedAdminSections(s=>({...s,trailers:true}))} className="rounded-xl border border-[#21483B] bg-[#091611] p-3 text-left transition hover:border-[#36EBA6]">
-                  <span className="flex items-center gap-2 text-xs text-[#C3D8D0]"><CircleCheck className="h-5 w-5 fill-[#36EBA6] text-[#36EBA6]"/>{language==="ru"?"Найдено трейлеров":"Trailers found"}</span>
+                  <span className="flex items-center gap-2.5"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#0E2B21]"><CircleCheck className="h-5 w-5 fill-[#36EBA6] text-[#36EBA6]"/></span><span className="text-xs text-[#C3D8D0]">{language==="ru"?"Найдено трейлеров":"Trailers found"}</span></span>
                   <span className="mt-1 block text-xl font-bold tabular-nums text-[#36EBA6]">{adminStats ? adminStats.found.toLocaleString(language==="ru"?"ru-RU":"en-US") : "—"}</span>
                 </button>
                 <button type="button" onClick={() => setExpandedAdminSections(s=>({...s,trailers:true}))} className="rounded-xl border border-[#493A27] bg-[#171108] p-3 text-left transition hover:border-[#FFAA43]">
-                  <span className="flex items-center gap-2 text-xs text-[#D9C9B3]"><Clock3 className="h-5 w-5 text-[#FFAA43]"/>{language==="ru"?"Очередь":"Queue"}</span>
+                  <span className="flex items-center gap-2.5"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#332313]"><Clock3 className="h-5 w-5 text-[#FFAA43]"/></span><span className="text-xs text-[#D9C9B3]">{language==="ru"?"Очередь":"Queue"}</span></span>
                   <span className="mt-1 block text-xl font-bold tabular-nums text-[#FFAA43]">{adminStats ? adminStats.pending.toLocaleString(language==="ru"?"ru-RU":"en-US") : "—"}</span>
                 </button>
               </section>
