@@ -263,6 +263,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
         await db.batch([
           db.prepare("DELETE FROM admin_catalog_import_items WHERE run_id <> ?").bind(runId),
           setMeta(db,"admin_import_run_id",runId),
+          setMeta(db,"admin_import_baseline_added","0"),setMeta(db,"admin_import_baseline_skipped","0"),setMeta(db,"admin_import_baseline_incomplete","0"),
           setMeta(db,"admin_import_target",String(target)),setMeta(db,"admin_import_cursor","1"),
           setMeta(db,"admin_import_added","0"),setMeta(db,"admin_import_skipped","0"),
           setMeta(db,"admin_import_incomplete","0"),setMeta(db,"admin_import_errors","0"),
@@ -296,7 +297,17 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
           await audit(db,"catalog.import.partial","warning",{cursor:before.cursor,reason:"empty_source_page"});
           return json({isAdmin:true,...await snapshot(db),message:"Источник не вернул записи; импорт остановлен."});
         }
-        const runId = (await getMeta(db,"admin_import_run_id")) ?? "legacy";
+        let runId = await getMeta(db,"admin_import_run_id");
+        if (!runId) {
+          // Preserve statistics from an import started by the earlier implementation.
+          runId = crypto.randomUUID();
+          await db.batch([
+            setMeta(db,"admin_import_run_id",runId),
+            setMeta(db,"admin_import_baseline_added",String(before.added)),
+            setMeta(db,"admin_import_baseline_skipped",String(before.skipped)),
+            setMeta(db,"admin_import_baseline_incomplete",String(before.incomplete)),
+          ]);
+        }
         const currentCount = await db.prepare("SELECT COUNT(*) AS count FROM anime_catalog").first<{count:number}>();
         let position = Number(currentCount?.count ?? 0);
         const prepared: {statement:Statement;item:ReturnType<typeof mapItem>}[] = [];
@@ -314,9 +325,9 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
             .bind(runId,entry.item.id,incomplete(entry.item)?1:0));
         }
         const resumeAtValue = String(Date.now()+REQUEST_DELAY_MS);
-        statements.push(db.prepare("UPDATE anime_catalog_meta SET value = CAST((SELECT COUNT(*) FROM admin_catalog_import_items WHERE run_id = ? AND outcome = 'added') AS TEXT) WHERE key = 'admin_import_added'").bind(runId));
-        statements.push(db.prepare("UPDATE anime_catalog_meta SET value = CAST((SELECT COUNT(*) FROM admin_catalog_import_items WHERE run_id = ? AND outcome = 'skipped') AS TEXT) WHERE key = 'admin_import_skipped'").bind(runId));
-        statements.push(db.prepare("UPDATE anime_catalog_meta SET value = CAST((SELECT COUNT(*) FROM admin_catalog_import_items WHERE run_id = ? AND outcome = 'added' AND incomplete = 1) AS TEXT) WHERE key = 'admin_import_incomplete'").bind(runId));
+        statements.push(db.prepare("UPDATE anime_catalog_meta SET value = CAST(CAST((SELECT value FROM anime_catalog_meta WHERE key = 'admin_import_baseline_added') AS INTEGER) + (SELECT COUNT(*) FROM admin_catalog_import_items WHERE run_id = ? AND outcome = 'added') AS TEXT) WHERE key = 'admin_import_added'").bind(runId));
+        statements.push(db.prepare("UPDATE anime_catalog_meta SET value = CAST(CAST((SELECT value FROM anime_catalog_meta WHERE key = 'admin_import_baseline_skipped') AS INTEGER) + (SELECT COUNT(*) FROM admin_catalog_import_items WHERE run_id = ? AND outcome = 'skipped') AS TEXT) WHERE key = 'admin_import_skipped'").bind(runId));
+        statements.push(db.prepare("UPDATE anime_catalog_meta SET value = CAST(CAST((SELECT value FROM anime_catalog_meta WHERE key = 'admin_import_baseline_incomplete') AS INTEGER) + (SELECT COUNT(*) FROM admin_catalog_import_items WHERE run_id = ? AND outcome = 'added' AND incomplete = 1) AS TEXT) WHERE key = 'admin_import_incomplete'").bind(runId));
         statements.push(db.prepare("UPDATE anime_catalog_meta SET value = CAST(CAST(value AS INTEGER) + 1 AS TEXT) WHERE key = 'admin_import_cursor'"));
         statements.push(setMeta(db,"admin_import_resume_at",resumeAtValue));
         statements.push(db.prepare("UPDATE anime_catalog_meta SET value = CASE WHEN CAST((SELECT value FROM anime_catalog_meta WHERE key = 'admin_import_added') AS INTEGER) >= CAST((SELECT value FROM anime_catalog_meta WHERE key = 'admin_import_target') AS INTEGER) THEN 'completed' WHEN CAST((SELECT value FROM anime_catalog_meta WHERE key = 'admin_import_cursor') AS INTEGER) > 500 THEN 'partial' ELSE 'running' END WHERE key = 'admin_import_state'"));
