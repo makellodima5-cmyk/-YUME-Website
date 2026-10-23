@@ -81,6 +81,8 @@ function ensureSchema(db: DB): Promise<void> {
       db.prepare("CREATE INDEX IF NOT EXISTS idx_yume_analytics_date ON yume_analytics_events(event_date)"),
       db.prepare("CREATE INDEX IF NOT EXISTS idx_yume_analytics_created_at ON yume_analytics_events(created_at)"),
       db.prepare("CREATE INDEX IF NOT EXISTS idx_yume_analytics_visitor ON yume_analytics_events(event_date, visitor_hash)"),
+      db.prepare("CREATE INDEX IF NOT EXISTS idx_yume_analytics_visitor_created ON yume_analytics_events(visitor_hash, created_at)"),
+      db.prepare("CREATE INDEX IF NOT EXISTS idx_yume_analytics_session_path_created ON yume_analytics_events(session_hash, page_path, created_at)"),
     ]);
     // Upgrade an older analytics table without session IDs.
     let addedSessionColumn = false;
@@ -148,6 +150,19 @@ async function makeMetrics(db: DB, now: Date) {
     updatedAt: now.toISOString(),
   };
 }
+const ANALYTICS_METRICS_CACHE_TTL_MS = 30_000;
+type AnalyticsMetrics = Awaited<ReturnType<typeof makeMetrics>>;
+let analyticsMetricsCache: { expiresAt: number; value: AnalyticsMetrics } | null = null;
+
+async function cachedMetrics(db: DB): Promise<AnalyticsMetrics> {
+  if (analyticsMetricsCache && analyticsMetricsCache.expiresAt > Date.now()) {
+    return analyticsMetricsCache.value;
+  }
+  const value = await makeMetrics(db, new Date());
+  analyticsMetricsCache = { value, expiresAt: Date.now() + ANALYTICS_METRICS_CACHE_TTL_MS };
+  return value;
+}
+
 export async function handleYumeAnalytics(request: Request): Promise<Response> {
   const env = getEnv();
   const db = dbFrom(env);
@@ -182,7 +197,7 @@ export async function handleYumeAnalytics(request: Request): Promise<Response> {
     }
     if (request.method !== "GET") return json({ error: "Method not allowed." }, 405);
     if (!await isAdmin(request, env, db)) return json({ error: "Unauthorized." }, 401);
-    return json({ ok: true, analytics: await makeMetrics(db, new Date()) });
+    return json({ ok: true, analytics: await cachedMetrics(db) });
   } catch (error) {
     return json({ error: error instanceof Error ? error.message : "Analytics operation failed." }, 500);
   }
