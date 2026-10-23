@@ -16,6 +16,7 @@ import { validateCatalogSearch } from "@/data/catalog-search";
 import homeSocialImage from "@/assets/yume-hero-desktop-new.png.PNG";
 import { absoluteImageUrl, canonicalUrl } from "@/data/seo";
 import { getTelegramWebApp } from "@/lib/telegram-mini-app";
+import { trackYumePage } from "@/lib/yume-analytics";
 import { syncTelegramLibrary } from "@/data/profile-storage";
 import { runAdminTrailerUpdate, type AdminTrailerStats } from "@/data/admin-trailer-update";
 
@@ -417,25 +418,8 @@ function Index() {
   }, [isTelegramMiniApp, telegramAuthReady, telegramConsentRequired, telegramConsentPending]);
 
   useEffect(() => {
-    if (typeof window === "undefined" || view === "admin") return;
-    const path = window.location.pathname + "#" + String(view);
-    const now = Date.now();
-    const key = "yume-analytics-session";
-    let sessionId: string;
-    try {
-      const stored = JSON.parse(window.sessionStorage.getItem(key) ?? "null") as {id?:unknown;lastActivity?:unknown;lastPath?:unknown;lastEventAt?:unknown} | null;
-      const valid = typeof stored?.id === "string" && /^[A-Za-z0-9_-]{16,100}$/.test(stored.id);
-      const active = valid && typeof stored?.lastActivity === "number" && now - stored.lastActivity < 30 * 60 * 1000;
-      sessionId = active ? stored!.id as string : window.crypto.randomUUID();
-      if (active && stored?.lastPath === path && typeof stored.lastEventAt === "number" && now - stored.lastEventAt < 2500) {
-        window.sessionStorage.setItem(key, JSON.stringify({...stored,lastActivity:now}));
-        return;
-      }
-      window.sessionStorage.setItem(key, JSON.stringify({id:sessionId,lastActivity:now,lastPath:path,lastEventAt:now}));
-    } catch {
-      sessionId = window.crypto.randomUUID();
-    }
-    fetch("/api/analytics", {method:"POST",credentials:"same-origin",keepalive:true,headers:{"Content-Type":"application/json"},body:JSON.stringify({path,sessionId})}).catch(() => {});
+    if (view === "admin" || typeof window === "undefined") return;
+    trackYumePage(window.location.pathname + "#" + String(view));
   }, [view]);
 
   useEffect(() => {
