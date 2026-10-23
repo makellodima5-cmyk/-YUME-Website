@@ -52,7 +52,11 @@ export function YumeSplash({ contentReady = false }: SplashProps) {
     if (!visible || !minimumTimePassed || !contentReady) return;
 
     setLeaving(true);
-    const hideTimer = window.setTimeout(() => setVisible(false), SPLASH_EXIT_DURATION_MS);
+    const hideTimer = window.setTimeout(() => {
+      setVisible(false);
+      // Restore the app's selected light/dark theme as soon as the splash exits.
+      delete document.documentElement.dataset.yumeSplashActive;
+    }, SPLASH_EXIT_DURATION_MS);
     return () => window.clearTimeout(hideTimer);
   }, [contentReady, minimumTimePassed, visible]);
 
