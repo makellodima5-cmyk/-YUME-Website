@@ -75,6 +75,7 @@ async function ensureSchema(db: Database): Promise<void> {
     db.prepare("CREATE TABLE IF NOT EXISTS anime_catalog_meta (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL)"),
     db.prepare("CREATE TABLE IF NOT EXISTS yume_admin_audit_log (id INTEGER PRIMARY KEY AUTOINCREMENT, action TEXT NOT NULL, status TEXT NOT NULL, details TEXT NOT NULL DEFAULT '{}', actor_telegram_id TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)"),
     db.prepare("CREATE TABLE IF NOT EXISTS admin_catalog_import_lock (id INTEGER PRIMARY KEY CHECK (id = 1), token TEXT NOT NULL DEFAULT '', expires_at INTEGER NOT NULL DEFAULT 0)"),
+    db.prepare("CREATE TABLE IF NOT EXISTS admin_catalog_import_items (run_id TEXT NOT NULL, anime_id TEXT NOT NULL, outcome TEXT NOT NULL CHECK (outcome IN ('added','skipped')), incomplete INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (run_id,anime_id))"),
     db.prepare("INSERT OR IGNORE INTO admin_catalog_import_lock (id,token,expires_at) VALUES (1,'',0)"),
     db.prepare("INSERT OR IGNORE INTO anime_catalog_meta (key,value) VALUES ('admin_import_state','idle')"),
     db.prepare("INSERT OR IGNORE INTO anime_catalog_meta (key,value) VALUES ('admin_import_cursor','1')"),
@@ -253,7 +254,10 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
         if (!Number.isInteger(target) || target < 1 || target > MAX_TARGET) return json({error:"invalid_target",max:MAX_TARGET},400);
         const current = await getMeta(db,"admin_import_state");
         if (current === "running") return json({isAdmin:true,...await snapshot(db),message:"Импорт уже выполняется."},409);
+        const runId = crypto.randomUUID();
         await db.batch([
+          db.prepare("DELETE FROM admin_catalog_import_items WHERE run_id <> ?").bind(runId),
+          setMeta(db,"admin_import_run_id",runId),
           setMeta(db,"admin_import_target",String(target)),setMeta(db,"admin_import_cursor","1"),
           setMeta(db,"admin_import_added","0"),setMeta(db,"admin_import_skipped","0"),
           setMeta(db,"admin_import_incomplete","0"),setMeta(db,"admin_import_errors","0"),
@@ -267,51 +271,54 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
         if (state !== "running") return json({isAdmin:true,...await snapshot(db),message:"Нет активного импорта."},409);
         const resumeAt = Number(await getMeta(db,"admin_import_resume_at") ?? "0");
         if (resumeAt > Date.now()) return json({isAdmin:true,...await snapshot(db),retryAfterMs:resumeAt-Date.now(),error:"Источник временно на паузе. Повтори запрос позже."},503);
-        const stats = await snapshot(db);
-        if (stats.added >= stats.target || stats.cursor > 500) {
-          const finalState = stats.added >= stats.target ? "completed" : "partial";
+        const before = await snapshot(db);
+        if (before.added >= before.target || before.cursor > 500) {
+          const finalState = before.added >= before.target ? "completed" : "partial";
           await db.batch([setMeta(db,"admin_import_state",finalState)]);
-          await audit(db,"catalog.import.finish",finalState,{added:stats.added,target:stats.target,skipped:stats.skipped,errors:stats.errors});
+          await audit(db,"catalog.import.finish",finalState,{added:before.added,target:before.target,skipped:before.skipped,errors:before.errors});
           return json({isAdmin:true,...await snapshot(db)});
         }
         let source: ShikimoriAnime[];
-        try { source = await fetchPage(stats.cursor); }
+        try { source = await fetchPage(before.cursor); }
         catch (error) {
           const retryAfterMs = Number((error as {retryAfterMs?:number})?.retryAfterMs ?? 5000);
-          await db.batch([setMeta(db,"admin_import_errors",String(stats.errors+1)),setMeta(db,"admin_import_resume_at",String(Date.now()+retryAfterMs))]);
-          await audit(db,"catalog.import.source-error","warning",{cursor:stats.cursor,message:error instanceof Error?error.message:"Ошибка источника.",retryAfterMs});
+          await db.batch([setMeta(db,"admin_import_errors",String(before.errors+1)),setMeta(db,"admin_import_resume_at",String(Date.now()+retryAfterMs))]);
+          await audit(db,"catalog.import.source-error","warning",{cursor:before.cursor,message:error instanceof Error?error.message:"Ошибка источника.",retryAfterMs});
           return json({isAdmin:true,...await snapshot(db),retryAfterMs,error:error instanceof Error?error.message:"Ошибка источника."},503);
         }
         if (!source.length) {
           await db.batch([setMeta(db,"admin_import_state","partial")]);
-          await audit(db,"catalog.import.partial","warning",{cursor:stats.cursor,reason:"empty_source_page"});
+          await audit(db,"catalog.import.partial","warning",{cursor:before.cursor,reason:"empty_source_page"});
           return json({isAdmin:true,...await snapshot(db),message:"Источник не вернул записи; импорт остановлен."});
         }
-        let added = stats.added, skipped = stats.skipped, incompleteCount = stats.incomplete;
+        const runId = (await getMeta(db,"admin_import_run_id")) ?? "legacy";
         const currentCount = await db.prepare("SELECT COUNT(*) AS count FROM anime_catalog").first<{count:number}>();
         let position = Number(currentCount?.count ?? 0);
         const prepared: {statement:Statement;item:ReturnType<typeof mapItem>}[] = [];
         for (const sourceItem of source) {
-          if (prepared.length + added >= stats.target) break;
+          if (prepared.length + before.added >= before.target) break;
           const item = mapItem(sourceItem);
-          prepared.push({item,statement:db.prepare("INSERT OR IGNORE INTO anime_catalog (id,title,english_title,original_title,year,episodes,rating,genres_json,status,description,hue,glyph,is_new,popular,poster_url,banner_url,kind,age_rating,next_episode_at,episodes_aired,aired_on,studios_json,youtube_trailer_id,position,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)")
-            .bind(item.id,item.title,item.english_title,item.original_title,item.year,item.episodes,item.rating,item.genres_json,item.status,item.description,item.hue,item.glyph,item.is_new,item.popular,item.poster_url,item.banner_url,item.kind,item.age_rating,item.next_episode_at,item.episodes_aired,item.aired_on,item.studios_json,item.youtube_trailer_id,position + prepared.length)});
+          const statement = db.prepare("INSERT OR IGNORE INTO anime_catalog (id,title,english_title,original_title,year,episodes,rating,genres_json,status,description,hue,glyph,is_new,popular,poster_url,banner_url,kind,age_rating,next_episode_at,episodes_aired,aired_on,studios_json,youtube_trailer_id,position,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)")
+            .bind(item.id,item.title,item.english_title,item.original_title,item.year,item.episodes,item.rating,item.genres_json,item.status,item.description,item.hue,item.glyph,item.is_new,item.popular,item.poster_url,item.banner_url,item.kind,item.age_rating,item.next_episode_at,item.episodes_aired,item.aired_on,item.studios_json,item.youtube_trailer_id,position++);
+          prepared.push({item,statement});
         }
-        const results = prepared.length ? await db.batch(prepared.map(entry=>entry.statement)) : [];
-        for (let i=0;i<results.length;i++) {
-          const changed = Number((results[i] as {meta?:{changes?:number}})?.meta?.changes ?? 0) > 0;
-          if (changed) { added++; if (incomplete(prepared[i]!.item)) incompleteCount++; }
-          else skipped++;
+        const statements: Statement[] = [];
+        for (const entry of prepared) {
+          statements.push(entry.statement);
+          statements.push(db.prepare("INSERT OR IGNORE INTO admin_catalog_import_items (run_id,anime_id,outcome,incomplete) VALUES (?,?,CASE WHEN changes() > 0 THEN 'added' ELSE 'skipped' END,?)")
+            .bind(runId,entry.item.id,incomplete(entry.item)?1:0));
         }
-        const nextCursor = stats.cursor + 1;
-        const nextState = added >= stats.target ? "completed" : nextCursor > 500 ? "partial" : "running";
-        await db.batch([
-          setMeta(db,"admin_import_cursor",String(nextCursor)),setMeta(db,"admin_import_added",String(added)),
-          setMeta(db,"admin_import_skipped",String(skipped)),setMeta(db,"admin_import_incomplete",String(incompleteCount)),
-          setMeta(db,"admin_import_resume_at",String(Date.now()+REQUEST_DELAY_MS)),setMeta(db,"admin_import_state",nextState),
-        ]);
-        await audit(db,"catalog.import.page","success",{page:stats.cursor,added:added-stats.added,skipped:skipped-stats.skipped,incomplete:incompleteCount-stats.incomplete,state:nextState});
-        return json({isAdmin:true,...await snapshot(db)});
+        const resumeAtValue = String(Date.now()+REQUEST_DELAY_MS);
+        statements.push(db.prepare("UPDATE anime_catalog_meta SET value = CAST((SELECT COUNT(*) FROM admin_catalog_import_items WHERE run_id = ? AND outcome = 'added') AS TEXT) WHERE key = 'admin_import_added'").bind(runId));
+        statements.push(db.prepare("UPDATE anime_catalog_meta SET value = CAST((SELECT COUNT(*) FROM admin_catalog_import_items WHERE run_id = ? AND outcome = 'skipped') AS TEXT) WHERE key = 'admin_import_skipped'").bind(runId));
+        statements.push(db.prepare("UPDATE anime_catalog_meta SET value = CAST((SELECT COUNT(*) FROM admin_catalog_import_items WHERE run_id = ? AND outcome = 'added' AND incomplete = 1) AS TEXT) WHERE key = 'admin_import_incomplete'").bind(runId));
+        statements.push(db.prepare("UPDATE anime_catalog_meta SET value = CAST(CAST(value AS INTEGER) + 1 AS TEXT) WHERE key = 'admin_import_cursor'"));
+        statements.push(setMeta(db,"admin_import_resume_at",resumeAtValue));
+        statements.push(db.prepare("UPDATE anime_catalog_meta SET value = CASE WHEN CAST((SELECT value FROM anime_catalog_meta WHERE key = 'admin_import_added') AS INTEGER) >= CAST((SELECT value FROM anime_catalog_meta WHERE key = 'admin_import_target') AS INTEGER) THEN 'completed' WHEN CAST((SELECT value FROM anime_catalog_meta WHERE key = 'admin_import_cursor') AS INTEGER) > 500 THEN 'partial' ELSE 'running' END WHERE key = 'admin_import_state'"));
+        if (statements.length) await db.batch(statements);
+        const after = await snapshot(db);
+        await audit(db,"catalog.import.page","success",{page:before.cursor,added:after.added-before.added,skipped:after.skipped-before.skipped,incomplete:after.incomplete-before.incomplete,state:after.state});
+        return json({isAdmin:true,...after});
       }
       if (body.action === "stop") {
         await db.batch([setMeta(db,"admin_import_state","paused")]);
