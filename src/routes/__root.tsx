@@ -12,8 +12,6 @@ import {
 import { useEffect, useState, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
-import splashCss from "../yume-splash.css?url";
-import { YumeSplash } from "@/components/yume/YumeSplash";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { YumePreferencesProvider, useYumePreferences } from "@/data/preferences";
 import { DEFAULT_META_DESCRIPTION, SITE_NAME } from "@/data/seo";
@@ -125,7 +123,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     ],
     links: [
       { rel: "stylesheet", href: appCss },
-      { rel: "stylesheet", href: splashCss },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Unbounded:wght@500;700&display=swap&subset=cyrillic" },
@@ -142,11 +139,6 @@ function RootShell({ children }: { children: ReactNode }) {
   return (
     <html lang="ru">
       <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `(function(){try{var r=document.documentElement;var q=new URLSearchParams(location.search);var ua=navigator.userAgent||"";var isTelegram=q.has("tgWebAppData")||/Telegram/i.test(ua);if(isTelegram){r.classList.add("telegram-mini-app");r.dataset.yumeSplashActive="true";r.style.backgroundColor="#030207";}}catch(e){}})();`,
-          }}
-        />
         <script src="https://telegram.org/js/telegram-web-app.js"></script>
         <script
           dangerouslySetInnerHTML={{
@@ -195,7 +187,6 @@ function RootComponent() {
         <DocumentLanguageSync />
         <SkipToContent />
         <Outlet />
-        <YumeSplash contentReady />
       </YumePreferencesProvider>
     </QueryClientProvider>
   );
