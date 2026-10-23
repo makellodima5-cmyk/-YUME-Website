@@ -53,9 +53,12 @@ async function sha256Hex(value: string): Promise<string> {
   return Array.from(digest, byte => byte.toString(16).padStart(2, "0")).join("");
 }
 function sameOrigin(request: Request): boolean {
+  const expected = new URL(request.url).origin;
   const origin = request.headers.get("origin");
-  if (origin) { try { return new URL(origin).origin === new URL(request.url).origin; } catch { return false; } }
-  return request.headers.get("sec-fetch-site") !== "cross-site";
+  if (origin) { try { return new URL(origin).origin === expected; } catch { return false; } }
+  const referer = request.headers.get("referer");
+  if (referer) { try { return new URL(referer).origin === expected; } catch { return false; } }
+  return request.headers.get("sec-fetch-site") === "same-origin";
 }
 async function authorize(request: Request, env: Environment, db: Database): Promise<boolean> {
   const adminId = typeof env.TELEGRAM_ADMIN_ID === "string" ? env.TELEGRAM_ADMIN_ID.trim() : "";
@@ -214,92 +217,117 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
     if (request.method === "GET") { const quality = await catalogQuality(db); return json({isAdmin:true,...await snapshot(db),quality:quality.items,qualitySummary:quality.summary,qualityLimit:quality.limit,auditLog:await recentAudit(db)}); }
     let body: {action?:unknown; target?:unknown};
     try { body = await request.json() as {action?:unknown;target?:unknown}; } catch { return json({error:"invalid_request"},400); }
-    if (body.action === "delete") {
-      const ids = Array.isArray((body as {ids?:unknown}).ids) ? ((body as {ids:string[]}).ids) : [];
-      const safeIds = Array.from(new Set(ids.filter(id => typeof id === "string" && /^\\d{1,20}$/.test(id)))).slice(0,100);
-      if (!safeIds.length) return json({error:"no_valid_ids"},400);
-      const result = await db.batch(safeIds.map(id => db.prepare("DELETE FROM anime_catalog WHERE id = ?").bind(id)));
-      const deleted = result.reduce((sum,item) => sum + Number((item as {meta?:{changes?:number}})?.meta?.changes ?? 0),0);
-      return json({isAdmin:true,deleted,quality:await catalogQuality(db)});
-    }
-    if (body.action === "repair") {
-      const ids = Array.isArray((body as {ids?:unknown}).ids) ? ((body as {ids:string[]}).ids) : [];
-      const safeIds = Array.from(new Set(ids.filter(id => typeof id === "string" && /^\\d{1,20}$/.test(id)))).slice(0,100);
-      if (!safeIds.length) return json({error:"no_valid_ids"},400);
-      const source = await fetchByIds(safeIds);
-      let repaired = 0, stillIncomplete = 0;
-      for (const sourceItem of source) {
-        const item = mapItem(sourceItem);
-        const existing = await db.prepare("SELECT id FROM anime_catalog WHERE id = ?").bind(item.id).first<{id:string}>();
-        if (!existing) continue;
-        const result = await db.prepare("UPDATE anime_catalog SET title=?,english_title=?,original_title=?,year=?,episodes=?,rating=?,genres_json=?,status=?,description=?,hue=?,glyph=?,is_new=?,popular=?,poster_url=?,banner_url=?,kind=?,age_rating=?,next_episode_at=?,episodes_aired=?,aired_on=?,studios_json=?,updated_at=CURRENT_TIMESTAMP WHERE id=?")
-          .bind(item.title,item.english_title,item.original_title,item.year,item.episodes,item.rating,item.genres_json,item.status,item.description,item.hue,item.glyph,item.is_new,item.popular,item.poster_url,item.banner_url,item.kind,item.age_rating,item.next_episode_at,item.episodes_aired,item.aired_on,item.studios_json,item.id).run();
-        if ((result.meta?.changes ?? 0) > 0) repaired++;
-        if (incomplete(item)) stillIncomplete++;
+    const lockToken = await acquireLock(db);
+    if (!lockToken) return json({isAdmin:true,error:"operation_in_progress",message:"Другая административная операция ещё выполняется."},409);
+    try {
+      if (body.action === "delete") {
+        const rawIds = Array.isArray((body as {ids?:unknown}).ids) ? (body as {ids:unknown[]}).ids : [];
+        const safeIds = Array.from(new Set(rawIds.filter((id): id is string => typeof id === "string" && /^\d{1,20}$/.test(id)))).slice(0,100);
+        if (!safeIds.length) return json({error:"no_valid_ids"},400);
+        const result = await db.batch(safeIds.map(id => db.prepare("DELETE FROM anime_catalog WHERE id = ?").bind(id)));
+        const deleted = result.reduce((sum,item) => sum + Number((item as {meta?:{changes?:number}})?.meta?.changes ?? 0),0);
+        const quality = await catalogQuality(db);
+        await audit(db,"catalog.delete","success",{requested:safeIds.length,deleted});
+        return json({isAdmin:true,deleted,quality:quality.items,qualitySummary:quality.summary});
       }
-      return json({isAdmin:true,repaired,notFound:safeIds.length-source.length,stillIncomplete,quality:await catalogQuality(db)});
-    }
-    if (body.action === "start") {
-      const target = Number(body.target);
-      if (!Number.isInteger(target) || target < 1 || target > MAX_TARGET) return json({error:"invalid_target",max:MAX_TARGET},400);
-      const current = await getMeta(db,"admin_import_state");
-      if (current === "running") return json({isAdmin:true,...await snapshot(db),message:"Импорт уже выполняется."},409);
-      await db.batch([
-        setMeta(db,"admin_import_target",String(target)),setMeta(db,"admin_import_cursor","1"),
-        setMeta(db,"admin_import_added","0"),setMeta(db,"admin_import_skipped","0"),
-        setMeta(db,"admin_import_incomplete","0"),setMeta(db,"admin_import_errors","0"),
-        setMeta(db,"admin_import_state","running"),setMeta(db,"admin_import_resume_at","0"),
-      ]);
-      return json({isAdmin:true,...await snapshot(db),message:"Импорт подготовлен."});
-    }
-    if (body.action === "step") {
-      const state = await getMeta(db,"admin_import_state");
-      if (state !== "running") return json({isAdmin:true,...await snapshot(db),message:"Нет активного импорта."},409);
-      const resumeAt = Number(await getMeta(db,"admin_import_resume_at") ?? "0");
-      if (resumeAt > Date.now()) return json({isAdmin:true,...await snapshot(db),retryAfterMs:resumeAt-Date.now(),error:"Источник временно на паузе. Повтори запрос позже."},503);
-      const stats = await snapshot(db);
-      if (stats.added >= stats.target || stats.cursor > 500) {
-        await db.batch([setMeta(db,"admin_import_state",stats.added >= stats.target ? "completed" : "partial")]);
+      if (body.action === "repair") {
+        const rawIds = Array.isArray((body as {ids?:unknown}).ids) ? (body as {ids:unknown[]}).ids : [];
+        const safeIds = Array.from(new Set(rawIds.filter((id): id is string => typeof id === "string" && /^\d{1,20}$/.test(id)))).slice(0,100);
+        if (!safeIds.length) return json({error:"no_valid_ids"},400);
+        const source = await fetchByIds(safeIds);
+        let repaired = 0, stillIncomplete = 0;
+        for (const sourceItem of source) {
+          const item = mapItem(sourceItem);
+          const result = await db.prepare("UPDATE anime_catalog SET title=COALESCE(NULLIF(?,'Без названия'),title),english_title=COALESCE(NULLIF(?,'Без названия'),english_title),original_title=COALESCE(NULLIF(?,'Без названия'),original_title),year=CASE WHEN ?>0 THEN ? ELSE year END,episodes=CASE WHEN ?>0 THEN ? ELSE episodes END,rating=COALESCE(?,rating),genres_json=CASE WHEN ?<>'[]' THEN ? ELSE genres_json END,status=CASE WHEN ?<>'Неизвестно' THEN ? ELSE status END,description=COALESCE(NULLIF(? ,''),description),hue=?,glyph=?,is_new=?,popular=?,poster_url=COALESCE(?,poster_url),banner_url=COALESCE(?,banner_url),kind=COALESCE(?,kind),age_rating=COALESCE(?,age_rating),next_episode_at=COALESCE(?,next_episode_at),episodes_aired=CASE WHEN ?>0 THEN ? ELSE episodes_aired END,aired_on=COALESCE(?,aired_on),studios_json=CASE WHEN ?<>'[]' THEN ? ELSE studios_json END,updated_at=CURRENT_TIMESTAMP WHERE id=?")
+            .bind(item.title,item.english_title,item.original_title,item.year,item.year,item.episodes,item.episodes,item.rating,item.genres_json,item.genres_json,item.status,item.status,item.description,item.hue,item.glyph,item.is_new,item.popular,item.poster_url,item.banner_url,item.kind,item.age_rating,item.next_episode_at,item.episodes_aired,item.episodes_aired,item.aired_on,item.studios_json,item.studios_json,item.id).run();
+          if ((result.meta?.changes ?? 0) > 0) repaired++;
+          if (incomplete(item)) stillIncomplete++;
+        }
+        const quality = await catalogQuality(db);
+        const notFound = Math.max(0,safeIds.length-source.length);
+        await audit(db,"catalog.repair","success",{requested:safeIds.length,repaired,notFound,stillIncomplete});
+        return json({isAdmin:true,repaired,notFound,stillIncomplete,quality:quality.items,qualitySummary:quality.summary});
+      }
+      if (body.action === "start") {
+        const target = Number(body.target);
+        if (!Number.isInteger(target) || target < 1 || target > MAX_TARGET) return json({error:"invalid_target",max:MAX_TARGET},400);
+        const current = await getMeta(db,"admin_import_state");
+        if (current === "running") return json({isAdmin:true,...await snapshot(db),message:"Импорт уже выполняется."},409);
+        await db.batch([
+          setMeta(db,"admin_import_target",String(target)),setMeta(db,"admin_import_cursor","1"),
+          setMeta(db,"admin_import_added","0"),setMeta(db,"admin_import_skipped","0"),
+          setMeta(db,"admin_import_incomplete","0"),setMeta(db,"admin_import_errors","0"),
+          setMeta(db,"admin_import_state","running"),setMeta(db,"admin_import_resume_at","0"),
+        ]);
+        await audit(db,"catalog.import.start","success",{target});
+        return json({isAdmin:true,...await snapshot(db),message:"Импорт подготовлен."});
+      }
+      if (body.action === "step") {
+        const state = await getMeta(db,"admin_import_state");
+        if (state !== "running") return json({isAdmin:true,...await snapshot(db),message:"Нет активного импорта."},409);
+        const resumeAt = Number(await getMeta(db,"admin_import_resume_at") ?? "0");
+        if (resumeAt > Date.now()) return json({isAdmin:true,...await snapshot(db),retryAfterMs:resumeAt-Date.now(),error:"Источник временно на паузе. Повтори запрос позже."},503);
+        const stats = await snapshot(db);
+        if (stats.added >= stats.target || stats.cursor > 500) {
+          const finalState = stats.added >= stats.target ? "completed" : "partial";
+          await db.batch([setMeta(db,"admin_import_state",finalState)]);
+          await audit(db,"catalog.import.finish",finalState,{added:stats.added,target:stats.target,skipped:stats.skipped,errors:stats.errors});
+          return json({isAdmin:true,...await snapshot(db)});
+        }
+        let source: ShikimoriAnime[];
+        try { source = await fetchPage(stats.cursor); }
+        catch (error) {
+          const retryAfterMs = Number((error as {retryAfterMs?:number})?.retryAfterMs ?? 5000);
+          await db.batch([setMeta(db,"admin_import_errors",String(stats.errors+1)),setMeta(db,"admin_import_resume_at",String(Date.now()+retryAfterMs))]);
+          await audit(db,"catalog.import.source-error","warning",{cursor:stats.cursor,message:error instanceof Error?error.message:"Ошибка источника.",retryAfterMs});
+          return json({isAdmin:true,...await snapshot(db),retryAfterMs,error:error instanceof Error?error.message:"Ошибка источника."},503);
+        }
+        if (!source.length) {
+          await db.batch([setMeta(db,"admin_import_state","partial")]);
+          await audit(db,"catalog.import.partial","warning",{cursor:stats.cursor,reason:"empty_source_page"});
+          return json({isAdmin:true,...await snapshot(db),message:"Источник не вернул записи; импорт остановлен."});
+        }
+        let added = stats.added, skipped = stats.skipped, incompleteCount = stats.incomplete;
+        const currentCount = await db.prepare("SELECT COUNT(*) AS count FROM anime_catalog").first<{count:number}>();
+        let position = Number(currentCount?.count ?? 0);
+        const prepared: {statement:Statement;item:ReturnType<typeof mapItem>}[] = [];
+        for (const sourceItem of source) {
+          if (prepared.length + added >= stats.target) break;
+          const item = mapItem(sourceItem);
+          prepared.push({item,statement:db.prepare("INSERT OR IGNORE INTO anime_catalog (id,title,english_title,original_title,year,episodes,rating,genres_json,status,description,hue,glyph,is_new,popular,poster_url,banner_url,kind,age_rating,next_episode_at,episodes_aired,aired_on,studios_json,youtube_trailer_id,position,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)")
+            .bind(item.id,item.title,item.english_title,item.original_title,item.year,item.episodes,item.rating,item.genres_json,item.status,item.description,item.hue,item.glyph,item.is_new,item.popular,item.poster_url,item.banner_url,item.kind,item.age_rating,item.next_episode_at,item.episodes_aired,item.aired_on,item.studios_json,item.youtube_trailer_id,position + prepared.length)});
+        }
+        const results = prepared.length ? await db.batch(prepared.map(entry=>entry.statement)) : [];
+        for (let i=0;i<results.length;i++) {
+          const changed = Number((results[i] as {meta?:{changes?:number}})?.meta?.changes ?? 0) > 0;
+          if (changed) { added++; if (incomplete(prepared[i]!.item)) incompleteCount++; }
+          else skipped++;
+        }
+        const nextCursor = stats.cursor + 1;
+        const nextState = added >= stats.target ? "completed" : nextCursor > 500 ? "partial" : "running";
+        await db.batch([
+          setMeta(db,"admin_import_cursor",String(nextCursor)),setMeta(db,"admin_import_added",String(added)),
+          setMeta(db,"admin_import_skipped",String(skipped)),setMeta(db,"admin_import_incomplete",String(incompleteCount)),
+          setMeta(db,"admin_import_resume_at",String(Date.now()+REQUEST_DELAY_MS)),setMeta(db,"admin_import_state",nextState),
+        ]);
+        await audit(db,"catalog.import.page","success",{page:stats.cursor,added:added-stats.added,skipped:skipped-stats.skipped,incomplete:incompleteCount-stats.incomplete,state:nextState});
         return json({isAdmin:true,...await snapshot(db)});
       }
-      let source: ShikimoriAnime[];
-      try { source = await fetchPage(stats.cursor); }
-      catch (error) {
-        const retryAfterMs = Number((error as {retryAfterMs?:number})?.retryAfterMs ?? 5000);
-        await db.batch([setMeta(db,"admin_import_errors",String(stats.errors+1)),setMeta(db,"admin_import_resume_at",String(Date.now()+retryAfterMs))]);
-        return json({isAdmin:true,...await snapshot(db),retryAfterMs,error:error instanceof Error?error.message:"Ошибка источника."},503);
+      if (body.action === "stop") {
+        await db.batch([setMeta(db,"admin_import_state","paused")]);
+        await audit(db,"catalog.import.pause","success",await snapshot(db));
+        return json({isAdmin:true,...await snapshot(db)});
       }
-      if (!source.length) {
-        await db.batch([setMeta(db,"admin_import_state","partial")]);
-        return json({isAdmin:true,...await snapshot(db),message:"Источник не вернул записи; импорт остановлен."});
+      if (body.action === "maintenance") {
+        const report = await maintenanceCheck(db);
+        const status = report.ok ? "success" : "error";
+        await audit(db,"maintenance.check",status,{catalogRecords:report.catalogRecords,qualitySummary:report.qualitySummary});
+        return json({isAdmin:true,maintenance:report});
       }
-      let added = stats.added, skipped = stats.skipped, incompleteCount = stats.incomplete;
-      const currentCount = await db.prepare("SELECT COUNT(*) AS count FROM anime_catalog").first<{count:number}>();
-      let position = Number(currentCount?.count ?? 0);
-      for (const sourceItem of source) {
-        if (added >= stats.target) break;
-        const item = mapItem(sourceItem);
-        const result = await db.prepare("INSERT OR IGNORE INTO anime_catalog (id,title,english_title,original_title,year,episodes,rating,genres_json,status,description,hue,glyph,is_new,popular,poster_url,banner_url,kind,age_rating,next_episode_at,episodes_aired,aired_on,studios_json,youtube_trailer_id,position,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)")
-          .bind(item.id,item.title,item.english_title,item.original_title,item.year,item.episodes,item.rating,item.genres_json,item.status,item.description,item.hue,item.glyph,item.is_new,item.popular,item.poster_url,item.banner_url,item.kind,item.age_rating,item.next_episode_at,item.episodes_aired,item.aired_on,item.studios_json,item.youtube_trailer_id,position).run();
-        if ((result.meta?.changes ?? 0) > 0) {
-          added++; position++;
-          if (incomplete(item)) incompleteCount++;
-        } else skipped++;
-      }
-      const nextCursor = stats.cursor + 1;
-      const nextState = added >= stats.target ? "completed" : nextCursor > 500 ? "partial" : "running";
-      await db.batch([
-        setMeta(db,"admin_import_cursor",String(nextCursor)),setMeta(db,"admin_import_added",String(added)),
-        setMeta(db,"admin_import_skipped",String(skipped)),setMeta(db,"admin_import_incomplete",String(incompleteCount)),
-        setMeta(db,"admin_import_resume_at",String(Date.now()+REQUEST_DELAY_MS)),setMeta(db,"admin_import_state",nextState),
-      ]);
-      return json({isAdmin:true,...await snapshot(db)});
+      return json({error:"invalid_action"},400);
+    } finally {
+      await releaseLock(db,lockToken);
     }
-    if (body.action === "stop") {
-      await db.batch([setMeta(db,"admin_import_state","paused")]);
-      return json({isAdmin:true,...await snapshot(db)});
-    }
-    return json({error:"invalid_action"},400);
   } catch (error) {
     console.error("[YUME][ADMIN_CATALOG_IMPORT] Operation failed.",error);
     return json({error:"admin_operation_failed"},503);
