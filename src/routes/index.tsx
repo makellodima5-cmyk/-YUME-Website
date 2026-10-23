@@ -318,6 +318,7 @@ function Index() {
   const [adminRunning, setAdminRunning] = useState(false);
   const [adminMessage, setAdminMessage] = useState("");
   const [notificationReadIds, setNotificationReadIds] = useState<string[]>([]);
+  const [notificationStateLoaded, setNotificationStateLoaded] = useState(false);
   const [notificationRemoteAccount, setNotificationRemoteAccount] = useState(false);
   const [notificationActionBusy, setNotificationActionBusy] = useState(false);
   const [notificationActionMessage, setNotificationActionMessage] = useState("");
@@ -353,6 +354,7 @@ function Index() {
     if (!telegramDetectionComplete) return;
     if (isTelegramMiniApp && !telegramAuthReady && !telegramConsentRequired && !telegramAuthError) return;
     let cancelled = false;
+    setNotificationStateLoaded(false);
     const loadNotificationState = async () => {
       try {
         const response = await fetch("/api/notifications", {
@@ -372,10 +374,12 @@ function Index() {
           setNotificationReadIds(readLocalNotificationIds());
           setNotificationRemoteAccount(false);
         }
+        setNotificationStateLoaded(true);
       } catch {
         if (cancelled) return;
         setNotificationReadIds(readLocalNotificationIds());
         setNotificationRemoteAccount(false);
+        setNotificationStateLoaded(true);
       }
     };
     void loadNotificationState();
@@ -1003,7 +1007,7 @@ function Index() {
   const visibleAiringAnime = airingAnime.slice((airingPage - 1) * catalogPageSize, airingPage * catalogPageSize);
   return (
     <div className="min-h-screen pb-8">
-      <Header view={view} setView={setView} onProfile={() => setView("profile")} isAdmin={isAdmin} unreadNotificationCount={USER_NOTIFICATIONS.filter((item) => !notificationReadIds.includes(item.id)).length} />
+      <Header view={view} setView={setView} onProfile={() => setView("profile")} isAdmin={isAdmin} unreadNotificationCount={notificationStateLoaded ? USER_NOTIFICATIONS.filter((item) => !notificationReadIds.includes(item.id)).length : 0} />
       {isTelegramMiniApp && telegramConsentRequired && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-background/85 px-4 py-6 backdrop-blur-md" role="dialog" aria-modal="true" aria-labelledby="telegram-consent-title">
           <section className="w-full max-w-md rounded-3xl border border-border bg-card p-6 shadow-2xl sm:p-8">
