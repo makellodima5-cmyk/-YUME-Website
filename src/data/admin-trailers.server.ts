@@ -190,7 +190,6 @@ export async function handleAdminTrailers(request: Request): Promise<Response> {
     try { body = await request.json() as { action?: unknown }; } catch { return json({ error: "invalid_request" }, 400); }
     if (body.action === "start") {
       const counts = await queueCounts(db);
-      if (counts.pending > 0) return json({ isAdmin: true, ...counts, message: "Обработка уже начата." });
 
       // Re-queue every catalogue item that still lacks a trailer. INSERT OR IGNORE
       // alone leaves previously checked rows stuck in "checked" forever.
@@ -200,7 +199,13 @@ export async function handleAdminTrailers(request: Request): Promise<Response> {
       ]);
       const refreshed = await queueCounts(db);
       console.info("[YUME][TRAILER_SCAN] Queue prepared.", { total: refreshed.total, pending: refreshed.pending, checked: refreshed.checked, found: refreshed.found });
-      return json({ isAdmin: true, ...refreshed, message: "Очередь обновления создана; ранее не найденные трейлеры будут проверены повторно." });
+      return json({
+        isAdmin: true,
+        ...refreshed,
+        message: counts.pending > 0
+          ? "Продолжаем обработку очереди; аниме без трейлеров будут проверены повторно."
+          : "Очередь обновления создана; ранее не найденные трейлеры будут проверены повторно.",
+      });
     }
     if (body.action !== "step") return json({ error: "invalid_action" }, 400);
 
