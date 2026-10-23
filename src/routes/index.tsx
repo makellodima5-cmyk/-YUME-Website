@@ -22,6 +22,7 @@ import { USER_NOTIFICATIONS } from "@/data/notifications.shared";
 import { runAdminTrailerUpdate, type AdminTrailerStats } from "@/data/admin-trailer-update";
 
 const NOTIFICATION_STORAGE_KEY = "yume-user-notifications-read-v1";
+const NOTIFICATION_DISMISSED_STORAGE_KEY = "yume-user-notifications-dismissed-v1";
 
 function readLocalNotificationIds(): string[] {
   try {
@@ -31,6 +32,26 @@ function readLocalNotificationIds(): string[] {
     ) : [];
   } catch {
     return [];
+  }
+}
+
+function readLocalDismissedNotificationIds(): string[] {
+  try {
+    const value: unknown = JSON.parse(window.localStorage.getItem(NOTIFICATION_DISMISSED_STORAGE_KEY) ?? "[]");
+    return Array.isArray(value) ? value.filter((id): id is string =>
+      typeof id === "string" && USER_NOTIFICATIONS.some((item) => item.id === id),
+    ) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveLocalDismissedNotificationIds(ids: string[]): boolean {
+  try {
+    window.localStorage.setItem(NOTIFICATION_DISMISSED_STORAGE_KEY, JSON.stringify(ids));
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -318,6 +339,8 @@ function Index() {
   const [adminRunning, setAdminRunning] = useState(false);
   const [adminMessage, setAdminMessage] = useState("");
   const [notificationReadIds, setNotificationReadIds] = useState<string[]>([]);
+  const [notificationDismissedIds, setNotificationDismissedIds] = useState<string[]>([]);
+  const notificationTouchStart = useRef<{ id: string; x: number; y: number } | null>(null);
   const [notificationStateLoaded, setNotificationStateLoaded] = useState(false);
   const [notificationRemoteAccount, setNotificationRemoteAccount] = useState(false);
   const [notificationActionBusy, setNotificationActionBusy] = useState(false);
@@ -362,22 +385,25 @@ function Index() {
           cache: "no-store",
         });
         if (!response.ok) throw new Error("Notification state unavailable");
-        const payload = await response.json() as { authenticated?: boolean; readIds?: unknown };
+        const payload = await response.json() as { authenticated?: boolean; readIds?: unknown; dismissedIds?: unknown };
         if (cancelled) return;
         const ids = Array.isArray(payload.readIds)
           ? payload.readIds.filter((id): id is string => typeof id === "string")
           : [];
         if (payload.authenticated === true) {
           setNotificationReadIds(ids);
+          setNotificationDismissedIds(Array.isArray(payload.dismissedIds) ? payload.dismissedIds.filter((id): id is string => typeof id === "string") : []);
           setNotificationRemoteAccount(true);
         } else {
           setNotificationReadIds(readLocalNotificationIds());
+          setNotificationDismissedIds(readLocalDismissedNotificationIds());
           setNotificationRemoteAccount(false);
         }
         setNotificationStateLoaded(true);
       } catch {
         if (cancelled) return;
         setNotificationReadIds(readLocalNotificationIds());
+        setNotificationDismissedIds(readLocalDismissedNotificationIds());
         setNotificationRemoteAccount(false);
         setNotificationStateLoaded(true);
       }
@@ -587,6 +613,54 @@ function Index() {
     } catch {
       setAdminMessage(language === "ru" ? "Не удалось связаться с сервером." : "Could not reach the server.");
     } finally { setTrailerAutoBusy(false); }
+  };
+
+  const dismissNotification = async (notificationId: string) => {
+    if (notificationActionBusy || notificationDismissedIds.includes(notificationId)) return;
+    const next = [...notificationDismissedIds, notificationId];
+    setNotificationActionMessage("");
+    try {
+      if (notificationRemoteAccount) {
+        const response = await fetch("/api/notifications", {
+          method: "POST",
+          credentials: "same-origin",
+          cache: "no-store",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "dismiss-one", notificationId }),
+        });
+        if (response.status === 401) {
+          setNotificationRemoteAccount(false);
+        } else if (!response.ok) {
+          throw new Error("Could not dismiss notification");
+        } else {
+          const payload = await response.json() as { dismissedIds?: unknown };
+          const ids = Array.isArray(payload.dismissedIds)
+            ? payload.dismissedIds.filter((id): id is string => typeof id === "string")
+            : next;
+          setNotificationDismissedIds(ids);
+          setNotificationReadIds((current) => current.includes(notificationId) ? current : [...current, notificationId]);
+          return;
+        }
+      }
+      if (!saveLocalDismissedNotificationIds(next)) {
+        setNotificationActionMessage(language === "ru" ? "Не удалось сохранить удаление. Попробуй ещё раз." : "Could not save this dismissal. Please try again.");
+        return;
+      }
+      setNotificationDismissedIds(next);
+      setNotificationReadIds((current) => current.includes(notificationId) ? current : [...current, notificationId]);
+    } catch {
+      setNotificationActionMessage(language === "ru" ? "Не удалось удалить уведомление. Попробуй ещё раз." : "Could not dismiss notification. Please try again.");
+    }
+  };
+
+  const handleNotificationTouchEnd = (notificationId: string, event: React.TouchEvent<HTMLElement>) => {
+    const start = notificationTouchStart.current;
+    notificationTouchStart.current = null;
+    if (!start || start.id !== notificationId || event.changedTouches.length === 0) return;
+    const touch = event.changedTouches[0];
+    const dx = touch.clientX - start.x;
+    const dy = touch.clientY - start.y;
+    if (dx < -80 && Math.abs(dx) > Math.abs(dy) * 1.4) void dismissNotification(notificationId);
   };
 
   const markAllNotificationsRead = async () => {
@@ -1131,7 +1205,7 @@ function Index() {
                 <h1 className="text-3xl font-bold tracking-tight text-foreground">{language === "ru" ? "Уведомления" : "Notifications"}</h1>
                 <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">{language === "ru" ? "Здесь собраны новости о новых пользовательских возможностях и функциях YUME." : "Updates about new user-facing YUME features and capabilities appear here."}</p>
               </div>
-              <button type="button" onClick={markAllNotificationsRead} disabled={notificationActionBusy || USER_NOTIFICATIONS.every((item) => notificationReadIds.includes(item.id))} className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-primary/30 bg-primary/10 px-3 py-2 text-sm font-semibold text-foreground transition hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-45">
+              <button type="button" onClick={markAllNotificationsRead} disabled={notificationActionBusy || USER_NOTIFICATIONS.filter((item) => !notificationDismissedIds.includes(item.id)).every((item) => notificationReadIds.includes(item.id))} className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-primary/30 bg-primary/10 px-3 py-2 text-sm font-semibold text-foreground transition hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-45">
                 <CheckCheck className="h-4 w-4" />
                 {notificationActionBusy ? (language === "ru" ? "Сохраняю…" : "Saving…") : (language === "ru" ? "Прочитать всё" : "Mark all as read")}
               </button>
@@ -1139,14 +1213,14 @@ function Index() {
 
             <div className="mb-4 flex items-center justify-between rounded-xl border border-border bg-card/50 px-3 py-2.5">
               <span className="text-sm text-muted-foreground">{language === "ru" ? "Всего уведомлений" : "Total notifications"}</span>
-              <span className="font-semibold tabular-nums">{USER_NOTIFICATIONS.length}</span>
+              <span className="font-semibold tabular-nums">{USER_NOTIFICATIONS.filter((item) => !notificationDismissedIds.includes(item.id)).length}</span>
               <span className="text-sm text-muted-foreground">{language === "ru" ? "Непрочитано" : "Unread"}</span>
               <span className={`font-semibold tabular-nums ${USER_NOTIFICATIONS.some((item) => !notificationReadIds.includes(item.id)) ? "text-red-400" : "text-emerald-400"}`}>{USER_NOTIFICATIONS.filter((item) => !notificationReadIds.includes(item.id)).length}</span>
             </div>
 
             {notificationActionMessage && <p role="status" className="mb-4 rounded-xl border border-border bg-card/60 px-3 py-2.5 text-sm text-muted-foreground">{notificationActionMessage}</p>}
 
-            {USER_NOTIFICATIONS.length === 0 ? (
+            {USER_NOTIFICATIONS.every((item) => notificationDismissedIds.includes(item.id)) ? (
               <div className="rounded-2xl border border-dashed border-border bg-card/30 px-5 py-12 text-center">
                 <Bell className="mx-auto h-8 w-8 text-muted-foreground" />
                 <h2 className="mt-3 font-semibold">{language === "ru" ? "Пока нет уведомлений" : "No notifications yet"}</h2>
@@ -1154,11 +1228,10 @@ function Index() {
               </div>
             ) : (
               <div className="space-y-3">
-                {USER_NOTIFICATIONS.map((item) => {
+                {USER_NOTIFICATIONS.filter((item) => !notificationDismissedIds.includes(item.id)).map((item) => {
                   const unread = !notificationReadIds.includes(item.id);
                   return (
-                    <article key={item.id} className={`relative overflow-hidden rounded-2xl border bg-card/50 p-4 sm:p-5 ${unread ? "border-red-500/35 shadow-[0_0_18px_rgba(239,68,68,0.06)]" : "border-border"}`}>
-                      {unread && <span aria-hidden="true" className="absolute inset-y-0 left-0 w-1 bg-red-500" />}
+                    <article key={item.id} onTouchStart={(event) => { const touch = event.touches[0]; if (touch) notificationTouchStart.current = { id: item.id, x: touch.clientX, y: touch.clientY }; }} onTouchEnd={(event) => handleNotificationTouchEnd(item.id, event)} className={`relative overflow-hidden rounded-2xl border bg-card/50 p-4 sm:p-5 transition-transform duration-200 ${unread ? "border-red-500/35 shadow-[0_0_18px_rgba(239,68,68,0.06)]" : "border-border"}`}>
                       <div className="flex items-start gap-3 pl-1">
                         <div className="mt-0.5 grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-primary/20 bg-primary/10 text-primary"><Sparkles className="h-5 w-5" /></div>
                         <div className="min-w-0 flex-1">
@@ -1168,7 +1241,9 @@ function Index() {
                           </div>
                           <p className="mt-1 text-xs text-muted-foreground">{new Date(item.publishedAt).toLocaleDateString(language === "ru" ? "ru-RU" : "en-US", { day: "numeric", month: "long", year: "numeric" })}</p>
                           <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-foreground/85">{item.description[language]}</p>
+                          <p className="mt-3 text-[11px] text-muted-foreground sm:hidden">{language === "ru" ? "Смахни влево, чтобы удалить" : "Swipe left to dismiss"}</p>
                         </div>
+                        <button type="button" onClick={() => void dismissNotification(item.id)} aria-label={language === "ru" ? "Удалить уведомление" : "Dismiss notification"} className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-muted-foreground transition hover:bg-red-500/10 hover:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><X className="h-4 w-4" /></button>
                       </div>
                     </article>
                   );
