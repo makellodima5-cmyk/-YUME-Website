@@ -89,7 +89,12 @@ class FakeAnalyticsDb {
 const db = new FakeAnalyticsDb();
 const runtime = globalThis as typeof globalThis & { __YUME_RUNTIME_ENV__?: unknown };
 
-function visit(path: string, sessionId: string, userAgent = "YUME Analytics Test Browser") {
+function visit(
+  path: string,
+  sessionId: string,
+  userAgent = "YUME Analytics Test Browser",
+  visitorId = "00000000-0000-4000-8000-000000000099",
+) {
   return new Request("https://yume.test/api/analytics", {
     method: "POST",
     headers: {
@@ -98,7 +103,7 @@ function visit(path: string, sessionId: string, userAgent = "YUME Analytics Test
       "CF-Connecting-IP": "203.0.113.20",
       "User-Agent": userAgent,
     },
-    body: JSON.stringify({ path, sessionId }),
+    body: JSON.stringify({ path, sessionId, visitorId }),
   });
 }
 
@@ -117,7 +122,7 @@ describe("YUME server analytics", () => {
     const request = new Request("https://yume.test/api/analytics", {
       method: "POST",
       headers: { Origin: "https://attacker.test", "Content-Type": "application/json" },
-      body: JSON.stringify({ path: "/", sessionId: "00000000-0000-4000-8000-000000000001" }),
+      body: JSON.stringify({ path: "/", sessionId: "00000000-0000-4000-8000-000000000001", visitorId: "00000000-0000-4000-8000-000000000099" }),
     });
     const response = await handleYumeAnalytics(request);
     expect(response.status).toBe(403);
@@ -133,6 +138,7 @@ describe("YUME server analytics", () => {
     expect(db.rows[0]?.visitor_hash).toMatch(/^[a-f0-9]{64}$/);
     expect(db.rows[0]?.session_hash).toMatch(/^[a-f0-9]{64}$/);
     expect(db.rows[0]?.session_hash).not.toBe(sessionId);
+    expect(db.rows[0]?.visitor_hash).not.toBe("00000000-0000-4000-8000-000000000099");
     expect(JSON.stringify(db.rows)).not.toContain("203.0.113.20");
   });
 
