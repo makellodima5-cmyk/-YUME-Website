@@ -409,8 +409,14 @@ export async function handleTelegramSession(request: Request): Promise<Response>
     }
     if (!user) user = await upsertTelegramUser(db, validated.user);
     else {
+      const profileValues = [
+        validated.user.firstName,
+        validated.user.lastName ?? null,
+        validated.user.username ?? null,
+        validated.user.languageCode ?? null,
+      ] as const;
       await db.prepare("UPDATE yume_users SET telegram_first_name = ?, telegram_last_name = ?, telegram_username = ?, telegram_language_code = ? WHERE telegram_user_id = ? AND (telegram_first_name IS NOT ? OR telegram_last_name IS NOT ? OR telegram_username IS NOT ? OR telegram_language_code IS NOT ?)")
-        .bind(validated.user.firstName, validated.user.lastName ?? null, validated.user.username ?? null, validated.user.languageCode ?? null, String(validated.user.id)).run();
+        .bind(...profileValues, String(validated.user.id), ...profileValues).run();
       // The existing row was already selected above; reuse the updated payload instead of issuing the same SELECT again.
       user = {
         ...user,
