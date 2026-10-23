@@ -435,7 +435,9 @@ function Index() {
       }
       setTelegramConsentPending(false);
       setTelegramConsentRequired(false);
-      setAdminCheckVersion((version) => version + 1);
+      // A successful consent response creates the server session, so mark auth ready.
+      // This also triggers the admin-session check effect for newly registered users.
+      setTelegramAuthReady(true);
     } catch {
       setTelegramAuthError(language === "ru"
         ? "Не удалось связаться с сервером авторизации."
