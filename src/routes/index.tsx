@@ -17,7 +17,7 @@ import homeSocialImage from "@/assets/yume-hero-desktop-new.png.PNG";
 import { absoluteImageUrl, canonicalUrl } from "@/data/seo";
 import { getTelegramWebApp } from "@/lib/telegram-mini-app";
 import { syncTelegramLibrary } from "@/data/profile-storage";
-import { runAdminTrailerUpdate, type AdminTrailerStats } from "@/data/admin-trailers.client";
+import { runAdminTrailerUpdate, type AdminTrailerStats } from "@/data/admin-trailer-update";
 
 export const Route = createFileRoute("/")({
   head: () => {
