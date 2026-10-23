@@ -90,7 +90,7 @@ html[data-yume-splash-active="true"] body {
   box-shadow: 0 0 8px 3px rgba(222, 185, 255, .95), 0 0 24px 10px rgba(151, 68, 246, .42);
   transform: translate(-50%, -50%) scale(1);
   opacity: 0;
-  animation: yume-splash-origin 1.55s cubic-bezier(.16, 1, .3, 1) 120ms both;
+  animation: yume-splash-origin 7.2s cubic-bezier(.16, 1, .3, 1) 180ms both;
 }
 .yume-splash__logo {
   grid-area: 1 / 1;
@@ -98,10 +98,20 @@ html[data-yume-splash-active="true"] body {
   opacity: 0;
   clip-path: circle(0% at 50% 50%);
   filter: drop-shadow(0 0 12px rgba(177, 104, 255, .18));
-  animation: yume-splash-logo-reveal 1.8s cubic-bezier(.16, 1, .3, 1) 280ms both,
-    yume-splash-logo-glow 2.8s ease-in-out 2.25s infinite alternate;
+  filter: brightness(.42) drop-shadow(0 0 8px rgba(177, 104, 255, .08));
+  animation: yume-splash-logo-reveal 7.4s cubic-bezier(.16, 1, .3, 1) 280ms both;
 }
-.yume-splash__logo img {
+.yume-splash__logo-lit {
+  grid-area: 1 / 1;
+  z-index: 1;
+  width: 100%;
+  clip-path: inset(0 100% 0 0);
+  filter: drop-shadow(0 0 12px rgba(177, 104, 255, .18));
+  animation: yume-splash-logo-letter-light 7.2s cubic-bezier(.22, .7, .25, 1) 650ms both,
+    yume-splash-logo-glow 2.8s ease-in-out 7.8s infinite alternate;
+}
+.yume-splash__logo img,
+.yume-splash__logo-lit img {
   display: block;
   width: 100%;
   height: auto;
@@ -200,15 +210,21 @@ html[data-yume-splash-active="true"] body {
 }
 @keyframes yume-splash-origin {
   0% { opacity: 1; transform: translate(-50%, -50%) scale(.35); }
-  24% { opacity: 1; transform: translate(-50%, -50%) scale(1.25); }
-  58% { opacity: .95; transform: translate(-50%, -50%) scale(1.6); }
-  100% { opacity: 0; transform: translate(-50%, -50%) scale(.2); }
+  12% { opacity: 1; transform: translate(-50%, -50%) scale(1.25); }
+  62% { opacity: .8; transform: translate(-50%, -50%) scale(1.6); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(.15); }
 }
 @keyframes yume-splash-logo-reveal {
-  0% { opacity: .12; clip-path: circle(0% at 50% 50%); filter: blur(7px) drop-shadow(0 0 8px rgba(177, 104, 255, .08)); transform: scale(.72); }
-  28% { opacity: .8; }
-  72% { opacity: 1; clip-path: circle(58% at 50% 50%); transform: scale(1.035); }
-  100% { opacity: 1; clip-path: circle(75% at 50% 50%); filter: blur(0) drop-shadow(0 0 17px rgba(177, 104, 255, .28)); transform: scale(1); }
+  0% { opacity: .08; clip-path: circle(0% at 50% 50%); filter: blur(7px) brightness(.42) drop-shadow(0 0 8px rgba(177, 104, 255, .08)); transform: scale(.72); }
+  22% { opacity: .55; }
+  62% { opacity: .9; clip-path: circle(58% at 50% 50%); transform: scale(1.025); }
+  100% { opacity: 1; clip-path: circle(75% at 50% 50%); filter: blur(0) brightness(.42) drop-shadow(0 0 12px rgba(177, 104, 255, .2)); transform: scale(1); }
+}
+@keyframes yume-splash-logo-letter-light {
+  0% { clip-path: inset(0 100% 0 0); opacity: .15; }
+  12% { opacity: .65; }
+  88% { clip-path: inset(0 0 0 0); opacity: 1; }
+  100% { clip-path: inset(0 0 0 0); opacity: 1; }
 }
 @keyframes yume-splash-logo-glow {
   from { filter: drop-shadow(0 0 10px rgba(167, 99, 255, .16)); }

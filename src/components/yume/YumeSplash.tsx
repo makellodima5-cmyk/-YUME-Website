@@ -7,7 +7,7 @@ type SplashProps = {
   contentReady?: boolean;
 };
 
-const SPLASH_PROGRESS_DURATION_MS = 4650;
+const SPLASH_PROGRESS_DURATION_MS = 8000;
 const SPLASH_EXIT_DURATION_MS = 350;
 
 export function YumeSplash({ contentReady = false }: SplashProps) {
@@ -107,6 +107,9 @@ export function YumeSplash({ contentReady = false }: SplashProps) {
         <div className="yume-splash__logo-stage">
           <span className="yume-splash__origin-point" aria-hidden="true" />
           <div className="yume-splash__logo">
+            <Logo />
+          </div>
+          <div className="yume-splash__logo-lit" aria-hidden="true">
             <Logo />
           </div>
         </div>
