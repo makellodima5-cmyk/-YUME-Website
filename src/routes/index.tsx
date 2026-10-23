@@ -298,7 +298,7 @@ function Index() {
   const [adminImport, setAdminImport] = useState<{target:number;cursor:number;added:number;skipped:number;incomplete:number;errors:number;state:string;delayMs?:number}>({target:0,cursor:1,added:0,skipped:0,incomplete:0,errors:0,state:"idle"});
   const [adminImportMessage, setAdminImportMessage] = useState("");
   const [catalogQuality, setCatalogQuality] = useState<{id:string;title:string;year:number;missingYear:boolean;missingPoster:boolean;missingDescription:boolean}[]>([]);
-  const [catalogQualitySummary, setCatalogQualitySummary] = useState({total:0,missingYear:0,missingPoster:0,missingDescription:0});
+  const [catalogQualitySummary, setCatalogQualitySummary] = useState({total:0,incomplete:0,missingYear:0,missingPoster:0,missingDescription:0});
   const [catalogFilter, setCatalogFilter] = useState<"all"|"year"|"poster"|"description">("all");
   const [catalogSelected, setCatalogSelected] = useState<string[]>([]);
   const [catalogQualityBusy, setCatalogQualityBusy] = useState(false);
@@ -494,7 +494,7 @@ function Index() {
         if (cancelled || !response.ok || payload.isAdmin !== true) return;
         setAdminImport({target:payload.target ?? 0,cursor:payload.cursor ?? 1,added:payload.added ?? 0,skipped:payload.skipped ?? 0,incomplete:payload.incomplete ?? 0,errors:payload.errors ?? 0,state:payload.state ?? "idle",delayMs:payload.delayMs});
         setCatalogQuality(payload.quality ?? []);
-        setCatalogQualitySummary(payload.qualitySummary ?? {total:0,missingYear:0,missingPoster:0,missingDescription:0});
+        setCatalogQualitySummary(payload.qualitySummary ?? {total:0,incomplete:0,missingYear:0,missingPoster:0,missingDescription:0});
         setAdminAuditLog(payload.auditLog ?? []);
       }).catch(() => {});
     return () => { cancelled = true; };
@@ -537,7 +537,7 @@ function Index() {
     setMaintenanceMessage("");
     try {
       const response = await fetch("/api/admin/catalog-import", {method:"POST",credentials:"same-origin",cache:"no-store",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"maintenance"})});
-      const payload = await response.json().catch(() => ({})) as {isAdmin?:boolean;error?:string;maintenance?:{ok:boolean;catalogRecords:number;qualitySummary:{total:number;missingYear:number;missingPoster:number;missingDescription:number};checkedAt:string}};
+      const payload = await response.json().catch(() => ({})) as {isAdmin?:boolean;error?:string;maintenance?:{ok:boolean;catalogRecords:number;qualitySummary:{total:number;incomplete:number;missingYear:number;missingPoster:number;missingDescription:number};checkedAt:string}};
       if (!response.ok || payload.isAdmin !== true || !payload.maintenance) throw new Error(payload.error ?? (language === "ru" ? "Проверка не удалась." : "Maintenance check failed."));
       const report = payload.maintenance;
       setMaintenanceMessage(report.ok
@@ -1205,7 +1205,7 @@ function Index() {
                   <span className="rounded-full border border-border px-3 py-1 text-xs text-muted-foreground">{language === "ru" ? "Всего в каталоге: " : "Catalog total: "}{catalogQualitySummary.total}</span>
                 </div>
                 <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                  <button type="button" onClick={() => setCatalogFilter("all")} className={"rounded-xl border p-3 text-left " + (catalogFilter==="all" ? "border-primary bg-primary/10" : "border-border bg-background/50")}><span className="block text-xs text-muted-foreground">{language === "ru" ? "Без года или постера/описания" : "Any missing fields"}</span><strong className="mt-1 block text-xl tabular-nums">{catalogQuality.length}</strong></button>
+                  <button type="button" onClick={() => setCatalogFilter("all")} className={"rounded-xl border p-3 text-left " + (catalogFilter==="all" ? "border-primary bg-primary/10" : "border-border bg-background/50")}><span className="block text-xs text-muted-foreground">{language === "ru" ? "Без года или постера/описания" : "Records with missing fields"}</span><strong className="mt-1 block text-xl tabular-nums">{catalogQualitySummary.incomplete}</strong></button>
                   <button type="button" onClick={() => setCatalogFilter("year")} className={"rounded-xl border p-3 text-left " + (catalogFilter==="year" ? "border-primary bg-primary/10" : "border-border bg-background/50")}><span className="block text-xs text-muted-foreground">{language === "ru" ? "Без года" : "Missing year"}</span><strong className="mt-1 block text-xl tabular-nums">{catalogQualitySummary.missingYear}</strong></button>
                   <button type="button" onClick={() => setCatalogFilter("poster")} className={"rounded-xl border p-3 text-left " + (catalogFilter==="poster" ? "border-primary bg-primary/10" : "border-border bg-background/50")}><span className="block text-xs text-muted-foreground">{language === "ru" ? "Без постера" : "Missing poster"}</span><strong className="mt-1 block text-xl tabular-nums">{catalogQualitySummary.missingPoster}</strong></button>
                   <button type="button" onClick={() => setCatalogFilter("description")} className={"rounded-xl border p-3 text-left " + (catalogFilter==="description" ? "border-primary bg-primary/10" : "border-border bg-background/50")}><span className="block text-xs text-muted-foreground">{language === "ru" ? "Без описания" : "Missing description"}</span><strong className="mt-1 block text-xl tabular-nums">{catalogQualitySummary.missingDescription}</strong></button>
