@@ -115,11 +115,60 @@ const CREATE_SCHEMA_STATEMENTS = [
 let schemaReady = false;
 let missingBindingWarningLogged = false;
 const CATALOG_READ_CACHE_TTL_MS = 30_000;
+const CATALOG_EDGE_CACHE_KEY = "https://yume-catalog-cache.internal/v1/snapshot";
+type WorkerCacheLike = {
+  match(request: Request): Promise<Response | undefined>;
+  put(request: Request, response: Response): Promise<void>;
+  delete(request: Request): Promise<boolean>;
+};
+type CacheGlobals = typeof globalThis & { caches?: { default?: WorkerCacheLike } };
 let catalogReadCache: { db: D1Database; expiresAt: number; result: CatalogResult } | null = null;
 
-/** Clear the isolate-local public snapshot after a catalog mutation. Other isolates refresh within the short TTL. */
+function catalogEdgeCache(): WorkerCacheLike | null {
+  try {
+    return (globalThis as CacheGlobals).caches?.default ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function readCachedCatalog(db: D1Database): Promise<CatalogResult | null> {
+  if (catalogReadCache?.db === db && catalogReadCache.expiresAt > Date.now()) {
+    return catalogReadCache.result;
+  }
+  catalogReadCache = null;
+  const edge = catalogEdgeCache();
+  if (!edge) return null;
+  try {
+    const response = await edge.match(new Request(CATALOG_EDGE_CACHE_KEY));
+    if (!response?.ok) return null;
+    const result = await response.json() as CatalogResult;
+    if (!Array.isArray(result.items) || !result.progress || typeof result.progress.status !== "string") return null;
+    catalogReadCache = { db, expiresAt: Date.now() + CATALOG_READ_CACHE_TTL_MS, result };
+    return result;
+  } catch {
+    return null;
+  }
+}
+
+async function writeCachedCatalog(db: D1Database, result: CatalogResult): Promise<void> {
+  catalogReadCache = { db, expiresAt: Date.now() + CATALOG_READ_CACHE_TTL_MS, result };
+  const edge = catalogEdgeCache();
+  if (!edge) return;
+  try {
+    await edge.put(new Request(CATALOG_EDGE_CACHE_KEY), new Response(JSON.stringify(result), {
+      headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "public, max-age=30" },
+    }));
+  } catch {
+    // Cache is an optimization only; D1 remains the source of truth.
+  }
+}
+
+/** Clear the isolate-local public snapshot and this data center's edge snapshot after a catalog mutation. */
 export function invalidatePersistentCatalogCache(): void {
   catalogReadCache = null;
+  const edge = catalogEdgeCache();
+  if (edge) void edge.delete(new Request(CATALOG_EDGE_CACHE_KEY)).catch(() => undefined);
 }
 
 function database(): D1Database | null {
@@ -296,12 +345,9 @@ export async function getPersistentCatalog(
     return null;
   }
 
-  if (!options.allowImport && catalogReadCache?.db === db) {
-    if (catalogReadCache.expiresAt > Date.now()) {
-      const cached = catalogReadCache.result;
-      return { ...cached, items: options.progressOnly ? [] : cached.items };
-    }
-    catalogReadCache = null;
+  if (!options.allowImport) {
+    const cached = await readCachedCatalog(db);
+    if (cached) return { ...cached, items: options.progressOnly ? [] : cached.items };
   }
 
   try {
@@ -318,9 +364,7 @@ export async function getPersistentCatalog(
           : null,
         progress: makeProgress(state, imported),
       };
-      if (!options.allowImport) {
-        catalogReadCache = { db, expiresAt: Date.now() + CATALOG_READ_CACHE_TTL_MS, result };
-      }
+      if (!options.allowImport) await writeCachedCatalog(db, result);
       return { ...result, items: options.progressOnly ? [] : result.items };
     }
 
@@ -328,7 +372,7 @@ export async function getPersistentCatalog(
     if (!state && imported > 0) {
       await db.batch([putMeta(db, "catalog_state", "ready")]);
       const result: CatalogResult = { items: await readRows(db), error: null, progress: makeProgress("ready", imported) };
-      if (!options.allowImport) catalogReadCache = { db, expiresAt: Date.now() + CATALOG_READ_CACHE_TTL_MS, result };
+      if (!options.allowImport) await writeCachedCatalog(db, result);
       return { ...result, items: options.progressOnly ? [] : result.items };
     }
 
