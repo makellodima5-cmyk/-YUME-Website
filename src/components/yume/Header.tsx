@@ -3,7 +3,7 @@ import { Home, LayoutGrid, Library, User, Menu, X, Bell, Moon, Sun, ShieldCheck,
 import { Logo } from "./Logo";
 import { useYumePreferences } from "@/data/preferences";
 
-export type View = "home" | "admin" | "catalog" | "collections" | "profile" | "popular" | "new-releases" | "announcements" | "airing" | "favorites" | "watchlist" | "history" | "privacy" | "privacy-policy" | "rules" | "rights";
+export type View = "home" | "admin" | "catalog" | "collections" | "profile" | "popular" | "new-releases" | "announcements" | "airing" | "favorites" | "watchlist" | "history" | "privacy" | "privacy-policy" | "rules" | "rights" | "notifications";
 
 export const NAV: { id: View; label: string; icon: typeof Home }[] = [
   { id: "home", label: "Главная", icon: Home },
@@ -16,9 +16,10 @@ type Props = {
   setView: (v: View) => void;
   onProfile: () => void;
   isAdmin?: boolean;
+  unreadNotificationCount?: number;
 };
 
-export function Header({ view, setView, onProfile, isAdmin = false }: Props) {
+export function Header({ view, setView, onProfile, isAdmin = false, unreadNotificationCount = 0 }: Props) {
   const { t, theme, setTheme, language, setLanguage } = useYumePreferences();
   const [menuOpen, setMenuOpen] = useState(false);
   // Keep primary navigation labels directly tied to the active language.
@@ -109,12 +110,17 @@ export function Header({ view, setView, onProfile, isAdmin = false }: Props) {
           <div className="ml-auto mt-5 flex items-center gap-1 sm:gap-2">
             <button
               type="button"
-              aria-label={t("nav.notifications")}
-              title={t("nav.notificationsComing")}
-              className="relative flex h-10 w-10 items-center justify-center rounded-full text-foreground/80 transition hover:bg-primary/10"
+              onClick={() => setView("notifications")}
+              aria-label={language === "ru"
+                ? `Уведомления${unreadNotificationCount > 0 ? `, непрочитанных: ${unreadNotificationCount}` : ""}`
+                : `Notifications${unreadNotificationCount > 0 ? `, unread: ${unreadNotificationCount}` : ""}`}
+              aria-current={view === "notifications" ? "page" : undefined}
+              title={language === "ru" ? "Уведомления" : "Notifications"}
+              className={`relative flex h-10 w-10 items-center justify-center rounded-full text-foreground/80 transition hover:bg-primary/10 ${view === "notifications" ? "bg-primary/10 text-primary" : ""}`}
             >
               <Bell className="h-5 w-5" />
-              <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-primary" />
+              {unreadNotificationCount > 0 && <span aria-hidden="true" className="absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-background" />}
+              {unreadNotificationCount > 0 && <span className="sr-only">{language === "ru" ? `${unreadNotificationCount} непрочитанных уведомлений` : `${unreadNotificationCount} unread notifications`}</span>}
             </button>
             <button
               type="button"
