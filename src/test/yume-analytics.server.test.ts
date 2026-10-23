@@ -12,11 +12,15 @@ type EventRow = {
 };
 
 class FakeAnalyticsDb {
-  rows: EventRow[] = [];
-  nextId = 1;
+  private state: { rows: EventRow[]; nextId: number } = { rows: [], nextId: 1 };
+
+  get rows(): EventRow[] { return this.state.rows; }
+  set rows(rows: EventRow[]) { this.state.rows = rows; }
+  get nextId(): number { return this.state.nextId; }
+  set nextId(nextId: number) { this.state.nextId = nextId; }
 
   prepare(sql: string) {
-    const db = this;
+    const state = this.state;
     let values: unknown[] = [];
     return {
       bind(...args: unknown[]) { values = args; return this; },
@@ -27,12 +31,12 @@ class FakeAnalyticsDb {
         if (sql.startsWith("INSERT INTO yume_analytics_events")) {
           const [eventDate, eventHour, visitorHash, sessionHash, pagePath, createdAt] = values;
           const visitorLimit = String(values[7] ?? "");
-          const countForVisitor = db.rows.filter(row => row.visitor_hash === values[6] && row.created_at >= visitorLimit).length;
+          const countForVisitor = state.rows.filter(row => row.visitor_hash === values[6] && row.created_at >= visitorLimit).length;
           const duplicateCutoff = String(values[10] ?? "");
-          const isDuplicate = db.rows.some(row => row.session_hash === values[8] && row.page_path === values[9] && row.created_at >= duplicateCutoff);
+          const isDuplicate = state.rows.some(row => row.session_hash === values[8] && row.page_path === values[9] && row.created_at >= duplicateCutoff);
           if (countForVisitor < 240 && !isDuplicate) {
-            db.rows.push({
-              id: db.nextId++,
+            state.rows.push({
+              id: state.nextId++,
               event_date: String(eventDate),
               event_hour: Number(eventHour),
               visitor_hash: String(visitorHash),
@@ -50,21 +54,21 @@ class FakeAnalyticsDb {
         }
         if (sql.includes("COUNT(DISTINCT CASE WHEN session_hash")) {
           const threshold = sql.includes("WHERE created_at >= ?") ? String(values[0] ?? "") : "";
-          const rows = db.rows.filter(row => !threshold || row.created_at >= threshold);
+          const rows = state.rows.filter(row => !threshold || row.created_at >= threshold);
           return { n: new Set(rows.map(row => row.session_hash || "legacy-" + row.id)).size } as T;
         }
         if (sql.includes("COUNT(DISTINCT visitor_hash)")) {
           const threshold = sql.includes("WHERE created_at >= ?") ? String(values[0] ?? "") : "";
-          const rows = db.rows.filter(row => !threshold || row.created_at >= threshold);
+          const rows = state.rows.filter(row => !threshold || row.created_at >= threshold);
           return { n: new Set(rows.map(row => row.visitor_hash)).size } as T;
         }
-        if (sql.includes("COUNT(*)")) return { n: db.rows.length } as T;
+        if (sql.includes("COUNT(*)")) return { n: state.rows.length } as T;
         return null;
       },
       async all<T>() {
         if (!sql.includes("SELECT event_date AS date")) return { results: [] as T[] };
         const threshold = String(values[0] ?? "");
-        const inRange = db.rows.filter(row => row.created_at >= threshold);
+        const inRange = state.rows.filter(row => row.created_at >= threshold);
         const grouped = new Map<string, EventRow[]>();
         for (const row of inRange) grouped.set(row.event_date, [...(grouped.get(row.event_date) ?? []), row]);
         return {
@@ -100,8 +104,8 @@ function visit(path: string, sessionId: string, userAgent = "YUME Analytics Test
 
 describe("YUME server analytics", () => {
   beforeEach(() => {
-    db.rows = [];
-    db.nextId = 1;
+    state.rows = [];
+    state.nextId = 1;
     runtime.__YUME_RUNTIME_ENV__ = { YUME_DB: db, TELEGRAM_ADMIN_ID: "12345" };
   });
 
@@ -117,26 +121,26 @@ describe("YUME server analytics", () => {
     });
     const response = await handleYumeAnalytics(request);
     expect(response.status).toBe(403);
-    expect(db.rows).toHaveLength(0);
+    expect(state.rows).toHaveLength(0);
   });
 
   it("stores only hashed visitor and session identifiers", async () => {
     const sessionId = "00000000-0000-4000-8000-000000000001";
     const response = await handleYumeAnalytics(visit("/#home", sessionId));
     expect(response.status).toBe(200);
-    expect(db.rows).toHaveLength(1);
-    expect(db.rows[0]?.page_path).toBe("/#home");
-    expect(db.rows[0]?.visitor_hash).toMatch(/^[a-f0-9]{64}$/);
-    expect(db.rows[0]?.session_hash).toMatch(/^[a-f0-9]{64}$/);
-    expect(db.rows[0]?.session_hash).not.toBe(sessionId);
-    expect(JSON.stringify(db.rows)).not.toContain("203.0.113.20");
+    expect(state.rows).toHaveLength(1);
+    expect(state.rows[0]?.page_path).toBe("/#home");
+    expect(state.rows[0]?.visitor_hash).toMatch(/^[a-f0-9]{64}$/);
+    expect(state.rows[0]?.session_hash).toMatch(/^[a-f0-9]{64}$/);
+    expect(state.rows[0]?.session_hash).not.toBe(sessionId);
+    expect(JSON.stringify(state.rows)).not.toContain("203.0.113.20");
   });
 
   it("counts sessions separately from pageviews and protects analytics stats", async () => {
     const sessionId = "00000000-0000-4000-8000-000000000001";
     await handleYumeAnalytics(visit("/#home", sessionId));
     await handleYumeAnalytics(visit("/#catalog", sessionId));
-    expect(db.rows).toHaveLength(2);
+    expect(state.rows).toHaveLength(2);
 
     const anonymous = await handleYumeAnalytics(new Request("https://yume.test/api/analytics"));
     expect(anonymous.status).toBe(401);
