@@ -59,6 +59,7 @@ describe("YUME analytics pageview tracking", () => {
       lastPath: "/#home",
       lastEventAt: now - 31 * 60 * 1000,
     }));
+    vi.mocked(window.crypto.randomUUID).mockReturnValueOnce(secondId);
     trackYumePage("/#catalog");
     const body = JSON.parse(String(vi.mocked(fetch).mock.calls[0]![1]?.body)) as { sessionId: string };
     expect(body.sessionId).toBe(secondId);
