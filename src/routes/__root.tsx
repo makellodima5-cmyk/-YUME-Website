@@ -60,10 +60,21 @@ function NotFoundComponent() {
 
 function ErrorComponent({ error, reset }: ErrorComponentProps) {
   const language = useStoredInterfaceLanguage();
-  console.error(error);
   const router = useRouter();
   useEffect(() => {
-    reportLovableError(error, { boundary: "tanstack_root_error_component" });
+    const details = error instanceof Error
+      ? { name: error.name, message: error.message, stack: error.stack }
+      : { name: "UnknownError", message: String(error), stack: undefined };
+    console.error("[YUME][PAGE_ERROR] Unhandled route/render error.", {
+      ...details,
+      boundary: "tanstack_root_error_component",
+      path: typeof window !== "undefined" ? window.location.pathname : "server",
+    });
+    try {
+      reportLovableError(error, { boundary: "tanstack_root_error_component" });
+    } catch (reportingError) {
+      console.error("[YUME][PAGE_ERROR] Error reporter itself failed.", reportingError);
+    }
   }, [error]);
 
   return (
