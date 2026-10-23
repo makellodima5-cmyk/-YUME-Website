@@ -1,7 +1,7 @@
 import { env as cloudflareEnv } from "cloudflare:workers";
 import { USER_NOTIFICATIONS } from "@/data/notifications.shared";
 
-type Environment = Record<string, unknown> & { YUME_DB?: unknown };
+type Environment = Record<string, unknown> & { YUME_DB?: unknown; YUME_AUTH_SESSION_SECRET?: string };
 type Statement = {
   bind(...values: unknown[]): Statement;
   first<T = Record<string, unknown>>(): Promise<T | null>;
@@ -49,8 +49,9 @@ function cookieValue(request: Request, name: string): string | null {
   return null;
 }
 
-async function sha256Hex(value: string): Promise<string> {
-  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)));
+async function sessionTokenHash(value: string, secret: string): Promise<string> {
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const digest = new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(value)));
   return Array.from(digest, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
@@ -66,14 +67,18 @@ function sameOrigin(request: Request): boolean {
   return request.headers.get("sec-fetch-site") !== "cross-site";
 }
 
-async function authenticatedUserId(request: Request, db: Database): Promise<string | null> {
+async function authenticatedUserId(request: Request, db: Database, env: Environment): Promise<string | null> {
   const token = cookieValue(request, SESSION_COOKIE);
-  if (!token) return null;
+  const secret = typeof env.YUME_AUTH_SESSION_SECRET === "string" && env.YUME_AUTH_SESSION_SECRET.trim().length >= 32
+    ? env.YUME_AUTH_SESSION_SECRET
+    : "";
+  if (!token || !secret) return null;
+  const tokenHash = await sessionTokenHash(token, secret);
   const session = await db.prepare(
     "SELECT s.user_id, s.expires_at FROM yume_sessions s JOIN yume_users u ON u.id = s.user_id WHERE s.token_hash = ? AND u.provider = 'telegram'",
-  ).bind(await sha256Hex(token)).first<SessionRow>();
+  ).bind(tokenHash).first<SessionRow>();
   if (!session || session.expires_at <= Date.now()) {
-    if (session) await db.prepare("DELETE FROM yume_sessions WHERE token_hash = ?").bind(await sha256Hex(token)).run();
+    if (session) await db.prepare("DELETE FROM yume_sessions WHERE token_hash = ?").bind(tokenHash).run();
     return null;
   }
   return session.user_id;
@@ -124,7 +129,7 @@ export async function handleNotifications(request: Request): Promise<Response> {
 
   try {
     await ensureSchema(db);
-    const userId = await authenticatedUserId(request, db);
+    const userId = await authenticatedUserId(request, db, environment());
 
     if (request.method === "GET") {
       const state = userId
