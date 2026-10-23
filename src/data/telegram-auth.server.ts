@@ -310,16 +310,18 @@ export async function handleTelegramLibrary(request: Request): Promise<Response>
     }
 
     if (saved) {
-      const existing = await db.prepare("SELECT 1 AS found FROM yume_saved_anime WHERE user_id = ? AND list_type = ? AND anime_id = ?")
-        .bind(userId, listType, animeId).first<{ found: number }>();
-      if (!existing) {
-        const count = await db.prepare("SELECT COUNT(*) AS count FROM yume_saved_anime WHERE user_id = ? AND list_type = ?")
-          .bind(userId, listType).first<{ count: number }>();
-        if ((count?.count ?? 0) >= MAX_SAVED_ANIME_IDS) {
+      // Enforce the per-list cap inside the INSERT statement. This removes the
+      // separate existence/count reads and avoids a check-then-insert race when
+      // two requests try to fill the final slot concurrently.
+      const result = await db.prepare(
+        "INSERT OR IGNORE INTO yume_saved_anime (user_id, list_type, anime_id) SELECT ?, ?, ? WHERE EXISTS (SELECT 1 FROM yume_saved_anime WHERE user_id = ? AND list_type = ? AND anime_id = ?) OR (SELECT COUNT(*) FROM yume_saved_anime WHERE user_id = ? AND list_type = ?) < ?",
+      ).bind(userId, listType, animeId, userId, listType, animeId, userId, listType, MAX_SAVED_ANIME_IDS).run();
+      if (Number(result.meta?.changes ?? 0) === 0) {
+        const existing = await db.prepare("SELECT 1 AS found FROM yume_saved_anime WHERE user_id = ? AND list_type = ? AND anime_id = ?")
+          .bind(userId, listType, animeId).first<{ found: number }>();
+        if (!existing) {
           return jsonResponse({ error: "library_limit_reached", limit: MAX_SAVED_ANIME_IDS }, 409);
         }
-        await db.prepare("INSERT OR IGNORE INTO yume_saved_anime (user_id, list_type, anime_id) VALUES (?, ?, ?)")
-          .bind(userId, listType, animeId).run();
       }
     } else {
       await db.prepare("DELETE FROM yume_saved_anime WHERE user_id = ? AND list_type = ? AND anime_id = ?")
