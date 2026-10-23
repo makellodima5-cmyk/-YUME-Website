@@ -83,7 +83,6 @@ function ensureSchema(db: DB): Promise<void> {
       db.prepare("CREATE INDEX IF NOT EXISTS idx_yume_analytics_created_at ON yume_analytics_events(created_at)"),
       db.prepare("CREATE INDEX IF NOT EXISTS idx_yume_analytics_visitor ON yume_analytics_events(event_date, visitor_hash)"),
       db.prepare("CREATE INDEX IF NOT EXISTS idx_yume_analytics_visitor_created ON yume_analytics_events(visitor_hash, created_at)"),
-      db.prepare("CREATE INDEX IF NOT EXISTS idx_yume_analytics_session_path_created ON yume_analytics_events(session_hash, page_path, created_at)"),
     ]);
     // Upgrade an older analytics table without session IDs.
     let addedSessionColumn = false;
@@ -98,6 +97,7 @@ function ensureSchema(db: DB): Promise<void> {
       await db.prepare("UPDATE yume_analytics_events SET session_hash = 'legacy-' || visitor_hash || '-' || event_date WHERE session_hash = ''").run();
     }
     await db.prepare("CREATE INDEX IF NOT EXISTS idx_yume_analytics_session ON yume_analytics_events(event_date, session_hash)").run();
+    await db.prepare("CREATE INDEX IF NOT EXISTS idx_yume_analytics_session_path_created ON yume_analytics_events(session_hash, page_path, created_at)").run();
   })().catch(error => {
     schemaPromise = null;
     throw error;
