@@ -694,13 +694,46 @@ function Index() {
   };
 
   const toggleNotificationExpanded = (notificationId: string) => {
+    const isExpanded = expandedNotificationIds.includes(notificationId);
     setExpandedNotificationIds((current) => current.includes(notificationId)
       ? current.filter((id) => id !== notificationId)
       : [...current, notificationId]);
-    setNotificationReadIds((current) => current.includes(notificationId) ? current : [...current, notificationId]);
+    if (isExpanded || notificationReadIds.includes(notificationId)) return;
+
+    const localIds = Array.from(new Set([...readLocalNotificationIds(), notificationId]));
     if (!notificationRemoteAccount) {
-      saveLocalNotificationIds([...readLocalNotificationIds(), notificationId]);
+      setNotificationReadIds(localIds);
+      if (!saveLocalNotificationIds(localIds)) {
+        setNotificationActionMessage(language === "ru" ? "Не удалось сохранить отметку о прочтении." : "Could not save the read status.");
+      }
+      return;
     }
+
+    // Mark an opened message read on the server as well, so its unread badge stays cleared after reloads.
+    setNotificationReadIds((current) => current.includes(notificationId) ? current : [...current, notificationId]);
+    void fetch("/api/notifications", {
+      method: "POST",
+      credentials: "same-origin",
+      cache: "no-store",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "read-one", notificationId }),
+    }).then(async (response) => {
+      const payload = await response.json().catch(() => ({})) as { authenticated?: boolean; readIds?: unknown };
+      if (response.status === 401 || payload.authenticated !== true) {
+        setNotificationRemoteAccount(false);
+        const ids = Array.from(new Set([...readLocalNotificationIds(), notificationId]));
+        saveLocalNotificationIds(ids);
+        setNotificationReadIds(ids);
+        return;
+      }
+      if (!response.ok) throw new Error("Notification read status could not be saved.");
+      if (Array.isArray(payload.readIds)) setNotificationReadIds(payload.readIds.filter((id): id is string => typeof id === "string"));
+    }).catch(() => {
+      setNotificationReadIds((current) => current.filter((id) => id !== notificationId));
+      setNotificationActionMessage(language === "ru"
+        ? "Не удалось сохранить прочтение уведомления. Попробуй ещё раз."
+        : "Could not save the notification read status. Please try again.");
+    });
   };
 
   const markAllNotificationsRead = async () => {
@@ -1121,7 +1154,7 @@ function Index() {
   const visibleAiringAnime = airingAnime.slice((airingPage - 1) * catalogPageSize, airingPage * catalogPageSize);
   return (
     <div className="min-h-screen pb-8">
-      <Header view={view} setView={setView} onProfile={() => setView("profile")} isAdmin={isAdmin} unreadNotificationCount={notificationStateLoaded ? USER_NOTIFICATIONS.filter((item) => !notificationReadIds.includes(item.id)).length : 0} />
+      <Header view={view} setView={setView} onProfile={() => setView("profile")} isAdmin={isAdmin} unreadNotificationCount={notificationStateLoaded ? USER_NOTIFICATIONS.filter((item) => !notificationReadIds.includes(item.id) && !notificationDismissedIds.includes(item.id)).length : 0} />
       {isTelegramMiniApp && telegramConsentRequired && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-background/85 px-4 py-6 backdrop-blur-md" role="dialog" aria-modal="true" aria-labelledby="telegram-consent-title">
           <section className="w-full max-w-md rounded-3xl border border-border bg-card p-6 shadow-2xl sm:p-8">
