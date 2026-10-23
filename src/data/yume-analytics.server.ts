@@ -17,7 +17,7 @@ const BOT_PATTERN = /bot|crawler|spider|headless|preview|facebookexternalhit|wha
 function getEnv(): Env {
   try {
     const env = cloudflareEnv as unknown as Env;
-    if (env && typeof env === "object") return env;
+    if (env && typeof env === "object" && ("YUME_DB" in env || "TELEGRAM_ADMIN_ID" in env)) return env;
   } catch {
     // Runtime fallback is useful for unit tests and local adapters.
   }
