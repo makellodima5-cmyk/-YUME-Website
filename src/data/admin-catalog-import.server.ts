@@ -218,12 +218,19 @@ async function maintenanceCheck(db: Database) {
   return {ok:health?.ok === 1, catalogRecords:Number(count?.count ?? 0), qualitySummary:quality.summary, checkedAt:new Date().toISOString()};
 }
 async function snapshot(db: Database) {
-  const [target,cursor,added,skipped,incompleteCount,errors,state] = await Promise.all([
-    getMeta(db,"admin_import_target"),getMeta(db,"admin_import_cursor"),getMeta(db,"admin_import_added"),
-    getMeta(db,"admin_import_skipped"),getMeta(db,"admin_import_incomplete"),getMeta(db,"admin_import_errors"),getMeta(db,"admin_import_state"),
-  ]);
-  return { target:Number(target??0), cursor:Number(cursor??1), added:Number(added??0), skipped:Number(skipped??0),
-    incomplete:Number(incompleteCount??0), errors:Number(errors??0), state:state??"idle", delayMs:REQUEST_DELAY_MS };
+  const rows = await db.prepare("SELECT key, value FROM anime_catalog_meta WHERE key IN ('admin_import_target','admin_import_cursor','admin_import_added','admin_import_skipped','admin_import_incomplete','admin_import_errors','admin_import_state')")
+    .all<{ key: string; value: string }>();
+  const values = new Map(rows.results.map((row) => [row.key, row.value]));
+  return {
+    target: Number(values.get("admin_import_target") ?? 0),
+    cursor: Number(values.get("admin_import_cursor") ?? 1),
+    added: Number(values.get("admin_import_added") ?? 0),
+    skipped: Number(values.get("admin_import_skipped") ?? 0),
+    incomplete: Number(values.get("admin_import_incomplete") ?? 0),
+    errors: Number(values.get("admin_import_errors") ?? 0),
+    state: values.get("admin_import_state") ?? "idle",
+    delayMs: REQUEST_DELAY_MS,
+  };
 }
 export async function handleAdminCatalogImport(request: Request): Promise<Response> {
   if (request.method !== "GET" && request.method !== "POST") return json({error:"method_not_allowed"},405);
