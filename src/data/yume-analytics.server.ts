@@ -155,7 +155,7 @@ export async function handleYumeAnalytics(request: Request): Promise<Response> {
     await ensureSchema(db);
     if (request.method === "POST") {
       if (!sameOrigin(request)) return json({ error: "Forbidden origin." }, 403);
-      const body = await request.json().catch(() => null) as { path?: unknown; sessionId?: unknown } | null;
+      const body = await request.json().catch(() => null) as { path?: unknown; sessionId?: unknown; visitorId?: unknown } | null;
       const rawPath = typeof body?.path === "string" && body.path.startsWith("/") ? body.path : "/";
       const path = rawPath.split("?")[0].slice(0, 180);
       if (path.includes("#admin")) return json({ ok: true, ignored: true });
@@ -164,9 +164,12 @@ export async function handleYumeAnalytics(request: Request): Promise<Response> {
       const sessionId = typeof body?.sessionId === "string" && SESSION_ID_PATTERN.test(body.sessionId)
         ? body.sessionId
         : null;
-      if (!sessionId) return json({ error: "A valid analytics session is required." }, 400);
-      const ip = request.headers.get("cf-connecting-ip") ?? "unknown";
-      const visitorHash = await sha256("visitor|" + ip + "|" + agent.slice(0, 300));
+      const visitorId = typeof body?.visitorId === "string" && SESSION_ID_PATTERN.test(body.visitorId)
+        ? body.visitorId
+        : null;
+      if (!sessionId || !visitorId) return json({ error: "Valid analytics session and visitor IDs are required." }, 400);
+      // Use browser-generated random identifiers. Raw IP addresses are neither read nor stored.
+      const visitorHash = await sha256("visitor|" + visitorId);
       const sessionHash = await sha256("session|" + sessionId);
       const now = new Date();
       const timestamp = sqlTime(now);
