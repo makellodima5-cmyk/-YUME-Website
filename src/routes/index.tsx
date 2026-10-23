@@ -516,9 +516,9 @@ function Index() {
         }
         if (!response.ok) throw new Error(payload.error ?? "Import request failed");
         if (payload.state !== "running") {
-          setAdminImportMessage(language === "ru"
+          setAdminImportMessage(payload.message ?? (language === "ru"
             ? (payload.state === "completed" ? "Импорт завершён." : "Импорт остановлен: достигнут предел доступных страниц.")
-            : (payload.state === "completed" ? "Import completed." : "Import stopped: available page limit reached."));
+            : (payload.state === "completed" ? "Import completed." : "Import stopped: available page limit reached.")));
           return;
         }
         setAdminImportMessage(language === "ru"
