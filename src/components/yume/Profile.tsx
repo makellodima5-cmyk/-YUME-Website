@@ -254,8 +254,8 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
       <div className="mx-auto max-w-6xl">
         {panel === "overview" ? (
           <>
-            <div className="relative isolate overflow-hidden rounded-[28px] border border-primary/25 bg-[#08050f] shadow-[0_18px_60px_rgba(0,0,0,0.38)]">
-              <div className="relative h-36 overflow-hidden sm:h-48">
+            <div className="relative isolate overflow-hidden rounded-[20px] border border-primary/20 bg-[#08050f]/95 shadow-[0_10px_34px_rgba(0,0,0,0.24)]">
+              <div className="relative h-28 overflow-hidden sm:h-40">
                 <img
                   src="/images/7E68AFCE-335A-41A6-826D-41E8674B7B0F.png"
                   alt=""
@@ -266,13 +266,13 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
                   decoding="async"
                   className="absolute inset-0 h-full w-full object-cover object-[center_38%]"
                 />
-                <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-[#10071b]/10 to-[#10071b]/95" />
-                <div className="absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-[#10071b] to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-b from-black/5 via-[#10071b]/5 to-[#10071b]/70" />
+                <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-[#10071b]/80 to-transparent" />
               </div>
 
-              <div className="relative -mt-8 rounded-t-[28px] bg-gradient-to-b from-[#1b0d2b]/95 via-[#140a20]/98 to-[#0d0916] px-4 pb-4 pt-0 sm:px-6 sm:pb-6">
+              <div className="relative -mt-6 rounded-t-[22px] bg-gradient-to-b from-[#1b0d2b]/72 via-[#140a20]/82 to-[#0d0916]/92 px-3 pb-3 pt-0 sm:px-5 sm:pb-5">
                 <div className="flex min-w-0 items-end gap-3 sm:gap-4">
-                  <div className="relative -mt-10 h-[100px] w-[100px] shrink-0 overflow-hidden rounded-full border-[3px] border-[#d98aff] bg-[#21102f] shadow-[0_0_28px_rgba(206,100,255,0.38)] sm:-mt-14 sm:h-32 sm:w-32">
+                  <div className="relative -mt-8 h-[78px] w-[78px] shrink-0 overflow-hidden rounded-full border-[2.5px] border-[#d98aff] bg-[#21102f] shadow-[0_0_20px_rgba(206,100,255,0.3)] sm:-mt-11 sm:h-28 sm:w-28">
                     {telegramUser?.photo_url ? (
                       <img
                         src={telegramUser.photo_url}
@@ -287,42 +287,42 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
                       </div>
                     )}
                   </div>
-                  <div className="min-w-0 flex-1 pb-1 pt-4 sm:pb-2">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#c16aff] sm:text-xs">
+                  <div className="min-w-0 flex-1 pb-1 pt-3 sm:pb-2">
+                    <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-[#c16aff] sm:text-xs">
                       {t("profile.space")}
                     </p>
-                    <h1 className="mt-1 break-words text-xl font-bold leading-tight text-white sm:text-3xl">
+                    <h1 className="mt-1 break-words text-lg font-bold leading-tight text-white sm:text-2xl">
                       {telegramDisplayName}
                     </h1>
-                    <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-white/65 sm:text-sm">
+                    <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-white/65 sm:text-sm">
                       {t("profile.subtitle")}
                     </p>
                   </div>
                 </div>
 
-                <div className="mt-5 grid grid-cols-2 overflow-hidden rounded-2xl border border-[#8d51bd]/50 bg-black/25 sm:mt-6">
+                <div className="mt-4 grid grid-cols-2 overflow-hidden rounded-[18px] border border-[#8d51bd]/40 bg-black/20 sm:mt-5">
                   <button
                     type="button"
                     onClick={() => navigatePanel("favorites")}
                     aria-label={`${favorites.length} — ${t("profile.favoritesCount")}`}
-                    className="flex min-w-0 items-center gap-3 px-3 py-3 text-left transition hover:bg-white/[0.06] sm:gap-4 sm:px-5 sm:py-4"
+                    className="flex min-w-0 items-center gap-2.5 px-2.5 py-2.5 text-left transition hover:bg-white/[0.06] sm:gap-4 sm:px-5 sm:py-3.5"
                   >
-                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#241035] text-[#e58aff] sm:h-14 sm:w-14">
-                      <Heart className="h-6 w-6 sm:h-7 sm:w-7" strokeWidth={1.9} />
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#241035] text-[#e58aff] sm:h-12 sm:w-12">
+                      <Heart className="h-5 w-5 sm:h-6 sm:w-6" strokeWidth={1.9} />
                     </span>
                     <span className="min-w-0">
-                      <span className="block text-xl font-bold tabular-nums text-white sm:text-2xl">{favorites.length}</span>
-                      <span className="mt-0.5 block text-[11px] leading-snug text-white/65 sm:text-sm">{t("profile.favoritesCount")}</span>
+                      <span className="block text-lg font-bold tabular-nums text-white sm:text-xl">{favorites.length}</span>
+                      <span className="mt-0.5 block text-[10px] leading-snug text-white/65 sm:text-xs">{t("profile.favoritesCount")}</span>
                     </span>
                   </button>
                   <button
                     type="button"
                     onClick={() => navigatePanel("watchlist")}
                     aria-label={`${watchlist.length} — ${t("profile.watchlistCount")}`}
-                    className="flex min-w-0 items-center gap-3 border-l border-[#8d51bd]/45 px-3 py-3 text-left transition hover:bg-white/[0.06] sm:gap-4 sm:px-5 sm:py-4"
+                    className="flex min-w-0 items-center gap-2.5 border-l border-[#8d51bd]/40 px-2.5 py-2.5 text-left transition hover:bg-white/[0.06] sm:gap-4 sm:px-5 sm:py-3.5"
                   >
-                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#241035] text-primary sm:h-14 sm:w-14">
-                      <Bookmark className="h-6 w-6 sm:h-7 sm:w-7" strokeWidth={1.9} />
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#241035] text-primary sm:h-12 sm:w-12">
+                      <Bookmark className="h-5 w-5 sm:h-6 sm:w-6" strokeWidth={1.9} />
                     </span>
                     <span className="min-w-0">
                       <span className="block text-xl font-bold tabular-nums text-white sm:text-2xl">{watchlist.length}</span>
