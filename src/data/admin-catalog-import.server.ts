@@ -1,4 +1,5 @@
 import { env as cloudflareEnv } from "cloudflare:workers";
+import { invalidatePersistentCatalogCache } from "@/data/catalog-d1.server";
 
 type RuntimeGlobal = typeof globalThis & { __YUME_RUNTIME_ENV__?: unknown };
 type Environment = Record<string, unknown> & { TELEGRAM_ADMIN_ID?: string; YUME_DB?: unknown };
@@ -69,10 +70,17 @@ async function authorize(request: Request, env: Environment, db: Database): Prom
     .bind(await sha256Hex(token)).first<{ telegram_user_id: string | null; expires_at: number }>();
   return Boolean(session && session.expires_at > Date.now() && session.telegram_user_id === adminId);
 }
-async function ensureSchema(db: Database): Promise<void> {
-  await db.batch([
+const adminImportSchemaPromises = new WeakMap<object, Promise<void>>();
+
+function ensureSchema(db: Database): Promise<void> {
+  const key = db as object;
+  const existing = adminImportSchemaPromises.get(key);
+  if (existing) return existing;
+  const pending = (async () => {
+
     db.prepare("CREATE TABLE IF NOT EXISTS anime_catalog (id TEXT PRIMARY KEY NOT NULL, title TEXT NOT NULL, english_title TEXT, original_title TEXT NOT NULL, year INTEGER NOT NULL DEFAULT 0, episodes INTEGER NOT NULL DEFAULT 0, rating REAL, genres_json TEXT NOT NULL DEFAULT '[]', status TEXT NOT NULL DEFAULT 'Неизвестно', description TEXT NOT NULL DEFAULT '', hue INTEGER NOT NULL DEFAULT 280, glyph TEXT NOT NULL DEFAULT 'Y', is_new INTEGER NOT NULL DEFAULT 0, popular INTEGER NOT NULL DEFAULT 0, poster_url TEXT, banner_url TEXT, kind TEXT, age_rating TEXT, next_episode_at TEXT, episodes_aired INTEGER NOT NULL DEFAULT 0, aired_on TEXT, studios_json TEXT NOT NULL DEFAULT '[]', youtube_trailer_id TEXT, position INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)"),
     db.prepare("CREATE TABLE IF NOT EXISTS anime_catalog_meta (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL)"),
+    db.prepare("CREATE INDEX IF NOT EXISTS idx_anime_catalog_missing_trailer ON anime_catalog(id) WHERE youtube_trailer_id IS NULL OR youtube_trailer_id = '',"),
     db.prepare("CREATE TABLE IF NOT EXISTS yume_admin_audit_log (id INTEGER PRIMARY KEY AUTOINCREMENT, action TEXT NOT NULL, status TEXT NOT NULL, details TEXT NOT NULL DEFAULT '{}', actor_telegram_id TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)"),
     db.prepare("CREATE TABLE IF NOT EXISTS admin_catalog_import_lock (id INTEGER PRIMARY KEY CHECK (id = 1), token TEXT NOT NULL DEFAULT '', expires_at INTEGER NOT NULL DEFAULT 0)"),
     db.prepare("CREATE TABLE IF NOT EXISTS admin_catalog_import_items (run_id TEXT NOT NULL, anime_id TEXT NOT NULL, outcome TEXT NOT NULL CHECK (outcome IN ('added','skipped')), incomplete INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (run_id,anime_id))"),
@@ -84,8 +92,12 @@ async function ensureSchema(db: Database): Promise<void> {
     db.prepare("INSERT OR IGNORE INTO anime_catalog_meta (key,value) VALUES ('admin_import_skipped','0')"),
     db.prepare("INSERT OR IGNORE INTO anime_catalog_meta (key,value) VALUES ('admin_import_incomplete','0')"),
     db.prepare("INSERT OR IGNORE INTO anime_catalog_meta (key,value) VALUES ('admin_import_errors','0')"),
-    db.prepare("INSERT OR IGNORE INTO anime_catalog_meta (key,value) VALUES ('admin_import_resume_at','0')"),
-  ]);
+  })().catch((error) => {
+    adminImportSchemaPromises.delete(key);
+    throw error;
+  });
+  adminImportSchemaPromises.set(key, pending);
+  return pending;
 }
 async function getMeta(db: Database, key: string): Promise<string | null> {
   const row = await db.prepare("SELECT value FROM anime_catalog_meta WHERE key = ?").bind(key).first<{value:string}>();
@@ -231,6 +243,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
         if (!safeIds.length) return json({error:"no_valid_ids"},400);
         const result = await db.batch(safeIds.map(id => db.prepare("DELETE FROM anime_catalog WHERE id = ?").bind(id)));
         const deleted = result.reduce((sum,item) => sum + Number((item as {meta?:{changes?:number}})?.meta?.changes ?? 0),0);
+        if (deleted > 0) invalidatePersistentCatalogCache();
         const quality = await catalogQuality(db);
         await audit(db,"catalog.delete","success",{requested:safeIds.length,deleted});
         return json({isAdmin:true,deleted,quality:quality.items,qualitySummary:quality.summary});
@@ -249,6 +262,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
           const refreshed = await db.prepare("SELECT year,poster_url,description FROM anime_catalog WHERE id = ?").bind(item.id).first<{year:number;poster_url:string|null;description:string|null}>();
           if (!refreshed || !refreshed.year || !refreshed.poster_url?.trim() || !refreshed.description?.trim()) stillIncomplete++;
         }
+        if (repaired > 0) invalidatePersistentCatalogCache();
         const quality = await catalogQuality(db);
         const notFound = Math.max(0,safeIds.length-source.length);
         await audit(db,"catalog.repair","success",{requested:safeIds.length,repaired,notFound,stillIncomplete});
@@ -341,7 +355,10 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
         statements.push(db.prepare("UPDATE anime_catalog_meta SET value = CAST(CAST(value AS INTEGER) + 1 AS TEXT) WHERE key = 'admin_import_cursor'"));
         statements.push(setMeta(db,"admin_import_resume_at",resumeAtValue));
         statements.push(db.prepare("UPDATE anime_catalog_meta SET value = CASE WHEN CAST((SELECT value FROM anime_catalog_meta WHERE key = 'admin_import_added') AS INTEGER) >= CAST((SELECT value FROM anime_catalog_meta WHERE key = 'admin_import_target') AS INTEGER) THEN 'completed' WHEN CAST((SELECT value FROM anime_catalog_meta WHERE key = 'admin_import_cursor') AS INTEGER) > 500 THEN 'partial' ELSE 'running' END WHERE key = 'admin_import_state'"));
-        if (statements.length) await db.batch(statements);
+        if (statements.length) {
+          await db.batch(statements);
+          invalidatePersistentCatalogCache();
+        }
         const after = await snapshot(db);
         await audit(db,"catalog.import.page","success",{page:before.cursor,added:after.added-before.added,skipped:after.skipped-before.skipped,incomplete:after.incomplete-before.incomplete,state:after.state});
         if (after.state !== "running") await audit(db,"catalog.import.finish",after.state,{added:after.added,target:after.target,skipped:after.skipped,errors:after.errors});
