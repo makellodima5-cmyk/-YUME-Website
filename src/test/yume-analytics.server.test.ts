@@ -111,7 +111,7 @@ describe("YUME server analytics", () => {
   beforeEach(() => {
     db.rows = [];
     db.nextId = 1;
-    runtime.__YUME_RUNTIME_ENV__ = { YUME_DB: db, TELEGRAM_ADMIN_ID: "12345" };
+    runtime.__YUME_RUNTIME_ENV__ = { YUME_DB: db, TELEGRAM_ADMIN_ID: "12345", YUME_AUTH_SESSION_SECRET: "test-session-secret-with-at-least-32-characters" };
   });
 
   afterEach(() => {
