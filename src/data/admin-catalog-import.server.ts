@@ -77,10 +77,10 @@ function ensureSchema(db: Database): Promise<void> {
   const existing = adminImportSchemaPromises.get(key);
   if (existing) return existing;
   const pending = (async () => {
-
+    await db.batch([
     db.prepare("CREATE TABLE IF NOT EXISTS anime_catalog (id TEXT PRIMARY KEY NOT NULL, title TEXT NOT NULL, english_title TEXT, original_title TEXT NOT NULL, year INTEGER NOT NULL DEFAULT 0, episodes INTEGER NOT NULL DEFAULT 0, rating REAL, genres_json TEXT NOT NULL DEFAULT '[]', status TEXT NOT NULL DEFAULT 'Неизвестно', description TEXT NOT NULL DEFAULT '', hue INTEGER NOT NULL DEFAULT 280, glyph TEXT NOT NULL DEFAULT 'Y', is_new INTEGER NOT NULL DEFAULT 0, popular INTEGER NOT NULL DEFAULT 0, poster_url TEXT, banner_url TEXT, kind TEXT, age_rating TEXT, next_episode_at TEXT, episodes_aired INTEGER NOT NULL DEFAULT 0, aired_on TEXT, studios_json TEXT NOT NULL DEFAULT '[]', youtube_trailer_id TEXT, position INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)"),
     db.prepare("CREATE TABLE IF NOT EXISTS anime_catalog_meta (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL)"),
-    db.prepare("CREATE INDEX IF NOT EXISTS idx_anime_catalog_missing_trailer ON anime_catalog(id) WHERE youtube_trailer_id IS NULL OR youtube_trailer_id = '',"),
+    db.prepare("CREATE INDEX IF NOT EXISTS idx_anime_catalog_missing_trailer ON anime_catalog(id) WHERE youtube_trailer_id IS NULL OR youtube_trailer_id = ''"),
     db.prepare("CREATE TABLE IF NOT EXISTS yume_admin_audit_log (id INTEGER PRIMARY KEY AUTOINCREMENT, action TEXT NOT NULL, status TEXT NOT NULL, details TEXT NOT NULL DEFAULT '{}', actor_telegram_id TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)"),
     db.prepare("CREATE TABLE IF NOT EXISTS admin_catalog_import_lock (id INTEGER PRIMARY KEY CHECK (id = 1), token TEXT NOT NULL DEFAULT '', expires_at INTEGER NOT NULL DEFAULT 0)"),
     db.prepare("CREATE TABLE IF NOT EXISTS admin_catalog_import_items (run_id TEXT NOT NULL, anime_id TEXT NOT NULL, outcome TEXT NOT NULL CHECK (outcome IN ('added','skipped')), incomplete INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (run_id,anime_id))"),
@@ -92,6 +92,8 @@ function ensureSchema(db: Database): Promise<void> {
     db.prepare("INSERT OR IGNORE INTO anime_catalog_meta (key,value) VALUES ('admin_import_skipped','0')"),
     db.prepare("INSERT OR IGNORE INTO anime_catalog_meta (key,value) VALUES ('admin_import_incomplete','0')"),
     db.prepare("INSERT OR IGNORE INTO anime_catalog_meta (key,value) VALUES ('admin_import_errors','0')"),
+    db.prepare("INSERT OR IGNORE INTO anime_catalog_meta (key,value) VALUES ('admin_import_resume_at','0')"),
+    ]);
   })().catch((error) => {
     adminImportSchemaPromises.delete(key);
     throw error;
