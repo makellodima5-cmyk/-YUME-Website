@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowDownWideNarrow, ChevronDown, ChevronRight, Search, SlidersHorizontal, X, UserRound, Globe, Sun, Moon, Monitor, ShieldCheck, Play, ListChecks, CircleCheck, Clock3, ChartNoAxesCombined } from "lucide-react";
+import { ArrowDownWideNarrow, ChevronDown, ChevronRight, Search, SlidersHorizontal, X, UserRound, Globe, Sun, Moon, Monitor, ShieldCheck, Play, ListChecks, CircleCheck, Clock3, ChartNoAxesCombined, Download, Database, Settings, History } from "lucide-react";
 import { COLLECTIONS, type Anime } from "@/data/anime";
 import { getShikimoriCatalog } from "@/data/shikimori";
 import { getExactReleaseDate, isNewRelease, isUpcomingAnnouncement } from "@/data/anime-sections";
@@ -1238,9 +1238,9 @@ function Index() {
                   {adminImportMessage && <p className="mt-2 rounded-lg border border-border bg-background/60 p-2.5 text-xs" role="status">{adminImportMessage}</p>}
                 </div>
               </details>
-              <details open={expandedAdminSections.quality} onToggle={event => { const isOpen = event.currentTarget.open; setExpandedAdminSections(current => current.quality === isOpen ? current : {...current, quality: isOpen}); }} className="group mb-3 overflow-hidden rounded-2xl border border-border bg-card/50" aria-label={language === "ru" ? "Качество каталога" : "Catalog quality"}>
+              <details open={expandedAdminSections.quality} onToggle={event => { const isOpen = event.currentTarget.open; setExpandedAdminSections(current => current.quality === isOpen ? current : {...current, quality: isOpen}); }} className="group mb-3 overflow-hidden rounded-2xl border border-[#382846] bg-[#0C0A12]" aria-label={language === "ru" ? "Качество каталога" : "Catalog quality"}>
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 hover:bg-card/80 [&::-webkit-details-marker]:hidden">
-                  <span className="min-w-0"><span className="block font-semibold">{language === "ru" ? "Качество каталога" : "Catalog quality"}</span><span className="mt-0.5 block text-xs text-muted-foreground">{language === "ru" ? "Неполных записей: " : "Incomplete records: "}{catalogQualitySummary.incomplete} · {language === "ru" ? "всего: " : "total: "}{catalogQualitySummary.total}</span></span>
+                  <span className="flex min-w-0 items-center gap-3"><Database className="h-6 w-6 shrink-0 text-[#BE65FF]"/><span className="min-w-0"><span className="block font-semibold text-[#F8F4FF]">{language === "ru" ? "Качество каталога" : "Catalog quality"}</span><span className="mt-0.5 block text-xs text-[#A89CB8]">{language === "ru" ? "Неполных записей: " : "Incomplete records: "}{catalogQualitySummary.incomplete}</span></span></span><span className="rounded-full bg-[#1D1729] px-3 py-1 text-xs text-[#DCC8F8]">{language === "ru" ? "Всего: " : "Total: "}{catalogQualitySummary.total}</span>
                   <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
                 </summary>
                 <div className="border-t border-border/70 p-3 sm:p-4">
@@ -1276,9 +1276,9 @@ function Index() {
                   </div>
                 </div>
               </details>
-              <details open={expandedAdminSections.maintenance} onToggle={event => { const isOpen = event.currentTarget.open; setExpandedAdminSections(current => current.maintenance === isOpen ? current : {...current, maintenance: isOpen}); }} className="group mb-3 overflow-hidden rounded-2xl border border-border bg-card/50" aria-label={language === "ru" ? "Обслуживание" : "Maintenance"}>
+              <details open={expandedAdminSections.maintenance} onToggle={event => { const isOpen = event.currentTarget.open; setExpandedAdminSections(current => current.maintenance === isOpen ? current : {...current, maintenance: isOpen}); }} className="group mb-3 overflow-hidden rounded-2xl border border-[#382846] bg-[#0C0A12]" aria-label={language === "ru" ? "Обслуживание" : "Maintenance"}>
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 hover:bg-card/80 [&::-webkit-details-marker]:hidden">
-                  <span><span className="block font-semibold">{language==="ru"?"Обслуживание":"Maintenance"}</span><span className="mt-0.5 block text-xs text-muted-foreground">{language==="ru"?"Проверка подключения к D1":"D1 connectivity check"}</span></span>
+                  <span className="flex min-w-0 items-center gap-3"><Settings className="h-6 w-6 shrink-0 text-[#BE65FF]"/><span><span className="block font-semibold text-[#F8F4FF]">{language==="ru"?"Обслуживание":"Maintenance"}</span><span className="mt-0.5 block text-xs text-[#A89CB8]">{language==="ru"?"Проверка подключения к D1":"D1 connectivity check"}</span></span></span>
                   <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
                 </summary>
                 <div className="border-t border-border/70 p-3 sm:p-4">
@@ -1287,9 +1287,9 @@ function Index() {
                   {maintenanceMessage && <p role="status" className="mt-3 rounded-lg bg-background/60 p-3 text-xs">{maintenanceMessage}</p>}
                 </div>
               </details>
-              <details open={expandedAdminSections.audit} onToggle={event => { const isOpen = event.currentTarget.open; setExpandedAdminSections(current => current.audit === isOpen ? current : {...current, audit: isOpen}); }} className="group mb-3 overflow-hidden rounded-2xl border border-border bg-card/50" aria-label={language==="ru"?"История административных операций":"Admin operation history"}>
+              <details open={expandedAdminSections.audit} onToggle={event => { const isOpen = event.currentTarget.open; setExpandedAdminSections(current => current.audit === isOpen ? current : {...current, audit: isOpen}); }} className="group mb-3 overflow-hidden rounded-2xl border border-[#382846] bg-[#0C0A12]" aria-label={language==="ru"?"История административных операций":"Admin operation history"}>
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 hover:bg-card/80 [&::-webkit-details-marker]:hidden">
-                  <span><span className="block font-semibold">{language==="ru"?"История операций":"Operation history"}</span><span className="mt-0.5 block text-xs text-muted-foreground">{language==="ru"?"Последние 30 событий":"Latest 30 events"}</span></span>
+                  <span className="flex min-w-0 items-center gap-3"><History className="h-6 w-6 shrink-0 text-[#BE65FF]"/><span><span className="block font-semibold text-[#F8F4FF]">{language==="ru"?"История операций":"Operation history"}</span><span className="mt-0.5 block text-xs text-[#A89CB8]">{language==="ru"?"Последние 30 событий":"Latest 30 events"}</span></span></span>
                   <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
                 </summary>
                 <div className="border-t border-border/70 p-3 sm:p-4">
