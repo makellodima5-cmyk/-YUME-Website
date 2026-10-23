@@ -78,7 +78,8 @@ function ensureSchema(db: DB): Promise<void> {
   schemaPromise = (async () => {
     await db.batch([
       db.prepare("CREATE TABLE IF NOT EXISTS yume_analytics_events (id INTEGER PRIMARY KEY AUTOINCREMENT, event_date TEXT NOT NULL, event_hour INTEGER NOT NULL, visitor_hash TEXT NOT NULL, session_hash TEXT NOT NULL DEFAULT '', page_path TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)"),
-      db.prepare("CREATE INDEX IF NOT EXISTS idx_yume_analytics_date ON yume_analytics_events(event_date)"),
+      // event_date is already the leading column of the visitor and session composite indexes.
+      db.prepare("DROP INDEX IF EXISTS idx_yume_analytics_date"),
       db.prepare("CREATE INDEX IF NOT EXISTS idx_yume_analytics_created_at ON yume_analytics_events(created_at)"),
       db.prepare("CREATE INDEX IF NOT EXISTS idx_yume_analytics_visitor ON yume_analytics_events(event_date, visitor_hash)"),
       db.prepare("CREATE INDEX IF NOT EXISTS idx_yume_analytics_visitor_created ON yume_analytics_events(visitor_hash, created_at)"),
