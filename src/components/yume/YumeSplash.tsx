@@ -7,31 +7,56 @@ type SplashProps = {
   contentReady?: boolean;
 };
 
+const SPLASH_PROGRESS_DURATION_MS = 4650;
+const SPLASH_EXIT_DURATION_MS = 350;
+
 export function YumeSplash({ contentReady = false }: SplashProps) {
+  // Keep the splash in the server-rendered markup. The early head script marks
+  // Telegram sessions before the browser can paint the home page.
   const [visible, setVisible] = useState(true);
   const [leaving, setLeaving] = useState(false);
-  const [isTelegramSession, setIsTelegramSession] = useState(false);
+  const [progress, setProgress] = useState(0);
   const [minimumTimePassed, setMinimumTimePassed] = useState(false);
 
   useEffect(() => {
     const isTelegram = Boolean(getTelegramWebApp()?.initData);
-    setIsTelegramSession(isTelegram);
     if (!isTelegram) {
       setVisible(false);
       return;
     }
-    const minimumTimer = window.setTimeout(() => setMinimumTimePassed(true), 1200);
-    return () => window.clearTimeout(minimumTimer);
+
+    const root = document.documentElement;
+    root.classList.add("telegram-mini-app");
+    root.dataset.yumeSplashActive = "true";
+
+    const startedAt = window.performance.now();
+    const progressInterval = window.setInterval(() => {
+      const elapsed = window.performance.now() - startedAt;
+      const nextProgress = Math.min(100, Math.floor((elapsed / SPLASH_PROGRESS_DURATION_MS) * 100));
+      setProgress(nextProgress);
+    }, 75);
+
+    const finishTimer = window.setTimeout(() => {
+      window.clearInterval(progressInterval);
+      setProgress(100);
+      setMinimumTimePassed(true);
+    }, SPLASH_PROGRESS_DURATION_MS);
+
+    return () => {
+      window.clearInterval(progressInterval);
+      window.clearTimeout(finishTimer);
+    };
   }, []);
 
   useEffect(() => {
-    if (!isTelegramSession || !visible || !minimumTimePassed || !contentReady) return;
-    setLeaving(true);
-    const hideTimer = window.setTimeout(() => setVisible(false), 520);
-    return () => window.clearTimeout(hideTimer);
-  }, [isTelegramSession, visible, minimumTimePassed, contentReady]);
+    if (!visible || !minimumTimePassed || !contentReady) return;
 
-  if (!visible || !isTelegramSession) return null;
+    setLeaving(true);
+    const hideTimer = window.setTimeout(() => setVisible(false), SPLASH_EXIT_DURATION_MS);
+    return () => window.clearTimeout(hideTimer);
+  }, [contentReady, minimumTimePassed, visible]);
+
+  if (!visible) return null;
 
   const petals = Array.from({ length: 16 }, (_, index) => ({
     id: index,
@@ -49,8 +74,8 @@ export function YumeSplash({ contentReady = false }: SplashProps) {
     <div
       className={`yume-splash fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden ${leaving ? "yume-splash--leaving" : ""}`}
       role="status"
-      aria-label="YUME"
-      aria-live="polite"
+      aria-label={`Загрузка YUME: ${progress}%`}
+      aria-live="off"
     >
       <div className="yume-splash__vignette" aria-hidden="true" />
       <div className="yume-splash__glow" aria-hidden="true" />
@@ -75,11 +100,18 @@ export function YumeSplash({ contentReady = false }: SplashProps) {
         ))}
       </div>
       <div className="yume-splash__identity">
-        <div className="yume-splash__logo"><Logo /></div>
-        <p className="yume-splash__caption">YOUR UNIVERSE OF ANIME</p>
-        <div className="yume-splash__loader" aria-hidden="true"><span /></div>
+        <div className="yume-splash__logo">
+          <Logo />
+        </div>
+        <div className="yume-splash__loading">
+          <div className="yume-splash__spinner" aria-hidden="true" />
+          <div className="yume-splash__loading-copy">
+            <p>Загрузка...</p>
+            <span>{progress}%</span>
+          </div>
+        </div>
       </div>
-      <span className="sr-only">Загрузка YUME…</span>
+      <span className="sr-only">Загрузка YUME, {progress}%</span>
     </div>
   );
 }
