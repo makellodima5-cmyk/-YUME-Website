@@ -32,7 +32,7 @@ describe("catalog URL search validation", () => {
 
   it("rejects unsupported values and malformed numbers", () => {
     expect(validateCatalogSearch({
-      section: "admin",
+      section: "not-a-section",
       page: "1.5",
       sort: "random",
       status: "unknown",
