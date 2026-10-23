@@ -211,6 +211,7 @@ export async function handleAdminTrailers(request: Request): Promise<Response> {
       const refreshed = await queueCounts(db);
       console.info("[YUME][TRAILER_SCAN] Queue prepared.", { total: refreshed.total, pending: refreshed.pending, checked: refreshed.checked, found: refreshed.found });
       await audit(db,"trailers.scan.start","success",{total:refreshed.total,pending:refreshed.pending,checked:refreshed.checked,found:refreshed.found});
+      if (refreshed.pending === 0) await audit(db,"trailers.scan.finish","success",refreshed);
       return json({
         isAdmin: true,
         ...refreshed,
@@ -258,6 +259,7 @@ export async function handleAdminTrailers(request: Request): Promise<Response> {
     await db.batch(statements);
     const counts = await queueCounts(db);
     await audit(db,"trailers.scan.batch","success",{requested:ids.length,sourceMissing,noVideo,unusableVideo,trailersFoundInBatch,queuePending:counts.pending,queueChecked:counts.checked,queueFound:counts.found});
+    if (counts.pending === 0) await audit(db,"trailers.scan.finish","success",counts);
     console.info("[YUME][TRAILER_SCAN] Batch processed.", {
       requested: ids.length,
       returnedFromSource: fetched.items.length,
