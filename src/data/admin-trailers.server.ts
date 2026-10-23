@@ -93,6 +93,7 @@ async function authorize(request: Request, env: Environment, db: Database): Prom
     console.warn("[YUME][ADMIN_AUTH] Denied: Telegram account ID does not match configured administrator. ID values omitted.");
     return false;
   }
+  console.info("[YUME][ADMIN_AUTH] Authorized administrator session.", { path: new URL(request.url).pathname });
   return true;
 }
 
@@ -158,14 +159,25 @@ async function fetchBatch(ids: string[]): Promise<{ items: ShikimoriAnime[]; ret
 }
 
 export async function handleAdminTrailers(request: Request): Promise<Response> {
-  if (request.method !== "GET" && request.method !== "POST") return json({ error: "method_not_allowed" }, 405);
-  if (request.method === "POST" && !sameOrigin(request)) return json({ error: "cross_origin_request" }, 403);
+  if (request.method !== "GET" && request.method !== "POST") {
+    console.warn("[YUME][ADMIN_API] Rejected unsupported method.", { method: request.method });
+    return json({ error: "method_not_allowed" }, 405);
+  }
+  if (request.method === "POST" && !sameOrigin(request)) {
+    console.warn("[YUME][ADMIN_API] Rejected cross-origin mutation.");
+    return json({ error: "cross_origin_request" }, 403);
+  }
   const env = environment();
   const db = database(env);
-  if (!db) return json({ error: "database_unavailable" }, 503);
+  if (!db) {
+    console.error("[YUME][ADMIN_API] Database binding YUME_DB unavailable.");
+    return json({ error: "database_unavailable" }, 503);
+  }
+  console.info("[YUME][ADMIN_API] Request received.", { method: request.method, path: new URL(request.url).pathname });
   try {
     if (!await authorize(request, env, db)) return json({ isAdmin: false, error: "admin_required" }, 403);
     await ensureQueue(db);
+    console.info("[YUME][ADMIN_API] Queue schema ready.");
 
     if (request.method === "GET") {
       const counts = await queueCounts(db);
@@ -211,7 +223,13 @@ export async function handleAdminTrailers(request: Request): Promise<Response> {
     const counts = await queueCounts(db);
     return json({ isAdmin: true, ...counts, processed: ids.length, batchSize: BATCH_SIZE, delayMs: REQUEST_DELAY_MS, done: counts.pending === 0 });
   } catch (error) {
-    console.error("[YUME] Admin trailer update failed:", error);
+    console.error("[YUME][ADMIN_API] Admin trailer operation failed.", {
+      method: request.method,
+      path: new URL(request.url).pathname,
+      name: error instanceof Error ? error.name : "UnknownError",
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     return json({ error: "admin_operation_failed" }, 503);
   }
 }
