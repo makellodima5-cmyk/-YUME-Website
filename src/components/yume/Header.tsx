@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Home, LayoutGrid, Library, User, Menu, X, Bell, Moon, Sun, ShieldCheck, Heart, Clock3, Star, Languages, Bookmark, Megaphone, Radio, Sparkles } from "lucide-react"
 import { Logo } from "./Logo";
 import { useYumePreferences } from "@/data/preferences";
+import { getTelegramWebApp } from "@/lib/telegram-mini-app";
 
 export type View = "home" | "admin" | "catalog" | "collections" | "profile" | "popular" | "new-releases" | "announcements" | "airing" | "favorites" | "watchlist" | "history" | "privacy" | "privacy-policy" | "rules" | "rights" | "notifications";
 
@@ -22,6 +23,14 @@ type Props = {
 export function Header({ view, setView, onProfile, isAdmin = false, unreadNotificationCount = 0 }: Props) {
   const { t, theme, setTheme, language, setLanguage } = useYumePreferences();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [telegramPhotoUrl, setTelegramPhotoUrl] = useState<string | null>(null);
+  const [telegramPhotoFailed, setTelegramPhotoFailed] = useState(false);
+
+  useEffect(() => {
+    const webApp = getTelegramWebApp();
+    const user = webApp?.initData ? webApp.initDataUnsafe?.user : undefined;
+    setTelegramPhotoUrl(user?.photo_url ?? null);
+  }, []);
   // Keep primary navigation labels directly tied to the active language.
   // This prevents translation-key identifiers from ever appearing in the drawer.
   const navigationText = language === "ru"
@@ -128,7 +137,19 @@ export function Header({ view, setView, onProfile, isAdmin = false, unreadNotifi
               aria-label={t("nav.profileButton")}
               className="flex h-10 w-10 items-center justify-center rounded-full border border-primary/20 bg-primary/10 text-foreground transition hover:bg-primary/20"
             >
-              <User className="h-5 w-5" />
+              {telegramPhotoUrl && !telegramPhotoFailed ? (
+                <img
+                  src={telegramPhotoUrl}
+                  alt=""
+                  aria-hidden="true"
+                  referrerPolicy="no-referrer"
+                  decoding="async"
+                  onError={() => setTelegramPhotoFailed(true)}
+                  className="h-full w-full rounded-full object-cover"
+                />
+              ) : (
+                <User className="h-5 w-5" />
+              )}
             </button>
           </div>
         </div>
