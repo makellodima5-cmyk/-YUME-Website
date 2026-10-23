@@ -12,6 +12,8 @@ import {
 import { useEffect, useState, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
+import splashCss from "../yume-splash.css?url";
+import { YumeSplash } from "@/components/yume/YumeSplash";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { YumePreferencesProvider, useYumePreferences } from "@/data/preferences";
 import { DEFAULT_META_DESCRIPTION, SITE_NAME } from "@/data/seo";
@@ -123,6 +125,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     ],
     links: [
       { rel: "stylesheet", href: appCss },
+      { rel: "stylesheet", href: splashCss },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Unbounded:wght@500;700&display=swap&subset=cyrillic" },
@@ -183,11 +186,11 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <YumePreferencesProvider>
         <DocumentLanguageSync />
         <SkipToContent />
         <Outlet />
+        <YumeSplash contentReady={pathname !== "/"} />
       </YumePreferencesProvider>
     </QueryClientProvider>
   );
