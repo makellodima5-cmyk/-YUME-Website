@@ -71,26 +71,36 @@ async function isAdmin(request: Request, env: Env, db: DB): Promise<boolean> {
   ).bind(await sha256(token)).first<{ telegram_user_id: string | null; expires_at: number }>();
   return Boolean(session && session.expires_at > Date.now() && session.telegram_user_id === adminId);
 }
-async function ensureSchema(db: DB): Promise<void> {
-  await db.batch([
-    db.prepare("CREATE TABLE IF NOT EXISTS yume_analytics_events (id INTEGER PRIMARY KEY AUTOINCREMENT, event_date TEXT NOT NULL, event_hour INTEGER NOT NULL, visitor_hash TEXT NOT NULL, session_hash TEXT NOT NULL DEFAULT '', page_path TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)"),
-    db.prepare("CREATE INDEX IF NOT EXISTS idx_yume_analytics_date ON yume_analytics_events(event_date)"),
-    db.prepare("CREATE INDEX IF NOT EXISTS idx_yume_analytics_visitor ON yume_analytics_events(event_date, visitor_hash)"),
-  ]);
-  // Upgrade the table if an earlier analytics build created it without session IDs.
-  let addedSessionColumn = false;
-  try {
-    await db.prepare("ALTER TABLE yume_analytics_events ADD COLUMN session_hash TEXT NOT NULL DEFAULT ''").run();
-    addedSessionColumn = true;
-  } catch (error) {
-    if (!String(error).toLowerCase().includes("duplicate column")) throw error;
-  }
-  if (addedSessionColumn) {
-    // Earlier event rows cannot be sessionized precisely; estimate one legacy session per visitor/day.
-    await db.prepare("UPDATE yume_analytics_events SET session_hash = 'legacy-' || visitor_hash || '-' || event_date WHERE session_hash = ''").run();
-  }
-  await db.prepare("CREATE INDEX IF NOT EXISTS idx_yume_analytics_session ON yume_analytics_events(event_date, session_hash)").run();
+let schemaPromise: Promise<void> | null = null;
+
+function ensureSchema(db: DB): Promise<void> {
+  if (schemaPromise) return schemaPromise;
+  schemaPromise = (async () => {
+    await db.batch([
+      db.prepare("CREATE TABLE IF NOT EXISTS yume_analytics_events (id INTEGER PRIMARY KEY AUTOINCREMENT, event_date TEXT NOT NULL, event_hour INTEGER NOT NULL, visitor_hash TEXT NOT NULL, session_hash TEXT NOT NULL DEFAULT '', page_path TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)"),
+      db.prepare("CREATE INDEX IF NOT EXISTS idx_yume_analytics_date ON yume_analytics_events(event_date)"),
+      db.prepare("CREATE INDEX IF NOT EXISTS idx_yume_analytics_visitor ON yume_analytics_events(event_date, visitor_hash)"),
+    ]);
+    // Upgrade an older analytics table without session IDs.
+    let addedSessionColumn = false;
+    try {
+      await db.prepare("ALTER TABLE yume_analytics_events ADD COLUMN session_hash TEXT NOT NULL DEFAULT ''").run();
+      addedSessionColumn = true;
+    } catch (error) {
+      if (!String(error).toLowerCase().includes("duplicate column")) throw error;
+    }
+    if (addedSessionColumn) {
+      // Old rows cannot be sessionized precisely; estimate one legacy visit per visitor/day.
+      await db.prepare("UPDATE yume_analytics_events SET session_hash = 'legacy-' || visitor_hash || '-' || event_date WHERE session_hash = ''").run();
+    }
+    await db.prepare("CREATE INDEX IF NOT EXISTS idx_yume_analytics_session ON yume_analytics_events(event_date, session_hash)").run();
+  })().catch(error => {
+    schemaPromise = null;
+    throw error;
+  });
+  return schemaPromise;
 }
+
 function utcDay(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
