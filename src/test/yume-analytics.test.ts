@@ -31,9 +31,10 @@ describe("YUME analytics pageview tracking", () => {
 
   it("does not collect analytics before the site's cookie notice is acknowledged", () => {
     window.localStorage.removeItem("yume-cookie-notice-acknowledged");
+    window.localStorage.removeItem("yume-analytics-visitor-id");
     trackYumePage("/#home");
     expect(fetch).not.toHaveBeenCalled();
-    expect(window.localStorage.getItem("yume-analytics-visitor-id")).toBe(visitorId);
+    expect(window.localStorage.getItem("yume-analytics-visitor-id")).toBeNull();
   });
 
   it("sends a sanitized route and a pseudonymous session token", () => {
