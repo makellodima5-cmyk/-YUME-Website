@@ -4,6 +4,9 @@
   "compatibility_date": "2026-10-20",
   "compatibility_flags": ["nodejs_compat"],
   "main": ".output/server/index.mjs",
+  "triggers": {
+    "crons": ["* * * * *"]
+  },
   "observability": {
     "enabled": true
   },
