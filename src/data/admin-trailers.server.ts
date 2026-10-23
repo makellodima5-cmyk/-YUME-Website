@@ -223,6 +223,7 @@ export async function handleAdminTrailers(request: Request): Promise<Response> {
     let sourceMissing = 0;
     let noVideo = 0;
     let unusableVideo = 0;
+    let trailersFoundInBatch = 0;
     const statements: Statement[] = [];
     for (const id of ids) {
       const item = fetched.items.find((candidate) => String(candidate.id) === id);
@@ -230,6 +231,7 @@ export async function handleAdminTrailers(request: Request): Promise<Response> {
       if (!returnedIds.has(id)) sourceMissing += 1;
       else if (!item?.videos?.length) noVideo += 1;
       else if (!found) unusableVideo += 1;
+      if (found) trailersFoundInBatch += 1;
       if (found) {
         statements.push(db.prepare("UPDATE anime_catalog SET youtube_trailer_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND (youtube_trailer_id IS NULL OR youtube_trailer_id = '')").bind(found, id));
       }
@@ -243,7 +245,7 @@ export async function handleAdminTrailers(request: Request): Promise<Response> {
       sourceMissing,
       noVideo,
       unusableVideo,
-      trailersFoundInBatch: ids.length - sourceMissing - noVideo - unusableVideo - (ids.filter((id) => !byId.get(id)).length - sourceMissing - noVideo - unusableVideo),
+      trailersFoundInBatch,
       queuePending: counts.pending,
       queueChecked: counts.checked,
       queueFound: counts.found,
