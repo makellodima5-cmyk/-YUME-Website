@@ -104,8 +104,8 @@ function visit(path: string, sessionId: string, userAgent = "YUME Analytics Test
 
 describe("YUME server analytics", () => {
   beforeEach(() => {
-    state.rows = [];
-    state.nextId = 1;
+    db.rows = [];
+    db.nextId = 1;
     runtime.__YUME_RUNTIME_ENV__ = { YUME_DB: db, TELEGRAM_ADMIN_ID: "12345" };
   });
 
@@ -121,26 +121,26 @@ describe("YUME server analytics", () => {
     });
     const response = await handleYumeAnalytics(request);
     expect(response.status).toBe(403);
-    expect(state.rows).toHaveLength(0);
+    expect(db.rows).toHaveLength(0);
   });
 
   it("stores only hashed visitor and session identifiers", async () => {
     const sessionId = "00000000-0000-4000-8000-000000000001";
     const response = await handleYumeAnalytics(visit("/#home", sessionId));
     expect(response.status).toBe(200);
-    expect(state.rows).toHaveLength(1);
-    expect(state.rows[0]?.page_path).toBe("/#home");
-    expect(state.rows[0]?.visitor_hash).toMatch(/^[a-f0-9]{64}$/);
-    expect(state.rows[0]?.session_hash).toMatch(/^[a-f0-9]{64}$/);
-    expect(state.rows[0]?.session_hash).not.toBe(sessionId);
-    expect(JSON.stringify(state.rows)).not.toContain("203.0.113.20");
+    expect(db.rows).toHaveLength(1);
+    expect(db.rows[0]?.page_path).toBe("/#home");
+    expect(db.rows[0]?.visitor_hash).toMatch(/^[a-f0-9]{64}$/);
+    expect(db.rows[0]?.session_hash).toMatch(/^[a-f0-9]{64}$/);
+    expect(db.rows[0]?.session_hash).not.toBe(sessionId);
+    expect(JSON.stringify(db.rows)).not.toContain("203.0.113.20");
   });
 
   it("counts sessions separately from pageviews and protects analytics stats", async () => {
     const sessionId = "00000000-0000-4000-8000-000000000001";
     await handleYumeAnalytics(visit("/#home", sessionId));
     await handleYumeAnalytics(visit("/#catalog", sessionId));
-    expect(state.rows).toHaveLength(2);
+    expect(db.rows).toHaveLength(2);
 
     const anonymous = await handleYumeAnalytics(new Request("https://yume.test/api/analytics"));
     expect(anonymous.status).toBe(401);
