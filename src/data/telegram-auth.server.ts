@@ -90,7 +90,21 @@ function jsonResponse(payload: unknown, status = 200, cookies: string[] = []): R
   return new Response(JSON.stringify(payload), { status, headers });
 }
 
-async function ensureSchema(db: TelegramDatabase): Promise<void> {
+const telegramSchemaPromises = new WeakMap<object, Promise<void>>();
+
+function ensureSchema(db: TelegramDatabase): Promise<void> {
+  const key = db as object;
+  const cached = telegramSchemaPromises.get(key);
+  if (cached) return cached;
+  const pending = initializeTelegramSchema(db).catch((error) => {
+    telegramSchemaPromises.delete(key);
+    throw error;
+  });
+  telegramSchemaPromises.set(key, pending);
+  return pending;
+}
+
+async function initializeTelegramSchema(db: TelegramDatabase): Promise<void> {
   const existing = await db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'yume_users'").first<{ sql: string }>();
   // The nullable date field is a temporary compatibility bridge for older migration history.
   // Migration 0005 removes it from the final schema.
@@ -165,11 +179,21 @@ async function upsertTelegramUser(db: TelegramDatabase, user: TelegramValidatedU
 
 const MAX_LIBRARY_BODY_CHARS = 64_000;
 
-async function ensureSavedAnimeSchema(db: TelegramDatabase): Promise<void> {
-  await db.batch([
+const savedAnimeSchemaPromises = new WeakMap<object, Promise<void>>();
+
+function ensureSavedAnimeSchema(db: TelegramDatabase): Promise<void> {
+  const key = db as object;
+  const cached = savedAnimeSchemaPromises.get(key);
+  if (cached) return cached;
+  const pending = db.batch([
     db.prepare("CREATE TABLE IF NOT EXISTS yume_saved_anime (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT NOT NULL REFERENCES yume_users(id) ON DELETE CASCADE, list_type TEXT NOT NULL CHECK (list_type IN ('favorite', 'watchlist')), anime_id TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, UNIQUE (user_id, list_type, anime_id))"),
     db.prepare("CREATE INDEX IF NOT EXISTS idx_yume_saved_anime_user_list ON yume_saved_anime (user_id, list_type, created_at)"),
-  ]);
+  ]).then(() => undefined).catch((error) => {
+    savedAnimeSchemaPromises.delete(key);
+    throw error;
+  });
+  savedAnimeSchemaPromises.set(key, pending);
+  return pending;
 }
 
 type SavedListType = "favorite" | "watchlist";
@@ -375,7 +399,14 @@ export async function handleTelegramSession(request: Request): Promise<Response>
     else {
       await db.prepare("UPDATE yume_users SET telegram_first_name = ?, telegram_last_name = ?, telegram_username = ?, telegram_language_code = ? WHERE telegram_user_id = ?")
         .bind(validated.user.firstName, validated.user.lastName ?? null, validated.user.username ?? null, validated.user.languageCode ?? null, String(validated.user.id)).run();
-      user = await findTelegramUser(db, validated.user.id);
+      // The existing row was already selected above; reuse the updated payload instead of issuing the same SELECT again.
+      user = {
+        ...user,
+        telegram_first_name: validated.user.firstName,
+        telegram_last_name: validated.user.lastName ?? null,
+        telegram_username: validated.user.username ?? null,
+        telegram_language_code: validated.user.languageCode ?? null,
+      };
     }
     if (!user) throw new Error("TELEGRAM_USER_UPSERT_FAILED");
     const cookie = await createSession(db, user.id);
