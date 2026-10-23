@@ -170,7 +170,7 @@ async function upsertTelegramUser(db: TelegramDatabase, user: TelegramValidatedU
     await db.prepare("INSERT OR IGNORE INTO yume_users (id, provider, provider_user_id, telegram_user_id, telegram_first_name, telegram_last_name, telegram_username, telegram_language_code, privacy_consent_at, privacy_policy_version) VALUES (?, 'telegram', ?, ?, ?, ?, ?, ?, ?, ?)")
       .bind(crypto.randomUUID(), telegramId, telegramId, user.firstName, user.lastName ?? null, user.username ?? null, user.languageCode ?? null, new Date().toISOString(), PRIVACY_POLICY_VERSION).run();
   } else {
-    await db.prepare("UPDATE yume_users SET telegram_first_name = ?, telegram_last_name = ?, telegram_username = ?, telegram_language_code = ? WHERE telegram_user_id = ? AND (telegram_first_name IS NOT ? OR telegram_last_name IS NOT ? OR telegram_username IS NOT ? OR telegram_language_code IS NOT ?)")
+    await db.prepare("UPDATE yume_users SET telegram_first_name = ?, telegram_last_name = ?, telegram_username = ?, telegram_language_code = ? WHERE telegram_user_id = ?")
       .bind(user.firstName, user.lastName ?? null, user.username ?? null, user.languageCode ?? null, telegramId).run();
   }
   return findTelegramUser(db, user.id);
@@ -397,8 +397,8 @@ export async function handleTelegramSession(request: Request): Promise<Response>
     }
     if (!user) user = await upsertTelegramUser(db, validated.user);
     else {
-      await db.prepare("UPDATE yume_users SET telegram_first_name = ?, telegram_last_name = ?, telegram_username = ?, telegram_language_code = ? WHERE telegram_user_id = ?")
-        .bind(validated.user.firstName, validated.user.lastName ?? null, validated.user.username ?? null, validated.user.languageCode ?? null, String(validated.user.id), validated.user.firstName, validated.user.lastName ?? null, validated.user.username ?? null, validated.user.languageCode ?? null).run();
+      await db.prepare("UPDATE yume_users SET telegram_first_name = ?, telegram_last_name = ?, telegram_username = ?, telegram_language_code = ? WHERE telegram_user_id = ? AND (telegram_first_name IS NOT ? OR telegram_last_name IS NOT ? OR telegram_username IS NOT ? OR telegram_language_code IS NOT ?)")
+        .bind(validated.user.firstName, validated.user.lastName ?? null, validated.user.username ?? null, validated.user.languageCode ?? null, String(validated.user.id)).run();
       // The existing row was already selected above; reuse the updated payload instead of issuing the same SELECT again.
       user = {
         ...user,
