@@ -505,7 +505,7 @@ function Index() {
     const payload = await response.json().catch(() => ({})) as {isAdmin?:boolean;error?:string;quality?:typeof catalogQuality;qualitySummary?:typeof catalogQualitySummary;auditLog?:typeof adminAuditLog};
     if (!response.ok || payload.isAdmin !== true) throw new Error(payload.error ?? (language === "ru" ? "Не удалось обновить список." : "Could not refresh catalog."));
     setCatalogQuality(payload.quality ?? []);
-    setCatalogQualitySummary(payload.qualitySummary ?? {total:0,missingYear:0,missingPoster:0,missingDescription:0});
+    setCatalogQualitySummary(payload.qualitySummary ?? {total:0,incomplete:0,missingYear:0,missingPoster:0,missingDescription:0});
     setAdminAuditLog(payload.auditLog ?? []);
   };
 
@@ -541,7 +541,7 @@ function Index() {
       if (!response.ok || payload.isAdmin !== true || !payload.maintenance) throw new Error(payload.error ?? (language === "ru" ? "Проверка не удалась." : "Maintenance check failed."));
       const report = payload.maintenance;
       setMaintenanceMessage(report.ok
-        ? (language === "ru" ? "База доступна. Записей: " + report.catalogRecords + ". Записей с проблемами: " + report.qualitySummary.total + ". Проверено: " + new Date(report.checkedAt).toLocaleString("ru-RU") + "." : "Database is healthy. Records: " + report.catalogRecords + ". Records with missing fields: " + report.qualitySummary.total + ". Checked: " + new Date(report.checkedAt).toLocaleString() + ".")
+        ? (language === "ru" ? "База доступна. Записей: " + report.catalogRecords + ". Записей с проблемами: " + report.qualitySummary.incomplete + ". Проверено: " + new Date(report.checkedAt).toLocaleString("ru-RU") + "." : "Database is healthy. Records: " + report.catalogRecords + ". Records with missing fields: " + report.qualitySummary.incomplete + ". Checked: " + new Date(report.checkedAt).toLocaleString() + ".")
         : (language === "ru" ? "Проверка базы не пройдена." : "Database health check failed."));
       await refreshCatalogQuality();
     } catch (error) {
@@ -1205,7 +1205,7 @@ function Index() {
                   <span className="rounded-full border border-border px-3 py-1 text-xs text-muted-foreground">{language === "ru" ? "Всего в каталоге: " : "Catalog total: "}{catalogQualitySummary.total}</span>
                 </div>
                 <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                  <button type="button" onClick={() => setCatalogFilter("all")} className={"rounded-xl border p-3 text-left " + (catalogFilter==="all" ? "border-primary bg-primary/10" : "border-border bg-background/50")}><span className="block text-xs text-muted-foreground">{language === "ru" ? "Без года или постера/описания" : "Records with missing fields"}</span><strong className="mt-1 block text-xl tabular-nums">{catalogQualitySummary.incomplete}</strong></button>
+                  <button type="button" onClick={() => setCatalogFilter("all")} className={"rounded-xl border p-3 text-left " + (catalogFilter==="all" ? "border-primary bg-primary/10" : "border-border bg-background/50")}><span className="block text-xs text-muted-foreground">{language === "ru" ? "Неполные записи" : "Records with missing fields"}</span><strong className="mt-1 block text-xl tabular-nums">{catalogQualitySummary.incomplete}</strong></button>
                   <button type="button" onClick={() => setCatalogFilter("year")} className={"rounded-xl border p-3 text-left " + (catalogFilter==="year" ? "border-primary bg-primary/10" : "border-border bg-background/50")}><span className="block text-xs text-muted-foreground">{language === "ru" ? "Без года" : "Missing year"}</span><strong className="mt-1 block text-xl tabular-nums">{catalogQualitySummary.missingYear}</strong></button>
                   <button type="button" onClick={() => setCatalogFilter("poster")} className={"rounded-xl border p-3 text-left " + (catalogFilter==="poster" ? "border-primary bg-primary/10" : "border-border bg-background/50")}><span className="block text-xs text-muted-foreground">{language === "ru" ? "Без постера" : "Missing poster"}</span><strong className="mt-1 block text-xl tabular-nums">{catalogQualitySummary.missingPoster}</strong></button>
                   <button type="button" onClick={() => setCatalogFilter("description")} className={"rounded-xl border p-3 text-left " + (catalogFilter==="description" ? "border-primary bg-primary/10" : "border-border bg-background/50")}><span className="block text-xs text-muted-foreground">{language === "ru" ? "Без описания" : "Missing description"}</span><strong className="mt-1 block text-xl tabular-nums">{catalogQualitySummary.missingDescription}</strong></button>
