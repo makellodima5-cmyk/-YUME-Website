@@ -79,13 +79,24 @@ async function authenticatedUserId(request: Request, db: Database): Promise<stri
   return session.user_id;
 }
 
-async function ensureSchema(db: Database): Promise<void> {
-  await db.batch([
+const notificationSchemaPromises = new WeakMap<object, Promise<void>>();
+
+function ensureSchema(db: Database): Promise<void> {
+  const key = db as object;
+  const cached = notificationSchemaPromises.get(key);
+  if (cached) return cached;
+  const pending = db.batch([
     db.prepare("CREATE TABLE IF NOT EXISTS yume_notification_reads (user_id TEXT NOT NULL REFERENCES yume_users(id) ON DELETE CASCADE, notification_id TEXT NOT NULL, read_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (user_id, notification_id))"),
-    db.prepare("CREATE INDEX IF NOT EXISTS idx_yume_notification_reads_user ON yume_notification_reads(user_id)"),
     db.prepare("CREATE TABLE IF NOT EXISTS yume_notification_dismissals (user_id TEXT NOT NULL REFERENCES yume_users(id) ON DELETE CASCADE, notification_id TEXT NOT NULL, dismissed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (user_id, notification_id))"),
-    db.prepare("CREATE INDEX IF NOT EXISTS idx_yume_notification_dismissals_user ON yume_notification_dismissals(user_id)"),
-  ]);
+    // Composite primary keys already index each table by user_id; the separate user-only indexes are redundant.
+    db.prepare("DROP INDEX IF EXISTS idx_yume_notification_reads_user"),
+    db.prepare("DROP INDEX IF EXISTS idx_yume_notification_dismissals_user"),
+  ]).then(() => undefined).catch((error) => {
+    notificationSchemaPromises.delete(key);
+    throw error;
+  });
+  notificationSchemaPromises.set(key, pending);
+  return pending;
 }
 
 async function readIds(db: Database, userId: string): Promise<string[]> {
