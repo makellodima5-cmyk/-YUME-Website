@@ -110,7 +110,8 @@ html[data-yume-splash-active="true"] body {
   animation: yume-splash-logo-letter-light 7.2s cubic-bezier(.22, .7, .25, 1) 650ms both,
     yume-splash-logo-glow 2.8s ease-in-out 7.8s infinite alternate;
 }
-.yume-splash__logo img {
+.yume-splash__logo img,
+.yume-splash__logo-lit img {
   display: block;
   width: 100%;
   height: auto;
