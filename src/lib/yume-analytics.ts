@@ -19,6 +19,12 @@ export function trackYumePage(path: string): void {
   if (typeof window === "undefined") return;
   const safePath = path.startsWith("/") ? path.split("?")[0].slice(0, 180) : "/";
   const now = Date.now();
+  try {
+    // The site's existing cookie notice must be acknowledged before persistent analytics IDs are created.
+    if (window.localStorage.getItem("yume-cookie-notice-acknowledged") !== "true") return;
+  } catch {
+    return;
+  }
 
   let sessionId: string;
   let visitorId: string;
