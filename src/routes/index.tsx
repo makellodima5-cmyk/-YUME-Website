@@ -341,6 +341,7 @@ function Index() {
       setTelegramAuthError("");
       setTelegramConsentPending(false);
       setTelegramConsentRequired(false);
+      setAdminCheckVersion((version) => version + 1);
     }).catch(() => {
       if (!cancelled) setTelegramAuthError(language === "ru"
         ? "Не удалось связаться с сервером авторизации."
@@ -348,6 +349,43 @@ function Index() {
     });
     return () => { cancelled = true; };
   }, [isTelegramMiniApp, language]);
+
+  useEffect(() => {
+    if (!isTelegramMiniApp || adminCheckVersion === 0 || telegramConsentRequired || telegramConsentPending) return;
+    let cancelled = false;
+    fetch("/api/admin/trailers", { credentials: "same-origin", cache: "no-store" })
+      .then(async (response) => {
+        const result = await response.json().catch(() => ({})) as {
+          isAdmin?: boolean;
+          total?: number;
+          pending?: number;
+          checked?: number;
+          found?: number;
+          missing?: number;
+        };
+        if (cancelled) return;
+        if (!response.ok || result.isAdmin !== true) {
+          setIsAdmin(false);
+          setAdminStats(null);
+          return;
+        }
+        setIsAdmin(true);
+        setAdminStats({
+          total: Number(result.total ?? 0),
+          pending: Number(result.pending ?? 0),
+          checked: Number(result.checked ?? 0),
+          found: Number(result.found ?? 0),
+          missing: Number(result.missing ?? 0),
+        });
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setIsAdmin(false);
+          setAdminStats(null);
+        }
+      });
+    return () => { cancelled = true; };
+  }, [isTelegramMiniApp, adminCheckVersion, telegramConsentRequired, telegramConsentPending]);
 
   useEffect(() => {
     if (isTelegramMiniApp && telegramConsentPending && view !== "privacy-policy") {
@@ -397,6 +435,7 @@ function Index() {
       }
       setTelegramConsentPending(false);
       setTelegramConsentRequired(false);
+      setAdminCheckVersion((version) => version + 1);
     } catch {
       setTelegramAuthError(language === "ru"
         ? "Не удалось связаться с сервером авторизации."
