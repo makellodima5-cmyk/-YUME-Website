@@ -293,6 +293,10 @@ function Index() {
   const [adminStats, setAdminStats] = useState<AdminTrailerStats | null>(null);
   const [adminRunning, setAdminRunning] = useState(false);
   const [adminMessage, setAdminMessage] = useState("");
+  const [adminImportTarget, setAdminImportTarget] = useState("50");
+  const [adminImportRunning, setAdminImportRunning] = useState(false);
+  const [adminImport, setAdminImport] = useState<{target:number;cursor:number;added:number;skipped:number;incomplete:number;errors:number;state:string;delayMs?:number}>({target:0,cursor:1,added:0,skipped:0,incomplete:0,errors:0,state:"idle"});
+  const [adminImportMessage, setAdminImportMessage] = useState("");
   const [cookieNoticeAcknowledged, setCookieNoticeAcknowledged] = useState(true);
 
   useEffect(() => {
@@ -470,6 +474,63 @@ function Index() {
       });
     } finally {
       setAdminRunning(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    let cancelled = false;
+    fetch("/api/admin/catalog-import", { credentials: "same-origin", cache: "no-store" })
+      .then(async response => ({ response, payload: await response.json().catch(() => ({})) as {isAdmin?:boolean;target?:number;cursor?:number;added?:number;skipped?:number;incomplete?:number;errors?:number;state?:string;delayMs?:number} }))
+      .then(({response,payload}) => {
+        if (cancelled || !response.ok || payload.isAdmin !== true) return;
+        setAdminImport({target:payload.target ?? 0,cursor:payload.cursor ?? 1,added:payload.added ?? 0,skipped:payload.skipped ?? 0,incomplete:payload.incomplete ?? 0,errors:payload.errors ?? 0,state:payload.state ?? "idle",delayMs:payload.delayMs});
+      }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [isAdmin]);
+
+  const runCatalogImport = async () => {
+    if (!isAdmin || adminImportRunning) return;
+    const target = Number(adminImportTarget);
+    if (adminImport.state !== "running" && (!Number.isInteger(target) || target < 1 || target > 500)) {
+      setAdminImportMessage(language === "ru" ? "Укажи целое число от 1 до 500." : "Enter a whole number from 1 to 500.");
+      return;
+    }
+    setAdminImportRunning(true);
+    setAdminImportMessage("");
+    try {
+      if (adminImport.state !== "running") {
+        const start = await fetch("/api/admin/catalog-import", {method:"POST",credentials:"same-origin",cache:"no-store",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"start",target})});
+        const started = await start.json().catch(() => ({})) as typeof adminImport & {isAdmin?:boolean;error?:string;message?:string};
+        if (!start.ok || started.isAdmin !== true) throw new Error(started.error ?? (language === "ru" ? "Не удалось запустить импорт." : "Could not start import."));
+        setAdminImport(started);
+      }
+      for (let requestCount=0; requestCount<120; requestCount++) {
+        const response = await fetch("/api/admin/catalog-import", {method:"POST",credentials:"same-origin",cache:"no-store",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"step"})});
+        const payload = await response.json().catch(() => ({})) as typeof adminImport & {isAdmin?:boolean;error?:string;retryAfterMs?:number;message?:string};
+        if (payload.isAdmin !== true) throw new Error(payload.error ?? (language === "ru" ? "Доступ к импорту отклонён." : "Import access denied."));
+        setAdminImport(payload);
+        if (response.status === 503) {
+          setAdminImportMessage((payload.error ?? (language === "ru" ? "Shikimori временно недоступен." : "Shikimori is temporarily unavailable.")) + (language === "ru" ? " Прогресс сохранён; повтори запуск позже." : " Progress saved; resume later."));
+          return;
+        }
+        if (!response.ok) throw new Error(payload.error ?? "Import request failed");
+        if (payload.state !== "running") {
+          setAdminImportMessage(language === "ru"
+            ? (payload.state === "completed" ? "Импорт завершён." : "Импорт остановлен: достигнут предел доступных страниц.")
+            : (payload.state === "completed" ? "Import completed." : "Import stopped: available page limit reached."));
+          return;
+        }
+        setAdminImportMessage(language === "ru"
+          ? `Добавлено ${payload.added} из ${payload.target}; пропущено дубликатов: ${payload.skipped}. Страница источника: ${Math.max(1,(payload.cursor ?? 2)-1)}.`
+          : `Added ${payload.added} of ${payload.target}; duplicates skipped: ${payload.skipped}. Source page: ${Math.max(1,(payload.cursor ?? 2)-1)}.`);
+        await new Promise(resolve => setTimeout(resolve, Math.min(5000, Math.max(1000, payload.delayMs ?? 1500))));
+      }
+      setAdminImportMessage(language === "ru" ? "Импорт поставлен на паузу для ограничения нагрузки. Нажми «Продолжить импорт»." : "Import paused to limit load. Press Resume import.");
+    } catch (error) {
+      setAdminImportMessage(error instanceof Error ? error.message : (language === "ru" ? "Ошибка импорта." : "Import failed."));
+    } finally {
+      setAdminImportRunning(false);
     }
   };
 
@@ -1040,6 +1101,33 @@ function Index() {
                   </span>
                 </div>
                 {adminMessage && <p className="mt-3 rounded-xl border border-border bg-background/60 p-3 text-sm" role="status">{adminMessage}</p>}
+              </section>
+              <section className="mb-5 rounded-2xl border border-primary/30 bg-card p-4 shadow-lg" aria-label={language === "ru" ? "Пополнение каталога" : "Catalog import"}>
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="h-5 w-5 text-primary" />
+                  <h2 className="text-lg font-semibold">{language === "ru" ? "Пополнение каталога из Shikimori" : "Import catalogue from Shikimori"}</h2>
+                </div>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  {language === "ru" ? "Укажи, сколько новых аниме добавить. Дубликаты пропускаются, неполные записи сохраняются для последующего восстановления. Импорт можно продолжить после паузы." : "Choose how many new anime to add. Duplicates are skipped and incomplete records are retained for later repair. Import can resume after a pause."}
+                </p>
+                <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+                  <label className="text-sm">
+                    <span className="mb-1 block text-muted-foreground">{language === "ru" ? "Количество новых записей (1–500)" : "Number of new records (1–500)"}</span>
+                    <input type="number" min={1} max={500} step={1} value={adminImportTarget} onChange={event => setAdminImportTarget(event.target.value)} disabled={adminImportRunning || adminImport.state === "running"} className="h-11 w-full rounded-xl border border-border bg-background px-3" />
+                  </label>
+                  <button type="button" onClick={runCatalogImport} disabled={adminImportRunning || (adminImport.state !== "running" && (!Number.isInteger(Number(adminImportTarget)) || Number(adminImportTarget)<1 || Number(adminImportTarget)>500))} className="self-end rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground disabled:cursor-wait disabled:opacity-50">
+                    {adminImportRunning ? (language === "ru" ? "Импорт…" : "Importing…") : adminImport.state === "running" ? (language === "ru" ? "Продолжить импорт" : "Resume import") : (language === "ru" ? "Начать импорт" : "Start import")}
+                  </button>
+                </div>
+                <div className="mt-4 grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
+                  <div className="rounded-xl bg-background/70 p-3"><span className="block text-muted-foreground">{language === "ru" ? "Добавлено" : "Added"}</span><strong>{adminImport.added} / {adminImport.target}</strong></div>
+                  <div className="rounded-xl bg-background/70 p-3"><span className="block text-muted-foreground">{language === "ru" ? "Дубликаты" : "Duplicates"}</span><strong>{adminImport.skipped}</strong></div>
+                  <div className="rounded-xl bg-background/70 p-3"><span className="block text-muted-foreground">{language === "ru" ? "Неполные записи" : "Incomplete records"}</span><strong>{adminImport.incomplete}</strong></div>
+                  <div className="rounded-xl bg-background/70 p-3"><span className="block text-muted-foreground">{language === "ru" ? "Ошибки источника" : "Source errors"}</span><strong>{adminImport.errors}</strong></div>
+                </div>
+                {adminImportRunning && <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted" role="progressbar" aria-valuemin={0} aria-valuemax={adminImport.target || 1} aria-valuenow={adminImport.added}><div className="h-full rounded-full bg-primary transition-all" style={{width:`${adminImport.target ? Math.min(100,adminImport.added/adminImport.target*100) : 0}%`}} /></div>}
+                <p className="mt-3 text-xs text-muted-foreground">{language === "ru" ? `Состояние: ${adminImport.state}. Страница Shikimori: ${adminImport.cursor}.` : `Status: ${adminImport.state}. Shikimori page: ${adminImport.cursor}.`}</p>
+                {adminImportMessage && <p className="mt-3 rounded-xl border border-border bg-background/60 p-3 text-sm" role="status">{adminImportMessage}</p>}
               </section>
               <section className="rounded-2xl border border-primary/30 bg-card p-4 shadow-lg" aria-label="Панель администратора">
                 <div className="flex items-center gap-2">
