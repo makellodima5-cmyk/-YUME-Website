@@ -308,21 +308,31 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
             setMeta(db,"admin_import_baseline_incomplete",String(before.incomplete)),
           ]);
         }
+        const sourceIds = Array.from(new Set(source.map(item => String(item.id)).filter(id => /^\d{1,20}$/.test(id)));
+        const existingRows = sourceIds.length
+          ? await db.prepare("SELECT id FROM anime_catalog WHERE id IN (" + sourceIds.map(() => "?").join(",") + ")").bind(...sourceIds).all<{id:string}>()
+          : {results:[] as {id:string}[]};
+        const existingIds = new Set(existingRows.results.map(row => row.id));
+        const seen = new Set<string>();
         const currentCount = await db.prepare("SELECT COUNT(*) AS count FROM anime_catalog").first<{count:number}>();
         let position = Number(currentCount?.count ?? 0);
-        const prepared: {statement:Statement;item:ReturnType<typeof mapItem>}[] = [];
-        for (const sourceItem of source) {
-          if (prepared.length + before.added >= before.target) break;
-          const item = mapItem(sourceItem);
-          const statement = db.prepare("INSERT OR IGNORE INTO anime_catalog (id,title,english_title,original_title,year,episodes,rating,genres_json,status,description,hue,glyph,is_new,popular,poster_url,banner_url,kind,age_rating,next_episode_at,episodes_aired,aired_on,studios_json,youtube_trailer_id,position,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)")
-            .bind(item.id,item.title,item.english_title,item.original_title,item.year,item.episodes,item.rating,item.genres_json,item.status,item.description,item.hue,item.glyph,item.is_new,item.popular,item.poster_url,item.banner_url,item.kind,item.age_rating,item.next_episode_at,item.episodes_aired,item.aired_on,item.studios_json,item.youtube_trailer_id,position++);
-          prepared.push({item,statement});
-        }
+        let addedCandidates = 0;
         const statements: Statement[] = [];
-        for (const entry of prepared) {
-          statements.push(entry.statement);
+        for (const sourceItem of source) {
+          const sourceId = String(sourceItem.id);
+          if (seen.has(sourceId)) continue;
+          seen.add(sourceId);
+          if (before.added + addedCandidates >= before.target) break;
+          if (existingIds.has(sourceId)) {
+            statements.push(db.prepare("INSERT OR IGNORE INTO admin_catalog_import_items (run_id,anime_id,outcome,incomplete) VALUES (?,?,'skipped',0)").bind(runId,sourceId));
+            continue;
+          }
+          const item = mapItem(sourceItem);
+          statements.push(db.prepare("INSERT OR IGNORE INTO anime_catalog (id,title,english_title,original_title,year,episodes,rating,genres_json,status,description,hue,glyph,is_new,popular,poster_url,banner_url,kind,age_rating,next_episode_at,episodes_aired,aired_on,studios_json,youtube_trailer_id,position,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)")
+            .bind(item.id,item.title,item.english_title,item.original_title,item.year,item.episodes,item.rating,item.genres_json,item.status,item.description,item.hue,item.glyph,item.is_new,item.popular,item.poster_url,item.banner_url,item.kind,item.age_rating,item.next_episode_at,item.episodes_aired,item.aired_on,item.studios_json,item.youtube_trailer_id,position++));
           statements.push(db.prepare("INSERT OR IGNORE INTO admin_catalog_import_items (run_id,anime_id,outcome,incomplete) VALUES (?,?,CASE WHEN changes() > 0 THEN 'added' ELSE 'skipped' END,?)")
-            .bind(runId,entry.item.id,incomplete(entry.item)?1:0));
+            .bind(runId,item.id,incomplete(item)?1:0));
+          addedCandidates++;
         }
         const resumeAtValue = String(Date.now()+REQUEST_DELAY_MS);
         statements.push(db.prepare("UPDATE anime_catalog_meta SET value = CAST(CAST((SELECT value FROM anime_catalog_meta WHERE key = 'admin_import_baseline_added') AS INTEGER) + (SELECT COUNT(*) FROM admin_catalog_import_items WHERE run_id = ? AND outcome = 'added') AS TEXT) WHERE key = 'admin_import_added'").bind(runId));
