@@ -121,7 +121,6 @@ function ensureQueue(db: Database): Promise<void> {
     db.prepare("CREATE INDEX IF NOT EXISTS idx_anime_trailer_queue_status ON anime_trailer_update_queue(status, anime_id)"),
     db.prepare("CREATE TABLE IF NOT EXISTS yume_admin_audit_log (id INTEGER PRIMARY KEY AUTOINCREMENT, action TEXT NOT NULL, status TEXT NOT NULL, details TEXT NOT NULL DEFAULT '{}', actor_telegram_id TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)"),
     db.prepare("CREATE TABLE IF NOT EXISTS yume_trailer_auto_state (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL)"),
-    db.prepare("CREATE INDEX IF NOT EXISTS idx_anime_catalog_missing_trailer ON anime_catalog(id) WHERE youtube_trailer_id IS NULL OR youtube_trailer_id = ''"),
   ]).then(() => undefined).catch((error) => {
     trailerSchemaPromises.delete(key);
     throw error;
