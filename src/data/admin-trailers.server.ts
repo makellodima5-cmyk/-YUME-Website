@@ -69,13 +69,31 @@ function sameOrigin(request: Request): boolean {
 
 async function authorize(request: Request, env: Environment, db: Database): Promise<boolean> {
   const adminId = typeof env.TELEGRAM_ADMIN_ID === "string" ? env.TELEGRAM_ADMIN_ID.trim() : "";
-  if (!/^\d{1,20}$/.test(adminId)) return false;
+  if (!/^\d{1,20}$/.test(adminId)) {
+    console.error("[YUME][ADMIN_AUTH] Configuration invalid: TELEGRAM_ADMIN_ID must contain only digits.");
+    return false;
+  }
   const token = cookieValue(request, SESSION_COOKIE);
-  if (!token) return false;
+  if (!token) {
+    console.warn("[YUME][ADMIN_AUTH] Denied: session cookie missing.", { path: new URL(request.url).pathname });
+    return false;
+  }
   const session = await db.prepare(
     "SELECT u.telegram_user_id, s.expires_at FROM yume_sessions s JOIN yume_users u ON u.id = s.user_id WHERE s.token_hash = ? AND u.provider = 'telegram'",
   ).bind(await sha256Hex(token)).first<{ telegram_user_id: string | null; expires_at: number }>();
-  return Boolean(session && session.expires_at > Date.now() && session.telegram_user_id === adminId);
+  if (!session) {
+    console.warn("[YUME][ADMIN_AUTH] Denied: session hash not found or user is not a Telegram account.", { path: new URL(request.url).pathname });
+    return false;
+  }
+  if (session.expires_at <= Date.now()) {
+    console.warn("[YUME][ADMIN_AUTH] Denied: session expired.");
+    return false;
+  }
+  if (session.telegram_user_id !== adminId) {
+    console.warn("[YUME][ADMIN_AUTH] Denied: Telegram account ID does not match configured administrator. ID values omitted.");
+    return false;
+  }
+  return true;
 }
 
 async function queueCounts(db: Database): Promise<{ total: number; pending: number; checked: number; found: number }> {
