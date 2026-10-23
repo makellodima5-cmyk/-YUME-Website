@@ -10,6 +10,8 @@ import { CollectionsGrid, Grid, Hero, Row } from "@/components/yume/Sections";
 import { CatalogFilters, EMPTY_CATALOG_FILTERS, type CatalogFiltersValue } from "@/components/yume/CatalogFilters";
 import { Profile } from "@/components/yume/Profile";
 import { Footer } from "@/components/yume/Footer";
+import { HomePetals } from "@/components/yume/HomePetals";
+import "../home-petals.css";
 import { useYumePreferences, displayGenre, type TranslationKey } from "@/data/preferences";
 import { filterAndSortCatalog, getCatalogPageCount, paginateCatalog } from "@/data/catalog-utils";
 import { validateCatalogSearch } from "@/data/catalog-search";
@@ -1153,7 +1155,9 @@ function Index() {
   const totalAiringPages = Math.max(1, Math.ceil(airingAnime.length / catalogPageSize));
   const visibleAiringAnime = airingAnime.slice((airingPage - 1) * catalogPageSize, airingPage * catalogPageSize);
   return (
-    <div className="min-h-screen pb-8">
+    <div className="relative isolate min-h-screen pb-8">
+      {view === "home" && <HomePetals />}
+      <div className="relative z-10">
       <Header view={view} setView={setView} onProfile={() => setView("profile")} isAdmin={isAdmin} unreadNotificationCount={notificationStateLoaded ? USER_NOTIFICATIONS.filter((item) => !notificationReadIds.includes(item.id) && !notificationDismissedIds.includes(item.id)).length : 0} />
       {isTelegramMiniApp && telegramConsentRequired && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-background/85 px-4 py-6 backdrop-blur-md" role="dialog" aria-modal="true" aria-labelledby="telegram-consent-title">
@@ -1711,6 +1715,7 @@ function Index() {
       {!["profile", "favorites", "watchlist", "privacy", "privacy-policy", "rules", "rights"].includes(view) && (
         <Footer onNavigate={setView} />
       )}
+      </div>
     </div>
   );
 }
