@@ -2,7 +2,7 @@ import { env as cloudflareEnv } from "cloudflare:workers";
 import { invalidatePersistentCatalogCache } from "@/data/catalog-d1.server";
 
 type RuntimeGlobal = typeof globalThis & { __YUME_RUNTIME_ENV__?: unknown };
-type Environment = Record<string, unknown> & { TELEGRAM_ADMIN_ID?: string; YUME_DB?: unknown };
+type Environment = Record<string, unknown> & { TELEGRAM_ADMIN_ID?: string; YUME_AUTH_SESSION_SECRET?: string; YUME_DB?: unknown };
 type Statement = {
   bind(...values: unknown[]): Statement;
   first<T = Record<string, unknown>>(): Promise<T | null>;
@@ -55,8 +55,9 @@ function cookieValue(request: Request, name: string): string | null {
   return null;
 }
 
-async function sha256Hex(value: string): Promise<string> {
-  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)));
+async function sessionTokenHash(value: string, secret: string): Promise<string> {
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const digest = new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(value)));
   return Array.from(digest, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
@@ -84,9 +85,16 @@ async function authorize(request: Request, env: Environment, db: Database): Prom
     console.warn("[YUME][ADMIN_AUTH] Denied: session cookie missing.", { path: new URL(request.url).pathname });
     return false;
   }
+  const secret = typeof env.YUME_AUTH_SESSION_SECRET === "string" && env.YUME_AUTH_SESSION_SECRET.trim().length >= 32
+    ? env.YUME_AUTH_SESSION_SECRET
+    : "";
+  if (!secret) {
+    console.error("[YUME][ADMIN_AUTH] Configuration invalid: YUME_AUTH_SESSION_SECRET is missing or too short.");
+    return false;
+  }
   const session = await db.prepare(
     "SELECT u.telegram_user_id, s.expires_at FROM yume_sessions s JOIN yume_users u ON u.id = s.user_id WHERE s.token_hash = ? AND u.provider = 'telegram'",
-  ).bind(await sha256Hex(token)).first<{ telegram_user_id: string | null; expires_at: number }>();
+  ).bind(await sessionTokenHash(token, secret)).first<{ telegram_user_id: string | null; expires_at: number }>();
   if (!session) {
     console.warn("[YUME][ADMIN_AUTH] Denied: session hash not found or user is not a Telegram account.", { path: new URL(request.url).pathname });
     return false;
