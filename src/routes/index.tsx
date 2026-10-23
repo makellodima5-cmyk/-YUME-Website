@@ -1154,7 +1154,7 @@ function Index() {
       ) : view === "rights" ? (
         <Profile key="rights" initialPanel="rights" animeList={ANIME} onSelect={select} onCatalog={() => setView("catalog")} />
       ) : view === "admin" ? (
-        <main id="main-content" className="min-h-[70vh] px-4 pt-20 pb-8 md:px-10 md:pt-24">
+        <main id="main-content" className="min-h-[70vh] bg-[#050408] px-4 pt-20 pb-8 md:px-10 md:pt-24">
           <div className="mx-auto max-w-5xl">
             <h1 className="mb-2 text-2xl font-bold md:text-3xl">{language === "ru" ? "Панель администратора" : "Admin panel"}</h1>
             <p className="mb-4 text-sm text-muted-foreground">{language === "ru" ? "Управление функциями и обслуживанием YUME." : "Manage YUME features and maintenance."}</p>
