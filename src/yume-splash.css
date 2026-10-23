@@ -99,54 +99,18 @@
   position: absolute;
   top: -12vh;
   display: block;
-  border-radius: 68% 10% 64% 18%;
   opacity: 0;
-  background:
-    radial-gradient(ellipse at 34% 28%, rgba(255, 247, 252, .98) 0%, rgba(255, 211, 235, .94) 18%, rgba(221, 139, 205, .94) 48%, rgba(133, 78, 161, .92) 78%, rgba(70, 39, 96, .84) 100%);
-  box-shadow: inset 1px 1px 1px rgba(255,255,255,.58), inset -1px -1px 2px rgba(66,26,88,.4), 0 0 7px rgba(180, 99, 222, .16);
-  filter: blur(var(--petal-blur, 0));
+  background: url("/yume-sakura-petal.svg") center / 100% 100% no-repeat;
+  filter: drop-shadow(0 2px 4px rgba(27, 8, 34, .22)) blur(var(--petal-blur, 0));
   transform-origin: 50% 15%;
   will-change: transform, opacity;
   animation-name: yume-splash-fall;
   animation-timing-function: linear;
   animation-iteration-count: infinite;
 }
-.yume-splash__petal::before {
-  content: "";
-  position: absolute;
-  inset: 4% 7% 8% 8%;
-  border-radius: inherit;
-  background: linear-gradient(128deg, rgba(255,255,255,.3), transparent 38%, rgba(73,35,102,.16) 78%, transparent);
-  opacity: .8;
-}
-.yume-splash__petal::after {
-  content: "";
-  position: absolute;
-  left: 49%;
-  top: 8%;
-  width: 1px;
-  height: 84%;
-  transform: rotate(-10deg);
-  background: linear-gradient(180deg, rgba(255,255,255,.58), rgba(255,226,244,.28) 35%, rgba(99,50,130,.4));
-  border-radius: 999px;
-  box-shadow: 2px 12px 0 -0.35px rgba(255,255,255,.16), -2px 25px 0 -0.35px rgba(255,255,255,.13);
-}
-.yume-splash__petal:nth-child(3n) {
-  border-radius: 74% 8% 62% 16%;
-  background: radial-gradient(ellipse at 28% 22%, #fff7fc 0%, #f8d5e9 20%, #d99acb 52%, #8653a2 83%, #48285f 100%);
-}
-.yume-splash__petal:nth-child(3n + 1) {
-  border-radius: 58% 14% 72% 9%;
-  background: radial-gradient(ellipse at 32% 25%, #fff8fc 0%, #f7d9ec 16%, #e6acd5 43%, #a76db9 74%, #59336e 100%);
-}
-.yume-splash__petal:nth-child(4n) {
-  border-radius: 82% 6% 54% 20%;
-  background: radial-gradient(ellipse at 26% 20%, rgba(255,255,255,.98) 0%, #f9d5eb 19%, #d88fc8 49%, #9959aa 78%, #47265f 100%);
-}
-.yume-splash__petal:nth-child(5n) {
-  filter: blur(.7px) saturate(.9);
-  opacity: .55;
-}
+.yume-splash__petal:nth-child(3n) { filter: hue-rotate(-7deg) saturate(.92) drop-shadow(0 2px 4px rgba(27, 8, 34, .22)); }
+.yume-splash__petal:nth-child(4n) { filter: hue-rotate(8deg) brightness(1.04) drop-shadow(0 2px 4px rgba(27, 8, 34, .22)); }
+.yume-splash__petal:nth-child(5n) { opacity: .5; }
 .yume-splash--leaving {
   pointer-events: none;
   animation: yume-splash-exit 520ms ease-in both;
