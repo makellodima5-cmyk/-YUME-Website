@@ -1,4 +1,14 @@
 /* YUME Mini App cinematic launch screen */
+/* This selector is controlled by a tiny inline script in the document head,
+   before the browser can paint the server-rendered home page. */
+html.telegram-mini-app,
+html.telegram-mini-app body {
+  background: #030207 !important;
+  color-scheme: dark;
+}
+html:not([data-yume-splash-active="true"]) .yume-splash {
+  display: none !important;
+}
 .yume-splash {
   isolation: isolate;
   background:
@@ -6,7 +16,6 @@
     #030207;
   color: #f8f3ff;
   opacity: 1;
-  animation: yume-splash-reveal 700ms ease-out both;
   contain: layout paint style;
 }
 .yume-splash__vignette {
@@ -22,11 +31,11 @@
   width: min(76vw, 430px);
   aspect-ratio: 1;
   border-radius: 50%;
-  transform: translate(-50%, -50%) scale(.28);
+  transform: translate(-50%, -50%) scale(.22);
   background: radial-gradient(circle, rgba(168, 92, 255, .24) 0%, rgba(115, 48, 201, .12) 29%, rgba(112, 48, 174, .035) 53%, transparent 72%);
   filter: blur(10px);
   opacity: 0;
-  animation: yume-splash-glow 1.5s cubic-bezier(.16, 1, .3, 1) 120ms forwards, yume-splash-breathe 3.8s ease-in-out 1.8s infinite alternate;
+  animation: yume-splash-glow 1.55s cubic-bezier(.16, 1, .3, 1) 80ms forwards, yume-splash-breathe 3.8s ease-in-out 1.8s infinite alternate;
   pointer-events: none;
 }
 .yume-splash__spark {
@@ -40,7 +49,7 @@
   box-shadow: 0 0 8px 3px rgba(182, 111, 255, .9), 0 0 24px 10px rgba(151, 68, 246, .3);
   transform: translate(-50%, -50%);
   opacity: 0;
-  animation: yume-splash-spark 1.2s ease-out 250ms forwards;
+  animation: yume-splash-spark 1.2s ease-out 180ms forwards;
 }
 .yume-splash__identity {
   position: relative;
@@ -49,14 +58,14 @@
   width: min(76vw, 360px);
   flex-direction: column;
   align-items: center;
-  gap: 16px;
-  transform: translateY(3px);
-  animation: yume-splash-identity 900ms cubic-bezier(.16, 1, .3, 1) 350ms both;
 }
 .yume-splash__logo {
   width: 100%;
+  opacity: 0;
+  clip-path: inset(0 100% 0 0);
   filter: drop-shadow(0 0 12px rgba(177, 104, 255, .18));
-  animation: yume-splash-logo-glow 4.5s ease-in-out 1.4s infinite alternate;
+  animation: yume-splash-logo-reveal 1.9s cubic-bezier(.22, 1, .36, 1) 320ms both,
+    yume-splash-logo-glow 2.8s ease-in-out 2.25s infinite alternate;
 }
 .yume-splash__logo img {
   display: block;
@@ -64,36 +73,60 @@
   height: auto;
   object-fit: contain;
 }
-.yume-splash__caption {
-  margin: 0;
-  color: rgba(226, 206, 248, .58);
-  font: 500 9px/1.4 "Manrope", sans-serif;
-  letter-spacing: .28em;
+.yume-splash__loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  margin-top: 30px;
+  opacity: 0;
+  transform: translateY(8px);
+  animation: yume-splash-loader-enter 500ms ease-out 1.5s forwards;
+}
+.yume-splash__spinner {
+  width: 46px;
+  height: 46px;
+  flex: none;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 8deg,
+    rgba(154, 67, 224, 0) 0deg,
+    rgba(154, 67, 224, .3) 35deg,
+    #9b4de5 135deg,
+    #e7baff 235deg,
+    rgba(154, 67, 224, .08) 320deg,
+    rgba(154, 67, 224, 0) 360deg
+  );
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3px));
+  filter: drop-shadow(0 0 7px rgba(179, 94, 255, .22));
+  animation: yume-splash-spin 1.05s linear infinite;
+}
+.yume-splash__loading-copy {
+  display: flex;
+  min-width: 94px;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  color: rgba(218, 190, 244, .9);
+  font: 400 14px/1.35 "Manrope", sans-serif;
+  letter-spacing: .01em;
   text-align: center;
+  font-variant-numeric: tabular-nums;
 }
-.yume-splash__loader {
-  position: relative;
-  width: 86px;
-  height: 2px;
-  margin-top: 8px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: rgba(206, 169, 255, .12);
+.yume-splash__loading-copy p {
+  margin: 0;
 }
-.yume-splash__loader span {
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 44%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, transparent, #d9b5ff, #8f4bdf, transparent);
-  box-shadow: 0 0 10px rgba(178, 104, 255, .7);
-  animation: yume-splash-progress 1.25s ease-in-out infinite;
+.yume-splash__loading-copy span {
+  color: #d5a8ff;
 }
 .yume-splash__petals {
   position: absolute;
   inset: 0;
   overflow: hidden;
   pointer-events: none;
+  opacity: 0;
+  animation: yume-splash-petals-in 850ms ease-out 550ms forwards;
 }
 .yume-splash__petal {
   position: absolute;
@@ -113,11 +146,7 @@
 .yume-splash__petal:nth-child(5n) { opacity: .5; }
 .yume-splash--leaving {
   pointer-events: none;
-  animation: yume-splash-exit 520ms ease-in both;
-}
-@keyframes yume-splash-reveal {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  animation: yume-splash-exit 350ms ease-in forwards;
 }
 @keyframes yume-splash-glow {
   0% { opacity: 0; transform: translate(-50%, -50%) scale(.22); }
@@ -133,17 +162,23 @@
   45% { opacity: 1; }
   100% { opacity: .28; transform: translate(-50%, -50%) scale(1.7); }
 }
-@keyframes yume-splash-identity {
-  from { opacity: 0; transform: translateY(14px) scale(.96); filter: blur(5px); }
-  to { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+@keyframes yume-splash-logo-reveal {
+  0% { opacity: .15; clip-path: inset(0 100% 0 0); filter: blur(7px) drop-shadow(0 0 8px rgba(177, 104, 255, .08)); }
+  35% { opacity: 1; }
+  100% { opacity: 1; clip-path: inset(0 0 0 0); filter: blur(0) drop-shadow(0 0 17px rgba(177, 104, 255, .28)); }
 }
 @keyframes yume-splash-logo-glow {
-  from { filter: drop-shadow(0 0 9px rgba(167, 99, 255, .14)); }
-  to { filter: drop-shadow(0 0 19px rgba(167, 99, 255, .35)); }
+  from { filter: drop-shadow(0 0 10px rgba(167, 99, 255, .16)); }
+  to { filter: drop-shadow(0 0 20px rgba(167, 99, 255, .34)); }
 }
-@keyframes yume-splash-progress {
-  0% { transform: translateX(-120%); }
-  100% { transform: translateX(330%); }
+@keyframes yume-splash-loader-enter {
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes yume-splash-spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes yume-splash-petals-in {
+  to { opacity: 1; }
 }
 @keyframes yume-splash-fall {
   0% { opacity: 0; transform: translate3d(0, -12vh, 0) rotate(var(--petal-rotate)) scale(.85); }
