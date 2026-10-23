@@ -4,10 +4,13 @@ import { trackYumePage } from "@/lib/yume-analytics";
 describe("YUME analytics pageview tracking", () => {
   const firstId = "00000000-0000-4000-8000-000000000001";
   const secondId = "00000000-0000-4000-8000-000000000002";
+  const visitorId = "00000000-0000-4000-8000-000000000099";
   let randomUuidDescriptor: PropertyDescriptor | undefined;
 
   beforeEach(() => {
     window.localStorage.clear();
+    window.localStorage.setItem("yume-cookie-notice-acknowledged", "true");
+    window.localStorage.setItem("yume-analytics-visitor-id", visitorId);
     randomUuidDescriptor = Object.getOwnPropertyDescriptor(window.crypto, "randomUUID");
     const ids = [firstId, secondId];
     Object.defineProperty(window.crypto, "randomUUID", {
@@ -18,11 +21,19 @@ describe("YUME analytics pageview tracking", () => {
   });
 
   afterEach(() => {
+    window.localStorage.clear();
     window.sessionStorage.clear();
     if (randomUuidDescriptor) Object.defineProperty(window.crypto, "randomUUID", randomUuidDescriptor);
     else Reflect.deleteProperty(window.crypto, "randomUUID");
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
+  });
+
+  it("does not collect analytics before the site's cookie notice is acknowledged", () => {
+    window.localStorage.removeItem("yume-cookie-notice-acknowledged");
+    trackYumePage("/#home");
+    expect(fetch).not.toHaveBeenCalled();
+    expect(window.localStorage.getItem("yume-analytics-visitor-id")).toBe(visitorId);
   });
 
   it("sends a sanitized route and a pseudonymous session token", () => {
@@ -32,7 +43,7 @@ describe("YUME analytics pageview tracking", () => {
     const body = JSON.parse(String(request?.body)) as { path: string; sessionId: string; visitorId: string };
     expect(body.path).toBe("/anime/123");
     expect(body.sessionId).toBe(firstId);
-    expect(body.visitorId).toMatch(/^[A-Za-z0-9_-]{16,100}$/);
+    expect(body.visitorId).toBe(visitorId);
     expect(request?.credentials).toBe("same-origin");
     expect(request?.keepalive).toBe(true);
   });
