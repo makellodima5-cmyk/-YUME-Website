@@ -131,6 +131,20 @@ async function fetchPage(page: number): Promise<ShikimoriAnime[]> {
   if (payload.errors?.length) throw new Error(payload.errors.map(e=>e.message).filter(Boolean).join("; ") || "GraphQL error");
   return (payload.data?.animes ?? []).filter(item => !(item.genres ?? []).some(g => [g.name,g.russian].some(n => clean(n).normalize("NFKC").toLowerCase() === "hentai" || clean(n).normalize("NFKC").toLowerCase() === "хентай")));
 }
+async function fetchByIds(ids: string[]): Promise<ShikimoriAnime[]> {
+  const safeIds = ids.filter(id => /^\\d{1,20}$/.test(id)).slice(0, 100);
+  if (!safeIds.length) return [];
+  const query = "query { animes(ids: " + JSON.stringify(safeIds.join(",")) + ", limit: 100) { " + FIELDS + " } }";
+  const response = await fetch(API_URL, { method:"POST", headers:{"Content-Type":"application/json",Accept:"application/json","User-Agent":"YUME/1.0"}, body:JSON.stringify({query}), signal:AbortSignal.timeout(12000) });
+  if (!response.ok) throw new Error("Shikimori вернул HTTP " + response.status);
+  const payload = await response.json() as Payload;
+  if (payload.errors?.length) throw new Error(payload.errors.map(e=>e.message).filter(Boolean).join("; ") || "GraphQL error");
+  return (payload.data?.animes ?? []).filter(item => !(item.genres ?? []).some(g => [g.name,g.russian].some(n => clean(n).normalize("NFKC").toLowerCase() === "hentai" || clean(n).normalize("NFKC").toLowerCase() === "хентай")));
+}
+async function catalogQuality(db: Database) {
+  const rows = await db.prepare("SELECT id,title,year,poster_url,description FROM anime_catalog WHERE year = 0 OR poster_url IS NULL OR TRIM(COALESCE(description,'')) = '' ORDER BY position,id LIMIT 500").all<{id:string;title:string;year:number;poster_url:string|null;description:string|null}>();
+  return rows.results.map(row => ({id:row.id,title:row.title,year:row.year,missingYear:!row.year,missingPoster:!row.poster_url,missingDescription:!row.description?.trim()}));
+}
 async function snapshot(db: Database) {
   const [target,cursor,added,skipped,incompleteCount,errors,state] = await Promise.all([
     getMeta(db,"admin_import_target"),getMeta(db,"admin_import_cursor"),getMeta(db,"admin_import_added"),
@@ -147,9 +161,34 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
   try {
     if (!await authorize(request,env,db)) return json({isAdmin:false,error:"admin_required"},403);
     await ensureSchema(db);
-    if (request.method === "GET") return json({isAdmin:true,...await snapshot(db)});
+    if (request.method === "GET") return json({isAdmin:true,...await snapshot(db),quality:await catalogQuality(db)});
     let body: {action?:unknown; target?:unknown};
     try { body = await request.json() as {action?:unknown;target?:unknown}; } catch { return json({error:"invalid_request"},400); }
+    if (body.action === "delete") {
+      const ids = Array.isArray((body as {ids?:unknown}).ids) ? ((body as {ids:string[]}).ids) : [];
+      const safeIds = Array.from(new Set(ids.filter(id => typeof id === "string" && /^\\d{1,20}$/.test(id)))).slice(0,100);
+      if (!safeIds.length) return json({error:"no_valid_ids"},400);
+      const result = await db.batch(safeIds.map(id => db.prepare("DELETE FROM anime_catalog WHERE id = ?").bind(id)));
+      const deleted = result.reduce((sum,item) => sum + Number((item as {meta?:{changes?:number}})?.meta?.changes ?? 0),0);
+      return json({isAdmin:true,deleted,quality:await catalogQuality(db)});
+    }
+    if (body.action === "repair") {
+      const ids = Array.isArray((body as {ids?:unknown}).ids) ? ((body as {ids:string[]}).ids) : [];
+      const safeIds = Array.from(new Set(ids.filter(id => typeof id === "string" && /^\\d{1,20}$/.test(id)))).slice(0,100);
+      if (!safeIds.length) return json({error:"no_valid_ids"},400);
+      const source = await fetchByIds(safeIds);
+      let repaired = 0, stillIncomplete = 0;
+      for (const sourceItem of source) {
+        const item = mapItem(sourceItem);
+        const existing = await db.prepare("SELECT id FROM anime_catalog WHERE id = ?").bind(item.id).first<{id:string}>();
+        if (!existing) continue;
+        const result = await db.prepare("UPDATE anime_catalog SET title=?,english_title=?,original_title=?,year=?,episodes=?,rating=?,genres_json=?,status=?,description=?,hue=?,glyph=?,is_new=?,popular=?,poster_url=?,banner_url=?,kind=?,age_rating=?,next_episode_at=?,episodes_aired=?,aired_on=?,studios_json=?,updated_at=CURRENT_TIMESTAMP WHERE id=?")
+          .bind(item.title,item.english_title,item.original_title,item.year,item.episodes,item.rating,item.genres_json,item.status,item.description,item.hue,item.glyph,item.is_new,item.popular,item.poster_url,item.banner_url,item.kind,item.age_rating,item.next_episode_at,item.episodes_aired,item.aired_on,item.studios_json,item.id).run();
+        if ((result.meta?.changes ?? 0) > 0) repaired++;
+        if (incomplete(item)) stillIncomplete++;
+      }
+      return json({isAdmin:true,repaired,notFound:safeIds.length-source.length,stillIncomplete,quality:await catalogQuality(db)});
+    }
     if (body.action === "start") {
       const target = Number(body.target);
       if (!Number.isInteger(target) || target < 1 || target > MAX_TARGET) return json({error:"invalid_target",max:MAX_TARGET},400);
