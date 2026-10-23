@@ -284,7 +284,7 @@ export async function handleAdminTrailers(request: Request): Promise<Response> {
       statements.push(db.prepare("UPDATE anime_trailer_update_queue SET status = 'checked', trailer_found = ?, updated_at = CURRENT_TIMESTAMP WHERE anime_id = ?").bind(found ? 1 : 0, id));
     }
     await db.batch(statements);
-    if (trailersFoundInBatch > 0) invalidatePersistentCatalogCache();
+    if (trailersFoundInBatch > 0) await invalidatePersistentCatalogCache();
     const counts = await queueCounts(db);
     await audit(db,"trailers.scan.batch","success",{requested:ids.length,sourceMissing,noVideo,unusableVideo,trailersFoundInBatch,queuePending:counts.pending,queueChecked:counts.checked,queueFound:counts.found});
     if (counts.pending === 0) await audit(db,"trailers.scan.finish","success",counts);
@@ -395,7 +395,7 @@ export async function runScheduledTrailerUpdate(envInput: unknown): Promise<void
         statements.push(db.prepare("UPDATE anime_trailer_update_queue SET status='checked',trailer_found=?,updated_at=CURRENT_TIMESTAMP WHERE anime_id=?").bind(found ? 1 : 0,id));
       }
       await db.batch(statements);
-      if (byId.size > 0 && ids.some((id) => Boolean(byId.get(id)))) invalidatePersistentCatalogCache();
+      if (ids.some((id) => Boolean(byId.get(id)))) await invalidatePersistentCatalogCache();
       const counts = await queueCounts(db);
       await setAutoValues(db,{retry_at:"",last_error:"",lock_until:"0"});
       await audit(db,"trailers.auto.batch","success",{requested:ids.length,returned:fetched.items.length,pending:counts.pending,found:counts.found});
