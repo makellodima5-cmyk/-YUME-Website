@@ -394,11 +394,13 @@ export async function getPersistentCatalog(
     }
 
     if (!options.allowImport) {
-      return {
-        items: options.progressOnly ? [] : await readRows(db),
+      const result: CatalogResult = {
+        items: await readRows(db),
         error: null,
         progress: makeProgress("ready", imported),
       };
+      await writeCachedCatalog(db, result);
+      return { ...result, items: options.progressOnly ? [] : result.items };
     }
 
     const now = Date.now();
