@@ -205,7 +205,7 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
       key={title}
       type="button"
       onClick={() => navigatePanel(next)}
-      className="flex w-full items-center gap-4 rounded-2xl border border-white/[0.08] bg-[#080808]/80 p-3.5 text-left transition hover:border-primary/35 hover:bg-accent/70 sm:p-4"
+      className="flex w-full items-center gap-4 rounded-2xl border border-border bg-card p-3.5 text-left text-card-foreground shadow-sm transition hover:border-primary/35 hover:bg-accent/70 sm:p-4"
     >
       <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#1b1028] text-primary">
         {(() => {
