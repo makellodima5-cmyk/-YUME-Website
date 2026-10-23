@@ -4,7 +4,6 @@ import { MAX_SAVED_ANIME_IDS, normalizeSavedAnimeIds } from "@/data/telegram-lib
 
 type TelegramEnvironment = Record<string, unknown> & {
   TELEGRAM_BOT_TOKEN?: string;
-  YUME_AUTH_SESSION_SECRET?: string;
   YUME_DB?: unknown;
 };
 type DbStatement = {
@@ -43,11 +42,6 @@ function environment(): TelegramEnvironment {
 
 function database(env: TelegramEnvironment): TelegramDatabase | null {
   return env.YUME_DB && typeof env.YUME_DB === "object" ? env.YUME_DB as TelegramDatabase : null;
-}
-
-function sessionSecret(env: TelegramEnvironment): string | null {
-  const value = env.YUME_AUTH_SESSION_SECRET;
-  return typeof value === "string" && value.length >= 32 ? value : null;
 }
 
 async function sha256Hex(value: string): Promise<string> {
@@ -381,9 +375,10 @@ export async function handleTelegramSession(request: Request): Promise<Response>
 
   const input = body as Record<string, unknown>;
   const env = environment();
-  const botToken = typeof env.TELEGRAM_BOT_TOKEN === "string" ? env.TELEGRAM_BOT_TOKEN : "";
-  const secret = sessionSecret(env);
-  if (!botToken || !secret) return jsonResponse({ error: "telegram_auth_not_configured" }, 503);
+  const botToken = typeof env.TELEGRAM_BOT_TOKEN === "string" ? env.TELEGRAM_BOT_TOKEN.trim() : "";
+  // Sessions use 256-bit random tokens whose hashes are stored in D1. A separate
+  // session secret is not part of this flow and must not block Telegram sign-in.
+  if (!botToken) return jsonResponse({ error: "telegram_auth_not_configured" }, 503);
   const validated = await validateTelegramInitData(input.initData as string, botToken);
   if (!validated.ok) return jsonResponse({ error: validated.error }, validated.error === "invalid_request" ? 400 : 401);
 
