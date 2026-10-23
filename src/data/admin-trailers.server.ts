@@ -232,7 +232,7 @@ export async function handleAdminTrailers(request: Request): Promise<Response> {
       // alone leaves previously checked rows stuck in "checked" forever.
       await db.batch([
         db.prepare("INSERT OR IGNORE INTO anime_trailer_update_queue (anime_id, status, trailer_found) SELECT id, 'pending', 0 FROM anime_catalog WHERE youtube_trailer_id IS NULL OR youtube_trailer_id = ''"),
-        db.prepare("UPDATE anime_trailer_update_queue SET status = 'pending', trailer_found = 0, updated_at = CURRENT_TIMESTAMP WHERE anime_id IN (SELECT id FROM anime_catalog WHERE youtube_trailer_id IS NULL OR youtube_trailer_id = '')"),
+        db.prepare("UPDATE anime_trailer_update_queue SET status = 'pending', trailer_found = 0, updated_at = CURRENT_TIMESTAMP WHERE (status <> 'pending' OR trailer_found <> 0) AND anime_id IN (SELECT id FROM anime_catalog WHERE youtube_trailer_id IS NULL OR youtube_trailer_id = '')"),
       ]);
       const refreshed = await queueCounts(db);
       console.info("[YUME][TRAILER_SCAN] Queue prepared.", { total: refreshed.total, pending: refreshed.pending, checked: refreshed.checked, found: refreshed.found });
@@ -361,7 +361,7 @@ export async function runScheduledTrailerUpdate(envInput: unknown): Promise<void
       if (!state.running) {
         await db.batch([
           db.prepare("INSERT OR IGNORE INTO anime_trailer_update_queue (anime_id,status,trailer_found) SELECT id,'pending',0 FROM anime_catalog WHERE youtube_trailer_id IS NULL OR youtube_trailer_id=''"),
-          db.prepare("UPDATE anime_trailer_update_queue SET status='pending',trailer_found=0,updated_at=CURRENT_TIMESTAMP WHERE anime_id IN (SELECT id FROM anime_catalog WHERE youtube_trailer_id IS NULL OR youtube_trailer_id='')"),
+          db.prepare("UPDATE anime_trailer_update_queue SET status='pending',trailer_found=0,updated_at=CURRENT_TIMESTAMP WHERE (status <> 'pending' OR trailer_found <> 0) AND anime_id IN (SELECT id FROM anime_catalog WHERE youtube_trailer_id IS NULL OR youtube_trailer_id='')"),
           db.prepare("INSERT OR REPLACE INTO yume_trailer_auto_state (key,value) VALUES ('running','1')"),
           db.prepare("INSERT OR REPLACE INTO yume_trailer_auto_state (key,value) VALUES ('last_error','')"),
           db.prepare("INSERT OR REPLACE INTO yume_trailer_auto_state (key,value) VALUES ('retry_at','')"),
