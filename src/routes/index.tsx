@@ -294,6 +294,8 @@ function Index() {
   const [adminStats, setAdminStats] = useState<AdminTrailerStats | null>(null);
   const [adminRunning, setAdminRunning] = useState(false);
   const [adminMessage, setAdminMessage] = useState("");
+  const [trailerAuto, setTrailerAuto] = useState<{enabled:boolean;running:boolean;nextRunAt:number|null;lastRunAt:number|null;retryAt:number|null;lastError:string}>({enabled:false,running:false,nextRunAt:null,lastRunAt:null,retryAt:null,lastError:""});
+  const [trailerAutoBusy, setTrailerAutoBusy] = useState(false);
   const [adminImportTarget, setAdminImportTarget] = useState("50");
   const [adminImportRunning, setAdminImportRunning] = useState(false);
   const [adminImport, setAdminImport] = useState<{target:number;cursor:number;added:number;skipped:number;incomplete:number;errors:number;state:string;delayMs?:number}>({target:0,cursor:1,added:0,skipped:0,incomplete:0,errors:0,state:"idle"});
@@ -389,6 +391,7 @@ function Index() {
           checked?: number;
           found?: number;
           missing?: number;
+          auto?: {enabled?:boolean;running?:boolean;nextRunAt?:number|null;lastRunAt?:number|null;retryAt?:number|null;lastError?:string};
         };
         if (cancelled) return;
         if (!response.ok || result.isAdmin !== true) {
@@ -398,6 +401,7 @@ function Index() {
           return;
         }
         setIsAdmin(true);
+        if (result.auto) setTrailerAuto({enabled:result.auto.enabled===true,running:result.auto.running===true,nextRunAt:result.auto.nextRunAt ?? null,lastRunAt:result.auto.lastRunAt ?? null,retryAt:result.auto.retryAt ?? null,lastError:result.auto.lastError ?? ""});
         setAdminStats({
           total: Number(result.total ?? 0),
           pending: Number(result.pending ?? 0),
@@ -496,6 +500,29 @@ function Index() {
     } finally {
       setTelegramConsentSubmitting(false);
     }
+  };
+
+  const toggleTrailerAuto = async () => {
+    if (!isAdmin || trailerAutoBusy) return;
+    setTrailerAutoBusy(true);
+    try {
+      const response = await fetch("/api/admin/trailers", {
+        method: "POST", credentials: "same-origin", cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: trailerAuto.enabled ? "auto-disable" : "auto-enable" }),
+      });
+      const payload = await response.json().catch(() => ({})) as {isAdmin?:boolean;auto?:{enabled?:boolean;running?:boolean;nextRunAt?:number|null;lastRunAt?:number|null;retryAt?:number|null;lastError?:string};error?:string};
+      if (!response.ok || payload.isAdmin !== true || !payload.auto) {
+        setAdminMessage(language === "ru" ? "Не удалось изменить режим автообновления." : "Could not change automatic update mode.");
+        return;
+      }
+      setTrailerAuto({enabled:payload.auto.enabled===true,running:payload.auto.running===true,nextRunAt:payload.auto.nextRunAt ?? null,lastRunAt:payload.auto.lastRunAt ?? null,retryAt:payload.auto.retryAt ?? null,lastError:payload.auto.lastError ?? ""});
+      setAdminMessage(payload.auto.enabled
+        ? (language === "ru" ? "Автообновление включено. Первый запуск начнётся в ближайшую минуту." : "Automatic updates enabled. The first run will start within a minute.")
+        : (language === "ru" ? "Автообновление выключено." : "Automatic updates disabled."));
+    } catch {
+      setAdminMessage(language === "ru" ? "Не удалось связаться с сервером." : "Could not reach the server.");
+    } finally { setTrailerAutoBusy(false); }
   };
 
   const runTrailerUpdate = async () => {
@@ -1308,6 +1335,19 @@ function Index() {
                     <div className="rounded-lg border border-[#263C50] bg-[#08070D] p-2.5"><span className="block text-xs text-[#A89CB8]">{language === "ru" ? "Проверено" : "Checked"}</span><strong className="tabular-nums text-[#B8D7FF]">{adminStats?.checked ?? 0}</strong></div>
                     <div className="rounded-lg border border-[#21483B] bg-[#08070D] p-2.5"><span className="block text-xs text-[#A89CB8]">{language === "ru" ? "Найдено" : "Found"}</span><strong className="tabular-nums text-[#36EBA6]">{adminStats?.found ?? 0}</strong></div>
                     <div className="rounded-lg border border-[#493A27] bg-[#08070D] p-2.5"><span className="block text-xs text-[#A89CB8]">{language === "ru" ? "Очередь" : "Queue"}</span><strong className="tabular-nums text-[#FFAA43]">{adminStats?.pending ?? 0}</strong></div>
+                  </div>
+                  <div className="mt-3 rounded-xl border border-[#382D46] bg-[#08070D] p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div><p className="text-sm font-semibold text-[#F8F4FF]">{language==="ru"?"Автообновление раз в 24 часа":"Automatic update every 24 hours"}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">{trailerAuto.enabled ? (trailerAuto.running ? (language==="ru"?"Идёт автоматическая проверка":"Automatic scan in progress") : (language==="ru"?"Режим включён":"Enabled")) : (language==="ru"?"Режим выключен":"Disabled")}</p></div>
+                      <button type="button" onClick={toggleTrailerAuto} disabled={trailerAutoBusy} className={`min-h-9 rounded-lg border px-3 py-2 text-xs font-semibold transition disabled:opacity-50 ${trailerAuto.enabled ? "border-[#FFAA43]/40 bg-[#2A1B0A] text-[#FFCA7D]" : "border-[#36EBA6]/40 bg-[#0D2621] text-[#70F0BC]"}`}>{trailerAutoBusy ? "…" : trailerAuto.enabled ? (language==="ru"?"Выключить":"Disable") : (language==="ru"?"Включить авто":"Enable auto")}</button>
+                    </div>
+                    <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+                      <p>{language==="ru"?"Следующий запуск: ":"Next run: "}{trailerAuto.nextRunAt ? new Date(trailerAuto.nextRunAt).toLocaleString(language==="ru"?"ru-RU":"en-US") : (trailerAuto.enabled ? (language==="ru"?"в ближайшую минуту":"within a minute") : "—")}</p>
+                      <p>{language==="ru"?"Последний запуск: ":"Last run: "}{trailerAuto.lastRunAt ? new Date(trailerAuto.lastRunAt).toLocaleString(language==="ru"?"ru-RU":"en-US") : "—"}</p>
+                      {trailerAuto.retryAt && <p className="text-[#FFAA43]">{language==="ru"?"Повтор после ошибки: ":"Retry after error: "}{new Date(trailerAuto.retryAt).toLocaleString(language==="ru"?"ru-RU":"en-US")}</p>}
+                      {trailerAuto.lastError && <p className="break-words text-[#FFAA43]">{language==="ru"?"Последняя ошибка: ":"Last error: "}{trailerAuto.lastError}</p>}
+                    </div>
                   </div>
                   <button type="button" onClick={runTrailerUpdate} disabled={adminRunning || adminStats?.missing === 0} className="mt-3 flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#AC4EFC] to-[#8736FA] px-4 py-2.5 text-sm font-semibold text-white shadow-[0_0_16px_rgba(155,65,245,0.18)] transition hover:brightness-110 disabled:cursor-wait disabled:opacity-50">
                     <ShieldCheck className="h-4 w-4" />
