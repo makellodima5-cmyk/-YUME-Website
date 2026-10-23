@@ -142,9 +142,12 @@ async function readCachedCatalog(db: D1Database): Promise<CatalogResult | null> 
   try {
     const response = await edge.match(new Request(CATALOG_EDGE_CACHE_KEY));
     if (!response?.ok) return null;
-    const result = await response.json() as CatalogResult;
-    if (!Array.isArray(result.items) || !result.progress || typeof result.progress.status !== "string") return null;
-    catalogReadCache = { db, expiresAt: Date.now() + CATALOG_READ_CACHE_TTL_MS, result };
+    const payload = await response.json() as { cachedAt?: number; result?: CatalogResult };
+    const cachedAt = Number(payload.cachedAt);
+    const result = payload.result;
+    if (!Number.isFinite(cachedAt) || Date.now() - cachedAt >= CATALOG_READ_CACHE_TTL_MS ||
+        !result || !Array.isArray(result.items) || !result.progress || typeof result.progress.status !== "string") return null;
+    catalogReadCache = { db, expiresAt: cachedAt + CATALOG_READ_CACHE_TTL_MS, result };
     return result;
   } catch {
     return null;
@@ -152,11 +155,12 @@ async function readCachedCatalog(db: D1Database): Promise<CatalogResult | null> 
 }
 
 async function writeCachedCatalog(db: D1Database, result: CatalogResult): Promise<void> {
-  catalogReadCache = { db, expiresAt: Date.now() + CATALOG_READ_CACHE_TTL_MS, result };
+  const cachedAt = Date.now();
+  catalogReadCache = { db, expiresAt: cachedAt + CATALOG_READ_CACHE_TTL_MS, result };
   const edge = catalogEdgeCache();
   if (!edge) return;
   try {
-    await edge.put(new Request(CATALOG_EDGE_CACHE_KEY), new Response(JSON.stringify(result), {
+    await edge.put(new Request(CATALOG_EDGE_CACHE_KEY), new Response(JSON.stringify({ cachedAt, result }), {
       headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "public, max-age=30" },
     }));
   } catch {
@@ -165,10 +169,13 @@ async function writeCachedCatalog(db: D1Database, result: CatalogResult): Promis
 }
 
 /** Clear the isolate-local public snapshot and this data center's edge snapshot after a catalog mutation. */
-export function invalidatePersistentCatalogCache(): void {
+export async function invalidatePersistentCatalogCache(): Promise<void> {
   catalogReadCache = null;
   const edge = catalogEdgeCache();
-  if (edge) void edge.delete(new Request(CATALOG_EDGE_CACHE_KEY)).catch(() => undefined);
+  if (edge) {
+    try { await edge.delete(new Request(CATALOG_EDGE_CACHE_KEY)); } catch { /* Best effort; the public cache also expires quickly. */ }
+  }
+  catalogReadCache = null;
 }
 
 function database(): D1Database | null {
@@ -471,7 +478,6 @@ export async function getPersistentCatalog(
         db.prepare(INSERT_ANIME).bind(...rowValues(item, cursor * 50 + index)),
       );
       if (statements.length) {
-        invalidatePersistentCatalogCache();
         statements.push(db.prepare([
           "DELETE FROM anime_catalog",
           "WHERE id IN (",
@@ -481,6 +487,7 @@ export async function getPersistentCatalog(
           ")",
         ].join("\n")).bind(CATALOG_LIMIT));
         await db.batch(statements);
+        await invalidatePersistentCatalogCache();
       }
 
       imported = await countRows(db);
