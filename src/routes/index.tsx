@@ -285,7 +285,7 @@ function Index() {
   const [telegramConsentPending, setTelegramConsentPending] = useState(false);
   const [telegramConsentSubmitting, setTelegramConsentSubmitting] = useState(false);
   const [telegramAuthError, setTelegramAuthError] = useState("");
-  const [adminCheckVersion, setAdminCheckVersion] = useState(0);
+  const [telegramAuthReady, setTelegramAuthReady] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminStats, setAdminStats] = useState<{ total: number; pending: number; checked: number; found: number; missing: number } | null>(null);
   const [adminRunning, setAdminRunning] = useState(false);
@@ -341,7 +341,7 @@ function Index() {
       setTelegramAuthError("");
       setTelegramConsentPending(false);
       setTelegramConsentRequired(false);
-      setAdminCheckVersion((version) => version + 1);
+      setTelegramAuthReady(true);
     }).catch(() => {
       if (!cancelled) setTelegramAuthError(language === "ru"
         ? "Не удалось связаться с сервером авторизации."
@@ -351,7 +351,7 @@ function Index() {
   }, [isTelegramMiniApp, language]);
 
   useEffect(() => {
-    if (!isTelegramMiniApp || adminCheckVersion === 0 || telegramConsentRequired || telegramConsentPending) return;
+    if (!isTelegramMiniApp || !telegramAuthReady || telegramConsentRequired || telegramConsentPending) return;
     let cancelled = false;
     fetch("/api/admin/trailers", { credentials: "same-origin", cache: "no-store" })
       .then(async (response) => {
@@ -385,7 +385,7 @@ function Index() {
         }
       });
     return () => { cancelled = true; };
-  }, [isTelegramMiniApp, adminCheckVersion, telegramConsentRequired, telegramConsentPending]);
+  }, [isTelegramMiniApp, telegramAuthReady, telegramConsentRequired, telegramConsentPending]);
 
   useEffect(() => {
     if (isTelegramMiniApp && telegramConsentPending && view !== "privacy-policy") {
