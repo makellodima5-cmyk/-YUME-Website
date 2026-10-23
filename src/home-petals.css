@@ -1,0 +1,40 @@
+/* Ambient sakura animation behind homepage content only. */
+.yume-home-petals {
+  position: fixed;
+  z-index: 0;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  isolation: isolate;
+  contain: layout paint;
+}
+.yume-home-petal {
+  position: absolute;
+  top: -14vh;
+  display: block;
+  opacity: 0;
+  background: url("/yume-sakura-petal.svg") center / 100% 100% no-repeat;
+  filter: drop-shadow(0 2px 4px rgba(27, 8, 34, .2)) blur(var(--petal-blur, 0));
+  transform-origin: 50% 15%;
+  will-change: transform, opacity;
+  animation-name: yume-home-petal-fall;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+.yume-home-petal:nth-child(3n) {
+  filter: hue-rotate(-7deg) saturate(.92) drop-shadow(0 2px 4px rgba(27, 8, 34, .2));
+}
+.yume-home-petal:nth-child(4n) {
+  filter: hue-rotate(8deg) brightness(1.04) drop-shadow(0 2px 4px rgba(27, 8, 34, .2));
+}
+@keyframes yume-home-petal-fall {
+  0% { opacity: 0; transform: translate3d(0, -14vh, 0) rotate(var(--petal-rotate)) scale(.82); }
+  8% { opacity: var(--petal-opacity); }
+  48% { transform: translate3d(calc(var(--petal-drift) * -.45), 48vh, 0) rotate(calc(var(--petal-rotate) + 170deg)) scale(1); }
+  90% { opacity: var(--petal-opacity); }
+  100% { opacity: 0; transform: translate3d(var(--petal-drift), 116vh, 0) rotate(calc(var(--petal-rotate) + 420deg)) scale(.78); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .yume-home-petals { display: none; }
+  .yume-home-petal { animation: none; }
+}
