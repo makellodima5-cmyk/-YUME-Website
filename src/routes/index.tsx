@@ -340,7 +340,7 @@ function Index() {
   const [adminMessage, setAdminMessage] = useState("");
   const [notificationReadIds, setNotificationReadIds] = useState<string[]>([]);
   const [notificationDismissedIds, setNotificationDismissedIds] = useState<string[]>([]);
-  const notificationTouchStart = useRef<{ id: string; x: number; y: number } | null>(null);
+  const notificationPointerStart = useRef<{ id: string; x: number; y: number; pointerId: number } | null>(null);
   const [notificationStateLoaded, setNotificationStateLoaded] = useState(false);
   const [notificationRemoteAccount, setNotificationRemoteAccount] = useState(false);
   const [notificationActionBusy, setNotificationActionBusy] = useState(false);
@@ -653,14 +653,27 @@ function Index() {
     }
   };
 
-  const handleNotificationTouchEnd = (notificationId: string, event: React.TouchEvent<HTMLElement>) => {
-    const start = notificationTouchStart.current;
-    notificationTouchStart.current = null;
-    if (!start || start.id !== notificationId || event.changedTouches.length === 0) return;
-    const touch = event.changedTouches[0];
-    const dx = touch.clientX - start.x;
-    const dy = touch.clientY - start.y;
-    if (dx < -80 && Math.abs(dx) > Math.abs(dy) * 1.4) void dismissNotification(notificationId);
+  const handleNotificationPointerDown = (notificationId: string, event: React.PointerEvent<HTMLElement>) => {
+    if (event.pointerType === "mouse" || !event.isPrimary || notificationActionBusy) return;
+    notificationPointerStart.current = {
+      id: notificationId,
+      x: event.clientX,
+      y: event.clientY,
+      pointerId: event.pointerId,
+    };
+  };
+
+  const handleNotificationPointerUp = (notificationId: string, event: React.PointerEvent<HTMLElement>) => {
+    const start = notificationPointerStart.current;
+    notificationPointerStart.current = null;
+    if (!start || start.id !== notificationId || start.pointerId !== event.pointerId) return;
+
+    const deltaX = event.clientX - start.x;
+    const deltaY = event.clientY - start.y;
+    // Swipe left, but ignore ordinary vertical scrolling or small taps.
+    if (deltaX <= -56 && Math.abs(deltaX) > Math.abs(deltaY) * 1.25) {
+      void dismissNotification(notificationId);
+    }
   };
 
   const markAllNotificationsRead = async () => {
@@ -1231,7 +1244,7 @@ function Index() {
                 {USER_NOTIFICATIONS.filter((item) => !notificationDismissedIds.includes(item.id)).map((item) => {
                   const unread = !notificationReadIds.includes(item.id);
                   return (
-                    <article key={item.id} onTouchStart={(event) => { const touch = event.touches[0]; if (touch) notificationTouchStart.current = { id: item.id, x: touch.clientX, y: touch.clientY }; }} onTouchEnd={(event) => handleNotificationTouchEnd(item.id, event)} className={`relative overflow-hidden rounded-2xl border bg-card/50 p-4 sm:p-5 transition-transform duration-200 ${unread ? "border-red-500/35 shadow-[0_0_18px_rgba(239,68,68,0.06)]" : "border-border"}`}>
+                    <article key={item.id} onPointerDown={(event) => handleNotificationPointerDown(item.id, event)} onPointerUp={(event) => handleNotificationPointerUp(item.id, event)} onPointerCancel={() => { notificationPointerStart.current = null; }} style={{ touchAction: "pan-y" }} className={`relative overflow-hidden rounded-2xl border bg-card/50 p-4 sm:p-5 transition-transform duration-200 ${unread ? "border-red-500/35 shadow-[0_0_18px_rgba(239,68,68,0.06)]" : "border-border"}`}>
                       <div className="flex items-start gap-3 pl-1">
                         <div className="mt-0.5 grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-primary/20 bg-primary/10 text-primary"><Sparkles className="h-5 w-5" /></div>
                         <div className="min-w-0 flex-1">
