@@ -99,16 +99,16 @@ function ensureSchema(db: Database): Promise<void> {
   return pending;
 }
 
-async function readIds(db: Database, userId: string): Promise<string[]> {
-  const rows = await db.prepare("SELECT notification_id FROM yume_notification_reads WHERE user_id = ?")
-    .bind(userId).all<{ notification_id: string }>();
-  return rows.results.map((row) => row.notification_id);
-}
-
-async function dismissedIds(db: Database, userId: string): Promise<string[]> {
-  const rows = await db.prepare("SELECT notification_id FROM yume_notification_dismissals WHERE user_id = ?")
-    .bind(userId).all<{ notification_id: string }>();
-  return rows.results.map((row) => row.notification_id);
+async function readNotificationState(db: Database, userId: string): Promise<{ readIds: string[]; dismissedIds: string[] }> {
+  const rows = await db.prepare(
+    "SELECT notification_id, 'read' AS state FROM yume_notification_reads WHERE user_id = ? UNION ALL SELECT notification_id, 'dismissed' AS state FROM yume_notification_dismissals WHERE user_id = ?",
+  ).bind(userId, userId).all<{ notification_id: string; state: "read" | "dismissed" }>();
+  const readIds: string[] = [];
+  const dismissedIds: string[] = [];
+  for (const row of rows.results) {
+    (row.state === "read" ? readIds : dismissedIds).push(row.notification_id);
+  }
+  return { readIds, dismissedIds };
 }
 
 export async function handleNotifications(request: Request): Promise<Response> {
@@ -127,31 +127,33 @@ export async function handleNotifications(request: Request): Promise<Response> {
     const userId = await authenticatedUserId(request, db);
 
     if (request.method === "GET") {
-      return json({
-        notifications: USER_NOTIFICATIONS,
-        authenticated: Boolean(userId),
-        readIds: userId ? await readIds(db, userId) : [],
-        dismissedIds: userId ? await dismissedIds(db, userId) : [],
-      });
+      const state = userId
+        ? await readNotificationState(db, userId)
+        : { readIds: [] as string[], dismissedIds: [] as string[] };
+      return json({ notifications: USER_NOTIFICATIONS, authenticated: Boolean(userId), ...state });
     }
 
     if (!userId) return json({ error: "authentication_required", authenticated: false }, 401);
     let body: { action?: unknown };
     try { body = await request.json() as { action?: unknown }; } catch { return json({ error: "invalid_request" }, 400); }
-    if (body.action === "dismiss-one") {
+    if (body.action === "read-one" || body.action === "dismiss-one") {
       const notificationId = typeof body.notificationId === "string" ? body.notificationId : "";
       if (!USER_NOTIFICATIONS.some((notification) => notification.id === notificationId)) return json({ error: "invalid_notification" }, 400);
+      if (body.action === "read-one") {
+        await db.prepare("INSERT OR IGNORE INTO yume_notification_reads (user_id, notification_id) VALUES (?, ?)").bind(userId, notificationId).run();
+        return json({ ok: true, authenticated: true, readIds: (await readNotificationState(db, userId)).readIds });
+      }
       await db.prepare("INSERT OR IGNORE INTO yume_notification_dismissals (user_id, notification_id) VALUES (?, ?)").bind(userId, notificationId).run();
-      return json({ ok: true, authenticated: true, dismissedIds: await dismissedIds(db, userId) });
+      return json({ ok: true, authenticated: true, dismissedIds: (await readNotificationState(db, userId)).dismissedIds });
     }
     if (body.action !== "read-all") return json({ error: "invalid_action" }, 400);
 
-    const statements = USER_NOTIFICATIONS.map((notification) =>
-      db.prepare("INSERT OR IGNORE INTO yume_notification_reads (user_id, notification_id) VALUES (?, ?)")
-        .bind(userId, notification.id),
-    );
-    if (statements.length) await db.batch(statements);
-    return json({ ok: true, authenticated: true, readIds: await readIds(db, userId) });
+    if (USER_NOTIFICATIONS.length) {
+      const placeholders = USER_NOTIFICATIONS.map(() => "(?, ?)").join(", ");
+      const values = USER_NOTIFICATIONS.flatMap((notification) => [userId, notification.id]);
+      await db.prepare("INSERT OR IGNORE INTO yume_notification_reads (user_id, notification_id) VALUES " + placeholders).bind(...values).run();
+    }
+    return json({ ok: true, authenticated: true, readIds: (await readNotificationState(db, userId)).readIds });
   } catch (error) {
     console.error("[YUME][NOTIFICATIONS] Request failed.", error);
     return json({ error: "notifications_unavailable" }, 503);
