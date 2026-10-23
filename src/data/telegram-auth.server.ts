@@ -228,16 +228,14 @@ async function authenticatedTelegramUserId(request: Request, db: TelegramDatabas
 }
 
 async function readSavedLibrary(db: TelegramDatabase, userId: string): Promise<{ favoriteIds: string[]; watchlistIds: string[] }> {
-  const [favorites, watchlist] = await Promise.all([
-    db.prepare("SELECT anime_id FROM yume_saved_anime WHERE user_id = ? AND list_type = 'favorite' ORDER BY created_at, id")
-      .bind(userId).all<SavedAnimeRow>(),
-    db.prepare("SELECT anime_id FROM yume_saved_anime WHERE user_id = ? AND list_type = 'watchlist' ORDER BY created_at, id")
-      .bind(userId).all<SavedAnimeRow>(),
-  ]);
-  return {
-    favoriteIds: favorites.results.map((row) => row.anime_id),
-    watchlistIds: watchlist.results.map((row) => row.anime_id),
-  };
+  const rows = await db.prepare("SELECT list_type, anime_id FROM yume_saved_anime WHERE user_id = ? AND list_type IN ('favorite','watchlist') ORDER BY list_type, created_at, id")
+    .bind(userId).all<SavedAnimeRow & { list_type: SavedListType }>();
+  const favoriteIds: string[] = [];
+  const watchlistIds: string[] = [];
+  for (const row of rows.results) {
+    (row.list_type === "favorite" ? favoriteIds : watchlistIds).push(row.anime_id);
+  }
+  return { favoriteIds, watchlistIds };
 }
 
 async function mergeSavedIds(db: TelegramDatabase, userId: string, listType: SavedListType, ids: string[]): Promise<void> {
