@@ -46,11 +46,31 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
   const { t, language } = useYumePreferences();
   const [panel, setPanel] = useState<ProfilePanel>(initialPanel);
   const [isTelegramMiniApp, setIsTelegramMiniApp] = useState(false);
+  const [telegramUser, setTelegramUser] = useState<{
+    first_name?: string;
+    last_name?: string;
+    username?: string;
+    photo_url?: string;
+  } | null>(null);
 
   useEffect(() => setPanel(initialPanel), [initialPanel]);
   useEffect(() => {
-    setIsTelegramMiniApp(Boolean(getTelegramWebApp()?.initData));
+    const webApp = getTelegramWebApp();
+    const user = webApp?.initData ? webApp.initDataUnsafe?.user : undefined;
+    setIsTelegramMiniApp(Boolean(webApp?.initData));
+    setTelegramUser(user ? {
+      first_name: user.first_name,
+      last_name: user.last_name,
+      username: user.username,
+      photo_url: user.photo_url,
+    } : null);
   }, []);
+
+  const telegramDisplayName = [
+    telegramUser?.first_name,
+    telegramUser?.last_name,
+  ].filter((part): part is string => Boolean(part?.trim())).join(" ")
+    || (telegramUser?.username ? `@${telegramUser.username}` : t("profile.title"));
   const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
   const [watchlistIds, setWatchlistIds] = useState<string[]>([]);
   const [savedAnime, setSavedAnime] = useState<Anime[]>([]);
@@ -185,12 +205,12 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
       key={title}
       type="button"
       onClick={() => navigatePanel(next)}
-      className="flex w-full items-center gap-3 rounded-xl border border-white/[0.07] bg-card/65 p-3.5 text-left transition hover:border-primary/35 hover:bg-accent/70 sm:p-4"
+      className="flex w-full items-center gap-4 rounded-2xl border border-white/[0.08] bg-[#080808]/80 p-3.5 text-left transition hover:border-primary/35 hover:bg-accent/70 sm:p-4"
     >
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+      <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#1b1028] text-primary">
         {(() => {
           const Icon = icon;
-          return <Icon className="h-5 w-5" />;
+          return <Icon className="h-6 w-6" />;
         })()}
       </span>
       <span className="min-w-0 flex-1">
@@ -234,38 +254,82 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
       <div className="mx-auto max-w-6xl">
         {panel === "overview" ? (
           <>
-            <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-[#120C20] p-5 shadow-[0_16px_55px_rgba(0,0,0,0.2)] sm:p-7">
-              <div
-                aria-hidden="true"
-                className="pointer-events-none absolute -right-10 -top-24 h-64 w-64 rounded-full bg-fuchsia-500/10 blur-3xl"
-              />
-              <div className="relative flex items-center gap-4">
-                <div className="flex h-[68px] w-[68px] shrink-0 items-center justify-center rounded-full border border-primary/50 bg-gradient-to-br from-primary/40 to-fuchsia-400/10 shadow-[0_0_32px_rgba(208,90,255,0.15)] sm:h-20 sm:w-20">
-                  <UserRound className="h-9 w-9 text-white sm:h-10 sm:w-10" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs font-semibold uppercase tracking-[0.15em] text-primary">{t("profile.space")}</p>
-                  <h1 className="mt-1 text-2xl font-bold sm:text-3xl">{t("profile.title")}</h1>
-                  <p className="mt-1 text-sm text-muted-foreground">{t("profile.subtitle")}</p>
-                </div>
+            <div className="relative isolate overflow-hidden rounded-[28px] border border-primary/25 bg-[#08050f] shadow-[0_18px_60px_rgba(0,0,0,0.38)]">
+              <div className="relative h-36 overflow-hidden sm:h-48">
+                <img
+                  src="/images/7E68AFCE-335A-41A6-826D-41E8674B7B0F.png"
+                  alt=""
+                  aria-hidden="true"
+                  width={1536}
+                  height={723}
+                  fetchPriority="high"
+                  decoding="async"
+                  className="absolute inset-0 h-full w-full object-cover object-[center_38%]"
+                />
+                <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-[#10071b]/10 to-[#10071b]/95" />
+                <div className="absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-[#10071b] to-transparent" />
               </div>
-              <div className="relative mt-6 grid grid-cols-2 gap-3 sm:max-w-md">
-                <button
-                  type="button"
-                  onClick={() => navigatePanel("favorites")}
-                  className="rounded-xl border border-white/10 bg-black/15 px-4 py-3 text-left transition hover:bg-white/[0.06]"
-                >
-                  <span className="text-2xl font-bold tabular-nums">{favorites.length}</span>
-                  <span className="mt-1 block text-xs text-muted-foreground">{t("profile.favoritesCount")}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => navigatePanel("watchlist")}
-                  className="rounded-xl border border-white/10 bg-black/15 px-4 py-3 text-left transition hover:bg-white/[0.06]"
-                >
-                  <span className="text-2xl font-bold tabular-nums">{watchlist.length}</span>
-                  <span className="mt-1 block text-xs text-muted-foreground">{t("profile.watchlistCount")}</span>
-                </button>
+
+              <div className="relative -mt-8 rounded-t-[28px] bg-gradient-to-b from-[#1b0d2b]/95 via-[#140a20]/98 to-[#0d0916] px-4 pb-4 pt-0 sm:px-6 sm:pb-6">
+                <div className="flex min-w-0 items-end gap-3 sm:gap-4">
+                  <div className="relative -mt-10 h-[100px] w-[100px] shrink-0 overflow-hidden rounded-full border-[3px] border-[#d98aff] bg-[#21102f] shadow-[0_0_28px_rgba(206,100,255,0.38)] sm:-mt-14 sm:h-32 sm:w-32">
+                    {telegramUser?.photo_url ? (
+                      <img
+                        src={telegramUser.photo_url}
+                        alt={telegramDisplayName}
+                        referrerPolicy="no-referrer"
+                        decoding="async"
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[#482465] to-[#150c22]">
+                        <UserRound className="h-11 w-11 text-white sm:h-14 sm:w-14" aria-hidden="true" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1 pb-1 pt-4 sm:pb-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#c16aff] sm:text-xs">
+                      {t("profile.space")}
+                    </p>
+                    <h1 className="mt-1 break-words text-xl font-bold leading-tight text-white sm:text-3xl">
+                      {telegramDisplayName}
+                    </h1>
+                    <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-white/65 sm:text-sm">
+                      {t("profile.subtitle")}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-5 grid grid-cols-2 overflow-hidden rounded-2xl border border-[#8d51bd]/50 bg-black/25 sm:mt-6">
+                  <button
+                    type="button"
+                    onClick={() => navigatePanel("favorites")}
+                    aria-label={`${favorites.length} — ${t("profile.favoritesCount")}`}
+                    className="flex min-w-0 items-center gap-3 px-3 py-3 text-left transition hover:bg-white/[0.06] sm:gap-4 sm:px-5 sm:py-4"
+                  >
+                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#241035] text-[#e58aff] sm:h-14 sm:w-14">
+                      <Heart className="h-6 w-6 sm:h-7 sm:w-7" strokeWidth={1.9} />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block text-xl font-bold tabular-nums text-white sm:text-2xl">{favorites.length}</span>
+                      <span className="mt-0.5 block text-[11px] leading-snug text-white/65 sm:text-sm">{t("profile.favoritesCount")}</span>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => navigatePanel("watchlist")}
+                    aria-label={`${watchlist.length} — ${t("profile.watchlistCount")}`}
+                    className="flex min-w-0 items-center gap-3 border-l border-[#8d51bd]/45 px-3 py-3 text-left transition hover:bg-white/[0.06] sm:gap-4 sm:px-5 sm:py-4"
+                  >
+                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#241035] text-primary sm:h-14 sm:w-14">
+                      <Bookmark className="h-6 w-6 sm:h-7 sm:w-7" strokeWidth={1.9} />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block text-xl font-bold tabular-nums text-white sm:text-2xl">{watchlist.length}</span>
+                      <span className="mt-0.5 block text-[11px] leading-snug text-white/65 sm:text-sm">{t("profile.watchlistCount")}</span>
+                    </span>
+                  </button>
+                </div>
               </div>
             </div>
             {!isTelegramMiniApp && <p className="mt-3 text-xs leading-relaxed text-muted-foreground">{t("profile.localLibraryNotice")}</p>}
@@ -291,9 +355,14 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
                       type="button"
                       aria-label={displayAnimeTitle(anime, language)}
                       onClick={() => onSelect(anime)}
-                      className="group w-[88px] shrink-0 overflow-hidden rounded-xl ring-1 ring-white/10 transition hover:-translate-y-1 hover:ring-primary sm:w-[104px]"
+                      className="group w-[98px] shrink-0 overflow-hidden rounded-xl text-left transition hover:-translate-y-1 sm:w-[118px]"
                     >
-                      <PosterArt anime={anime} className="aspect-[2/3] w-full transition duration-300 group-hover:scale-[1.02]" />
+                      <span className="block overflow-hidden rounded-xl ring-1 ring-white/10 transition group-hover:ring-primary">
+                        <PosterArt anime={anime} className="aspect-[2/3] w-full transition duration-300 group-hover:scale-[1.02]" />
+                      </span>
+                      <span className="mt-2 block line-clamp-2 min-h-8 px-0.5 text-[11px] leading-snug text-foreground/90 sm:text-xs">
+                        {displayAnimeTitle(anime, language)}
+                      </span>
                     </button>
                   ))}
                 </div>
