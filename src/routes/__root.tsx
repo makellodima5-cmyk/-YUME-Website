@@ -190,7 +190,7 @@ function RootComponent() {
         <DocumentLanguageSync />
         <SkipToContent />
         <Outlet />
-        <YumeSplash contentReady={pathname !== "/"} />
+        <YumeSplash contentReady />
       </YumePreferencesProvider>
     </QueryClientProvider>
   );
