@@ -146,7 +146,8 @@ describe("YUME server analytics", () => {
     const sessionId = "00000000-0000-4000-8000-000000000001";
     await handleYumeAnalytics(visit("/#home", sessionId));
     await handleYumeAnalytics(visit("/#catalog", sessionId));
-    expect(db.rows).toHaveLength(2);
+    await handleYumeAnalytics(visit("/#home", "00000000-0000-4000-8000-000000000002"));
+    expect(db.rows).toHaveLength(3);
 
     const anonymous = await handleYumeAnalytics(new Request("https://yume.test/api/analytics"));
     expect(anonymous.status).toBe(401);
@@ -161,10 +162,10 @@ describe("YUME server analytics", () => {
         daily: { visits: number; pageViews: number; visitors: number }[];
       };
     };
-    expect(payload.analytics.periods.hours).toMatchObject({ visits: 1, visitors: 1 });
-    expect(payload.analytics.periods.all).toMatchObject({ visits: 1, visitors: 1 });
+    expect(payload.analytics.periods.hours).toMatchObject({ visits: 2, visitors: 1 });
+    expect(payload.analytics.periods.all).toMatchObject({ visits: 2, visitors: 1 });
     expect(payload.analytics.daily).toHaveLength(7);
-    expect(payload.analytics.daily.reduce((sum, day) => sum + day.pageViews, 0)).toBe(2);
-    expect(payload.analytics.daily.reduce((sum, day) => sum + day.visits, 0)).toBe(1);
+    expect(payload.analytics.daily.reduce((sum, day) => sum + day.pageViews, 0)).toBe(3);
+    expect(payload.analytics.daily.reduce((sum, day) => sum + day.visits, 0)).toBe(2);
   });
 });
