@@ -1,32 +1,160 @@
 import { env as cloudflareEnv } from "cloudflare:workers";
 
 type Env = Record<string, unknown> & { YUME_DB?: unknown; TELEGRAM_ADMIN_ID?: string };
-type Stmt = { bind(...values: unknown[]): Stmt; first<T=Record<string,unknown>>(): Promise<T|null>; all<T=Record<string,unknown>>(): Promise<{results:T[]}>; run(): Promise<unknown> };
-type DB = { prepare(sql:string): Stmt; batch(stmts:Stmt[]): Promise<unknown[]> };
+type Stmt = {
+  bind(...values: unknown[]): Stmt;
+  first<T = Record<string, unknown>>(): Promise<T | null>;
+  all<T = Record<string, unknown>>(): Promise<{ results: T[] }>;
+  run(): Promise<unknown>;
+};
+type DB = { prepare(sql: string): Stmt; batch(stmts: Stmt[]): Promise<unknown[]> };
 type Runtime = typeof globalThis & { __YUME_RUNTIME_ENV__?: unknown };
-const COOKIE="__Host-yume-session";
-function getEnv():Env { try { const e=cloudflareEnv as unknown as Env; if(e&&typeof e==="object") return e; } catch {} const e=(globalThis as Runtime).__YUME_RUNTIME_ENV__; return e&&typeof e==="object"?e as Env:{}; }
-function dbFrom(e:Env):DB|null { return e.YUME_DB&&typeof e.YUME_DB==="object"?e.YUME_DB as DB:null; }
-function json(body:unknown,status=200):Response { return new Response(JSON.stringify(body),{status,headers:{"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store","X-Content-Type-Options":"nosniff","Referrer-Policy":"no-referrer"}}); }
-function cookie(req:Request):string|null { for(const p of (req.headers.get("cookie")??"").split(";")){const i=p.indexOf("=");if(i>=0&&p.slice(0,i).trim()===COOKIE)return p.slice(i+1).trim()||null;}return null; }
-async function hash(s:string):Promise<string>{const d=new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(s)));return Array.from(d,b=>b.toString(16).padStart(2,"0")).join("");}
-function sameOrigin(req:Request):boolean {const origin=req.headers.get("origin");if(origin){try{return new URL(origin).origin===new URL(req.url).origin;}catch{return false;}}const ref=req.headers.get("referer");if(ref){try{return new URL(ref).origin===new URL(req.url).origin;}catch{return false;}}return req.headers.get("sec-fetch-site")==="same-origin";}
-async function authorized(req:Request,e:Env,db:DB):Promise<boolean>{const admin=typeof e.TELEGRAM_ADMIN_ID==="string"?e.TELEGRAM_ADMIN_ID.trim():"";const token=cookie(req);if(!/^\d{1,20}$/.test(admin)||!token)return false;const s=await db.prepare("SELECT u.telegram_user_id,s.expires_at FROM yume_sessions s JOIN yume_users u ON u.id=s.user_id WHERE s.token_hash=? AND u.provider='telegram'").bind(await hash(token)).first<{telegram_user_id:string|null;expires_at:number}>();return Boolean(s&&s.expires_at>Date.now()&&s.telegram_user_id===admin);}
-async function schema(db:DB):Promise<void>{await db.batch([
-db.prepare("CREATE TABLE IF NOT EXISTS yume_analytics_events (id INTEGER PRIMARY KEY AUTOINCREMENT, event_date TEXT NOT NULL, event_hour INTEGER NOT NULL, visitor_hash TEXT NOT NULL, page_path TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)"),
-db.prepare("CREATE INDEX IF NOT EXISTS idx_yume_analytics_date ON yume_analytics_events(event_date)"),
-db.prepare("CREATE INDEX IF NOT EXISTS idx_yume_analytics_visitor ON yume_analytics_events(event_date,visitor_hash)"),
-]);}
-function day(d:Date):string{return d.toISOString().slice(0,10);}
-async function metrics(db:DB,now:Date){const today=day(now),since24=new Date(now.getTime()-86400000),since7=new Date(now.getTime()-7*86400000),since30=new Date(now.getTime()-30*86400000);const count=async(sql:string,...v:unknown[])=>{const r=await db.prepare(sql).bind(...v).first<{n:number}>();return Number(r?.n??0);};const [hours,week,month,all,unique24,uniqueWeek,uniqueMonth,uniqueAll,daily]=await Promise.all([
-count("SELECT COUNT(*) n FROM yume_analytics_events WHERE created_at >= ?",since24.toISOString().replace("T"," ").slice(0,19)),
-count("SELECT COUNT(*) n FROM yume_analytics_events WHERE event_date >= ?",day(since7)),
-count("SELECT COUNT(*) n FROM yume_analytics_events WHERE event_date >= ?",day(since30)),
-count("SELECT COUNT(*) n FROM yume_analytics_events"),
-count("SELECT COUNT(DISTINCT visitor_hash) n FROM yume_analytics_events WHERE created_at >= ?",since24.toISOString().replace("T"," ").slice(0,19)),
-count("SELECT COUNT(DISTINCT visitor_hash) n FROM yume_analytics_events WHERE event_date >= ?",day(since7)),
-count("SELECT COUNT(DISTINCT visitor_hash) n FROM yume_analytics_events WHERE event_date >= ?",day(since30)),
-count("SELECT COUNT(DISTINCT visitor_hash) n FROM yume_analytics_events"),
-db.prepare("SELECT event_date AS date,COUNT(*) AS visits,COUNT(DISTINCT visitor_hash) AS visitors FROM yume_analytics_events WHERE event_date >= ? GROUP BY event_date ORDER BY event_date").bind(day(since7)).all<{date:string;visits:number;visitors:number}>()
-]);return {periods:{hours:{visits:hours,visitors:unique24},week:{visits:week,visitors:uniqueWeek},month:{visits:month,visitors:uniqueMonth},all:{visits:all,visitors:uniqueAll}},daily:daily.results,updatedAt:now.toISOString()};}
-export async function handleYumeAnalytics(req:Request):Promise<Response>{const e=getEnv(),db=dbFrom(e);if(!db)return json({error:"Analytics database is unavailable."},503);try{await schema(db);if(req.method==="POST"){if(!sameOrigin(req))return json({error:"Forbidden origin."},403);const body=await req.json().catch(()=>null) as {path?:unknown}|null;const path=typeof body?.path==="string"&&body.path.startsWith("/")?body.path.slice(0,180):"/";const agent=req.headers.get("user-agent")??"";if(/bot|crawler|spider|headless/i.test(agent))return json({ok:true,ignored:true});const ip=req.headers.get("cf-connecting-ip")??"unknown";const salt=day(new Date());const visitor=await hash(ip+"|"+agent.slice(0,300)+"|yume-analytics-v1");const now=new Date();await db.prepare("INSERT INTO yume_analytics_events(event_date,event_hour,visitor_hash,page_path,created_at) VALUES(?,?,?,?,?)").bind(day(now),now.getUTCHours(),visitor,path,now.toISOString().replace("T"," ").slice(0,19)).run();return json({ok:true});}if(req.method!=="GET")return json({error:"Method not allowed."},405);if(!await authorized(req,e,db))return json({error:"Unauthorized."},401);return json({ok:true,analytics:await metrics(db,new Date())});}catch(error){return json({error:error instanceof Error?error.message:"Analytics operation failed."},500);}}
+
+const SESSION_COOKIE = "__Host-yume-session";
+const SESSION_ID_PATTERN = /^[A-Za-z0-9_-]{16,100}$/;
+const BOT_PATTERN = /bot|crawler|spider|headless|preview|facebookexternalhit|whatsapp/i;
+
+function getEnv(): Env {
+  try {
+    const env = cloudflareEnv as unknown as Env;
+    if (env && typeof env === "object") return env;
+  } catch {
+    // Runtime fallback is useful for unit tests and local adapters.
+  }
+  const injected = (globalThis as Runtime).__YUME_RUNTIME_ENV__;
+  return injected && typeof injected === "object" ? injected as Env : {};
+}
+function dbFrom(env: Env): DB | null {
+  return env.YUME_DB && typeof env.YUME_DB === "object" ? env.YUME_DB as DB : null;
+}
+function json(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": "no-store",
+      "X-Content-Type-Options": "nosniff",
+      "Referrer-Policy": "no-referrer",
+    },
+  });
+}
+function cookieValue(request: Request): string | null {
+  for (const part of (request.headers.get("cookie") ?? "").split(";")) {
+    const index = part.indexOf("=");
+    if (index >= 0 && part.slice(0, index).trim() === SESSION_COOKIE) {
+      return part.slice(index + 1).trim() || null;
+    }
+  }
+  return null;
+}
+async function sha256(value: string): Promise<string> {
+  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)));
+  return Array.from(digest, byte => byte.toString(16).padStart(2, "0")).join("");
+}
+function sameOrigin(request: Request): boolean {
+  const origin = request.headers.get("origin");
+  if (origin) {
+    try { return new URL(origin).origin === new URL(request.url).origin; } catch { return false; }
+  }
+  const referer = request.headers.get("referer");
+  if (referer) {
+    try { return new URL(referer).origin === new URL(request.url).origin; } catch { return false; }
+  }
+  return request.headers.get("sec-fetch-site") === "same-origin";
+}
+async function isAdmin(request: Request, env: Env, db: DB): Promise<boolean> {
+  const adminId = typeof env.TELEGRAM_ADMIN_ID === "string" ? env.TELEGRAM_ADMIN_ID.trim() : "";
+  const token = cookieValue(request);
+  if (!/^\d{1,20}$/.test(adminId) || !token) return false;
+  const session = await db.prepare(
+    "SELECT u.telegram_user_id, s.expires_at FROM yume_sessions s JOIN yume_users u ON u.id = s.user_id WHERE s.token_hash = ? AND u.provider = 'telegram'",
+  ).bind(await sha256(token)).first<{ telegram_user_id: string | null; expires_at: number }>();
+  return Boolean(session && session.expires_at > Date.now() && session.telegram_user_id === adminId);
+}
+async function ensureSchema(db: DB): Promise<void> {
+  await db.batch([
+    db.prepare("CREATE TABLE IF NOT EXISTS yume_analytics_events (id INTEGER PRIMARY KEY AUTOINCREMENT, event_date TEXT NOT NULL, event_hour INTEGER NOT NULL, visitor_hash TEXT NOT NULL, session_hash TEXT NOT NULL DEFAULT '', page_path TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)"),
+    db.prepare("CREATE INDEX IF NOT EXISTS idx_yume_analytics_date ON yume_analytics_events(event_date)"),
+    db.prepare("CREATE INDEX IF NOT EXISTS idx_yume_analytics_visitor ON yume_analytics_events(event_date, visitor_hash)"),
+  ]);
+  // Upgrade the table if an earlier analytics build created it without session IDs.
+  try {
+    await db.prepare("ALTER TABLE yume_analytics_events ADD COLUMN session_hash TEXT NOT NULL DEFAULT ''").run();
+  } catch (error) {
+    if (!String(error).toLowerCase().includes("duplicate column")) throw error;
+  }
+  await db.prepare("CREATE INDEX IF NOT EXISTS idx_yume_analytics_session ON yume_analytics_events(event_date, session_hash)").run();
+}
+function utcDay(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+function sqlTime(date: Date): string {
+  return date.toISOString().replace("T", " ").slice(0, 19);
+}
+async function makeMetrics(db: DB, now: Date) {
+  const since24 = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  const since7 = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const since30 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  const count = async (sql: string, ...values: unknown[]): Promise<number> => {
+    const row = await db.prepare(sql).bind(...values).first<{ n: number }>();
+    return Number(row?.n ?? 0);
+  };
+  const visitsSql = "SELECT COUNT(DISTINCT CASE WHEN session_hash <> '' THEN session_hash ELSE 'legacy-' || id END) AS n FROM yume_analytics_events WHERE created_at >= ?";
+  const visitorsSql = "SELECT COUNT(DISTINCT visitor_hash) AS n FROM yume_analytics_events WHERE created_at >= ?";
+  const [visits24, visits7, visits30, visitsAll, visitors24, visitors7, visitors30, visitorsAll, daily] = await Promise.all([
+    count(visitsSql, sqlTime(since24)),
+    count(visitsSql, sqlTime(since7)),
+    count(visitsSql, sqlTime(since30)),
+    count("SELECT COUNT(DISTINCT CASE WHEN session_hash <> '' THEN session_hash ELSE 'legacy-' || id END) AS n FROM yume_analytics_events"),
+    count(visitorsSql, sqlTime(since24)),
+    count(visitorsSql, sqlTime(since7)),
+    count(visitorsSql, sqlTime(since30)),
+    count("SELECT COUNT(DISTINCT visitor_hash) AS n FROM yume_analytics_events"),
+    db.prepare("SELECT event_date AS date, COUNT(DISTINCT CASE WHEN session_hash <> '' THEN session_hash ELSE 'legacy-' || id END) AS visits, COUNT(*) AS pageViews, COUNT(DISTINCT visitor_hash) AS visitors FROM yume_analytics_events WHERE created_at >= ? GROUP BY event_date ORDER BY event_date")
+      .bind(sqlTime(since7)).all<{ date: string; visits: number; pageViews: number; visitors: number }>(),
+  ]);
+  return {
+    periods: {
+      hours: { visits: visits24, visitors: visitors24 },
+      week: { visits: visits7, visitors: visitors7 },
+      month: { visits: visits30, visitors: visitors30 },
+      all: { visits: visitsAll, visitors: visitorsAll },
+    },
+    daily: daily.results,
+    updatedAt: now.toISOString(),
+  };
+}
+export async function handleYumeAnalytics(request: Request): Promise<Response> {
+  const env = getEnv();
+  const db = dbFrom(env);
+  if (!db) return json({ error: "Analytics database is unavailable." }, 503);
+  try {
+    await ensureSchema(db);
+    if (request.method === "POST") {
+      if (!sameOrigin(request)) return json({ error: "Forbidden origin." }, 403);
+      const body = await request.json().catch(() => null) as { path?: unknown; sessionId?: unknown } | null;
+      const rawPath = typeof body?.path === "string" && body.path.startsWith("/") ? body.path : "/";
+      const path = rawPath.split("?")[0].slice(0, 180);
+      if (path.includes("#admin")) return json({ ok: true, ignored: true });
+      const agent = request.headers.get("user-agent") ?? "";
+      if (BOT_PATTERN.test(agent)) return json({ ok: true, ignored: true });
+      const sessionId = typeof body?.sessionId === "string" && SESSION_ID_PATTERN.test(body.sessionId)
+        ? body.sessionId
+        : null;
+      if (!sessionId) return json({ error: "A valid analytics session is required." }, 400);
+      const ip = request.headers.get("cf-connecting-ip") ?? "unknown";
+      const visitorHash = await sha256("visitor|" + ip + "|" + agent.slice(0, 300));
+      const sessionHash = await sha256("session|" + sessionId);
+      const now = new Date();
+      await db.prepare(
+        "INSERT INTO yume_analytics_events (event_date, event_hour, visitor_hash, session_hash, page_path, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+      ).bind(utcDay(now), now.getUTCHours(), visitorHash, sessionHash, path, sqlTime(now)).run();
+      return json({ ok: true });
+    }
+    if (request.method !== "GET") return json({ error: "Method not allowed." }, 405);
+    if (!await isAdmin(request, env, db)) return json({ error: "Unauthorized." }, 401);
+    return json({ ok: true, analytics: await makeMetrics(db, new Date()) });
+  } catch (error) {
+    return json({ error: error instanceof Error ? error.message : "Analytics operation failed." }, 500);
+  }
+}
