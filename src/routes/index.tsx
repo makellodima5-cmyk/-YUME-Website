@@ -297,6 +297,14 @@ function Index() {
   const [adminImportRunning, setAdminImportRunning] = useState(false);
   const [adminImport, setAdminImport] = useState<{target:number;cursor:number;added:number;skipped:number;incomplete:number;errors:number;state:string;delayMs?:number}>({target:0,cursor:1,added:0,skipped:0,incomplete:0,errors:0,state:"idle"});
   const [adminImportMessage, setAdminImportMessage] = useState("");
+  const [catalogQuality, setCatalogQuality] = useState<{id:string;title:string;year:number;missingYear:boolean;missingPoster:boolean;missingDescription:boolean}[]>([]);
+  const [catalogQualitySummary, setCatalogQualitySummary] = useState({total:0,missingYear:0,missingPoster:0,missingDescription:0});
+  const [catalogFilter, setCatalogFilter] = useState<"all"|"year"|"poster"|"description">("all");
+  const [catalogSelected, setCatalogSelected] = useState<string[]>([]);
+  const [catalogQualityBusy, setCatalogQualityBusy] = useState(false);
+  const [adminAuditLog, setAdminAuditLog] = useState<{id:number;action:string;status:string;details:Record<string,unknown>;created_at:string}[]>([]);
+  const [maintenanceBusy, setMaintenanceBusy] = useState(false);
+  const [maintenanceMessage, setMaintenanceMessage] = useState("");
   const [cookieNoticeAcknowledged, setCookieNoticeAcknowledged] = useState(true);
 
   useEffect(() => {
@@ -481,13 +489,71 @@ function Index() {
     if (!isAdmin) return;
     let cancelled = false;
     fetch("/api/admin/catalog-import", { credentials: "same-origin", cache: "no-store" })
-      .then(async response => ({ response, payload: await response.json().catch(() => ({})) as {isAdmin?:boolean;target?:number;cursor?:number;added?:number;skipped?:number;incomplete?:number;errors?:number;state?:string;delayMs?:number} }))
+      .then(async response => ({ response, payload: await response.json().catch(() => ({})) as {isAdmin?:boolean;target?:number;cursor?:number;added?:number;skipped?:number;incomplete?:number;errors?:number;state?:string;delayMs?:number;quality?:typeof catalogQuality;qualitySummary?:typeof catalogQualitySummary;auditLog?:typeof adminAuditLog} }))
       .then(({response,payload}) => {
         if (cancelled || !response.ok || payload.isAdmin !== true) return;
         setAdminImport({target:payload.target ?? 0,cursor:payload.cursor ?? 1,added:payload.added ?? 0,skipped:payload.skipped ?? 0,incomplete:payload.incomplete ?? 0,errors:payload.errors ?? 0,state:payload.state ?? "idle",delayMs:payload.delayMs});
+        setCatalogQuality(payload.quality ?? []);
+        setCatalogQualitySummary(payload.qualitySummary ?? {total:0,missingYear:0,missingPoster:0,missingDescription:0});
+        setAdminAuditLog(payload.auditLog ?? []);
       }).catch(() => {});
     return () => { cancelled = true; };
   }, [isAdmin]);
+
+  const refreshCatalogQuality = async () => {
+    const response = await fetch("/api/admin/catalog-import", {credentials:"same-origin",cache:"no-store"});
+    const payload = await response.json().catch(() => ({})) as {isAdmin?:boolean;error?:string;quality?:typeof catalogQuality;qualitySummary?:typeof catalogQualitySummary;auditLog?:typeof adminAuditLog};
+    if (!response.ok || payload.isAdmin !== true) throw new Error(payload.error ?? (language === "ru" ? "Не удалось обновить список." : "Could not refresh catalog."));
+    setCatalogQuality(payload.quality ?? []);
+    setCatalogQualitySummary(payload.qualitySummary ?? {total:0,missingYear:0,missingPoster:0,missingDescription:0});
+    setAdminAuditLog(payload.auditLog ?? []);
+  };
+
+  const runCatalogQualityAction = async (action: "repair" | "delete") => {
+    if (!isAdmin || catalogQualityBusy || catalogSelected.length === 0) return;
+    const ids = catalogSelected.slice(0,100);
+    if (action === "delete" && !window.confirm(language === "ru" ? "Удалить выбранные записи (" + ids.length + ")? Это действие нельзя отменить." : "Delete " + ids.length + " selected records? This cannot be undone.")) return;
+    setCatalogQualityBusy(true);
+    setAdminImportMessage("");
+    try {
+      const response = await fetch("/api/admin/catalog-import", {method:"POST",credentials:"same-origin",cache:"no-store",headers:{"Content-Type":"application/json"},body:JSON.stringify({action,ids})});
+      const payload = await response.json().catch(() => ({})) as {isAdmin?:boolean;error?:string;message?:string;deleted?:number;repaired?:number;notFound?:number;stillIncomplete?:number};
+      if (!response.ok || payload.isAdmin !== true) throw new Error(payload.message ?? payload.error ?? (language === "ru" ? "Операция не выполнена." : "Operation failed."));
+      setCatalogSelected([]);
+      setAdminImportMessage(action === "delete"
+        ? (language === "ru" ? "Удалено записей: " + (payload.deleted ?? 0) + "." : "Records deleted: " + (payload.deleted ?? 0) + ".")
+        : (language === "ru" ? "Обновлено: " + (payload.repaired ?? 0) + "; не найдено в Shikimori: " + (payload.notFound ?? 0) + "; всё ещё неполных по данным источника: " + (payload.stillIncomplete ?? 0) + "." : "Updated: " + (payload.repaired ?? 0) + "; not found on Shikimori: " + (payload.notFound ?? 0) + "; still incomplete at source: " + (payload.stillIncomplete ?? 0) + "."));
+      await refreshCatalogQuality();
+    } catch (error) {
+      setAdminImportMessage(error instanceof Error ? error.message : (language === "ru" ? "Операция не удалась." : "Operation failed."));
+    } finally {
+      setCatalogQualityBusy(false);
+    }
+  };
+
+  const runMaintenanceCheck = async () => {
+    if (!isAdmin || maintenanceBusy) return;
+    setMaintenanceBusy(true);
+    setMaintenanceMessage("");
+    try {
+      const response = await fetch("/api/admin/catalog-import", {method:"POST",credentials:"same-origin",cache:"no-store",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"maintenance"})});
+      const payload = await response.json().catch(() => ({})) as {isAdmin?:boolean;error?:string;maintenance?:{ok:boolean;catalogRecords:number;qualitySummary:{total:number;missingYear:number;missingPoster:number;missingDescription:number};checkedAt:string}};
+      if (!response.ok || payload.isAdmin !== true || !payload.maintenance) throw new Error(payload.error ?? (language === "ru" ? "Проверка не удалась." : "Maintenance check failed."));
+      const report = payload.maintenance;
+      setMaintenanceMessage(report.ok
+        ? (language === "ru" ? "База доступна. Записей: " + report.catalogRecords + ". Записей с проблемами: " + report.qualitySummary.total + ". Проверено: " + new Date(report.checkedAt).toLocaleString("ru-RU") + "." : "Database is healthy. Records: " + report.catalogRecords + ". Records with missing fields: " + report.qualitySummary.total + ". Checked: " + new Date(report.checkedAt).toLocaleString() + ".")
+        : (language === "ru" ? "Проверка базы не пройдена." : "Database health check failed."));
+      await refreshCatalogQuality();
+    } catch (error) {
+      setMaintenanceMessage(error instanceof Error ? error.message : (language === "ru" ? "Проверка не удалась." : "Check failed."));
+    } finally { setMaintenanceBusy(false); }
+  };
+
+  const visibleCatalogQuality = catalogQuality.filter(item =>
+    catalogFilter === "year" ? item.missingYear :
+    catalogFilter === "poster" ? item.missingPoster :
+    catalogFilter === "description" ? item.missingDescription : true
+  );
 
   const runCatalogImport = async () => {
     if (!isAdmin || adminImportRunning) return;
@@ -1129,6 +1195,46 @@ function Index() {
                 {adminImportRunning && <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted" role="progressbar" aria-valuemin={0} aria-valuemax={adminImport.target || 1} aria-valuenow={adminImport.added}><div className="h-full rounded-full bg-primary transition-all" style={{width:`${adminImport.target ? Math.min(100,adminImport.added/adminImport.target*100) : 0}%`}} /></div>}
                 <p className="mt-3 text-xs text-muted-foreground">{language === "ru" ? `Состояние: ${adminImport.state}. Страница Shikimori: ${adminImport.cursor}.` : `Status: ${adminImport.state}. Shikimori page: ${adminImport.cursor}.`}</p>
                 {adminImportMessage && <p className="mt-3 rounded-xl border border-border bg-background/60 p-3 text-sm" role="status">{adminImportMessage}</p>}
+              </section>
+              <section className="mb-5 rounded-2xl border border-border bg-card/70 p-4" aria-label={language === "ru" ? "Качество каталога" : "Catalog quality"}>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h2 className="text-lg font-semibold">{language === "ru" ? "Качество каталога" : "Catalog quality"}</h2>
+                    <p className="mt-1 text-sm text-muted-foreground">{language === "ru" ? "Поиск записей без ключевых данных. Сводные цифры охватывают весь каталог; список показывает до 500 записей." : "Find records with missing key fields. Summary covers the whole catalog; the list shows up to 500 records."}</p>
+                  </div>
+                  <span className="rounded-full border border-border px-3 py-1 text-xs text-muted-foreground">{language === "ru" ? "Всего в каталоге: " : "Catalog total: "}{catalogQualitySummary.total}</span>
+                </div>
+                <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  <button type="button" onClick={() => setCatalogFilter("all")} className={"rounded-xl border p-3 text-left " + (catalogFilter==="all" ? "border-primary bg-primary/10" : "border-border bg-background/50")}><span className="block text-xs text-muted-foreground">{language === "ru" ? "Без года или постера/описания" : "Any missing fields"}</span><strong className="mt-1 block text-xl tabular-nums">{catalogQuality.length}</strong></button>
+                  <button type="button" onClick={() => setCatalogFilter("year")} className={"rounded-xl border p-3 text-left " + (catalogFilter==="year" ? "border-primary bg-primary/10" : "border-border bg-background/50")}><span className="block text-xs text-muted-foreground">{language === "ru" ? "Без года" : "Missing year"}</span><strong className="mt-1 block text-xl tabular-nums">{catalogQualitySummary.missingYear}</strong></button>
+                  <button type="button" onClick={() => setCatalogFilter("poster")} className={"rounded-xl border p-3 text-left " + (catalogFilter==="poster" ? "border-primary bg-primary/10" : "border-border bg-background/50")}><span className="block text-xs text-muted-foreground">{language === "ru" ? "Без постера" : "Missing poster"}</span><strong className="mt-1 block text-xl tabular-nums">{catalogQualitySummary.missingPoster}</strong></button>
+                  <button type="button" onClick={() => setCatalogFilter("description")} className={"rounded-xl border p-3 text-left " + (catalogFilter==="description" ? "border-primary bg-primary/10" : "border-border bg-background/50")}><span className="block text-xs text-muted-foreground">{language === "ru" ? "Без описания" : "Missing description"}</span><strong className="mt-1 block text-xl tabular-nums">{catalogQualitySummary.missingDescription}</strong></button>
+                </div>
+                <div className="mt-4 flex flex-wrap items-center gap-2">
+                  <button type="button" disabled={catalogQualityBusy || catalogSelected.length===0} onClick={() => runCatalogQualityAction("repair")} className="rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50">{catalogQualityBusy ? (language==="ru"?"Обработка…":"Working…") : (language==="ru"?"Перезаполнить из Shikimori":"Repair from Shikimori")}</button>
+                  <button type="button" disabled={catalogQualityBusy || catalogSelected.length===0} onClick={() => runCatalogQualityAction("delete")} className="rounded-xl border border-destructive/50 px-4 py-2.5 text-sm font-semibold text-destructive disabled:opacity-50">{language==="ru"?"Удалить выбранные":"Delete selected"}</button>
+                  <button type="button" disabled={catalogQualityBusy} onClick={() => {setCatalogQualityBusy(true); refreshCatalogQuality().catch(error=>setAdminImportMessage(error instanceof Error?error.message:"Refresh failed")).finally(()=>setCatalogQualityBusy(false));}} className="rounded-xl border border-border px-4 py-2.5 text-sm">{language==="ru"?"Обновить список":"Refresh list"}</button>
+                  <span className="text-xs text-muted-foreground">{language==="ru" ? "Выбрано: " : "Selected: "}{catalogSelected.length}/100</span>
+                </div>
+                <div className="mt-3 max-h-80 space-y-2 overflow-y-auto">
+                  {visibleCatalogQuality.length===0 ? <p className="rounded-lg bg-background/60 p-3 text-sm text-muted-foreground">{language==="ru"?"Записей с выбранным фильтром в списке нет. Обнови список для повторной проверки.":"No records for this filter in the current list. Refresh to check again."}</p> : visibleCatalogQuality.map(item => (
+                    <label key={item.id} className="flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-background/50 p-3 text-sm">
+                      <input type="checkbox" checked={catalogSelected.includes(item.id)} disabled={!catalogSelected.includes(item.id) && catalogSelected.length>=100} onChange={event=>setCatalogSelected(current=>event.target.checked ? (current.includes(item.id)||current.length>=100 ? current : [...current,item.id]) : current.filter(id=>id!==item.id))} className="mt-1"/>
+                      <span className="min-w-0 flex-1"><strong className="block">{item.title || (language==="ru"?"Без названия":"Untitled")}</strong><span className="text-xs text-muted-foreground">ID {item.id} · {[item.missingYear?(language==="ru"?"нет года":"no year"):null,item.missingPoster?(language==="ru"?"нет постера":"no poster"):null,item.missingDescription?(language==="ru"?"нет описания":"no description"):null].filter(Boolean).join(" · ")}</span></span>
+                    </label>
+                  ))}
+                </div>
+              </section>
+              <section className="mb-5 rounded-2xl border border-border bg-card/70 p-4" aria-label={language === "ru" ? "Обслуживание" : "Maintenance"}>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div><h2 className="text-lg font-semibold">{language==="ru"?"Обслуживание":"Maintenance"}</h2><p className="mt-1 text-sm text-muted-foreground">{language==="ru"?"Безопасная проверка доступности D1 и сводки каталога без удаления или изменения данных.":"Safe D1 connectivity and catalog summary check; it does not delete or modify catalog data."}</p></div>
+                  <button type="button" onClick={runMaintenanceCheck} disabled={maintenanceBusy} className="rounded-xl border border-border px-4 py-2.5 text-sm font-semibold disabled:opacity-50">{maintenanceBusy?(language==="ru"?"Проверка…":"Checking…"):(language==="ru"?"Проверить базу":"Check database")}</button>
+                </div>
+                {maintenanceMessage && <p role="status" className="mt-3 rounded-xl bg-background/60 p-3 text-sm">{maintenanceMessage}</p>}
+              </section>
+              <section className="mb-5 rounded-2xl border border-border bg-card/70 p-4" aria-label={language==="ru"?"История административных операций":"Admin operation history"}>
+                <div className="flex items-center justify-between gap-3"><h2 className="text-lg font-semibold">{language==="ru"?"История операций":"Operation history"}</h2><span className="text-xs text-muted-foreground">{language==="ru"?"Последние 30 событий":"Latest 30 events"}</span></div>
+                {adminAuditLog.length===0 ? <p className="mt-3 text-sm text-muted-foreground">{language==="ru"?"Событий пока нет.":"No events yet."}</p> : <div className="mt-3 max-h-72 space-y-2 overflow-y-auto">{adminAuditLog.map(entry=><div key={entry.id} className="flex flex-wrap items-start justify-between gap-2 rounded-xl border border-border bg-background/50 p-3 text-sm"><div><strong>{entry.action}</strong><p className="mt-1 text-xs text-muted-foreground">{JSON.stringify(entry.details)}</p></div><div className="text-right"><span className={entry.status==="success"?"text-emerald-500":"text-amber-500"}>{entry.status}</span><p className="mt-1 text-xs text-muted-foreground">{new Date(entry.created_at.replace(" ","T")+"Z").toLocaleString(language==="ru"?"ru-RU":"en-US")}</p></div></div>)}</div>}
               </section>
               <section className="rounded-2xl border border-primary/30 bg-card p-4 shadow-lg" aria-label="Панель администратора">
                 <div className="flex items-center gap-2">
