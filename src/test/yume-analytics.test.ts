@@ -4,9 +4,11 @@ import { trackYumePage } from "@/lib/yume-analytics";
 describe("YUME analytics pageview tracking", () => {
   const firstId = "00000000-0000-4000-8000-000000000001";
   const secondId = "00000000-0000-4000-8000-000000000002";
+  let randomUuidDescriptor: PropertyDescriptor | undefined;
 
   beforeEach(() => {
     window.sessionStorage.clear();
+    randomUuidDescriptor = Object.getOwnPropertyDescriptor(window.crypto, "randomUUID");
     const ids = [firstId, secondId];
     Object.defineProperty(window.crypto, "randomUUID", {
       configurable: true,
@@ -17,6 +19,8 @@ describe("YUME analytics pageview tracking", () => {
 
   afterEach(() => {
     window.sessionStorage.clear();
+    if (randomUuidDescriptor) Object.defineProperty(window.crypto, "randomUUID", randomUuidDescriptor);
+    else Reflect.deleteProperty(window.crypto, "randomUUID");
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
