@@ -4,6 +4,7 @@ import { MAX_SAVED_ANIME_IDS, normalizeSavedAnimeIds } from "@/data/telegram-lib
 
 type TelegramEnvironment = Record<string, unknown> & {
   TELEGRAM_BOT_TOKEN?: string;
+  YUME_AUTH_SESSION_SECRET?: string;
   YUME_DB?: unknown;
 };
 type DbStatement = {
@@ -44,8 +45,20 @@ function database(env: TelegramEnvironment): TelegramDatabase | null {
   return env.YUME_DB && typeof env.YUME_DB === "object" ? env.YUME_DB as TelegramDatabase : null;
 }
 
-async function sha256Hex(value: string): Promise<string> {
-  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", encoder.encode(value)));
+function sessionSecret(env: TelegramEnvironment): string | null {
+  const value = env.YUME_AUTH_SESSION_SECRET;
+  return typeof value === "string" && value.trim().length >= 32 ? value : null;
+}
+
+async function sessionTokenHash(value: string, secret: string): Promise<string> {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const digest = new Uint8Array(await crypto.subtle.sign("HMAC", key, encoder.encode(value)));
   return Array.from(digest, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
@@ -134,11 +147,11 @@ async function initializeTelegramSchema(db: TelegramDatabase): Promise<void> {
   ]);
 }
 
-async function createSession(db: TelegramDatabase, userId: string): Promise<string> {
+async function createSession(db: TelegramDatabase, userId: string, secret: string): Promise<string> {
   const token = randomToken();
   const expiresAt = Date.now() + SESSION_TTL_SECONDS * 1000;
   await db.prepare("DELETE FROM yume_sessions WHERE expires_at <= ?").bind(Date.now()).run();
-  await db.prepare("INSERT INTO yume_sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)").bind(await sha256Hex(token), userId, expiresAt).run();
+  await db.prepare("INSERT INTO yume_sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)").bind(await sessionTokenHash(token, secret), userId, expiresAt).run();
   return sessionCookie(token);
 }
 
@@ -207,10 +220,10 @@ function isSameOriginRequest(request: Request): boolean {
   return request.headers.get("sec-fetch-site") !== "cross-site";
 }
 
-async function authenticatedTelegramUserId(request: Request, db: TelegramDatabase): Promise<string | null> {
+async function authenticatedTelegramUserId(request: Request, db: TelegramDatabase, secret: string): Promise<string | null> {
   const token = readCookie(request, SESSION_COOKIE);
   if (!token) return null;
-  const tokenHash = await sha256Hex(token);
+  const tokenHash = await sessionTokenHash(token, secret);
   const session = await db.prepare(
     "SELECT s.user_id, s.expires_at FROM yume_sessions s JOIN yume_users u ON u.id = s.user_id WHERE s.token_hash = ? AND u.provider = 'telegram'",
   ).bind(tokenHash).first<AuthenticatedSessionRow>();
@@ -273,7 +286,9 @@ export async function handleTelegramLibrary(request: Request): Promise<Response>
   try {
     await ensureSchema(db);
     await ensureSavedAnimeSchema(db);
-    const userId = await authenticatedTelegramUserId(request, db);
+    const secret = sessionSecret(env);
+    if (!secret) return jsonResponse({ error: "telegram_auth_not_configured" }, 503);
+    const userId = await authenticatedTelegramUserId(request, db, secret);
     if (!userId) return jsonResponse({ authenticated: false, error: "authentication_required" }, 401);
 
     if (request.method === "GET") {
@@ -333,9 +348,10 @@ export async function handleTelegramSession(request: Request): Promise<Response>
     const env = environment();
     const db = database(env);
     const token = readCookie(request, SESSION_COOKIE);
-    if (db && token) {
+    const secret = sessionSecret(env);
+    if (db && token && secret) {
       try {
-        await db.prepare("DELETE FROM yume_sessions WHERE token_hash = ?").bind(await sha256Hex(token)).run();
+        await db.prepare("DELETE FROM yume_sessions WHERE token_hash = ?").bind(await sessionTokenHash(token, secret)).run();
       } catch {
         return jsonResponse({ error: "session_unavailable" }, 503, [clearSessionCookie()]);
       }
@@ -347,13 +363,15 @@ export async function handleTelegramSession(request: Request): Promise<Response>
     const env = environment();
     const db = database(env);
     const token = readCookie(request, SESSION_COOKIE);
+    const secret = sessionSecret(env);
     if (!db || !token) return jsonResponse({ authenticated: false }, 200);
+    if (!secret) return jsonResponse({ error: "telegram_auth_not_configured" }, 503);
     try {
       await ensureSchema(db);
       const row = await db.prepare("SELECT u.id, u.telegram_user_id, u.telegram_first_name, u.telegram_last_name, u.telegram_username, u.telegram_language_code, s.expires_at FROM yume_sessions s JOIN yume_users u ON u.id = s.user_id WHERE s.token_hash = ?")
-        .bind(await sha256Hex(token)).first<SessionRow>();
+        .bind(await sessionTokenHash(token, secret)).first<SessionRow>();
       if (!row || row.expires_at <= Date.now()) {
-        if (row) await db.prepare("DELETE FROM yume_sessions WHERE token_hash = ?").bind(await sha256Hex(token)).run();
+        if (row) await db.prepare("DELETE FROM yume_sessions WHERE token_hash = ?").bind(await sessionTokenHash(token, secret)).run();
         return jsonResponse({ authenticated: false }, 200, [clearSessionCookie()]);
       }
       return jsonResponse({ authenticated: true, user: userPayload(row) });
@@ -376,9 +394,8 @@ export async function handleTelegramSession(request: Request): Promise<Response>
   const input = body as Record<string, unknown>;
   const env = environment();
   const botToken = typeof env.TELEGRAM_BOT_TOKEN === "string" ? env.TELEGRAM_BOT_TOKEN.trim() : "";
-  // Sessions use 256-bit random tokens whose hashes are stored in D1. A separate
-  // session secret is not part of this flow and must not block Telegram sign-in.
-  if (!botToken) return jsonResponse({ error: "telegram_auth_not_configured" }, 503);
+  const secret = sessionSecret(env);
+  if (!botToken || !secret) return jsonResponse({ error: "telegram_auth_not_configured" }, 503);
   const validated = await validateTelegramInitData(input.initData as string, botToken);
   if (!validated.ok) return jsonResponse({ error: validated.error }, validated.error === "invalid_request" ? 400 : 401);
 
@@ -404,7 +421,7 @@ export async function handleTelegramSession(request: Request): Promise<Response>
       };
     }
     if (!user) throw new Error("TELEGRAM_USER_UPSERT_FAILED");
-    const cookie = await createSession(db, user.id);
+    const cookie = await createSession(db, user.id, secret);
     return jsonResponse({ authenticated: true, user: userPayload(user) }, 200, [cookie]);
   } catch (error) {
     console.error("[YUME] Telegram sign-in failed:", error);
