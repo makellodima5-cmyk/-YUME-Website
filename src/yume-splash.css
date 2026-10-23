@@ -1,13 +1,17 @@
 /* YUME Mini App cinematic launch screen */
 /* This selector is controlled by a tiny inline script in the document head,
    before the browser can paint the server-rendered home page. */
-html.telegram-mini-app,
-html.telegram-mini-app body {
+html.telegram-mini-app[data-yume-splash-active="true"],
+html.telegram-mini-app[data-yume-splash-active="true"] body {
   background: #030207 !important;
-  color-scheme: dark;
 }
+/* Keep the cinematic dark canvas only while the splash is active.
+   The app's own data-theme and color-scheme remain authoritative afterward. */
 html:not([data-yume-splash-active="true"]) .yume-splash {
   display: none !important;
+}
+html[data-yume-splash-active="true"] body {
+  background-image: none !important;
 }
 .yume-splash {
   isolation: isolate;
