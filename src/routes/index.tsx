@@ -719,14 +719,14 @@ function Index() {
       body: JSON.stringify({ action: "read-one", notificationId }),
     }).then(async (response) => {
       const payload = await response.json().catch(() => ({})) as { authenticated?: boolean; readIds?: unknown };
-      if (response.status === 401 || payload.authenticated !== true) {
+      if (response.status === 401) {
         setNotificationRemoteAccount(false);
         const ids = Array.from(new Set([...readLocalNotificationIds(), notificationId]));
         saveLocalNotificationIds(ids);
         setNotificationReadIds(ids);
         return;
       }
-      if (!response.ok) throw new Error("Notification read status could not be saved.");
+      if (!response.ok || payload.authenticated !== true) throw new Error("Notification read status could not be saved.");
       if (Array.isArray(payload.readIds)) setNotificationReadIds(payload.readIds.filter((id): id is string => typeof id === "string"));
     }).catch(() => {
       setNotificationReadIds((current) => current.filter((id) => id !== notificationId));
