@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { runAdminTrailerUpdate, type AdminTrailerStats } from "@/data/admin-trailers.client";
+import { runAdminTrailerUpdate, type AdminTrailerStats } from "@/data/admin-trailer-update";
 
 type MockReply = {
   status: number;
