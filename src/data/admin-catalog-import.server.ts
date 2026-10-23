@@ -334,6 +334,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
         if (statements.length) await db.batch(statements);
         const after = await snapshot(db);
         await audit(db,"catalog.import.page","success",{page:before.cursor,added:after.added-before.added,skipped:after.skipped-before.skipped,incomplete:after.incomplete-before.incomplete,state:after.state});
+        if (after.state !== "running") await audit(db,"catalog.import.finish",after.state,{added:after.added,target:after.target,skipped:after.skipped,errors:after.errors});
         return json({isAdmin:true,...after});
       }
       if (body.action === "stop") {
