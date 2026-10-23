@@ -156,15 +156,19 @@ async function fetchByIds(ids: string[]): Promise<ShikimoriAnime[]> {
   if (payload.errors?.length) throw new Error(payload.errors.map(e=>e.message).filter(Boolean).join("; ") || "GraphQL error");
   return (payload.data?.animes ?? []).filter(item => !(item.genres ?? []).some(g => [g.name,g.russian].some(n => clean(n).normalize("NFKC").toLowerCase() === "hentai" || clean(n).normalize("NFKC").toLowerCase() === "хентай")));
 }
-async function catalogQuality(db: Database) {
+async function catalogQuality(db: Database, requestedOffset = 0) {
+  const offset = Number.isFinite(requestedOffset) ? Math.max(0,Math.min(100000,Math.floor(requestedOffset))) : 0;
   const [rows, aggregate] = await Promise.all([
-    db.prepare("SELECT id,title,year,poster_url,description FROM anime_catalog WHERE year = 0 OR poster_url IS NULL OR TRIM(COALESCE(poster_url,'')) = '' OR TRIM(COALESCE(description,'')) = '' ORDER BY position,id LIMIT 500").all<{id:string;title:string;year:number;poster_url:string|null;description:string|null}>(),
+    db.prepare("SELECT id,title,year,poster_url,description FROM anime_catalog WHERE year = 0 OR poster_url IS NULL OR TRIM(COALESCE(poster_url,'')) = '' OR TRIM(COALESCE(description,'')) = '' ORDER BY position,id LIMIT 500 OFFSET ?").bind(offset).all<{id:string;title:string;year:number;poster_url:string|null;description:string|null}>(),
     db.prepare("SELECT COUNT(*) AS total, SUM(CASE WHEN year = 0 THEN 1 ELSE 0 END) AS missingYear, SUM(CASE WHEN poster_url IS NULL OR TRIM(COALESCE(poster_url,'')) = '' THEN 1 ELSE 0 END) AS missingPoster, SUM(CASE WHEN TRIM(COALESCE(description,'')) = '' THEN 1 ELSE 0 END) AS missingDescription, SUM(CASE WHEN year = 0 OR poster_url IS NULL OR TRIM(COALESCE(poster_url,'')) = '' OR TRIM(COALESCE(description,'')) = '' THEN 1 ELSE 0 END) AS incomplete FROM anime_catalog").first<{total:number;missingYear:number|null;missingPoster:number|null;missingDescription:number|null;incomplete:number|null}>(),
   ]);
+  const summary = {total:Number(aggregate?.total ?? 0), incomplete:Number(aggregate?.incomplete ?? 0), missingYear:Number(aggregate?.missingYear ?? 0), missingPoster:Number(aggregate?.missingPoster ?? 0), missingDescription:Number(aggregate?.missingDescription ?? 0)};
   return {
     items: rows.results.map(row => ({id:row.id,title:row.title,year:row.year,missingYear:!row.year,missingPoster:!row.poster_url?.trim(),missingDescription:!row.description?.trim()})),
-    summary: {total:Number(aggregate?.total ?? 0), incomplete:Number(aggregate?.incomplete ?? 0), missingYear:Number(aggregate?.missingYear ?? 0), missingPoster:Number(aggregate?.missingPoster ?? 0), missingDescription:Number(aggregate?.missingDescription ?? 0)},
+    summary,
     limit:500,
+    offset,
+    hasMore:offset + rows.results.length < summary.incomplete,
   };
 }
 async function acquireLock(db: Database): Promise<string | null> {
@@ -215,7 +219,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
   try {
     if (!await authorize(request,env,db)) return json({isAdmin:false,error:"admin_required"},403);
     await ensureSchema(db);
-    if (request.method === "GET") { const quality = await catalogQuality(db); return json({isAdmin:true,...await snapshot(db),quality:quality.items,qualitySummary:quality.summary,qualityLimit:quality.limit,auditLog:await recentAudit(db)}); }
+    if (request.method === "GET") { const url = new URL(request.url); const qualityOffset = Number(url.searchParams.get("qualityOffset") ?? "0"); const quality = await catalogQuality(db,qualityOffset); return json({isAdmin:true,...await snapshot(db),quality:quality.items,qualitySummary:quality.summary,qualityLimit:quality.limit,qualityOffset:quality.offset,qualityHasMore:quality.hasMore,auditLog:await recentAudit(db)}); }
     let body: {action?:unknown; target?:unknown};
     try { body = await request.json() as {action?:unknown;target?:unknown}; } catch { return json({error:"invalid_request"},400); }
     const lockToken = await acquireLock(db);
