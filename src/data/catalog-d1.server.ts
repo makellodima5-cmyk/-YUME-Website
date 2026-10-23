@@ -105,6 +105,7 @@ const CREATE_SCHEMA_STATEMENTS = [
   )`,
   "CREATE INDEX IF NOT EXISTS idx_anime_catalog_title ON anime_catalog(title)",
   "CREATE INDEX IF NOT EXISTS idx_anime_catalog_position ON anime_catalog(position)",
+  "CREATE INDEX IF NOT EXISTS idx_anime_catalog_missing_trailer ON anime_catalog(id) WHERE youtube_trailer_id IS NULL OR youtube_trailer_id = ''",
   `CREATE TABLE IF NOT EXISTS anime_catalog_meta (
     key TEXT PRIMARY KEY NOT NULL,
     value TEXT NOT NULL
@@ -113,6 +114,13 @@ const CREATE_SCHEMA_STATEMENTS = [
 
 let schemaReady = false;
 let missingBindingWarningLogged = false;
+const CATALOG_READ_CACHE_TTL_MS = 30_000;
+let catalogReadCache: { db: D1Database; expiresAt: number; result: CatalogResult } | null = null;
+
+/** Clear the isolate-local public snapshot after a catalog mutation. Other isolates refresh within the short TTL. */
+export function invalidatePersistentCatalogCache(): void {
+  catalogReadCache = null;
+}
 
 function database(): D1Database | null {
   let nativeBinding: unknown;
@@ -288,27 +296,40 @@ export async function getPersistentCatalog(
     return null;
   }
 
+  if (!options.allowImport && catalogReadCache?.db === db) {
+    if (catalogReadCache.expiresAt > Date.now()) {
+      const cached = catalogReadCache.result;
+      return { ...cached, items: options.progressOnly ? [] : cached.items };
+    }
+    catalogReadCache = null;
+  }
+
   try {
     await ensureSchema(db);
 
     let state = await getMeta(db, "catalog_state");
     let imported = await countRows(db);
 
-    if (state === "ready") {
-      return { items: await readRows(db), error: null, progress: makeProgress("ready", imported) };
-    }
-    if (state === "partial") {
-      return {
+    if (state === "ready" || state === "partial") {
+      const result: CatalogResult = {
         items: await readRows(db),
-        error: "Каталог загружен частично: " + imported + " из " + CATALOG_LIMIT + " записей.",
-        progress: makeProgress("partial", imported),
+        error: state === "partial"
+          ? "Каталог загружен частично: " + imported + " из " + CATALOG_LIMIT + " записей."
+          : null,
+        progress: makeProgress(state, imported),
       };
+      if (!options.allowImport) {
+        catalogReadCache = { db, expiresAt: Date.now() + CATALOG_READ_CACHE_TTL_MS, result };
+      }
+      return { ...result, items: options.progressOnly ? [] : result.items };
     }
 
     // Preserve manually inserted catalog rows from earlier deployments.
     if (!state && imported > 0) {
       await db.batch([putMeta(db, "catalog_state", "ready")]);
-      return { items: await readRows(db), error: null, progress: makeProgress("ready", imported) };
+      const result: CatalogResult = { items: await readRows(db), error: null, progress: makeProgress("ready", imported) };
+      if (!options.allowImport) catalogReadCache = { db, expiresAt: Date.now() + CATALOG_READ_CACHE_TTL_MS, result };
+      return { ...result, items: options.progressOnly ? [] : result.items };
     }
 
     // User-facing requests never initialize or advance the upstream import.
@@ -406,6 +427,7 @@ export async function getPersistentCatalog(
         db.prepare(INSERT_ANIME).bind(...rowValues(item, cursor * 50 + index)),
       );
       if (statements.length) {
+        invalidatePersistentCatalogCache();
         statements.push(db.prepare([
           "DELETE FROM anime_catalog",
           "WHERE id IN (",
