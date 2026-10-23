@@ -308,7 +308,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
             setMeta(db,"admin_import_baseline_incomplete",String(before.incomplete)),
           ]);
         }
-        const sourceIds = Array.from(new Set(source.map(item => String(item.id)).filter(id => /^\d{1,20}$/.test(id)));
+        const sourceIds = Array.from(new Set(source.map(item => String(item.id)).filter(id => /^\d{1,20}$/.test(id))));
         const existingRows = sourceIds.length
           ? await db.prepare("SELECT id FROM anime_catalog WHERE id IN (" + sourceIds.map(() => "?").join(",") + ")").bind(...sourceIds).all<{id:string}>()
           : {results:[] as {id:string}[]};
