@@ -1,4 +1,5 @@
 import { env as cloudflareEnv } from "cloudflare:workers";
+import { invalidatePersistentCatalogCache } from "@/data/catalog-d1.server";
 
 type RuntimeGlobal = typeof globalThis & { __YUME_RUNTIME_ENV__?: unknown };
 type Environment = Record<string, unknown> & { TELEGRAM_ADMIN_ID?: string; YUME_DB?: unknown };
@@ -109,13 +110,24 @@ async function queueCounts(db: Database): Promise<{ total: number; pending: numb
   return { total: Number(row?.total ?? 0), pending: Number(row?.pending ?? 0), checked: Number(row?.checked ?? 0), found: Number(row?.found ?? 0) };
 }
 
-async function ensureQueue(db: Database): Promise<void> {
-  await db.batch([
+const trailerSchemaPromises = new WeakMap<object, Promise<void>>();
+
+function ensureQueue(db: Database): Promise<void> {
+  const key = db as object;
+  const existing = trailerSchemaPromises.get(key);
+  if (existing) return existing;
+  const pending = db.batch([
     db.prepare("CREATE TABLE IF NOT EXISTS anime_trailer_update_queue (anime_id TEXT PRIMARY KEY NOT NULL, status TEXT NOT NULL DEFAULT 'pending', trailer_found INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)"),
     db.prepare("CREATE INDEX IF NOT EXISTS idx_anime_trailer_queue_status ON anime_trailer_update_queue(status, anime_id)"),
     db.prepare("CREATE TABLE IF NOT EXISTS yume_admin_audit_log (id INTEGER PRIMARY KEY AUTOINCREMENT, action TEXT NOT NULL, status TEXT NOT NULL, details TEXT NOT NULL DEFAULT '{}', actor_telegram_id TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)"),
     db.prepare("CREATE TABLE IF NOT EXISTS yume_trailer_auto_state (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL)"),
-  ]);
+    db.prepare("CREATE INDEX IF NOT EXISTS idx_anime_catalog_missing_trailer ON anime_catalog(id) WHERE youtube_trailer_id IS NULL OR youtube_trailer_id = ''"),
+  ]).then(() => undefined).catch((error) => {
+    trailerSchemaPromises.delete(key);
+    throw error;
+  });
+  trailerSchemaPromises.set(key, pending);
+  return pending;
 }
 
 async function audit(db: Database, action: string, status: string, details: Record<string, unknown> = {}): Promise<void> {
@@ -272,6 +284,7 @@ export async function handleAdminTrailers(request: Request): Promise<Response> {
       statements.push(db.prepare("UPDATE anime_trailer_update_queue SET status = 'checked', trailer_found = ?, updated_at = CURRENT_TIMESTAMP WHERE anime_id = ?").bind(found ? 1 : 0, id));
     }
     await db.batch(statements);
+    if (trailersFoundInBatch > 0) invalidatePersistentCatalogCache();
     const counts = await queueCounts(db);
     await audit(db,"trailers.scan.batch","success",{requested:ids.length,sourceMissing,noVideo,unusableVideo,trailersFoundInBatch,queuePending:counts.pending,queueChecked:counts.checked,queueFound:counts.found});
     if (counts.pending === 0) await audit(db,"trailers.scan.finish","success",counts);
@@ -305,21 +318,25 @@ export async function handleAdminTrailers(request: Request): Promise<Response> {
 
 
 type AutoState = { enabled: boolean; running: boolean; nextRunAt: number | null; lastRunAt: number | null; retryAt: number | null; lastError: string; };
-async function autoValue(db: Database, key: string): Promise<string | null> {
-  const row = await db.prepare("SELECT value FROM yume_trailer_auto_state WHERE key = ?").bind(key).first<{value:string}>();
-  return row?.value ?? null;
-}
 async function setAutoValues(db: Database, values: Record<string,string>): Promise<void> {
   await db.batch(Object.entries(values).map(([key,value]) =>
     db.prepare("INSERT OR REPLACE INTO yume_trailer_auto_state (key,value) VALUES (?,?)").bind(key,value)));
 }
 async function readAutoState(db: Database): Promise<AutoState> {
-  const [enabled,running,nextRunAt,lastRunAt,retryAt,lastError] = await Promise.all([
-    autoValue(db,"enabled"),autoValue(db,"running"),autoValue(db,"next_run_at"),
-    autoValue(db,"last_run_at"),autoValue(db,"retry_at"),autoValue(db,"last_error"),
-  ]);
-  return { enabled: enabled === "1", running: running === "1", nextRunAt: nextRunAt ? Number(nextRunAt) : null,
-    lastRunAt: lastRunAt ? Number(lastRunAt) : null, retryAt: retryAt ? Number(retryAt) : null, lastError: lastError ?? "" };
+  const rows = await db.prepare("SELECT key, value FROM yume_trailer_auto_state WHERE key IN ('enabled','running','next_run_at','last_run_at','retry_at','last_error')")
+    .all<{key:string;value:string}>();
+  const values = new Map(rows.results.map((row) => [row.key, row.value]));
+  const nextRunAt = values.get("next_run_at");
+  const lastRunAt = values.get("last_run_at");
+  const retryAt = values.get("retry_at");
+  return {
+    enabled: values.get("enabled") === "1",
+    running: values.get("running") === "1",
+    nextRunAt: nextRunAt ? Number(nextRunAt) : null,
+    lastRunAt: lastRunAt ? Number(lastRunAt) : null,
+    retryAt: retryAt ? Number(retryAt) : null,
+    lastError: values.get("last_error") ?? "",
+  };
 }
 
 /** Cloudflare Cron handler. Advances one durable queue batch per tick; it never depends on an open admin UI. */
@@ -378,6 +395,7 @@ export async function runScheduledTrailerUpdate(envInput: unknown): Promise<void
         statements.push(db.prepare("UPDATE anime_trailer_update_queue SET status='checked',trailer_found=?,updated_at=CURRENT_TIMESTAMP WHERE anime_id=?").bind(found ? 1 : 0,id));
       }
       await db.batch(statements);
+      if (byId.size > 0 && ids.some((id) => Boolean(byId.get(id)))) invalidatePersistentCatalogCache();
       const counts = await queueCounts(db);
       await setAutoValues(db,{retry_at:"",last_error:"",lock_until:"0"});
       await audit(db,"trailers.auto.batch","success",{requested:ids.length,returned:fetched.items.length,pending:counts.pending,found:counts.found});
