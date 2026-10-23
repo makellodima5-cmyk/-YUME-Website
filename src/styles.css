@@ -336,3 +336,23 @@ html.telegram-mini-app,
 html.telegram-mini-app body {
   min-height: var(--yume-tg-viewport-height, 100vh);
 }
+
+
+/* Telegram Mini App touch reliability: decorative poster layers must never
+   become independent hit targets, and interactive controls use native taps. */
+html.telegram-mini-app {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html.telegram-mini-app :where(button, a, [role="button"]) {
+  touch-action: manipulation;
+}
+
+html.telegram-mini-app :where(button, a, [role="button"]) :where(img, svg) {
+  pointer-events: none;
+}
+
+html.telegram-mini-app :where(button, a, [role="button"]) {
+  -webkit-user-select: none;
+  user-select: none;
+}
