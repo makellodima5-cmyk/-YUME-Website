@@ -191,8 +191,16 @@ export async function handleAdminTrailers(request: Request): Promise<Response> {
     if (body.action === "start") {
       const counts = await queueCounts(db);
       if (counts.pending > 0) return json({ isAdmin: true, ...counts, message: "Обработка уже начата." });
-      await db.prepare("INSERT OR IGNORE INTO anime_trailer_update_queue (anime_id, status) SELECT id, 'pending' FROM anime_catalog WHERE youtube_trailer_id IS NULL OR youtube_trailer_id = ''").run();
-      return json({ isAdmin: true, ...(await queueCounts(db)), message: "Очередь обновления создана." });
+
+      // Re-queue every catalogue item that still lacks a trailer. INSERT OR IGNORE
+      // alone leaves previously checked rows stuck in "checked" forever.
+      await db.batch([
+        db.prepare("INSERT OR IGNORE INTO anime_trailer_update_queue (anime_id, status, trailer_found) SELECT id, 'pending', 0 FROM anime_catalog WHERE youtube_trailer_id IS NULL OR youtube_trailer_id = ''"),
+        db.prepare("UPDATE anime_trailer_update_queue SET status = 'pending', trailer_found = 0, updated_at = CURRENT_TIMESTAMP WHERE anime_id IN (SELECT id FROM anime_catalog WHERE youtube_trailer_id IS NULL OR youtube_trailer_id = '')"),
+      ]);
+      const refreshed = await queueCounts(db);
+      console.info("[YUME][TRAILER_SCAN] Queue prepared.", { total: refreshed.total, pending: refreshed.pending, checked: refreshed.checked, found: refreshed.found });
+      return json({ isAdmin: true, ...refreshed, message: "Очередь обновления создана; ранее не найденные трейлеры будут проверены повторно." });
     }
     if (body.action !== "step") return json({ error: "invalid_action" }, 400);
 
@@ -210,10 +218,18 @@ export async function handleAdminTrailers(request: Request): Promise<Response> {
       return json({ isAdmin: true, ...(await queueCounts(db)), retryAfterMs, error: error instanceof Error ? error.message : "Не удалось запросить Shikimori." }, 503);
     }
 
+    const returnedIds = new Set(fetched.items.map((item) => String(item.id)));
     const byId = new Map(fetched.items.map((item) => [String(item.id), trailerId(item.videos)]));
+    let sourceMissing = 0;
+    let noVideo = 0;
+    let unusableVideo = 0;
     const statements: Statement[] = [];
     for (const id of ids) {
+      const item = fetched.items.find((candidate) => String(candidate.id) === id);
       const found = byId.get(id) ?? null;
+      if (!returnedIds.has(id)) sourceMissing += 1;
+      else if (!item?.videos?.length) noVideo += 1;
+      else if (!found) unusableVideo += 1;
       if (found) {
         statements.push(db.prepare("UPDATE anime_catalog SET youtube_trailer_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND (youtube_trailer_id IS NULL OR youtube_trailer_id = '')").bind(found, id));
       }
@@ -221,7 +237,22 @@ export async function handleAdminTrailers(request: Request): Promise<Response> {
     }
     await db.batch(statements);
     const counts = await queueCounts(db);
-    return json({ isAdmin: true, ...counts, processed: ids.length, batchSize: BATCH_SIZE, delayMs: REQUEST_DELAY_MS, done: counts.pending === 0 });
+    console.info("[YUME][TRAILER_SCAN] Batch processed.", {
+      requested: ids.length,
+      returnedFromSource: fetched.items.length,
+      sourceMissing,
+      noVideo,
+      unusableVideo,
+      trailersFoundInBatch: ids.length - sourceMissing - noVideo - unusableVideo - (ids.filter((id) => !byId.get(id)).length - sourceMissing - noVideo - unusableVideo),
+      queuePending: counts.pending,
+      queueChecked: counts.checked,
+      queueFound: counts.found,
+    });
+    return json({
+      isAdmin: true, ...counts, processed: ids.length, batchSize: BATCH_SIZE, delayMs: REQUEST_DELAY_MS,
+      diagnostics: { requested: ids.length, returnedFromSource: fetched.items.length, sourceMissing, noVideo, unusableVideo },
+      done: counts.pending === 0,
+    });
   } catch (error) {
     console.error("[YUME][ADMIN_API] Admin trailer operation failed.", {
       method: request.method,
