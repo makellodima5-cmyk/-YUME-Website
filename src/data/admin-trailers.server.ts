@@ -114,6 +114,7 @@ async function ensureQueue(db: Database): Promise<void> {
     db.prepare("CREATE TABLE IF NOT EXISTS anime_trailer_update_queue (anime_id TEXT PRIMARY KEY NOT NULL, status TEXT NOT NULL DEFAULT 'pending', trailer_found INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)"),
     db.prepare("CREATE INDEX IF NOT EXISTS idx_anime_trailer_queue_status ON anime_trailer_update_queue(status, anime_id)"),
     db.prepare("CREATE TABLE IF NOT EXISTS yume_admin_audit_log (id INTEGER PRIMARY KEY AUTOINCREMENT, action TEXT NOT NULL, status TEXT NOT NULL, details TEXT NOT NULL DEFAULT '{}', actor_telegram_id TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)"),
+    db.prepare("CREATE TABLE IF NOT EXISTS yume_trailer_auto_state (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL)"),
   ]);
 }
 
@@ -194,11 +195,25 @@ export async function handleAdminTrailers(request: Request): Promise<Response> {
       const counts = await queueCounts(db);
       const missing = await db.prepare("SELECT COUNT(*) AS count FROM anime_catalog WHERE youtube_trailer_id IS NULL OR youtube_trailer_id = ''")
         .first<{ count: number }>();
-      return json({ isAdmin: true, ...counts, missing: Number(missing?.count ?? 0), batchSize: BATCH_SIZE, delayMs: REQUEST_DELAY_MS });
+      const auto = await readAutoState(db);
+      return json({ isAdmin: true, ...counts, missing: Number(missing?.count ?? 0), batchSize: BATCH_SIZE, delayMs: REQUEST_DELAY_MS, auto });
     }
 
     let body: { action?: unknown };
     try { body = await request.json() as { action?: unknown }; } catch { return json({ error: "invalid_request" }, 400); }
+    if (body.action === "auto-enable" || body.action === "auto-disable") {
+      const enabled = body.action === "auto-enable";
+      const now = Date.now();
+      await db.batch([
+        db.prepare("INSERT OR REPLACE INTO yume_trailer_auto_state (key,value) VALUES ('enabled',?)").bind(enabled ? "1" : "0"),
+        ...(enabled ? [
+          db.prepare("INSERT OR REPLACE INTO yume_trailer_auto_state (key,value) VALUES ('next_run_at',?)").bind(String(now)),
+          db.prepare("INSERT OR REPLACE INTO yume_trailer_auto_state (key,value) VALUES ('last_error','')"),
+        ] : []),
+      ]);
+      await audit(db, enabled ? "trailers.auto.enable" : "trailers.auto.disable", "success");
+      return json({ isAdmin: true, auto: await readAutoState(db) });
+    }
     if (body.action === "start") {
       const counts = await queueCounts(db);
 
@@ -285,5 +300,98 @@ export async function handleAdminTrailers(request: Request): Promise<Response> {
       stack: error instanceof Error ? error.stack : undefined,
     });
     return json({ error: "admin_operation_failed" }, 503);
+  }
+}
+
+
+type AutoState = { enabled: boolean; running: boolean; nextRunAt: number | null; lastRunAt: number | null; retryAt: number | null; lastError: string; };
+async function autoValue(db: Database, key: string): Promise<string | null> {
+  const row = await db.prepare("SELECT value FROM yume_trailer_auto_state WHERE key = ?").bind(key).first<{value:string}>();
+  return row?.value ?? null;
+}
+async function setAutoValues(db: Database, values: Record<string,string>): Promise<void> {
+  await db.batch(Object.entries(values).map(([key,value]) =>
+    db.prepare("INSERT OR REPLACE INTO yume_trailer_auto_state (key,value) VALUES (?,?)").bind(key,value)));
+}
+async function readAutoState(db: Database): Promise<AutoState> {
+  const [enabled,running,nextRunAt,lastRunAt,retryAt,lastError] = await Promise.all([
+    autoValue(db,"enabled"),autoValue(db,"running"),autoValue(db,"next_run_at"),
+    autoValue(db,"last_run_at"),autoValue(db,"retry_at"),autoValue(db,"last_error"),
+  ]);
+  return { enabled: enabled === "1", running: running === "1", nextRunAt: nextRunAt ? Number(nextRunAt) : null,
+    lastRunAt: lastRunAt ? Number(lastRunAt) : null, retryAt: retryAt ? Number(retryAt) : null, lastError: lastError ?? "" };
+}
+
+/** Cloudflare Cron handler. Advances one durable queue batch per tick; it never depends on an open admin UI. */
+export async function runScheduledTrailerUpdate(envInput: unknown): Promise<void> {
+  const env = (envInput && typeof envInput === "object" ? envInput : {}) as Environment;
+  const db = database(env);
+  if (!db) { console.error("[YUME][TRAILER_AUTO] D1 binding unavailable."); return; }
+  try {
+    await ensureQueue(db);
+    const state = await readAutoState(db);
+    if (!state.enabled) return;
+    const now = Date.now();
+    if (state.retryAt && state.retryAt > now) return;
+    if (state.nextRunAt && state.nextRunAt > now && !state.running) return;
+
+    // Atomic lock prevents overlap with another scheduled invocation.
+    const lock = await db.prepare(
+      "INSERT INTO yume_trailer_auto_state (key,value) SELECT 'lock_until',? WHERE NOT EXISTS (SELECT 1 FROM yume_trailer_auto_state WHERE key='lock_until' AND CAST(value AS INTEGER)>?) ON CONFLICT(key) DO UPDATE SET value=excluded.value WHERE CAST(yume_trailer_auto_state.value AS INTEGER)<=?"
+    ).bind(String(now + 55000),now,now).run();
+    if ((lock.meta?.changes ?? 0) !== 1) return;
+
+    try {
+      if (!state.running) {
+        await db.batch([
+          db.prepare("INSERT OR IGNORE INTO anime_trailer_update_queue (anime_id,status,trailer_found) SELECT id,'pending',0 FROM anime_catalog WHERE youtube_trailer_id IS NULL OR youtube_trailer_id=''"),
+          db.prepare("UPDATE anime_trailer_update_queue SET status='pending',trailer_found=0,updated_at=CURRENT_TIMESTAMP WHERE anime_id IN (SELECT id FROM anime_catalog WHERE youtube_trailer_id IS NULL OR youtube_trailer_id='')"),
+          db.prepare("INSERT OR REPLACE INTO yume_trailer_auto_state (key,value) VALUES ('running','1')"),
+          db.prepare("INSERT OR REPLACE INTO yume_trailer_auto_state (key,value) VALUES ('last_error','')"),
+          db.prepare("INSERT OR REPLACE INTO yume_trailer_auto_state (key,value) VALUES ('retry_at','')"),
+        ]);
+      }
+      const pending = await db.prepare("SELECT anime_id FROM anime_trailer_update_queue WHERE status='pending' ORDER BY anime_id LIMIT ?").bind(BATCH_SIZE).all<QueueRow>();
+      if (!pending.results.length) {
+        const finishedAt = Date.now();
+        await setAutoValues(db,{running:"0",last_run_at:String(finishedAt),next_run_at:String(finishedAt + 86400000),retry_at:"",last_error:"",lock_until:"0"});
+        await audit(db,"trailers.auto.finish","success",await queueCounts(db));
+        return;
+      }
+      const ids = pending.results.map(row=>row.anime_id);
+      let fetched: {items:ShikimoriAnime[]};
+      try { fetched = await fetchBatch(ids); }
+      catch (error) {
+        const retryAfterMs = typeof error === "object" && error !== null && "retryAfterMs" in error
+          ? Math.max(60000,Number((error as {retryAfterMs:number}).retryAfterMs)) : 60000;
+        const message = error instanceof Error ? error.message : "Не удалось запросить Shikimori.";
+        await setAutoValues(db,{retry_at:String(Date.now()+retryAfterMs),last_error:message,lock_until:"0"});
+        await audit(db,"trailers.auto.retry","warning",{retryAfterMs,message});
+        return;
+      }
+      const returned = new Set(fetched.items.map(item=>String(item.id)));
+      const byId = new Map(fetched.items.map(item=>[String(item.id),trailerId(item.videos)]));
+      const statements: Statement[] = [];
+      for (const id of ids) {
+        const found = byId.get(id) ?? null;
+        if (found) statements.push(db.prepare("UPDATE anime_catalog SET youtube_trailer_id=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND (youtube_trailer_id IS NULL OR youtube_trailer_id='')").bind(found,id));
+        statements.push(db.prepare("UPDATE anime_trailer_update_queue SET status='checked',trailer_found=?,updated_at=CURRENT_TIMESTAMP WHERE anime_id=?").bind(found ? 1 : 0,id));
+      }
+      await db.batch(statements);
+      const counts = await queueCounts(db);
+      await setAutoValues(db,{retry_at:"",last_error:"",lock_until:"0"});
+      await audit(db,"trailers.auto.batch","success",{requested:ids.length,returned:fetched.items.length,pending:counts.pending,found:counts.found});
+      if (counts.pending === 0) {
+        const finishedAt = Date.now();
+        await setAutoValues(db,{running:"0",last_run_at:String(finishedAt),next_run_at:String(finishedAt+86400000)});
+        await audit(db,"trailers.auto.finish","success",counts);
+      }
+    } finally {
+      await setAutoValues(db,{lock_until:"0"});
+    }
+  } catch(error) {
+    const message = error instanceof Error ? error.message : String(error);
+    try { await setAutoValues(db,{retry_at:String(Date.now()+60000),last_error:message,lock_until:"0"}); } catch {}
+    console.error("[YUME][TRAILER_AUTO] Scheduled tick failed.",error);
   }
 }
