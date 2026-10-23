@@ -70,6 +70,17 @@ async function ensureSchema(db: Database): Promise<void> {
   await db.batch([
     db.prepare("CREATE TABLE IF NOT EXISTS anime_catalog (id TEXT PRIMARY KEY NOT NULL, title TEXT NOT NULL, english_title TEXT, original_title TEXT NOT NULL, year INTEGER NOT NULL DEFAULT 0, episodes INTEGER NOT NULL DEFAULT 0, rating REAL, genres_json TEXT NOT NULL DEFAULT '[]', status TEXT NOT NULL DEFAULT 'Неизвестно', description TEXT NOT NULL DEFAULT '', hue INTEGER NOT NULL DEFAULT 280, glyph TEXT NOT NULL DEFAULT 'Y', is_new INTEGER NOT NULL DEFAULT 0, popular INTEGER NOT NULL DEFAULT 0, poster_url TEXT, banner_url TEXT, kind TEXT, age_rating TEXT, next_episode_at TEXT, episodes_aired INTEGER NOT NULL DEFAULT 0, aired_on TEXT, studios_json TEXT NOT NULL DEFAULT '[]', youtube_trailer_id TEXT, position INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)"),
     db.prepare("CREATE TABLE IF NOT EXISTS anime_catalog_meta (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL)"),
+    db.prepare("CREATE TABLE IF NOT EXISTS yume_admin_audit_log (id INTEGER PRIMARY KEY AUTOINCREMENT, action TEXT NOT NULL, status TEXT NOT NULL, details TEXT NOT NULL DEFAULT '{}', actor_telegram_id TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)"),
+    db.prepare("CREATE TABLE IF NOT EXISTS admin_catalog_import_lock (id INTEGER PRIMARY KEY CHECK (id = 1), token TEXT NOT NULL DEFAULT '', expires_at INTEGER NOT NULL DEFAULT 0)"),
+    db.prepare("INSERT OR IGNORE INTO admin_catalog_import_lock (id,token,expires_at) VALUES (1,'',0)"),
+    db.prepare("INSERT OR IGNORE INTO anime_catalog_meta (key,value) VALUES ('admin_import_state','idle')"),
+    db.prepare("INSERT OR IGNORE INTO anime_catalog_meta (key,value) VALUES ('admin_import_cursor','1')"),
+    db.prepare("INSERT OR IGNORE INTO anime_catalog_meta (key,value) VALUES ('admin_import_target','0')"),
+    db.prepare("INSERT OR IGNORE INTO anime_catalog_meta (key,value) VALUES ('admin_import_added','0')"),
+    db.prepare("INSERT OR IGNORE INTO anime_catalog_meta (key,value) VALUES ('admin_import_skipped','0')"),
+    db.prepare("INSERT OR IGNORE INTO anime_catalog_meta (key,value) VALUES ('admin_import_incomplete','0')"),
+    db.prepare("INSERT OR IGNORE INTO anime_catalog_meta (key,value) VALUES ('admin_import_errors','0')"),
+    db.prepare("INSERT OR IGNORE INTO anime_catalog_meta (key,value) VALUES ('admin_import_resume_at','0')"),
   ]);
 }
 async function getMeta(db: Database, key: string): Promise<string | null> {
@@ -142,8 +153,47 @@ async function fetchByIds(ids: string[]): Promise<ShikimoriAnime[]> {
   return (payload.data?.animes ?? []).filter(item => !(item.genres ?? []).some(g => [g.name,g.russian].some(n => clean(n).normalize("NFKC").toLowerCase() === "hentai" || clean(n).normalize("NFKC").toLowerCase() === "хентай")));
 }
 async function catalogQuality(db: Database) {
-  const rows = await db.prepare("SELECT id,title,year,poster_url,description FROM anime_catalog WHERE year = 0 OR poster_url IS NULL OR TRIM(COALESCE(description,'')) = '' ORDER BY position,id LIMIT 500").all<{id:string;title:string;year:number;poster_url:string|null;description:string|null}>();
-  return rows.results.map(row => ({id:row.id,title:row.title,year:row.year,missingYear:!row.year,missingPoster:!row.poster_url,missingDescription:!row.description?.trim()}));
+  const [rows, aggregate] = await Promise.all([
+    db.prepare("SELECT id,title,year,poster_url,description FROM anime_catalog WHERE year = 0 OR poster_url IS NULL OR TRIM(COALESCE(poster_url,'')) = '' OR TRIM(COALESCE(description,'')) = '' ORDER BY position,id LIMIT 500").all<{id:string;title:string;year:number;poster_url:string|null;description:string|null}>(),
+    db.prepare("SELECT COUNT(*) AS total, SUM(CASE WHEN year = 0 THEN 1 ELSE 0 END) AS missingYear, SUM(CASE WHEN poster_url IS NULL OR TRIM(COALESCE(poster_url,'')) = '' THEN 1 ELSE 0 END) AS missingPoster, SUM(CASE WHEN TRIM(COALESCE(description,'')) = '' THEN 1 ELSE 0 END) AS missingDescription FROM anime_catalog").first<{total:number;missingYear:number|null;missingPoster:number|null;missingDescription:number|null}>(),
+  ]);
+  return {
+    items: rows.results.map(row => ({id:row.id,title:row.title,year:row.year,missingYear:!row.year,missingPoster:!row.poster_url?.trim(),missingDescription:!row.description?.trim()})),
+    summary: {total:Number(aggregate?.total ?? 0), missingYear:Number(aggregate?.missingYear ?? 0), missingPoster:Number(aggregate?.missingPoster ?? 0), missingDescription:Number(aggregate?.missingDescription ?? 0)},
+    limit:500,
+  };
+}
+async function acquireLock(db: Database): Promise<string | null> {
+  const token = crypto.randomUUID();
+  const now = Date.now();
+  const result = await db.prepare("UPDATE admin_catalog_import_lock SET token = ?, expires_at = ? WHERE id = 1 AND expires_at < ?")
+    .bind(token, now + 45000, now).run();
+  return Number(result.meta?.changes ?? 0) === 1 ? token : null;
+}
+async function releaseLock(db: Database, token: string): Promise<void> {
+  await db.prepare("UPDATE admin_catalog_import_lock SET token = '', expires_at = 0 WHERE id = 1 AND token = ?").bind(token).run();
+}
+async function audit(db: Database, action: string, status: string, details: Record<string, unknown> = {}, actor?: string | null): Promise<void> {
+  const safeDetails = JSON.stringify(details).slice(0, 4000);
+  await db.prepare("INSERT INTO yume_admin_audit_log (action,status,details,actor_telegram_id) VALUES (?,?,?,?)")
+    .bind(action,status,safeDetails,actor ?? null).run();
+}
+async function recentAudit(db: Database) {
+  const rows = await db.prepare("SELECT id,action,status,details,created_at FROM yume_admin_audit_log ORDER BY id DESC LIMIT 30")
+    .all<{id:number;action:string;status:string;details:string;created_at:string}>();
+  return rows.results.map(row => {
+    let details: Record<string, unknown> = {};
+    try { details = JSON.parse(row.details) as Record<string, unknown>; } catch {}
+    return {...row,details};
+  });
+}
+async function maintenanceCheck(db: Database) {
+  const [health, count, quality] = await Promise.all([
+    db.prepare("SELECT 1 AS ok").first<{ok:number}>(),
+    db.prepare("SELECT COUNT(*) AS count FROM anime_catalog").first<{count:number}>(),
+    catalogQuality(db),
+  ]);
+  return {ok:health?.ok === 1, catalogRecords:Number(count?.count ?? 0), qualitySummary:quality.summary, checkedAt:new Date().toISOString()};
 }
 async function snapshot(db: Database) {
   const [target,cursor,added,skipped,incompleteCount,errors,state] = await Promise.all([
@@ -161,7 +211,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
   try {
     if (!await authorize(request,env,db)) return json({isAdmin:false,error:"admin_required"},403);
     await ensureSchema(db);
-    if (request.method === "GET") return json({isAdmin:true,...await snapshot(db),quality:await catalogQuality(db)});
+    if (request.method === "GET") { const quality = await catalogQuality(db); return json({isAdmin:true,...await snapshot(db),quality:quality.items,qualitySummary:quality.summary,qualityLimit:quality.limit,auditLog:await recentAudit(db)}); }
     let body: {action?:unknown; target?:unknown};
     try { body = await request.json() as {action?:unknown;target?:unknown}; } catch { return json({error:"invalid_request"},400); }
     if (body.action === "delete") {
