@@ -7,7 +7,7 @@ describe("YUME analytics pageview tracking", () => {
   let randomUuidDescriptor: PropertyDescriptor | undefined;
 
   beforeEach(() => {
-    window.sessionStorage.clear();
+    window.localStorage.clear();
     randomUuidDescriptor = Object.getOwnPropertyDescriptor(window.crypto, "randomUUID");
     const ids = [firstId, secondId];
     Object.defineProperty(window.crypto, "randomUUID", {
@@ -29,9 +29,10 @@ describe("YUME analytics pageview tracking", () => {
     trackYumePage("/anime/123?utm_source=test");
     expect(fetch).toHaveBeenCalledTimes(1);
     const [, request] = vi.mocked(fetch).mock.calls[0]!;
-    const body = JSON.parse(String(request?.body)) as { path: string; sessionId: string };
+    const body = JSON.parse(String(request?.body)) as { path: string; sessionId: string; visitorId: string };
     expect(body.path).toBe("/anime/123");
     expect(body.sessionId).toBe(firstId);
+    expect(body.visitorId).toMatch(/^[A-Za-z0-9_-]{16,100}$/);
     expect(request?.credentials).toBe("same-origin");
     expect(request?.keepalive).toBe(true);
   });
@@ -46,14 +47,15 @@ describe("YUME analytics pageview tracking", () => {
     trackYumePage("/#home");
     trackYumePage("/#catalog");
     expect(fetch).toHaveBeenCalledTimes(2);
-    const firstBody = JSON.parse(String(vi.mocked(fetch).mock.calls[0]![1]?.body)) as { sessionId: string };
-    const secondBody = JSON.parse(String(vi.mocked(fetch).mock.calls[1]![1]?.body)) as { sessionId: string };
+    const firstBody = JSON.parse(String(vi.mocked(fetch).mock.calls[0]![1]?.body)) as { sessionId: string; visitorId: string };
+    const secondBody = JSON.parse(String(vi.mocked(fetch).mock.calls[1]![1]?.body)) as { sessionId: string; visitorId: string };
     expect(firstBody.sessionId).toBe(secondBody.sessionId);
+    expect(firstBody.visitorId).toBe(secondBody.visitorId);
   });
 
   it("starts a fresh session after more than 30 minutes of inactivity", () => {
     const now = Date.now();
-    window.sessionStorage.setItem("yume-analytics-session", JSON.stringify({
+    window.localStorage.setItem("yume-analytics-session", JSON.stringify({
       id: firstId,
       lastActivity: now - 31 * 60 * 1000,
       lastPath: "/#home",
