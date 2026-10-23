@@ -78,10 +78,16 @@ async function ensureSchema(db: DB): Promise<void> {
     db.prepare("CREATE INDEX IF NOT EXISTS idx_yume_analytics_visitor ON yume_analytics_events(event_date, visitor_hash)"),
   ]);
   // Upgrade the table if an earlier analytics build created it without session IDs.
+  let addedSessionColumn = false;
   try {
     await db.prepare("ALTER TABLE yume_analytics_events ADD COLUMN session_hash TEXT NOT NULL DEFAULT ''").run();
+    addedSessionColumn = true;
   } catch (error) {
     if (!String(error).toLowerCase().includes("duplicate column")) throw error;
+  }
+  if (addedSessionColumn) {
+    // Earlier event rows cannot be sessionized precisely; estimate one legacy session per visitor/day.
+    await db.prepare("UPDATE yume_analytics_events SET session_hash = 'legacy-' || visitor_hash || '-' || event_date WHERE session_hash = ''").run();
   }
   await db.prepare("CREATE INDEX IF NOT EXISTS idx_yume_analytics_session ON yume_analytics_events(event_date, session_hash)").run();
 }
@@ -95,6 +101,7 @@ async function makeMetrics(db: DB, now: Date) {
   const since24 = new Date(now.getTime() - 24 * 60 * 60 * 1000);
   const since7 = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
   const since30 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  const dailyStart = utcDay(new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000));
   const count = async (sql: string, ...values: unknown[]): Promise<number> => {
     const row = await db.prepare(sql).bind(...values).first<{ n: number }>();
     return Number(row?.n ?? 0);
@@ -111,8 +118,14 @@ async function makeMetrics(db: DB, now: Date) {
     count(visitorsSql, sqlTime(since30)),
     count("SELECT COUNT(DISTINCT visitor_hash) AS n FROM yume_analytics_events"),
     db.prepare("SELECT event_date AS date, COUNT(DISTINCT CASE WHEN session_hash <> '' THEN session_hash ELSE 'legacy-' || id END) AS visits, COUNT(*) AS pageViews, COUNT(DISTINCT visitor_hash) AS visitors FROM yume_analytics_events WHERE created_at >= ? GROUP BY event_date ORDER BY event_date")
-      .bind(sqlTime(since7)).all<{ date: string; visits: number; pageViews: number; visitors: number }>(),
+      .bind(dailyStart).all<{ date: string; visits: number; pageViews: number; visitors: number }>(),
   ]);
+  const dailyRows = new Map(daily.results.map(row => [row.date, row]));
+  const dailySeries = Array.from({ length: 7 }, (_, index) => {
+    const date = utcDay(new Date(new Date(dailyStart + "T00:00:00Z").getTime() + index * 24 * 60 * 60 * 1000));
+    const row = dailyRows.get(date);
+    return { date, visits: Number(row?.visits ?? 0), pageViews: Number(row?.pageViews ?? 0), visitors: Number(row?.visitors ?? 0) };
+  });
   return {
     periods: {
       hours: { visits: visits24, visitors: visitors24 },
@@ -120,7 +133,7 @@ async function makeMetrics(db: DB, now: Date) {
       month: { visits: visits30, visitors: visitors30 },
       all: { visits: visitsAll, visitors: visitorsAll },
     },
-    daily: daily.results,
+    daily: dailySeries,
     updatedAt: now.toISOString(),
   };
 }
@@ -146,9 +159,11 @@ export async function handleYumeAnalytics(request: Request): Promise<Response> {
       const visitorHash = await sha256("visitor|" + ip + "|" + agent.slice(0, 300));
       const sessionHash = await sha256("session|" + sessionId);
       const now = new Date();
+      const timestamp = sqlTime(now);
+      const since24 = sqlTime(new Date(now.getTime() - 24 * 60 * 60 * 1000));
       await db.prepare(
-        "INSERT INTO yume_analytics_events (event_date, event_hour, visitor_hash, session_hash, page_path, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-      ).bind(utcDay(now), now.getUTCHours(), visitorHash, sessionHash, path, sqlTime(now)).run();
+        "INSERT INTO yume_analytics_events (event_date, event_hour, visitor_hash, session_hash, page_path, created_at) SELECT ?, ?, ?, ?, ?, ? WHERE (SELECT COUNT(*) FROM yume_analytics_events WHERE visitor_hash = ? AND created_at >= ?) < 240 AND NOT EXISTS (SELECT 1 FROM yume_analytics_events WHERE session_hash = ? AND page_path = ? AND created_at >= ?)",
+      ).bind(utcDay(now), now.getUTCHours(), visitorHash, sessionHash, path, timestamp, visitorHash, since24, sessionHash, path, sqlTime(new Date(now.getTime() - 2500))).run();
       return json({ ok: true });
     }
     if (request.method !== "GET") return json({ error: "Method not allowed." }, 405);
