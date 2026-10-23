@@ -139,11 +139,6 @@ function RootShell({ children }: { children: ReactNode }) {
   return (
     <html lang="ru">
       <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `(function(){try{var r=document.documentElement;var q=new URLSearchParams(location.search);var ua=navigator.userAgent||"";var isTelegram=q.has("tgWebAppData")||/Telegram/i.test(ua);if(isTelegram){r.classList.add("telegram-mini-app");r.dataset.yumeSplashActive="true";r.style.backgroundColor="#030207";}}catch(e){}})();`,
-          }}
-        />
         <script src="https://telegram.org/js/telegram-web-app.js"></script>
         <script
           dangerouslySetInnerHTML={{
