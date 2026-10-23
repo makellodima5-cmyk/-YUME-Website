@@ -1067,6 +1067,7 @@ function Index() {
                 {language === "ru" ? "Проверяем права администратора…" : "Checking administrator access…"}
               </p>
             ) : isAdmin ? (
+              <>
               <section className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label={language === "ru" ? "Обзор каталога и задач" : "Catalog and tasks overview"}>
                 <article className="rounded-2xl border border-border bg-card/70 p-4">
                   <p className="text-sm text-muted-foreground">{language === "ru" ? "Без трейлера" : "Missing trailers"}</p>
@@ -1149,6 +1150,7 @@ function Index() {
                 </button>
                 {adminMessage && <p className="mt-3 text-sm text-muted-foreground" role="status">{adminMessage}</p>}
               </section>
+              </>
             ) : (
               <p role="alert" className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm">{telegramAuthError || (language === "ru" ? "Доступ запрещён. Войди через Telegram под аккаунтом администратора." : "Access denied. Sign in with the administrator Telegram account.")}</p>
             )}
