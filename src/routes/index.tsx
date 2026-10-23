@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowDownWideNarrow, ChevronDown, ChevronRight, Search, SlidersHorizontal, X, UserRound, Globe, Sun, Moon, Monitor, ShieldCheck, Play, ListChecks, CircleCheck, Clock3, ChartNoAxesCombined, Download, Database, Settings, History } from "lucide-react";
+import { ArrowDownWideNarrow, ChevronDown, ChevronRight, Search, SlidersHorizontal, X, UserRound, Globe, Sun, Moon, Monitor, ShieldCheck, Play, ListChecks, CircleCheck, Clock3, ChartNoAxesCombined, Download, Database, Settings, History, Bell, CheckCheck, Sparkles } from "lucide-react";
 import { COLLECTIONS, type Anime } from "@/data/anime";
 import { getShikimoriCatalog } from "@/data/shikimori";
 import { getExactReleaseDate, isNewRelease, isUpcomingAnnouncement } from "@/data/anime-sections";
@@ -18,7 +18,30 @@ import { absoluteImageUrl, canonicalUrl } from "@/data/seo";
 import { getTelegramWebApp } from "@/lib/telegram-mini-app";
 import { trackYumePage } from "@/lib/yume-analytics";
 import { syncTelegramLibrary } from "@/data/profile-storage";
+import { USER_NOTIFICATIONS } from "@/data/notifications.shared";
 import { runAdminTrailerUpdate, type AdminTrailerStats } from "@/data/admin-trailer-update";
+
+const NOTIFICATION_STORAGE_KEY = "yume-user-notifications-read-v1";
+
+function readLocalNotificationIds(): string[] {
+  try {
+    const value: unknown = JSON.parse(window.localStorage.getItem(NOTIFICATION_STORAGE_KEY) ?? "[]");
+    return Array.isArray(value) ? value.filter((id): id is string =>
+      typeof id === "string" && USER_NOTIFICATIONS.some((item) => item.id === id),
+    ) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveLocalNotificationIds(ids: string[]): boolean {
+  try {
+    window.localStorage.setItem(NOTIFICATION_STORAGE_KEY, JSON.stringify(ids));
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export const Route = createFileRoute("/")({
   head: () => {
@@ -294,6 +317,10 @@ function Index() {
   const [adminStats, setAdminStats] = useState<AdminTrailerStats | null>(null);
   const [adminRunning, setAdminRunning] = useState(false);
   const [adminMessage, setAdminMessage] = useState("");
+  const [notificationReadIds, setNotificationReadIds] = useState<string[]>([]);
+  const [notificationRemoteAccount, setNotificationRemoteAccount] = useState(false);
+  const [notificationActionBusy, setNotificationActionBusy] = useState(false);
+  const [notificationActionMessage, setNotificationActionMessage] = useState("");
   const [trailerAuto, setTrailerAuto] = useState<{enabled:boolean;running:boolean;nextRunAt:number|null;lastRunAt:number|null;retryAt:number|null;lastError:string}>({enabled:false,running:false,nextRunAt:null,lastRunAt:null,retryAt:null,lastError:""});
   const [trailerAutoBusy, setTrailerAutoBusy] = useState(false);
   const [adminImportTarget, setAdminImportTarget] = useState("50");
@@ -321,6 +348,39 @@ function Index() {
     setIsTelegramMiniApp(Boolean(getTelegramWebApp()?.initData));
     setTelegramDetectionComplete(true);
   }, []);
+
+  useEffect(() => {
+    if (!telegramDetectionComplete) return;
+    if (isTelegramMiniApp && !telegramAuthReady && !telegramConsentRequired && !telegramAuthError) return;
+    let cancelled = false;
+    const loadNotificationState = async () => {
+      try {
+        const response = await fetch("/api/notifications", {
+          credentials: "same-origin",
+          cache: "no-store",
+        });
+        if (!response.ok) throw new Error("Notification state unavailable");
+        const payload = await response.json() as { authenticated?: boolean; readIds?: unknown };
+        if (cancelled) return;
+        const ids = Array.isArray(payload.readIds)
+          ? payload.readIds.filter((id): id is string => typeof id === "string")
+          : [];
+        if (payload.authenticated === true) {
+          setNotificationReadIds(ids);
+          setNotificationRemoteAccount(true);
+        } else {
+          setNotificationReadIds(readLocalNotificationIds());
+          setNotificationRemoteAccount(false);
+        }
+      } catch {
+        if (cancelled) return;
+        setNotificationReadIds(readLocalNotificationIds());
+        setNotificationRemoteAccount(false);
+      }
+    };
+    void loadNotificationState();
+    return () => { cancelled = true; };
+  }, [isTelegramMiniApp, telegramAuthReady, telegramDetectionComplete, telegramConsentRequired, telegramAuthError]);
 
   useEffect(() => {
     if (!isTelegramMiniApp) return;
@@ -523,6 +583,52 @@ function Index() {
     } catch {
       setAdminMessage(language === "ru" ? "Не удалось связаться с сервером." : "Could not reach the server.");
     } finally { setTrailerAutoBusy(false); }
+  };
+
+  const markAllNotificationsRead = async () => {
+    if (notificationActionBusy) return;
+    const allIds = USER_NOTIFICATIONS.map((item) => item.id);
+    setNotificationActionBusy(true);
+    setNotificationActionMessage("");
+    try {
+      if (notificationRemoteAccount) {
+        const response = await fetch("/api/notifications", {
+          method: "POST",
+          credentials: "same-origin",
+          cache: "no-store",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "read-all" }),
+        });
+        if (response.status === 401) {
+          setNotificationRemoteAccount(false);
+        } else if (!response.ok) {
+          throw new Error("Could not update notification read state");
+        } else {
+          const payload = await response.json() as { authenticated?: boolean; readIds?: unknown };
+          if (payload.authenticated !== true) throw new Error("Notification account session expired");
+          const ids = Array.isArray(payload.readIds)
+            ? payload.readIds.filter((id): id is string => typeof id === "string")
+            : allIds;
+          setNotificationReadIds(ids);
+          setNotificationActionMessage(language === "ru" ? "Все уведомления прочитаны." : "All notifications marked as read.");
+          return;
+        }
+      }
+      if (!saveLocalNotificationIds(allIds)) {
+        setNotificationActionMessage(language === "ru"
+          ? "Не удалось сохранить отметку о прочтении. Проверь настройки хранения данных браузера."
+          : "Could not save read status. Check your browser storage settings.");
+        return;
+      }
+      setNotificationReadIds(allIds);
+      setNotificationActionMessage(language === "ru" ? "Все уведомления прочитаны." : "All notifications marked as read.");
+    } catch {
+      setNotificationActionMessage(language === "ru"
+        ? "Не удалось отметить уведомления как прочитанные. Попробуй ещё раз."
+        : "Could not mark notifications as read. Please try again.");
+    } finally {
+      setNotificationActionBusy(false);
+    }
   };
 
   const runTrailerUpdate = async () => {
@@ -897,7 +1003,7 @@ function Index() {
   const visibleAiringAnime = airingAnime.slice((airingPage - 1) * catalogPageSize, airingPage * catalogPageSize);
   return (
     <div className="min-h-screen pb-8">
-      <Header view={view} setView={setView} onProfile={() => setView("profile")} isAdmin={isAdmin} />
+      <Header view={view} setView={setView} onProfile={() => setView("profile")} isAdmin={isAdmin} unreadNotificationCount={USER_NOTIFICATIONS.filter((item) => !notificationReadIds.includes(item.id)).length} />
       {isTelegramMiniApp && telegramConsentRequired && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-background/85 px-4 py-6 backdrop-blur-md" role="dialog" aria-modal="true" aria-labelledby="telegram-consent-title">
           <section className="w-full max-w-md rounded-3xl border border-border bg-card p-6 shadow-2xl sm:p-8">
@@ -1011,6 +1117,61 @@ function Index() {
               )}
             </div>
           </div>
+        </main>
+      ) : view === "notifications" ? (
+        <main id="main-content" className="px-4 pb-12 pt-24 md:px-10 md:pt-24">
+          <section className="mx-auto max-w-3xl">
+            <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+              <div className="min-w-0">
+                <div className="mb-2 flex items-center gap-2 text-primary"><Bell className="h-5 w-5" /><span className="text-xs font-semibold uppercase tracking-[0.16em]">{language === "ru" ? "Новости YUME" : "YUME updates"}</span></div>
+                <h1 className="text-3xl font-bold tracking-tight text-foreground">{language === "ru" ? "Уведомления" : "Notifications"}</h1>
+                <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">{language === "ru" ? "Здесь собраны новости о новых пользовательских возможностях и функциях YUME." : "Updates about new user-facing YUME features and capabilities appear here."}</p>
+              </div>
+              <button type="button" onClick={markAllNotificationsRead} disabled={notificationActionBusy || USER_NOTIFICATIONS.every((item) => notificationReadIds.includes(item.id))} className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-primary/30 bg-primary/10 px-3 py-2 text-sm font-semibold text-foreground transition hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-45">
+                <CheckCheck className="h-4 w-4" />
+                {notificationActionBusy ? (language === "ru" ? "Сохраняю…" : "Saving…") : (language === "ru" ? "Прочитать всё" : "Mark all as read")}
+              </button>
+            </div>
+
+            <div className="mb-4 flex items-center justify-between rounded-xl border border-border bg-card/50 px-3 py-2.5">
+              <span className="text-sm text-muted-foreground">{language === "ru" ? "Всего уведомлений" : "Total notifications"}</span>
+              <span className="font-semibold tabular-nums">{USER_NOTIFICATIONS.length}</span>
+              <span className="text-sm text-muted-foreground">{language === "ru" ? "Непрочитано" : "Unread"}</span>
+              <span className={`font-semibold tabular-nums ${USER_NOTIFICATIONS.some((item) => !notificationReadIds.includes(item.id)) ? "text-red-400" : "text-emerald-400"}`}>{USER_NOTIFICATIONS.filter((item) => !notificationReadIds.includes(item.id)).length}</span>
+            </div>
+
+            {notificationActionMessage && <p role="status" className="mb-4 rounded-xl border border-border bg-card/60 px-3 py-2.5 text-sm text-muted-foreground">{notificationActionMessage}</p>}
+
+            {USER_NOTIFICATIONS.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-border bg-card/30 px-5 py-12 text-center">
+                <Bell className="mx-auto h-8 w-8 text-muted-foreground" />
+                <h2 className="mt-3 font-semibold">{language === "ru" ? "Пока нет уведомлений" : "No notifications yet"}</h2>
+                <p className="mt-1 text-sm text-muted-foreground">{language === "ru" ? "Когда в YUME появятся новые функции, новости о них будут здесь." : "Announcements about new YUME features will appear here."}</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {USER_NOTIFICATIONS.map((item) => {
+                  const unread = !notificationReadIds.includes(item.id);
+                  return (
+                    <article key={item.id} className={`relative overflow-hidden rounded-2xl border bg-card/50 p-4 sm:p-5 ${unread ? "border-red-500/35 shadow-[0_0_18px_rgba(239,68,68,0.06)]" : "border-border"}`}>
+                      {unread && <span aria-hidden="true" className="absolute inset-y-0 left-0 w-1 bg-red-500" />}
+                      <div className="flex items-start gap-3 pl-1">
+                        <div className="mt-0.5 grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-primary/20 bg-primary/10 text-primary"><Sparkles className="h-5 w-5" /></div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h2 className="font-semibold leading-snug text-foreground">{item.title[language]}</h2>
+                            {unread && <span className="inline-flex items-center gap-1 rounded-full bg-red-500/10 px-2 py-0.5 text-[11px] font-semibold text-red-400"><span className="h-1.5 w-1.5 rounded-full bg-red-500" />{language === "ru" ? "Новое" : "New"}</span>}
+                          </div>
+                          <p className="mt-1 text-xs text-muted-foreground">{new Date(item.publishedAt).toLocaleDateString(language === "ru" ? "ru-RU" : "en-US", { day: "numeric", month: "long", year: "numeric" })}</p>
+                          <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-foreground/85">{item.description[language]}</p>
+                        </div>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+          </section>
         </main>
       ) : view === "popular" ? (
         <main id="main-content" className="px-4 pt-24 md:px-10 md:pt-24">
