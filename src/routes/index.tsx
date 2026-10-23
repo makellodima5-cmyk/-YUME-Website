@@ -307,6 +307,7 @@ function Index() {
   const [adminAuditLog, setAdminAuditLog] = useState<{id:number;action:string;status:string;details:Record<string,unknown>;created_at:string}[]>([]);
   const [maintenanceBusy, setMaintenanceBusy] = useState(false);
   const [maintenanceMessage, setMaintenanceMessage] = useState("");
+  const [expandedAdminSections, setExpandedAdminSections] = useState({import:true,quality:false,maintenance:false,audit:false,trailers:false});
   const [cookieNoticeAcknowledged, setCookieNoticeAcknowledged] = useState(true);
 
   useEffect(() => {
@@ -1166,7 +1167,7 @@ function Index() {
                 </span>
                 {adminMessage && <p className="w-full border-t border-border/70 pt-2 text-xs text-muted-foreground" role="status">{adminMessage}</p>}
               </section>
-              <details open className="group mb-3 overflow-hidden rounded-2xl border border-primary/30 bg-card/60 shadow-sm" aria-label={language === "ru" ? "Пополнение каталога" : "Catalog import"}>
+              <details open={expandedAdminSections.import} onToggle={event => setExpandedAdminSections(current => current.import === event.currentTarget.open ? current : {...current, import: event.currentTarget.open})} className="group mb-3 overflow-hidden rounded-2xl border border-primary/30 bg-card/60 shadow-sm" aria-label={language === "ru" ? "Пополнение каталога" : "Catalog import"}>
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 hover:bg-card/80 [&::-webkit-details-marker]:hidden">
                   <span className="flex min-w-0 items-center gap-2.5"><ShieldCheck className="h-5 w-5 shrink-0 text-primary" /><span className="min-w-0"><span className="block font-semibold">{language === "ru" ? "Пополнение каталога из Shikimori" : "Import catalogue from Shikimori"}</span><span className="mt-0.5 block text-xs text-muted-foreground">{language === "ru" ? "Добавлено " : "Added "}{adminImport.added} / {adminImport.target} · {language === "ru" ? "страница " : "page "}{adminImport.cursor}</span></span></span>
                   <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
@@ -1193,7 +1194,7 @@ function Index() {
                   {adminImportMessage && <p className="mt-2 rounded-lg border border-border bg-background/60 p-2.5 text-xs" role="status">{adminImportMessage}</p>}
                 </div>
               </details>
-              <details className="group mb-3 overflow-hidden rounded-2xl border border-border bg-card/50" aria-label={language === "ru" ? "Качество каталога" : "Catalog quality"}>
+              <details open={expandedAdminSections.quality} onToggle={event => setExpandedAdminSections(current => current.quality === event.currentTarget.open ? current : {...current, quality: event.currentTarget.open})} className="group mb-3 overflow-hidden rounded-2xl border border-border bg-card/50" aria-label={language === "ru" ? "Качество каталога" : "Catalog quality"}>
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 hover:bg-card/80 [&::-webkit-details-marker]:hidden">
                   <span className="min-w-0"><span className="block font-semibold">{language === "ru" ? "Качество каталога" : "Catalog quality"}</span><span className="mt-0.5 block text-xs text-muted-foreground">{language === "ru" ? "Неполных записей: " : "Incomplete records: "}{catalogQualitySummary.incomplete} · {language === "ru" ? "всего: " : "total: "}{catalogQualitySummary.total}</span></span>
                   <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
@@ -1230,7 +1231,7 @@ function Index() {
                   </div>
                 </div>
               </details>
-              <details className="group mb-3 overflow-hidden rounded-2xl border border-border bg-card/50" aria-label={language === "ru" ? "Обслуживание" : "Maintenance"}>
+              <details open={expandedAdminSections.maintenance} onToggle={event => setExpandedAdminSections(current => current.maintenance === event.currentTarget.open ? current : {...current, maintenance: event.currentTarget.open})} className="group mb-3 overflow-hidden rounded-2xl border border-border bg-card/50" aria-label={language === "ru" ? "Обслуживание" : "Maintenance"}>
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 hover:bg-card/80 [&::-webkit-details-marker]:hidden">
                   <span><span className="block font-semibold">{language==="ru"?"Обслуживание":"Maintenance"}</span><span className="mt-0.5 block text-xs text-muted-foreground">{language==="ru"?"Проверка подключения к D1":"D1 connectivity check"}</span></span>
                   <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
@@ -1241,7 +1242,7 @@ function Index() {
                   {maintenanceMessage && <p role="status" className="mt-3 rounded-lg bg-background/60 p-3 text-xs">{maintenanceMessage}</p>}
                 </div>
               </details>
-              <details className="group mb-3 overflow-hidden rounded-2xl border border-border bg-card/50" aria-label={language==="ru"?"История административных операций":"Admin operation history"}>
+              <details open={expandedAdminSections.audit} onToggle={event => setExpandedAdminSections(current => current.audit === event.currentTarget.open ? current : {...current, audit: event.currentTarget.open})} className="group mb-3 overflow-hidden rounded-2xl border border-border bg-card/50" aria-label={language==="ru"?"История административных операций":"Admin operation history"}>
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 hover:bg-card/80 [&::-webkit-details-marker]:hidden">
                   <span><span className="block font-semibold">{language==="ru"?"История операций":"Operation history"}</span><span className="mt-0.5 block text-xs text-muted-foreground">{language==="ru"?"Последние 30 событий":"Latest 30 events"}</span></span>
                   <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
@@ -1250,7 +1251,7 @@ function Index() {
                   {adminAuditLog.length===0 ? <p className="text-sm text-muted-foreground">{language==="ru"?"Событий пока нет.":"No events yet."}</p> : <div className="max-h-64 space-y-2 overflow-y-auto">{adminAuditLog.map(entry=><div key={entry.id} className="flex flex-wrap items-start justify-between gap-2 rounded-lg border border-border bg-background/50 p-2.5 text-xs"><div className="min-w-0 flex-1"><strong className="break-words">{entry.action}</strong><p className="mt-1 break-words text-muted-foreground">{JSON.stringify(entry.details)}</p></div><div className="shrink-0 text-right"><span className={entry.status==="success"?"text-emerald-500":"text-amber-500"}>{entry.status}</span><p className="mt-1 text-muted-foreground">{new Date(entry.created_at.replace(" ","T")+"Z").toLocaleString(language==="ru"?"ru-RU":"en-US")}</p></div></div>)}</div>}
                 </div>
               </details>
-              <details className="group mb-3 overflow-hidden rounded-2xl border border-primary/30 bg-card/60 shadow-sm" aria-label={language==="ru"?"Обновление трейлеров":"Trailer updates"}>
+              <details open={expandedAdminSections.trailers} onToggle={event => setExpandedAdminSections(current => current.trailers === event.currentTarget.open ? current : {...current, trailers: event.currentTarget.open})} className="group mb-3 overflow-hidden rounded-2xl border border-primary/30 bg-card/60 shadow-sm" aria-label={language==="ru"?"Обновление трейлеров":"Trailer updates"}>
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 hover:bg-card/80 [&::-webkit-details-marker]:hidden">
                   <span className="flex min-w-0 items-center gap-2.5"><ShieldCheck className="h-5 w-5 shrink-0 text-primary"/><span className="min-w-0"><span className="block font-semibold">{language==="ru"?"Обновление трейлеров":"Trailer updates"}</span><span className="mt-0.5 block text-xs text-muted-foreground">{language==="ru"?"Без трейлера: ":"Missing trailers: "}{adminStats?.missing ?? "—"} · {language==="ru"?"в очереди: ":"queued: "}{adminStats?.pending ?? 0}</span></span></span>
                   <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
