@@ -1006,6 +1006,41 @@ function Index() {
                 {language === "ru" ? "Проверяем права администратора…" : "Checking administrator access…"}
               </p>
             ) : isAdmin ? (
+              <section className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label={language === "ru" ? "Обзор каталога и задач" : "Catalog and tasks overview"}>
+                <article className="rounded-2xl border border-border bg-card/70 p-4">
+                  <p className="text-sm text-muted-foreground">{language === "ru" ? "Без трейлера" : "Missing trailers"}</p>
+                  <p className="mt-2 text-2xl font-semibold tabular-nums">{adminStats ? adminStats.missing.toLocaleString(language === "ru" ? "ru-RU" : "en-US") : "—"}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{language === "ru" ? "Тайтлы, которым может потребоваться проверка" : "Titles that may need a check"}</p>
+                </article>
+                <article className="rounded-2xl border border-border bg-card/70 p-4">
+                  <p className="text-sm text-muted-foreground">{language === "ru" ? "Проверено" : "Checked"}</p>
+                  <p className="mt-2 text-2xl font-semibold tabular-nums">{adminStats ? adminStats.checked.toLocaleString(language === "ru" ? "ru-RU" : "en-US") : "—"}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{language === "ru" ? "Записей обработано текущей очередью" : "Records processed by the current queue"}</p>
+                </article>
+                <article className="rounded-2xl border border-border bg-card/70 p-4">
+                  <p className="text-sm text-muted-foreground">{language === "ru" ? "Найдено трейлеров" : "Trailers found"}</p>
+                  <p className="mt-2 text-2xl font-semibold tabular-nums">{adminStats ? adminStats.found.toLocaleString(language === "ru" ? "ru-RU" : "en-US") : "—"}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{language === "ru" ? "Успешные результаты проверки" : "Successful lookup results"}</p>
+                </article>
+                <article className="rounded-2xl border border-border bg-card/70 p-4">
+                  <p className="text-sm text-muted-foreground">{language === "ru" ? "Очередь" : "Queue"}</p>
+                  <p className="mt-2 text-2xl font-semibold tabular-nums">{adminStats ? adminStats.pending.toLocaleString(language === "ru" ? "ru-RU" : "en-US") : "—"}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{language === "ru" ? "Задач ожидают обработки" : "Tasks waiting to be processed"}</p>
+                </article>
+              </section>
+              <section className="mb-5 rounded-2xl border border-border bg-card/50 p-4" aria-label={language === "ru" ? "Состояние операций" : "Operations status"}>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h2 className="font-semibold">{language === "ru" ? "Состояние операций" : "Operations status"}</h2>
+                    <p className="mt-1 text-sm text-muted-foreground">{language === "ru" ? "Здесь отображаются данные доступной сейчас административной операции. Новые задачи будут подключаться к этому обзору по мере реализации следующих этапов." : "This view shows the currently available admin operation. Additional jobs will be connected here in later phases."}</p>
+                  </div>
+                  <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium ${adminRunning ? "border-primary/40 bg-primary/10 text-primary" : adminMessage ? "border-amber-500/40 bg-amber-500/10 text-amber-600" : "border-border bg-background/60 text-muted-foreground"}`}>
+                    <span className={`h-2 w-2 rounded-full ${adminRunning ? "animate-pulse bg-primary" : adminMessage ? "bg-amber-500" : "bg-muted-foreground/60"}`} />
+                    {adminRunning ? (language === "ru" ? "Выполняется" : "Running") : adminMessage ? (language === "ru" ? "Последняя операция завершена с сообщением" : "Latest operation reported a result") : (language === "ru" ? "Ожидание запуска" : "Idle")}
+                  </span>
+                </div>
+                {adminMessage && <p className="mt-3 rounded-xl border border-border bg-background/60 p-3 text-sm" role="status">{adminMessage}</p>}
+              </section>
               <section className="rounded-2xl border border-primary/30 bg-card p-4 shadow-lg" aria-label="Панель администратора">
                 <div className="flex items-center gap-2">
                   <ShieldCheck className="h-5 w-5 text-primary" />
