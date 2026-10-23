@@ -60,11 +60,16 @@ async function sha256Hex(value: string): Promise<string> {
 }
 
 function sameOrigin(request: Request): boolean {
+  const expected = new URL(request.url).origin;
   const origin = request.headers.get("origin");
   if (origin) {
-    try { return new URL(origin).origin === new URL(request.url).origin; } catch { return false; }
+    try { return new URL(origin).origin === expected; } catch { return false; }
   }
-  return request.headers.get("sec-fetch-site") !== "cross-site";
+  const referer = request.headers.get("referer");
+  if (referer) {
+    try { return new URL(referer).origin === expected; } catch { return false; }
+  }
+  return request.headers.get("sec-fetch-site") === "same-origin";
 }
 
 async function authorize(request: Request, env: Environment, db: Database): Promise<boolean> {
@@ -108,7 +113,13 @@ async function ensureQueue(db: Database): Promise<void> {
   await db.batch([
     db.prepare("CREATE TABLE IF NOT EXISTS anime_trailer_update_queue (anime_id TEXT PRIMARY KEY NOT NULL, status TEXT NOT NULL DEFAULT 'pending', trailer_found INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)"),
     db.prepare("CREATE INDEX IF NOT EXISTS idx_anime_trailer_queue_status ON anime_trailer_update_queue(status, anime_id)"),
+    db.prepare("CREATE TABLE IF NOT EXISTS yume_admin_audit_log (id INTEGER PRIMARY KEY AUTOINCREMENT, action TEXT NOT NULL, status TEXT NOT NULL, details TEXT NOT NULL DEFAULT '{}', actor_telegram_id TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)"),
   ]);
+}
+
+async function audit(db: Database, action: string, status: string, details: Record<string, unknown> = {}): Promise<void> {
+  await db.prepare("INSERT INTO yume_admin_audit_log (action,status,details) VALUES (?,?,?)")
+    .bind(action,status,JSON.stringify(details).slice(0,4000)).run();
 }
 
 function youtubeId(value: string | null | undefined): string | null {
@@ -199,6 +210,7 @@ export async function handleAdminTrailers(request: Request): Promise<Response> {
       ]);
       const refreshed = await queueCounts(db);
       console.info("[YUME][TRAILER_SCAN] Queue prepared.", { total: refreshed.total, pending: refreshed.pending, checked: refreshed.checked, found: refreshed.found });
+      await audit(db,"trailers.scan.start","success",{total:refreshed.total,pending:refreshed.pending,checked:refreshed.checked,found:refreshed.found});
       return json({
         isAdmin: true,
         ...refreshed,
@@ -211,7 +223,7 @@ export async function handleAdminTrailers(request: Request): Promise<Response> {
 
     const pending = await db.prepare("SELECT anime_id FROM anime_trailer_update_queue WHERE status = 'pending' ORDER BY anime_id LIMIT ?")
       .bind(BATCH_SIZE).all<QueueRow>();
-    if (!pending.results.length) return json({ isAdmin: true, ...(await queueCounts(db)), done: true });
+    if (!pending.results.length) { const counts = await queueCounts(db); await audit(db,"trailers.scan.finish","success",counts); return json({ isAdmin: true, ...counts, done: true }); }
 
     const ids = pending.results.map((row) => row.anime_id);
     let fetched: { items: ShikimoriAnime[]; retryAfterMs?: number };
@@ -220,6 +232,7 @@ export async function handleAdminTrailers(request: Request): Promise<Response> {
     } catch (error) {
       const retryAfterMs = typeof error === "object" && error !== null && "retryAfterMs" in error
         ? Number((error as { retryAfterMs: number }).retryAfterMs) : 5000;
+      await audit(db,"trailers.scan.source-error","warning",{batchSize:ids.length,retryAfterMs});
       return json({ isAdmin: true, ...(await queueCounts(db)), retryAfterMs, error: error instanceof Error ? error.message : "Не удалось запросить Shikimori." }, 503);
     }
 
@@ -244,6 +257,7 @@ export async function handleAdminTrailers(request: Request): Promise<Response> {
     }
     await db.batch(statements);
     const counts = await queueCounts(db);
+    await audit(db,"trailers.scan.batch","success",{requested:ids.length,sourceMissing,noVideo,unusableVideo,trailersFoundInBatch,queuePending:counts.pending,queueChecked:counts.checked,queueFound:counts.found});
     console.info("[YUME][TRAILER_SCAN] Batch processed.", {
       requested: ids.length,
       returnedFromSource: fetched.items.length,
