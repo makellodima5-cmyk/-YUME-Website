@@ -313,7 +313,7 @@ function Index() {
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [analyticsError, setAnalyticsError] = useState("");
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
-  const [cookieNoticeAcknowledged, setCookieNoticeAcknowledged] = useState(true);
+  const [cookieNoticeAcknowledged, setCookieNoticeAcknowledged] = useState(false);
 
   useEffect(() => {
     setIsTelegramMiniApp(Boolean(getTelegramWebApp()?.initData));
@@ -418,9 +418,9 @@ function Index() {
   }, [isTelegramMiniApp, telegramAuthReady, telegramConsentRequired, telegramConsentPending]);
 
   useEffect(() => {
-    if (view === "admin" || typeof window === "undefined") return;
+    if (!cookieNoticeAcknowledged || view === "admin" || typeof window === "undefined") return;
     trackYumePage(window.location.pathname + "#" + String(view));
-  }, [view]);
+  }, [view, cookieNoticeAcknowledged]);
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -1200,7 +1200,7 @@ function Index() {
                     <div className="mb-2 flex items-center justify-between gap-2"><span className="text-sm font-medium text-[#D9C8E8]">{language==="ru"?"Посещения за 7 дней":"Visits over 7 days"}</span><button type="button" disabled={analyticsLoading} onClick={async()=>{setAnalyticsLoading(true);setAnalyticsError("");try{const response=await fetch("/api/analytics",{credentials:"same-origin",cache:"no-store"});const result=await response.json().catch(()=>({})) as {analytics?:typeof analyticsData;error?:string};if(!response.ok||!result.analytics)throw new Error(result.error||(language==="ru"?"Не удалось обновить статистику.":"Could not refresh analytics."));setAnalyticsData(result.analytics);}catch(error){setAnalyticsError(error instanceof Error?error.message:"Analytics request failed.");}finally{setAnalyticsLoading(false);}}} className="text-xs text-[#C46AFF]">{language==="ru"?"Обновить":"Refresh"}</button></div>
                     {analyticsData?.daily.length ? <div role="img" aria-label={language==="ru"?"График количества визитов за последние семь дней":"Visits chart for the last seven days"} className="flex h-24 items-end gap-1.5 rounded-lg bg-[#08070D] px-2 pt-3">{analyticsData.daily.map(day=><div key={day.date} className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1"><div title={day.date+": "+day.visits+" "+(language==="ru"?"визитов · ":"visits · ")+day.pageViews+" "+(language==="ru"?"просмотров":"pageviews")} className="w-full max-w-8 rounded-t-md bg-gradient-to-t from-[#8B35D6] to-[#D08AFF]" style={{height:Math.max(4,day.visits/Math.max(1,...analyticsData.daily.map(d=>d.visits))*100)+"%"}}/><span className="text-[9px] text-[#8D819B]">{day.date.slice(5)}</span></div>)}</div> : <p className="rounded-lg bg-[#08070D] p-4 text-xs text-[#8D819B]">{language==="ru"?"Данные появятся после первых посещений с включённой аналитикой.":"Data will appear after the first visits are recorded."}</p>}
                   </div>
-                  <p className="mt-3 text-[11px] text-[#8D819B]">{language==="ru"?"Посещения сайта; уникальные посетители оцениваются по псевдонимному хешу IP и браузера.":"Page visits; unique visitors are estimated using a pseudonymous IP/browser hash."}</p>
+                  <p className="mt-3 text-[11px] text-[#8D819B]">{language==="ru"?"Посещения считаются по случайному ID браузера после подтверждения уведомления о cookie; IP не сохраняется.":"Visits use a random browser ID after the cookie notice is acknowledged; raw IP addresses are not stored."}</p>
                 </div>
               </details>
               <section className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-card/50 px-3 py-2.5" aria-label={language === "ru" ? "Состояние операций" : "Operations status"}>
