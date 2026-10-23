@@ -55,6 +55,7 @@ jobs:
           src/test/profile-storage.test.ts
           src/test/shikimori.test.ts
           src/test/yume-analytics.test.ts
+          src/test/yume-analytics.server.test.ts
           --rule 'prettier/prettier: off'
 
       - name: Build Cloudflare Worker
