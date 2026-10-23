@@ -145,7 +145,7 @@ function RootShell({ children }: { children: ReactNode }) {
         <script src="https://telegram.org/js/telegram-web-app.js"></script>
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var w=window.Telegram&&window.Telegram.WebApp;if(w&&w.initData){var r=document.documentElement;r.classList.add("telegram-mini-app");r.dataset.yumeSplashActive="true";r.style.backgroundColor="#030207";}}catch(e){}})();`,
+            __html: `(function(){try{var w=window.Telegram&&window.Telegram.WebApp;if(w&&w.initData){var r=document.documentElement;r.classList.add("telegram-mini-app");r.dataset.yumeSplashActive="true";}}catch(e){}})();`,
           }}
         />
         <script
