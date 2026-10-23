@@ -83,11 +83,19 @@ async function ensureSchema(db: Database): Promise<void> {
   await db.batch([
     db.prepare("CREATE TABLE IF NOT EXISTS yume_notification_reads (user_id TEXT NOT NULL REFERENCES yume_users(id) ON DELETE CASCADE, notification_id TEXT NOT NULL, read_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (user_id, notification_id))"),
     db.prepare("CREATE INDEX IF NOT EXISTS idx_yume_notification_reads_user ON yume_notification_reads(user_id)"),
+    db.prepare("CREATE TABLE IF NOT EXISTS yume_notification_dismissals (user_id TEXT NOT NULL REFERENCES yume_users(id) ON DELETE CASCADE, notification_id TEXT NOT NULL, dismissed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (user_id, notification_id))"),
+    db.prepare("CREATE INDEX IF NOT EXISTS idx_yume_notification_dismissals_user ON yume_notification_dismissals(user_id)"),
   ]);
 }
 
 async function readIds(db: Database, userId: string): Promise<string[]> {
   const rows = await db.prepare("SELECT notification_id FROM yume_notification_reads WHERE user_id = ?")
+    .bind(userId).all<{ notification_id: string }>();
+  return rows.results.map((row) => row.notification_id);
+}
+
+async function dismissedIds(db: Database, userId: string): Promise<string[]> {
+  const rows = await db.prepare("SELECT notification_id FROM yume_notification_dismissals WHERE user_id = ?")
     .bind(userId).all<{ notification_id: string }>();
   return rows.results.map((row) => row.notification_id);
 }
@@ -112,12 +120,19 @@ export async function handleNotifications(request: Request): Promise<Response> {
         notifications: USER_NOTIFICATIONS,
         authenticated: Boolean(userId),
         readIds: userId ? await readIds(db, userId) : [],
+        dismissedIds: userId ? await dismissedIds(db, userId) : [],
       });
     }
 
     if (!userId) return json({ error: "authentication_required", authenticated: false }, 401);
     let body: { action?: unknown };
     try { body = await request.json() as { action?: unknown }; } catch { return json({ error: "invalid_request" }, 400); }
+    if (body.action === "dismiss-one") {
+      const notificationId = typeof body.notificationId === "string" ? body.notificationId : "";
+      if (!USER_NOTIFICATIONS.some((notification) => notification.id === notificationId)) return json({ error: "invalid_notification" }, 400);
+      await db.prepare("INSERT OR IGNORE INTO yume_notification_dismissals (user_id, notification_id) VALUES (?, ?)").bind(userId, notificationId).run();
+      return json({ ok: true, authenticated: true, dismissedIds: await dismissedIds(db, userId) });
+    }
     if (body.action !== "read-all") return json({ error: "invalid_action" }, 400);
 
     const statements = USER_NOTIFICATIONS.map((notification) =>
