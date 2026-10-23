@@ -245,7 +245,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
         if (!safeIds.length) return json({error:"no_valid_ids"},400);
         const result = await db.batch(safeIds.map(id => db.prepare("DELETE FROM anime_catalog WHERE id = ?").bind(id)));
         const deleted = result.reduce((sum,item) => sum + Number((item as {meta?:{changes?:number}})?.meta?.changes ?? 0),0);
-        if (deleted > 0) invalidatePersistentCatalogCache();
+        if (deleted > 0) await invalidatePersistentCatalogCache();
         const quality = await catalogQuality(db);
         await audit(db,"catalog.delete","success",{requested:safeIds.length,deleted});
         return json({isAdmin:true,deleted,quality:quality.items,qualitySummary:quality.summary});
@@ -264,7 +264,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
           const refreshed = await db.prepare("SELECT year,poster_url,description FROM anime_catalog WHERE id = ?").bind(item.id).first<{year:number;poster_url:string|null;description:string|null}>();
           if (!refreshed || !refreshed.year || !refreshed.poster_url?.trim() || !refreshed.description?.trim()) stillIncomplete++;
         }
-        if (repaired > 0) invalidatePersistentCatalogCache();
+        if (repaired > 0) await invalidatePersistentCatalogCache();
         const quality = await catalogQuality(db);
         const notFound = Math.max(0,safeIds.length-source.length);
         await audit(db,"catalog.repair","success",{requested:safeIds.length,repaired,notFound,stillIncomplete});
@@ -359,7 +359,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
         statements.push(db.prepare("UPDATE anime_catalog_meta SET value = CASE WHEN CAST((SELECT value FROM anime_catalog_meta WHERE key = 'admin_import_added') AS INTEGER) >= CAST((SELECT value FROM anime_catalog_meta WHERE key = 'admin_import_target') AS INTEGER) THEN 'completed' WHEN CAST((SELECT value FROM anime_catalog_meta WHERE key = 'admin_import_cursor') AS INTEGER) > 500 THEN 'partial' ELSE 'running' END WHERE key = 'admin_import_state'"));
         if (statements.length) {
           await db.batch(statements);
-          invalidatePersistentCatalogCache();
+          await invalidatePersistentCatalogCache();
         }
         const after = await snapshot(db);
         await audit(db,"catalog.import.page","success",{page:before.cursor,added:after.added-before.added,skipped:after.skipped-before.skipped,incomplete:after.incomplete-before.incomplete,state:after.state});
