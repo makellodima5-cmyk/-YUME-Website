@@ -298,6 +298,8 @@ function Index() {
   const [adminImport, setAdminImport] = useState<{target:number;cursor:number;added:number;skipped:number;incomplete:number;errors:number;state:string;delayMs?:number}>({target:0,cursor:1,added:0,skipped:0,incomplete:0,errors:0,state:"idle"});
   const [adminImportMessage, setAdminImportMessage] = useState("");
   const [catalogQuality, setCatalogQuality] = useState<{id:string;title:string;year:number;missingYear:boolean;missingPoster:boolean;missingDescription:boolean}[]>([]);
+  const [catalogQualityOffset, setCatalogQualityOffset] = useState(0);
+  const [catalogQualityHasMore, setCatalogQualityHasMore] = useState(false);
   const [catalogQualitySummary, setCatalogQualitySummary] = useState({total:0,incomplete:0,missingYear:0,missingPoster:0,missingDescription:0});
   const [catalogFilter, setCatalogFilter] = useState<"all"|"year"|"poster"|"description">("all");
   const [catalogSelected, setCatalogSelected] = useState<string[]>([]);
@@ -489,23 +491,27 @@ function Index() {
     if (!isAdmin) return;
     let cancelled = false;
     fetch("/api/admin/catalog-import", { credentials: "same-origin", cache: "no-store" })
-      .then(async response => ({ response, payload: await response.json().catch(() => ({})) as {isAdmin?:boolean;target?:number;cursor?:number;added?:number;skipped?:number;incomplete?:number;errors?:number;state?:string;delayMs?:number;quality?:typeof catalogQuality;qualitySummary?:typeof catalogQualitySummary;auditLog?:typeof adminAuditLog} }))
+      .then(async response => ({ response, payload: await response.json().catch(() => ({})) as {isAdmin?:boolean;target?:number;cursor?:number;added?:number;skipped?:number;incomplete?:number;errors?:number;state?:string;delayMs?:number;quality?:typeof catalogQuality;qualitySummary?:typeof catalogQualitySummary;qualityOffset?:number;qualityHasMore?:boolean;auditLog?:typeof adminAuditLog} }))
       .then(({response,payload}) => {
         if (cancelled || !response.ok || payload.isAdmin !== true) return;
         setAdminImport({target:payload.target ?? 0,cursor:payload.cursor ?? 1,added:payload.added ?? 0,skipped:payload.skipped ?? 0,incomplete:payload.incomplete ?? 0,errors:payload.errors ?? 0,state:payload.state ?? "idle",delayMs:payload.delayMs});
         setCatalogQuality(payload.quality ?? []);
         setCatalogQualitySummary(payload.qualitySummary ?? {total:0,incomplete:0,missingYear:0,missingPoster:0,missingDescription:0});
+        setCatalogQualityOffset(payload.qualityOffset ?? 0);
+        setCatalogQualityHasMore(payload.qualityHasMore ?? false);
         setAdminAuditLog(payload.auditLog ?? []);
       }).catch(() => {});
     return () => { cancelled = true; };
   }, [isAdmin]);
 
-  const refreshCatalogQuality = async () => {
-    const response = await fetch("/api/admin/catalog-import", {credentials:"same-origin",cache:"no-store"});
-    const payload = await response.json().catch(() => ({})) as {isAdmin?:boolean;error?:string;quality?:typeof catalogQuality;qualitySummary?:typeof catalogQualitySummary;auditLog?:typeof adminAuditLog};
+  const refreshCatalogQuality = async (offset = catalogQualityOffset) => {
+    const response = await fetch("/api/admin/catalog-import?qualityOffset=" + Math.max(0,offset), {credentials:"same-origin",cache:"no-store"});
+    const payload = await response.json().catch(() => ({})) as {isAdmin?:boolean;error?:string;quality?:typeof catalogQuality;qualitySummary?:typeof catalogQualitySummary;qualityOffset?:number;qualityHasMore?:boolean;auditLog?:typeof adminAuditLog};
     if (!response.ok || payload.isAdmin !== true) throw new Error(payload.error ?? (language === "ru" ? "Не удалось обновить список." : "Could not refresh catalog."));
     setCatalogQuality(payload.quality ?? []);
     setCatalogQualitySummary(payload.qualitySummary ?? {total:0,incomplete:0,missingYear:0,missingPoster:0,missingDescription:0});
+    setCatalogQualityOffset(payload.qualityOffset ?? offset);
+    setCatalogQualityHasMore(payload.qualityHasMore ?? false);
     setAdminAuditLog(payload.auditLog ?? []);
   };
 
@@ -1215,6 +1221,13 @@ function Index() {
                   <button type="button" disabled={catalogQualityBusy || catalogSelected.length===0} onClick={() => runCatalogQualityAction("delete")} className="rounded-xl border border-destructive/50 px-4 py-2.5 text-sm font-semibold text-destructive disabled:opacity-50">{language==="ru"?"Удалить выбранные":"Delete selected"}</button>
                   <button type="button" disabled={catalogQualityBusy} onClick={() => {setCatalogQualityBusy(true); refreshCatalogQuality().catch(error=>setAdminImportMessage(error instanceof Error?error.message:"Refresh failed")).finally(()=>setCatalogQualityBusy(false));}} className="rounded-xl border border-border px-4 py-2.5 text-sm">{language==="ru"?"Обновить список":"Refresh list"}</button>
                   <span className="text-xs text-muted-foreground">{language==="ru" ? "Выбрано: " : "Selected: "}{catalogSelected.length}/100</span>
+                </div>
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+                  <span>{language==="ru" ? "Показано " : "Showing "}{catalogQualityOffset+1}-{catalogQualityOffset+catalogQuality.length} / {catalogQualitySummary.incomplete}</span>
+                  <div className="flex gap-2">
+                    <button type="button" disabled={catalogQualityBusy || catalogQualityOffset===0} onClick={() => {setCatalogQualityBusy(true);refreshCatalogQuality(Math.max(0,catalogQualityOffset-500)).catch(error=>setAdminImportMessage(error instanceof Error?error.message:"Refresh failed")).finally(()=>setCatalogQualityBusy(false));}} className="rounded-lg border border-border px-3 py-1.5 disabled:opacity-40">{language==="ru"?"Назад":"Previous"}</button>
+                    <button type="button" disabled={catalogQualityBusy || !catalogQualityHasMore} onClick={() => {setCatalogQualityBusy(true);refreshCatalogQuality(catalogQualityOffset+500).catch(error=>setAdminImportMessage(error instanceof Error?error.message:"Refresh failed")).finally(()=>setCatalogQualityBusy(false));}} className="rounded-lg border border-border px-3 py-1.5 disabled:opacity-40">{language==="ru"?"Далее":"Next"}</button>
+                  </div>
                 </div>
                 <div className="mt-3 max-h-80 space-y-2 overflow-y-auto">
                   {visibleCatalogQuality.length===0 ? <p className="rounded-lg bg-background/60 p-3 text-sm text-muted-foreground">{language==="ru"?"Записей с выбранным фильтром в списке нет. Обнови список для повторной проверки.":"No records for this filter in the current list. Refresh to check again."}</p> : visibleCatalogQuality.map(item => (
