@@ -1127,10 +1127,10 @@ function Index() {
       ) : view === "rights" ? (
         <Profile key="rights" initialPanel="rights" animeList={ANIME} onSelect={select} onCatalog={() => setView("catalog")} />
       ) : view === "admin" ? (
-        <main id="main-content" className="min-h-[70vh] px-4 pt-24 md:px-10 md:pt-28">
+        <main id="main-content" className="min-h-[70vh] px-4 pt-20 pb-8 md:px-10 md:pt-24">
           <div className="mx-auto max-w-5xl">
             <h1 className="mb-2 text-2xl font-bold md:text-3xl">{language === "ru" ? "Панель администратора" : "Admin panel"}</h1>
-            <p className="mb-6 text-sm text-muted-foreground">{language === "ru" ? "Управление функциями и обслуживанием YUME." : "Manage YUME features and maintenance."}</p>
+            <p className="mb-4 text-sm text-muted-foreground">{language === "ru" ? "Управление функциями и обслуживанием YUME." : "Manage YUME features and maintenance."}</p>
             {!telegramDetectionComplete || (isTelegramMiniApp && (
               (!telegramAuthReady && !telegramAuthError) ||
               (telegramAuthReady && !telegramConsentRequired && !telegramConsentPending && !adminCheckComplete)
@@ -1140,137 +1140,136 @@ function Index() {
               </p>
             ) : isAdmin ? (
               <>
-              <section className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label={language === "ru" ? "Обзор каталога и задач" : "Catalog and tasks overview"}>
-                <article className="rounded-2xl border border-border bg-card/70 p-4">
-                  <p className="text-sm text-muted-foreground">{language === "ru" ? "Без трейлера" : "Missing trailers"}</p>
-                  <p className="mt-2 text-2xl font-semibold tabular-nums">{adminStats ? adminStats.missing.toLocaleString(language === "ru" ? "ru-RU" : "en-US") : "—"}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">{language === "ru" ? "Тайтлы, которым может потребоваться проверка" : "Titles that may need a check"}</p>
+              <section className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4" aria-label={language === "ru" ? "Ключевые показатели" : "Key metrics"}>
+                <article className="rounded-xl border border-border bg-card/60 p-3">
+                  <p className="text-xs text-muted-foreground">{language === "ru" ? "Без трейлера" : "Missing trailers"}</p>
+                  <p className="mt-1 text-xl font-semibold tabular-nums">{adminStats ? adminStats.missing.toLocaleString(language === "ru" ? "ru-RU" : "en-US") : "—"}</p>
                 </article>
-                <article className="rounded-2xl border border-border bg-card/70 p-4">
-                  <p className="text-sm text-muted-foreground">{language === "ru" ? "Проверено" : "Checked"}</p>
-                  <p className="mt-2 text-2xl font-semibold tabular-nums">{adminStats ? adminStats.checked.toLocaleString(language === "ru" ? "ru-RU" : "en-US") : "—"}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">{language === "ru" ? "Записей обработано текущей очередью" : "Records processed by the current queue"}</p>
+                <article className="rounded-xl border border-border bg-card/60 p-3">
+                  <p className="text-xs text-muted-foreground">{language === "ru" ? "Проверено" : "Checked"}</p>
+                  <p className="mt-1 text-xl font-semibold tabular-nums">{adminStats ? adminStats.checked.toLocaleString(language === "ru" ? "ru-RU" : "en-US") : "—"}</p>
                 </article>
-                <article className="rounded-2xl border border-border bg-card/70 p-4">
-                  <p className="text-sm text-muted-foreground">{language === "ru" ? "Найдено трейлеров" : "Trailers found"}</p>
-                  <p className="mt-2 text-2xl font-semibold tabular-nums">{adminStats ? adminStats.found.toLocaleString(language === "ru" ? "ru-RU" : "en-US") : "—"}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">{language === "ru" ? "Успешные результаты проверки" : "Successful lookup results"}</p>
+                <article className="rounded-xl border border-border bg-card/60 p-3">
+                  <p className="text-xs text-muted-foreground">{language === "ru" ? "Найдено трейлеров" : "Trailers found"}</p>
+                  <p className="mt-1 text-xl font-semibold tabular-nums">{adminStats ? adminStats.found.toLocaleString(language === "ru" ? "ru-RU" : "en-US") : "—"}</p>
                 </article>
-                <article className="rounded-2xl border border-border bg-card/70 p-4">
-                  <p className="text-sm text-muted-foreground">{language === "ru" ? "Очередь" : "Queue"}</p>
-                  <p className="mt-2 text-2xl font-semibold tabular-nums">{adminStats ? adminStats.pending.toLocaleString(language === "ru" ? "ru-RU" : "en-US") : "—"}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">{language === "ru" ? "Задач ожидают обработки" : "Tasks waiting to be processed"}</p>
+                <article className="rounded-xl border border-border bg-card/60 p-3">
+                  <p className="text-xs text-muted-foreground">{language === "ru" ? "Очередь" : "Queue"}</p>
+                  <p className="mt-1 text-xl font-semibold tabular-nums">{adminStats ? adminStats.pending.toLocaleString(language === "ru" ? "ru-RU" : "en-US") : "—"}</p>
                 </article>
               </section>
-              <section className="mb-5 rounded-2xl border border-border bg-card/50 p-4" aria-label={language === "ru" ? "Состояние операций" : "Operations status"}>
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <h2 className="font-semibold">{language === "ru" ? "Состояние операций" : "Operations status"}</h2>
-                    <p className="mt-1 text-sm text-muted-foreground">{language === "ru" ? "Здесь отображаются данные доступной сейчас административной операции. Новые задачи будут подключаться к этому обзору по мере реализации следующих этапов." : "This view shows the currently available admin operation. Additional jobs will be connected here in later phases."}</p>
-                  </div>
-                  <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium ${adminRunning ? "border-primary/40 bg-primary/10 text-primary" : adminMessage ? "border-amber-500/40 bg-amber-500/10 text-amber-600" : "border-border bg-background/60 text-muted-foreground"}`}>
-                    <span className={`h-2 w-2 rounded-full ${adminRunning ? "animate-pulse bg-primary" : adminMessage ? "bg-amber-500" : "bg-muted-foreground/60"}`} />
-                    {adminRunning ? (language === "ru" ? "Выполняется" : "Running") : adminMessage ? (language === "ru" ? "Последняя операция завершена с сообщением" : "Latest operation reported a result") : (language === "ru" ? "Ожидание запуска" : "Idle")}
-                  </span>
-                </div>
-                {adminMessage && <p className="mt-3 rounded-xl border border-border bg-background/60 p-3 text-sm" role="status">{adminMessage}</p>}
+              <section className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-card/50 px-3 py-2.5" aria-label={language === "ru" ? "Состояние операций" : "Operations status"}>
+                <span className="text-sm font-medium">{language === "ru" ? "Состояние операций" : "Operations status"}</span>
+                <span className={`inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-xs font-medium ${adminRunning ? "border-primary/40 bg-primary/10 text-primary" : adminMessage ? "border-amber-500/40 bg-amber-500/10 text-amber-600" : "border-border bg-background/60 text-muted-foreground"}`}>
+                  <span className={`h-1.5 w-1.5 rounded-full ${adminRunning ? "animate-pulse bg-primary" : adminMessage ? "bg-amber-500" : "bg-muted-foreground/60"}`} />
+                  {adminRunning ? (language === "ru" ? "Выполняется" : "Running") : adminMessage ? (language === "ru" ? "Есть сообщение" : "Has message") : (language === "ru" ? "Ожидание запуска" : "Idle")}
+                </span>
+                {adminMessage && <p className="w-full border-t border-border/70 pt-2 text-xs text-muted-foreground" role="status">{adminMessage}</p>}
               </section>
-              <section className="mb-5 rounded-2xl border border-primary/30 bg-card p-4 shadow-lg" aria-label={language === "ru" ? "Пополнение каталога" : "Catalog import"}>
-                <div className="flex items-center gap-2">
-                  <ShieldCheck className="h-5 w-5 text-primary" />
-                  <h2 className="text-lg font-semibold">{language === "ru" ? "Пополнение каталога из Shikimori" : "Import catalogue from Shikimori"}</h2>
-                </div>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  {language === "ru" ? "Укажи, сколько новых аниме добавить. Дубликаты пропускаются, неполные записи сохраняются для последующего восстановления. Импорт можно продолжить после паузы." : "Choose how many new anime to add. Duplicates are skipped and incomplete records are retained for later repair. Import can resume after a pause."}
-                </p>
-                <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
-                  <label className="text-sm">
-                    <span className="mb-1 block text-muted-foreground">{language === "ru" ? "Количество новых записей (1–500)" : "Number of new records (1–500)"}</span>
-                    <input type="number" min={1} max={500} step={1} value={adminImportTarget} onChange={event => setAdminImportTarget(event.target.value)} disabled={adminImportRunning || adminImport.state === "running"} className="h-11 w-full rounded-xl border border-border bg-background px-3" />
-                  </label>
-                  <button type="button" onClick={runCatalogImport} disabled={adminImportRunning || (adminImport.state !== "running" && (!Number.isInteger(Number(adminImportTarget)) || Number(adminImportTarget)<1 || Number(adminImportTarget)>500))} className="self-end rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground disabled:cursor-wait disabled:opacity-50">
-                    {adminImportRunning ? (language === "ru" ? "Импорт…" : "Importing…") : adminImport.state === "running" ? (language === "ru" ? "Продолжить импорт" : "Resume import") : (language === "ru" ? "Начать импорт" : "Start import")}
-                  </button>
-                </div>
-                <div className="mt-4 grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
-                  <div className="rounded-xl bg-background/70 p-3"><span className="block text-muted-foreground">{language === "ru" ? "Добавлено" : "Added"}</span><strong>{adminImport.added} / {adminImport.target}</strong></div>
-                  <div className="rounded-xl bg-background/70 p-3"><span className="block text-muted-foreground">{language === "ru" ? "Дубликаты" : "Duplicates"}</span><strong>{adminImport.skipped}</strong></div>
-                  <div className="rounded-xl bg-background/70 p-3"><span className="block text-muted-foreground">{language === "ru" ? "Неполные записи" : "Incomplete records"}</span><strong>{adminImport.incomplete}</strong></div>
-                  <div className="rounded-xl bg-background/70 p-3"><span className="block text-muted-foreground">{language === "ru" ? "Ошибки источника" : "Source errors"}</span><strong>{adminImport.errors}</strong></div>
-                </div>
-                {adminImportRunning && <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted" role="progressbar" aria-valuemin={0} aria-valuemax={adminImport.target || 1} aria-valuenow={adminImport.added}><div className="h-full rounded-full bg-primary transition-all" style={{width:`${adminImport.target ? Math.min(100,adminImport.added/adminImport.target*100) : 0}%`}} /></div>}
-                <p className="mt-3 text-xs text-muted-foreground">{language === "ru" ? `Состояние: ${adminImport.state}. Страница Shikimori: ${adminImport.cursor}.` : `Status: ${adminImport.state}. Shikimori page: ${adminImport.cursor}.`}</p>
-                {adminImportMessage && <p className="mt-3 rounded-xl border border-border bg-background/60 p-3 text-sm" role="status">{adminImportMessage}</p>}
-              </section>
-              <section className="mb-5 rounded-2xl border border-border bg-card/70 p-4" aria-label={language === "ru" ? "Качество каталога" : "Catalog quality"}>
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <h2 className="text-lg font-semibold">{language === "ru" ? "Качество каталога" : "Catalog quality"}</h2>
-                    <p className="mt-1 text-sm text-muted-foreground">{language === "ru" ? "Поиск записей без ключевых данных. Сводные цифры охватывают весь каталог; список показывает до 500 записей." : "Find records with missing key fields. Summary covers the whole catalog; the list shows up to 500 records."}</p>
-                  </div>
-                  <span className="rounded-full border border-border px-3 py-1 text-xs text-muted-foreground">{language === "ru" ? "Всего в каталоге: " : "Catalog total: "}{catalogQualitySummary.total}</span>
-                </div>
-                <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                  <button type="button" onClick={() => setCatalogFilter("all")} className={"rounded-xl border p-3 text-left " + (catalogFilter==="all" ? "border-primary bg-primary/10" : "border-border bg-background/50")}><span className="block text-xs text-muted-foreground">{language === "ru" ? "Неполные записи" : "Records with missing fields"}</span><strong className="mt-1 block text-xl tabular-nums">{catalogQualitySummary.incomplete}</strong></button>
-                  <button type="button" onClick={() => setCatalogFilter("year")} className={"rounded-xl border p-3 text-left " + (catalogFilter==="year" ? "border-primary bg-primary/10" : "border-border bg-background/50")}><span className="block text-xs text-muted-foreground">{language === "ru" ? "Без года" : "Missing year"}</span><strong className="mt-1 block text-xl tabular-nums">{catalogQualitySummary.missingYear}</strong></button>
-                  <button type="button" onClick={() => setCatalogFilter("poster")} className={"rounded-xl border p-3 text-left " + (catalogFilter==="poster" ? "border-primary bg-primary/10" : "border-border bg-background/50")}><span className="block text-xs text-muted-foreground">{language === "ru" ? "Без постера" : "Missing poster"}</span><strong className="mt-1 block text-xl tabular-nums">{catalogQualitySummary.missingPoster}</strong></button>
-                  <button type="button" onClick={() => setCatalogFilter("description")} className={"rounded-xl border p-3 text-left " + (catalogFilter==="description" ? "border-primary bg-primary/10" : "border-border bg-background/50")}><span className="block text-xs text-muted-foreground">{language === "ru" ? "Без описания" : "Missing description"}</span><strong className="mt-1 block text-xl tabular-nums">{catalogQualitySummary.missingDescription}</strong></button>
-                </div>
-                <div className="mt-4 flex flex-wrap items-center gap-2">
-                  <button type="button" disabled={catalogQualityBusy || catalogSelected.length===0} onClick={() => runCatalogQualityAction("repair")} className="rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50">{catalogQualityBusy ? (language==="ru"?"Обработка…":"Working…") : (language==="ru"?"Перезаполнить из Shikimori":"Repair from Shikimori")}</button>
-                  <button type="button" disabled={catalogQualityBusy || catalogSelected.length===0} onClick={() => runCatalogQualityAction("delete")} className="rounded-xl border border-destructive/50 px-4 py-2.5 text-sm font-semibold text-destructive disabled:opacity-50">{language==="ru"?"Удалить выбранные":"Delete selected"}</button>
-                  <button type="button" disabled={catalogQualityBusy} onClick={() => {setCatalogQualityBusy(true); refreshCatalogQuality().catch(error=>setAdminImportMessage(error instanceof Error?error.message:"Refresh failed")).finally(()=>setCatalogQualityBusy(false));}} className="rounded-xl border border-border px-4 py-2.5 text-sm">{language==="ru"?"Обновить список":"Refresh list"}</button>
-                  <button type="button" disabled={catalogQualityBusy || visibleCatalogQuality.length===0 || catalogSelected.length>=100} onClick={() => setCatalogSelected(current => Array.from(new Set([...current,...visibleCatalogQuality.map(item=>item.id)])).slice(0,100))} className="rounded-xl border border-border px-3 py-2.5 text-sm disabled:opacity-40">{language==="ru"?"Выбрать страницу":"Select page"}</button>
-                  <button type="button" disabled={catalogQualityBusy || catalogSelected.length===0} onClick={() => setCatalogSelected([])} className="rounded-xl border border-border px-3 py-2.5 text-sm disabled:opacity-40">{language==="ru"?"Снять выделение":"Clear selection"}</button>
-                  <span className="text-xs text-muted-foreground">{language==="ru" ? "Выбрано: " : "Selected: "}{catalogSelected.length}/100</span>
-                </div>
-                <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-                  <span>{language==="ru" ? "Показано " : "Showing "}{catalogQualityOffset+1}-{catalogQualityOffset+catalogQuality.length} / {catalogQualitySummary.incomplete}</span>
-                  <div className="flex gap-2">
-                    <button type="button" disabled={catalogQualityBusy || catalogQualityOffset===0} onClick={() => {setCatalogQualityBusy(true);refreshCatalogQuality(Math.max(0,catalogQualityOffset-500)).catch(error=>setAdminImportMessage(error instanceof Error?error.message:"Refresh failed")).finally(()=>setCatalogQualityBusy(false));}} className="rounded-lg border border-border px-3 py-1.5 disabled:opacity-40">{language==="ru"?"Назад":"Previous"}</button>
-                    <button type="button" disabled={catalogQualityBusy || !catalogQualityHasMore} onClick={() => {setCatalogQualityBusy(true);refreshCatalogQuality(catalogQualityOffset+500).catch(error=>setAdminImportMessage(error instanceof Error?error.message:"Refresh failed")).finally(()=>setCatalogQualityBusy(false));}} className="rounded-lg border border-border px-3 py-1.5 disabled:opacity-40">{language==="ru"?"Далее":"Next"}</button>
-                  </div>
-                </div>
-                <div className="mt-3 max-h-80 space-y-2 overflow-y-auto">
-                  {visibleCatalogQuality.length===0 ? <p className="rounded-lg bg-background/60 p-3 text-sm text-muted-foreground">{language==="ru"?"Записей с выбранным фильтром в списке нет. Обнови список для повторной проверки.":"No records for this filter in the current list. Refresh to check again."}</p> : visibleCatalogQuality.map(item => (
-                    <label key={item.id} className="flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-background/50 p-3 text-sm">
-                      <input type="checkbox" checked={catalogSelected.includes(item.id)} disabled={!catalogSelected.includes(item.id) && catalogSelected.length>=100} onChange={event=>setCatalogSelected(current=>event.target.checked ? (current.includes(item.id)||current.length>=100 ? current : [...current,item.id]) : current.filter(id=>id!==item.id))} className="mt-1"/>
-                      <span className="min-w-0 flex-1"><strong className="block">{item.title || (language==="ru"?"Без названия":"Untitled")}</strong><span className="text-xs text-muted-foreground">ID {item.id} · {[item.missingYear?(language==="ru"?"нет года":"no year"):null,item.missingPoster?(language==="ru"?"нет постера":"no poster"):null,item.missingDescription?(language==="ru"?"нет описания":"no description"):null].filter(Boolean).join(" · ")}</span></span>
+              <details open className="group mb-3 overflow-hidden rounded-2xl border border-primary/30 bg-card/60 shadow-sm" aria-label={language === "ru" ? "Пополнение каталога" : "Catalog import"}>
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 hover:bg-card/80 [&::-webkit-details-marker]:hidden">
+                  <span className="flex min-w-0 items-center gap-2.5"><ShieldCheck className="h-5 w-5 shrink-0 text-primary" /><span className="min-w-0"><span className="block font-semibold">{language === "ru" ? "Пополнение каталога из Shikimori" : "Import catalogue from Shikimori"}</span><span className="mt-0.5 block text-xs text-muted-foreground">{language === "ru" ? "Добавлено " : "Added "}{adminImport.added} / {adminImport.target} · {language === "ru" ? "страница " : "page "}{adminImport.cursor}</span></span></span>
+                  <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+                </summary>
+                <div className="border-t border-border/70 p-3 sm:p-4">
+                  <p className="text-xs leading-relaxed text-muted-foreground">{language === "ru" ? "Укажи количество новых аниме. Дубликаты пропускаются, неполные записи сохраняются для последующего восстановления. Импорт можно продолжить после паузы." : "Choose how many new anime to add. Duplicates are skipped, incomplete records are retained, and the import can be resumed."}</p>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+                    <label className="text-sm">
+                      <span className="mb-1 block text-xs text-muted-foreground">{language === "ru" ? "Количество новых записей (1–500)" : "Number of new records (1–500)"}</span>
+                      <input type="number" min={1} max={500} step={1} value={adminImportTarget} onChange={event => setAdminImportTarget(event.target.value)} disabled={adminImportRunning || adminImport.state === "running"} className="h-10 w-full rounded-xl border border-border bg-background px-3" />
                     </label>
-                  ))}
+                    <button type="button" onClick={runCatalogImport} disabled={adminImportRunning || (adminImport.state !== "running" && (!Number.isInteger(Number(adminImportTarget)) || Number(adminImportTarget)<1 || Number(adminImportTarget)>500))} className="self-end rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground disabled:cursor-wait disabled:opacity-50">
+                      {adminImportRunning ? (language === "ru" ? "Импорт…" : "Importing…") : adminImport.state === "running" ? (language === "ru" ? "Продолжить импорт" : "Resume import") : (language === "ru" ? "Начать импорт" : "Start import")}
+                    </button>
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
+                    <div className="rounded-lg bg-background/70 p-2.5"><span className="block text-xs text-muted-foreground">{language === "ru" ? "Добавлено" : "Added"}</span><strong className="tabular-nums">{adminImport.added} / {adminImport.target}</strong></div>
+                    <div className="rounded-lg bg-background/70 p-2.5"><span className="block text-xs text-muted-foreground">{language === "ru" ? "Дубликаты" : "Duplicates"}</span><strong className="tabular-nums">{adminImport.skipped}</strong></div>
+                    <div className="rounded-lg bg-background/70 p-2.5"><span className="block text-xs text-muted-foreground">{language === "ru" ? "Неполные записи" : "Incomplete records"}</span><strong className="tabular-nums">{adminImport.incomplete}</strong></div>
+                    <div className="rounded-lg bg-background/70 p-2.5"><span className="block text-xs text-muted-foreground">{language === "ru" ? "Ошибки источника" : "Source errors"}</span><strong className="tabular-nums">{adminImport.errors}</strong></div>
+                  </div>
+                  {adminImportRunning && <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted" role="progressbar" aria-valuemin={0} aria-valuemax={adminImport.target || 1} aria-valuenow={adminImport.added}><div className="h-full rounded-full bg-primary transition-all" style={{width:`${adminImport.target ? Math.min(100,adminImport.added/adminImport.target*100) : 0}%`}} /></div>}
+                  <p className="mt-2 text-xs text-muted-foreground">{language === "ru" ? `Состояние: ${adminImport.state}. Страница Shikimori: ${adminImport.cursor}.` : `Status: ${adminImport.state}. Shikimori page: ${adminImport.cursor}.`}</p>
+                  {adminImportMessage && <p className="mt-2 rounded-lg border border-border bg-background/60 p-2.5 text-xs" role="status">{adminImportMessage}</p>}
                 </div>
-              </section>
-              <section className="mb-5 rounded-2xl border border-border bg-card/70 p-4" aria-label={language === "ru" ? "Обслуживание" : "Maintenance"}>
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div><h2 className="text-lg font-semibold">{language==="ru"?"Обслуживание":"Maintenance"}</h2><p className="mt-1 text-sm text-muted-foreground">{language==="ru"?"Безопасная проверка доступности D1 и сводки каталога без удаления или изменения данных.":"Safe D1 connectivity and catalog summary check; it does not delete or modify catalog data."}</p></div>
-                  <button type="button" onClick={runMaintenanceCheck} disabled={maintenanceBusy} className="rounded-xl border border-border px-4 py-2.5 text-sm font-semibold disabled:opacity-50">{maintenanceBusy?(language==="ru"?"Проверка…":"Checking…"):(language==="ru"?"Проверить базу":"Check database")}</button>
+              </details>
+              <details className="group mb-3 overflow-hidden rounded-2xl border border-border bg-card/50" aria-label={language === "ru" ? "Качество каталога" : "Catalog quality"}>
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 hover:bg-card/80 [&::-webkit-details-marker]:hidden">
+                  <span className="min-w-0"><span className="block font-semibold">{language === "ru" ? "Качество каталога" : "Catalog quality"}</span><span className="mt-0.5 block text-xs text-muted-foreground">{language === "ru" ? "Неполных записей: " : "Incomplete records: "}{catalogQualitySummary.incomplete} · {language === "ru" ? "всего: " : "total: "}{catalogQualitySummary.total}</span></span>
+                  <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+                </summary>
+                <div className="border-t border-border/70 p-3 sm:p-4">
+                  <p className="mb-3 text-xs leading-relaxed text-muted-foreground">{language === "ru" ? "Найди записи без года, постера или описания. Сводка охватывает весь каталог; список разбит на страницы по 500 записей." : "Find records missing year, poster or description. Summary covers the whole catalog; the list is paginated in groups of 500."}</p>
+                  <div className="mb-3 grid grid-cols-3 gap-2 text-xs">
+                    <div className="rounded-lg border border-border bg-background/60 p-2"><span className="block text-muted-foreground">{language === "ru" ? "Без года" : "No year"}</span><strong className="mt-1 block text-base tabular-nums">{catalogQualitySummary.missingYear}</strong></div>
+                    <div className="rounded-lg border border-border bg-background/60 p-2"><span className="block text-muted-foreground">{language === "ru" ? "Без постера" : "No poster"}</span><strong className="mt-1 block text-base tabular-nums">{catalogQualitySummary.missingPoster}</strong></div>
+                    <div className="rounded-lg border border-border bg-background/60 p-2"><span className="block text-muted-foreground">{language === "ru" ? "Без описания" : "No description"}</span><strong className="mt-1 block text-base tabular-nums">{catalogQualitySummary.missingDescription}</strong></div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button type="button" disabled={catalogQualityBusy || catalogSelected.length===0} onClick={() => runCatalogQualityAction("repair")} className="rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50">{catalogQualityBusy ? (language==="ru"?"Обработка…":"Working…") : (language==="ru"?"Перезаполнить":"Repair selected")}</button>
+                    <button type="button" disabled={catalogQualityBusy || catalogSelected.length===0} onClick={() => runCatalogQualityAction("delete")} className="rounded-lg border border-destructive/50 px-3 py-2 text-xs font-semibold text-destructive disabled:opacity-50">{language==="ru"?"Удалить выбранные":"Delete selected"}</button>
+                    <button type="button" disabled={catalogQualityBusy} onClick={() => {setCatalogQualityBusy(true); refreshCatalogQuality().catch(error=>setAdminImportMessage(error instanceof Error?error.message:"Refresh failed")).finally(()=>setCatalogQualityBusy(false));}} className="rounded-lg border border-border px-3 py-2 text-xs">{language==="ru"?"Обновить список":"Refresh list"}</button>
+                    <button type="button" disabled={catalogQualityBusy || visibleCatalogQuality.length===0 || catalogSelected.length>=100} onClick={() => setCatalogSelected(current => Array.from(new Set([...current,...visibleCatalogQuality.map(item=>item.id)])).slice(0,100))} className="rounded-lg border border-border px-3 py-2 text-xs disabled:opacity-40">{language==="ru"?"Выбрать страницу":"Select page"}</button>
+                    <button type="button" disabled={catalogQualityBusy || catalogSelected.length===0} onClick={() => setCatalogSelected([])} className="rounded-lg border border-border px-3 py-2 text-xs disabled:opacity-40">{language==="ru"?"Снять выбор":"Clear selection"}</button>
+                    <span className="text-xs text-muted-foreground">{language==="ru" ? "Выбрано: " : "Selected: "}{catalogSelected.length}/100</span>
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+                    <span>{language==="ru" ? "Показано " : "Showing "}{catalogQualityOffset+1}-{catalogQualityOffset+catalogQuality.length} / {catalogQualitySummary.incomplete}</span>
+                    <div className="flex gap-2">
+                      <button type="button" disabled={catalogQualityBusy || catalogQualityOffset===0} onClick={() => {setCatalogQualityBusy(true);refreshCatalogQuality(Math.max(0,catalogQualityOffset-500)).catch(error=>setAdminImportMessage(error instanceof Error?error.message:"Refresh failed")).finally(()=>setCatalogQualityBusy(false));}} className="rounded-lg border border-border px-2.5 py-1.5 disabled:opacity-40">{language==="ru"?"Назад":"Previous"}</button>
+                      <button type="button" disabled={catalogQualityBusy || !catalogQualityHasMore} onClick={() => {setCatalogQualityBusy(true);refreshCatalogQuality(catalogQualityOffset+500).catch(error=>setAdminImportMessage(error instanceof Error?error.message:"Refresh failed")).finally(()=>setCatalogQualityBusy(false));}} className="rounded-lg border border-border px-2.5 py-1.5 disabled:opacity-40">{language==="ru"?"Далее":"Next"}</button>
+                    </div>
+                  </div>
+                  <div className="mt-3 max-h-64 space-y-2 overflow-y-auto">
+                    {visibleCatalogQuality.length===0 ? <p className="rounded-lg bg-background/60 p-3 text-sm text-muted-foreground">{language==="ru"?"Записей с выбранным фильтром в списке нет. Обнови список для повторной проверки.":"No records for this filter in the current list. Refresh to check again."}</p> : visibleCatalogQuality.map(item => (
+                      <label key={item.id} className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-border bg-background/50 p-2.5 text-sm">
+                        <input type="checkbox" checked={catalogSelected.includes(item.id)} disabled={!catalogSelected.includes(item.id) && catalogSelected.length>=100} onChange={event=>setCatalogSelected(current=>event.target.checked ? (current.includes(item.id)||current.length>=100 ? current : [...current,item.id]) : current.filter(id=>id!==item.id))} className="mt-1"/>
+                        <span className="min-w-0 flex-1"><strong className="block">{item.title || (language==="ru"?"Без названия":"Untitled")}</strong><span className="text-xs text-muted-foreground">ID {item.id} · {[item.missingYear?(language==="ru"?"нет года":"no year"):null,item.missingPoster?(language==="ru"?"нет постера":"no poster"):null,item.missingDescription?(language==="ru"?"нет описания":"no description"):null].filter(Boolean).join(" · ")}</span></span>
+                      </label>
+                    ))}
+                  </div>
                 </div>
-                {maintenanceMessage && <p role="status" className="mt-3 rounded-xl bg-background/60 p-3 text-sm">{maintenanceMessage}</p>}
-              </section>
-              <section className="mb-5 rounded-2xl border border-border bg-card/70 p-4" aria-label={language==="ru"?"История административных операций":"Admin operation history"}>
-                <div className="flex items-center justify-between gap-3"><h2 className="text-lg font-semibold">{language==="ru"?"История операций":"Operation history"}</h2><span className="text-xs text-muted-foreground">{language==="ru"?"Последние 30 событий":"Latest 30 events"}</span></div>
-                {adminAuditLog.length===0 ? <p className="mt-3 text-sm text-muted-foreground">{language==="ru"?"Событий пока нет.":"No events yet."}</p> : <div className="mt-3 max-h-72 space-y-2 overflow-y-auto">{adminAuditLog.map(entry=><div key={entry.id} className="flex flex-wrap items-start justify-between gap-2 rounded-xl border border-border bg-background/50 p-3 text-sm"><div><strong>{entry.action}</strong><p className="mt-1 text-xs text-muted-foreground">{JSON.stringify(entry.details)}</p></div><div className="text-right"><span className={entry.status==="success"?"text-emerald-500":"text-amber-500"}>{entry.status}</span><p className="mt-1 text-xs text-muted-foreground">{new Date(entry.created_at.replace(" ","T")+"Z").toLocaleString(language==="ru"?"ru-RU":"en-US")}</p></div></div>)}</div>}
-              </section>
-              <section className="rounded-2xl border border-primary/30 bg-card p-4 shadow-lg" aria-label="Панель администратора">
-                <div className="flex items-center gap-2">
-                  <ShieldCheck className="h-5 w-5 text-primary" />
-                  <h2 className="text-lg font-semibold">{language === "ru" ? "Обновление трейлеров" : "Trailer updates"}</h2>
+              </details>
+              <details className="group mb-3 overflow-hidden rounded-2xl border border-border bg-card/50" aria-label={language === "ru" ? "Обслуживание" : "Maintenance"}>
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 hover:bg-card/80 [&::-webkit-details-marker]:hidden">
+                  <span><span className="block font-semibold">{language==="ru"?"Обслуживание":"Maintenance"}</span><span className="mt-0.5 block text-xs text-muted-foreground">{language==="ru"?"Проверка подключения к D1":"D1 connectivity check"}</span></span>
+                  <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+                </summary>
+                <div className="border-t border-border/70 p-3 sm:p-4">
+                  <p className="mb-3 text-xs text-muted-foreground">{language==="ru"?"Проверка безопасна: она не удаляет и не меняет данные каталога.":"Safe check: it does not change or delete catalog data."}</p>
+                  <button type="button" onClick={runMaintenanceCheck} disabled={maintenanceBusy} className="rounded-lg border border-border px-3 py-2 text-sm font-medium disabled:opacity-50">{maintenanceBusy?(language==="ru"?"Проверка…":"Checking…"):(language==="ru"?"Проверить базу":"Check database")}</button>
+                  {maintenanceMessage && <p role="status" className="mt-3 rounded-lg bg-background/60 p-3 text-xs">{maintenanceMessage}</p>}
                 </div>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  {language === "ru" ? "Обновление трейлеров для аниме, уже сохранённых в каталоге. Данные остальных полей не изменяются." : "Update trailers for anime already stored in the catalog. Other fields will not be changed."}
-                </p>
-                <div className="mt-3 grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
-                  <div className="rounded-xl bg-background/70 p-3"><span className="block text-muted-foreground">{language === "ru" ? "Без трейлера" : "Missing trailers"}</span><strong>{adminStats?.missing ?? "—"}</strong></div>
-                  <div className="rounded-xl bg-background/70 p-3"><span className="block text-muted-foreground">{language === "ru" ? "Проверено" : "Checked"}</span><strong>{adminStats?.checked ?? 0}</strong></div>
-                  <div className="rounded-xl bg-background/70 p-3"><span className="block text-muted-foreground">{language === "ru" ? "Найдено трейлеров" : "Trailers found"}</span><strong>{adminStats?.found ?? 0}</strong></div>
-                  <div className="rounded-xl bg-background/70 p-3"><span className="block text-muted-foreground">{language === "ru" ? "В очереди" : "Queue"}</span><strong>{adminStats?.pending ?? 0}</strong></div>
+              </details>
+              <details className="group mb-3 overflow-hidden rounded-2xl border border-border bg-card/50" aria-label={language==="ru"?"История административных операций":"Admin operation history"}>
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 hover:bg-card/80 [&::-webkit-details-marker]:hidden">
+                  <span><span className="block font-semibold">{language==="ru"?"История операций":"Operation history"}</span><span className="mt-0.5 block text-xs text-muted-foreground">{language==="ru"?"Последние 30 событий":"Latest 30 events"}</span></span>
+                  <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+                </summary>
+                <div className="border-t border-border/70 p-3 sm:p-4">
+                  {adminAuditLog.length===0 ? <p className="text-sm text-muted-foreground">{language==="ru"?"Событий пока нет.":"No events yet."}</p> : <div className="max-h-64 space-y-2 overflow-y-auto">{adminAuditLog.map(entry=><div key={entry.id} className="flex flex-wrap items-start justify-between gap-2 rounded-lg border border-border bg-background/50 p-2.5 text-xs"><div className="min-w-0 flex-1"><strong className="break-words">{entry.action}</strong><p className="mt-1 break-words text-muted-foreground">{JSON.stringify(entry.details)}</p></div><div className="shrink-0 text-right"><span className={entry.status==="success"?"text-emerald-500":"text-amber-500"}>{entry.status}</span><p className="mt-1 text-muted-foreground">{new Date(entry.created_at.replace(" ","T")+"Z").toLocaleString(language==="ru"?"ru-RU":"en-US")}</p></div></div>)}</div>}
                 </div>
-                <button type="button" onClick={runTrailerUpdate} disabled={adminRunning || adminStats?.missing === 0} className="mt-4 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition hover:brightness-110 disabled:cursor-wait disabled:opacity-50">
-                  <ShieldCheck className="h-4 w-4" />
-                  {adminRunning ? (language === "ru" ? "Обновление…" : "Updating…") : (language === "ru" ? "Обновить трейлеры" : "Update trailers")}
-                </button>
-                {adminMessage && <p className="mt-3 text-sm text-muted-foreground" role="status">{adminMessage}</p>}
-              </section>
+              </details>
+              <details className="group mb-3 overflow-hidden rounded-2xl border border-primary/30 bg-card/60 shadow-sm" aria-label={language==="ru"?"Обновление трейлеров":"Trailer updates"}>
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 hover:bg-card/80 [&::-webkit-details-marker]:hidden">
+                  <span className="flex min-w-0 items-center gap-2.5"><ShieldCheck className="h-5 w-5 shrink-0 text-primary"/><span className="min-w-0"><span className="block font-semibold">{language==="ru"?"Обновление трейлеров":"Trailer updates"}</span><span className="mt-0.5 block text-xs text-muted-foreground">{language==="ru"?"Без трейлера: ":"Missing trailers: "}{adminStats?.missing ?? "—"} · {language==="ru"?"в очереди: ":"queued: "}{adminStats?.pending ?? 0}</span></span></span>
+                  <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+                </summary>
+                <div className="border-t border-border/70 p-3 sm:p-4">
+                  <p className="mb-3 text-xs text-muted-foreground">{language==="ru"?"Обновляются только трейлеры уже сохранённых аниме; остальные поля не изменяются.":"Only trailer fields are updated; other catalog fields remain unchanged."}</p>
+                  <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
+                    <div className="rounded-lg bg-background/70 p-2.5"><span className="block text-xs text-muted-foreground">{language === "ru" ? "Без трейлера" : "Missing trailers"}</span><strong className="tabular-nums">{adminStats?.missing ?? "—"}</strong></div>
+                    <div className="rounded-lg bg-background/70 p-2.5"><span className="block text-xs text-muted-foreground">{language === "ru" ? "Проверено" : "Checked"}</span><strong className="tabular-nums">{adminStats?.checked ?? 0}</strong></div>
+                    <div className="rounded-lg bg-background/70 p-2.5"><span className="block text-xs text-muted-foreground">{language === "ru" ? "Найдено" : "Found"}</span><strong className="tabular-nums">{adminStats?.found ?? 0}</strong></div>
+                    <div className="rounded-lg bg-background/70 p-2.5"><span className="block text-xs text-muted-foreground">{language === "ru" ? "Очередь" : "Queue"}</span><strong className="tabular-nums">{adminStats?.pending ?? 0}</strong></div>
+                  </div>
+                  <button type="button" onClick={runTrailerUpdate} disabled={adminRunning || adminStats?.missing === 0} className="mt-3 flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition hover:brightness-110 disabled:cursor-wait disabled:opacity-50">
+                    <ShieldCheck className="h-4 w-4" />
+                    {adminRunning ? (language === "ru" ? "Обновление…" : "Updating…") : (language === "ru" ? "Обновить трейлеры" : "Update trailers")}
+                  </button>
+                  {adminMessage && <p className="mt-2 text-xs text-muted-foreground" role="status">{adminMessage}</p>}
+                </div>
+              </details>
               </>
             ) : (
               <p role="alert" className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm">{telegramAuthError || (language === "ru" ? "Доступ запрещён. Войди через Telegram под аккаунтом администратора." : "Access denied. Sign in with the administrator Telegram account.")}</p>
