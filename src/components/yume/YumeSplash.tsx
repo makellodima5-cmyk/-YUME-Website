@@ -104,8 +104,11 @@ export function YumeSplash({ contentReady = false }: SplashProps) {
         ))}
       </div>
       <div className="yume-splash__identity">
-        <div className="yume-splash__logo">
-          <Logo />
+        <div className="yume-splash__logo-stage">
+          <span className="yume-splash__origin-point" aria-hidden="true" />
+          <div className="yume-splash__logo">
+            <Logo />
+          </div>
         </div>
         <div className="yume-splash__loading">
           <div className="yume-splash__spinner" aria-hidden="true" />
