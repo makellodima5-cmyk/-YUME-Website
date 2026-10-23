@@ -308,7 +308,7 @@ function Index() {
   const [maintenanceBusy, setMaintenanceBusy] = useState(false);
   const [maintenanceMessage, setMaintenanceMessage] = useState("");
   const [expandedAdminSections, setExpandedAdminSections] = useState({import:true,quality:false,maintenance:false,audit:false,trailers:false});
-  const [analyticsData, setAnalyticsData] = useState<{periods:{hours:{visits:number;visitors:number};week:{visits:number;visitors:number};month:{visits:number;visitors:number};all:{visits:number;visitors:number}};daily:{date:string;visits:number;visitors:number}[];updatedAt:string}|null>(null);
+  const [analyticsData, setAnalyticsData] = useState<{periods:{hours:{visits:number;visitors:number};week:{visits:number;visitors:number};month:{visits:number;visitors:number};all:{visits:number;visitors:number}};daily:{date:string;visits:number;pageViews:number;visitors:number}[];updatedAt:string}|null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [analyticsError, setAnalyticsError] = useState("");
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
@@ -418,12 +418,28 @@ function Index() {
 
   useEffect(() => {
     if (typeof window === "undefined" || view === "admin") return;
-    const path = window.location.pathname;
-    fetch("/api/analytics", {method:"POST", credentials:"same-origin", keepalive:true, headers:{"Content-Type":"application/json"}, body:JSON.stringify({path})}).catch(() => {});
+    const path = window.location.pathname + "#" + String(view);
+    const now = Date.now();
+    const key = "yume-analytics-session";
+    let sessionId: string;
+    try {
+      const stored = JSON.parse(window.sessionStorage.getItem(key) ?? "null") as {id?:unknown;lastActivity?:unknown;lastPath?:unknown;lastEventAt?:unknown} | null;
+      const valid = typeof stored?.id === "string" && /^[A-Za-z0-9_-]{16,100}$/.test(stored.id);
+      const active = valid && typeof stored?.lastActivity === "number" && now - stored.lastActivity < 30 * 60 * 1000;
+      sessionId = active ? stored!.id as string : window.crypto.randomUUID();
+      if (active && stored?.lastPath === path && typeof stored.lastEventAt === "number" && now - stored.lastEventAt < 2500) {
+        window.sessionStorage.setItem(key, JSON.stringify({...stored,lastActivity:now}));
+        return;
+      }
+      window.sessionStorage.setItem(key, JSON.stringify({id:sessionId,lastActivity:now,lastPath:path,lastEventAt:now}));
+    } catch {
+      sessionId = window.crypto.randomUUID();
+    }
+    fetch("/api/analytics", {method:"POST",credentials:"same-origin",keepalive:true,headers:{"Content-Type":"application/json"},body:JSON.stringify({path,sessionId})}).catch(() => {});
   }, [view]);
 
   useEffect(() => {
-    if (!isAdmin || !analyticsOpen) return;
+    if (!isAdmin) return;
     let cancelled = false;
     setAnalyticsLoading(true);
     setAnalyticsError("");
