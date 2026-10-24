@@ -11,6 +11,7 @@ type DB = { prepare(sql: string): Stmt; batch(stmts: Stmt[]): Promise<unknown[]>
 type Runtime = typeof globalThis & { __YUME_RUNTIME_ENV__?: unknown };
 
 const SESSION_COOKIE = "__Host-yume-session";
+const ANALYTICS_CONSENT_COOKIE = "yume-analytics-consent";
 const SESSION_ID_PATTERN = /^[A-Za-z0-9_-]{16,100}$/;
 const BOT_PATTERN = /bot|crawler|spider|headless|preview|facebookexternalhit|whatsapp/i;
 
@@ -38,14 +39,17 @@ function json(body: unknown, status = 200): Response {
     },
   });
 }
-function cookieValue(request: Request): string | null {
+function cookieValue(request: Request, name: string): string | null {
   for (const part of (request.headers.get("cookie") ?? "").split(";")) {
     const index = part.indexOf("=");
-    if (index >= 0 && part.slice(0, index).trim() === SESSION_COOKIE) {
+    if (index >= 0 && part.slice(0, index).trim() === name) {
       return part.slice(index + 1).trim() || null;
     }
   }
   return null;
+}
+function hasAnalyticsConsent(request: Request): boolean {
+  return cookieValue(request, ANALYTICS_CONSENT_COOKIE) === "all";
 }
 async function sessionTokenHash(value: string, secret: string): Promise<string> {
   const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
@@ -69,7 +73,7 @@ function sameOrigin(request: Request): boolean {
 }
 async function isAdmin(request: Request, env: Env, db: DB): Promise<boolean> {
   const adminId = typeof env.TELEGRAM_ADMIN_ID === "string" ? env.TELEGRAM_ADMIN_ID.trim() : "";
-  const token = cookieValue(request);
+  const token = cookieValue(request, SESSION_COOKIE);
   const secret = typeof env.YUME_AUTH_SESSION_SECRET === "string" && env.YUME_AUTH_SESSION_SECRET.trim().length >= 32
     ? env.YUME_AUTH_SESSION_SECRET
     : "";
@@ -218,6 +222,9 @@ export async function handleYumeAnalytics(request: Request): Promise<Response> {
     await ensureSchema(db);
     if (request.method === "POST") {
       if (!sameOrigin(request)) return json({ error: "Forbidden origin." }, 403);
+      // Enforce the explicit optional-analytics choice on the server as well as in the client.
+      // The preference cookie stores only the consent choice, not an analytics identifier.
+      if (!hasAnalyticsConsent(request)) return json({ ok: true, ignored: true, reason: "analytics_consent_required" });
       const body = await request.json().catch(() => null) as { path?: unknown; sessionId?: unknown; visitorId?: unknown } | null;
       const rawPath = typeof body?.path === "string" && body.path.startsWith("/") ? body.path : "/";
       const path = rawPath.split("?")[0].slice(0, 180);
