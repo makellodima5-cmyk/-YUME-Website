@@ -130,8 +130,7 @@ export async function handleTelegramOidc(request: Request): Promise<Response> {
       if ((flow !== "login" && flow !== "register") || (flow === "register" && !consent)) return response({ error: flow === "register" ? "consent_required" : "invalid_request" }, 400);
       await db.prepare("DELETE FROM yume_telegram_oidc_states WHERE expires_at <= ?").bind(Date.now()).run();
       const state = randomToken(); const nonce = randomToken(); const verifier = randomToken(48);
-      if (readCookie(request, OIDC_STATE_COOKIE) !== state) return errorRedirect(origin, "telegram_login_state_mismatch");
-    const stateHash = await keyedHash(state, secret);
+      const stateHash = await keyedHash(state, secret);
       await db.prepare("INSERT INTO yume_telegram_oidc_states (state_hash, nonce, verifier, flow, privacy_consent, expires_at) VALUES (?, ?, ?, ?, ?, ?)")
         .bind(stateHash, nonce, verifier, flow, consent ? 1 : 0, Date.now() + 10 * 60 * 1000).run();
       const challenge = b64url(await digest(verifier));
@@ -149,6 +148,7 @@ export async function handleTelegramOidc(request: Request): Promise<Response> {
     const code = url.searchParams.get("code");
     const state = url.searchParams.get("state");
     if (!code || !state || code.length > 4096 || state.length > 256) return errorRedirect(origin, "telegram_login_cancelled");
+    if (readCookie(request, OIDC_STATE_COOKIE) !== state) return errorRedirect(origin, "telegram_login_state_mismatch");
     const stateHash = await keyedHash(state, secret);
     const pending = await db.prepare("SELECT state_hash, nonce, verifier, flow, privacy_consent, expires_at FROM yume_telegram_oidc_states WHERE state_hash = ?")
       .bind(stateHash).first<StateRow>();
