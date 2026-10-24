@@ -27,7 +27,7 @@ describe("YUME site rules", () => {
     SITE_RULES.forEach((section, sectionIndex) => {
       expect(section.clauses.length).toBeGreaterThan(0);
       section.clauses.forEach((clause) => {
-        expect(clause).toMatch(new RegExp("^" + (sectionIndex + 1) + "\\\\.\\\\d+\\\\."));
+        expect(clause).toMatch(new RegExp("^" + (sectionIndex + 1) + "\\.\\d+\\."));
       });
     });
   });
