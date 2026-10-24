@@ -517,6 +517,68 @@ export async function handleTelegramBrowserAuth(request: Request): Promise<Respo
   }
 }
 
+
+
+const viewHistorySchemaPromises = new WeakMap<object, Promise<void>>();
+
+async function ensureViewHistorySchema(db: TelegramDatabase): Promise<void> {
+  const key = db as object;
+  const cached = viewHistorySchemaPromises.get(key);
+  if (cached) return cached;
+  const pending = db.batch([
+    db.prepare("CREATE TABLE IF NOT EXISTS yume_view_history (user_id TEXT NOT NULL REFERENCES yume_users(id) ON DELETE CASCADE, anime_id TEXT NOT NULL, viewed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, view_count INTEGER NOT NULL DEFAULT 1, PRIMARY KEY (user_id, anime_id))"),
+    db.prepare("CREATE INDEX IF NOT EXISTS idx_yume_view_history_user_viewed ON yume_view_history(user_id, viewed_at)"),
+  ]).then(() => undefined).catch((error) => {
+    viewHistorySchemaPromises.delete(key);
+    throw error;
+  });
+  viewHistorySchemaPromises.set(key, pending);
+  return pending;
+}
+
+/** Saves recently opened anime only for a verified, signed-in Telegram account. */
+export async function handleTelegramHistory(request: Request): Promise<Response> {
+  if (request.method !== "GET" && request.method !== "POST") return jsonResponse({ error: "method_not_allowed" }, 405);
+  if (request.method === "POST" && !isSameOriginRequest(request)) return jsonResponse({ error: "cross_origin_request" }, 403);
+  const env = environment();
+  const db = database(env);
+  const secret = sessionSecret(env);
+  if (!db || !secret) return jsonResponse({ error: "telegram_auth_not_configured" }, 503);
+
+  try {
+    await ensureSchema(db);
+    await ensureViewHistorySchema(db);
+    const userId = await authenticatedTelegramUserId(request, db, secret);
+    if (!userId) return jsonResponse({ error: "authentication_required" }, 401);
+    if (request.method === "GET") {
+      const rows = await db.prepare("SELECT anime_id AS animeId, viewed_at AS viewedAt, view_count AS viewCount FROM yume_view_history WHERE user_id = ? ORDER BY viewed_at DESC LIMIT 100")
+        .bind(userId).all<{ animeId: string; viewedAt: string; viewCount: number }>();
+      return jsonResponse({ authenticated: true, items: rows.results });
+    }
+
+    let input: Record<string, unknown>;
+    try {
+      const raw = await request.text();
+      if (raw.length > 2_048) return jsonResponse({ error: "request_too_large" }, 413);
+      const parsed: unknown = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return jsonResponse({ error: "invalid_request" }, 400);
+      input = parsed as Record<string, unknown>;
+    } catch {
+      return jsonResponse({ error: "invalid_request" }, 400);
+    }
+    const animeId = input.animeId;
+    if (typeof animeId !== "string" || !/^\d{1,12}$/.test(animeId)) return jsonResponse({ error: "invalid_anime_id" }, 400);
+    await db.prepare("INSERT INTO yume_view_history (user_id, anime_id, viewed_at, view_count) VALUES (?, ?, ?, 1) ON CONFLICT(user_id, anime_id) DO UPDATE SET viewed_at = excluded.viewed_at, view_count = yume_view_history.view_count + 1")
+      .bind(userId, animeId, new Date().toISOString()).run();
+    await db.prepare("DELETE FROM yume_view_history WHERE user_id = ? AND anime_id NOT IN (SELECT anime_id FROM yume_view_history WHERE user_id = ? ORDER BY viewed_at DESC LIMIT 100)")
+      .bind(userId, userId).run();
+    return jsonResponse({ saved: true });
+  } catch (error) {
+    console.error("[YUME] Viewing history request failed:", error);
+    return jsonResponse({ error: "history_unavailable" }, 503);
+  }
+}
+
 /** Permanently removes the current account and all account-linked records. */
 export async function handleTelegramAccountDelete(request: Request): Promise<Response> {
   if (request.method !== "DELETE") return jsonResponse({ error: "method_not_allowed" }, 405);
@@ -531,6 +593,11 @@ export async function handleTelegramAccountDelete(request: Request): Promise<Res
     await ensureSchema(db);
     await ensureBrowserAuthSchema(db);
     await ensureSavedAnimeSchema(db);
+    await ensureViewHistorySchema(db);
+    await db.batch([
+      db.prepare("CREATE TABLE IF NOT EXISTS yume_notification_reads (user_id TEXT NOT NULL REFERENCES yume_users(id) ON DELETE CASCADE, notification_id TEXT NOT NULL, read_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (user_id, notification_id))"),
+      db.prepare("CREATE TABLE IF NOT EXISTS yume_notification_dismissals (user_id TEXT NOT NULL REFERENCES yume_users(id) ON DELETE CASCADE, notification_id TEXT NOT NULL, dismissed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (user_id, notification_id))"),
+    ]);
     const tokenHash = await sessionTokenHash(token, secret);
     const session = await db.prepare("SELECT user_id, expires_at FROM yume_sessions WHERE token_hash = ?")
       .bind(tokenHash).first<AuthenticatedSessionRow>();
