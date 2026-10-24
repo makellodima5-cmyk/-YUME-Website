@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowDownWideNarrow, ChevronDown, ChevronRight, Search, SlidersHorizontal, X, UserRound, Globe, Sun, Moon, Monitor, ShieldCheck, Play, ListChecks, CircleCheck, Clock3, ChartNoAxesCombined, Download, Database, Settings, History, Bell, CheckCheck, Sparkles } from "lucide-react";
 import { COLLECTIONS, type Anime } from "@/data/anime";
 import { getShikimoriCatalog } from "@/data/shikimori";
@@ -20,7 +20,7 @@ import homeSocialImage from "@/assets/yume-hero-desktop-new.png.PNG";
 import { absoluteImageUrl, canonicalUrl } from "@/data/seo";
 import { getTelegramWebApp } from "@/lib/telegram-mini-app";
 import { trackYumePage } from "@/lib/yume-analytics";
-import { clearLocalAccountLibrary, setProfileStorageAuthenticated, syncTelegramLibrary } from "@/data/profile-storage";
+import { setProfileStorageAuthenticated, syncTelegramLibrary } from "@/data/profile-storage";
 import { USER_NOTIFICATIONS } from "@/data/notifications.shared";
 import { runAdminTrailerUpdate, type AdminTrailerStats } from "@/data/admin-trailer-update";
 
@@ -977,6 +977,11 @@ function Index() {
   const [collection, setCollection] = useState<string | null>(null);
 
   const setView = (v: View) => {
+    if (v === "login" || v === "register") {
+      setViewRaw(v);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
     // Tapping Home is also a quick way out of search results: restore the default home state.
     if (v === "home") {
       setQuery("");
@@ -1005,6 +1010,26 @@ function Index() {
   };
   const select = (anime: Anime) =>
     navigate({ to: "/anime/$animeId", params: { animeId: anime.id } });
+
+  const handleAuthComplete = useCallback(async () => {
+    setTelegramAuthError("");
+    try {
+      const response = await fetch("/api/telegram/init-data", { credentials: "same-origin", cache: "no-store" });
+      const result = await response.json().catch(() => ({})) as { authenticated?: boolean; user?: { id?: string } };
+      if (!response.ok || result.authenticated !== true || !result.user?.id) throw new Error("Session could not be confirmed");
+      await syncTelegramLibrary(result.user.id);
+      setProfileStorageAuthenticated(true);
+      setTelegramAuthReady(true);
+      setTelegramConsentRequired(false);
+      setTelegramConsentPending(false);
+      setViewRaw("profile");
+      navigate({ to: "/", search: { section: "profile", q: undefined, page: undefined, sort: undefined, genres: undefined, status: undefined, from: undefined, to: undefined, rating: undefined, kind: undefined, age: undefined } });
+    } catch {
+      setTelegramAuthError(language === "ru"
+        ? "Вход выполнен не полностью: не удалось загрузить аккаунт. Обнови страницу и попробуй снова."
+        : "Sign-in did not finish: account data could not be loaded. Refresh and try again.");
+    }
+  }, [language, navigate]);
   const random = () => {
     const availableAnime = ANIME.filter(
       (anime) => anime.status === "Онгоинг" || anime.status === "Вышел",
@@ -1224,7 +1249,16 @@ function Index() {
         </div>
       )}
 
-      {searching ? (
+      {view === "login" || view === "register" ? (
+        <AuthPage
+          key={view}
+          mode={view}
+          language={language}
+          onModeChange={(mode) => setView(mode)}
+          onPrivacy={() => setView("privacy-policy")}
+          onComplete={handleAuthComplete}
+        />
+      ) : searching ? (
         <main id="main-content" className="px-4 pt-36 md:px-10 md:pt-24">
           <div className="mb-6 flex items-center justify-between">
             <h1 className="text-xl font-semibold">{submittedQuery ? `${t("catalog.results")}: «${submittedQuery}»` : t("catalog.filterResults")} <span className="text-muted-foreground">· {needsFullCatalog && catalogLoadState !== "loaded" && catalogLoadState !== "error" ? "…" : catalogResults.length}</span></h1>
@@ -1720,7 +1754,7 @@ function Index() {
           <p className="rounded-2xl border border-dashed border-border bg-card/40 px-5 py-8 text-sm text-muted-foreground">{t("history.empty")}</p>
         </main>
       ) : null}
-      {!["profile", "favorites", "watchlist", "privacy", "privacy-policy", "rules", "rights"].includes(view) && (
+      {!["profile", "favorites", "watchlist", "privacy", "privacy-policy", "rules", "rights", "login", "register"].includes(view) && (
         <Footer onNavigate={setView} />
       )}
       </div>
