@@ -75,9 +75,32 @@ export async function handleTelegramWebhook(request: Request): Promise<Response>
   }
 
   const firstName = message?.from?.first_name?.trim();
-  let greeting = firstName
-    ? `Привет, ${firstName}! 👋 Добро пожаловать в YUME — место, где проще найти аниме под настроение. Открывай каталог, собирай список того, что хочешь посмотреть, и находи новые истории. ✨`
-    : "Привет! 👋 Добро пожаловать в YUME — место, где проще найти аниме под настроение. Открывай каталог, собирай список того, что хочешь посмотреть, и находи новые истории. ✨";
+  const safeFirstName = (firstName || "друг")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+  let greeting = `<b>🌙 Привет, ${safeFirstName}! Добро пожаловать в YUME.</b>
+
+Знаешь, иногда одна история может изменить всё.
+
+<i>Включаешь аниме просто на вечер — и вдруг ловишь себя на том, что переживаешь за героев, не замечаешь, как наступает рассвет, и ещё долго не можешь отпустить эту историю после финальных титров…</i>
+
+💜 <b>Именно для таких моментов и существует YUME.</b>
+
+Я хочу, чтобы здесь ты находил не просто аниме, а истории, которые попадают прямо в сердце.
+
+✨ Открывай новые миры.
+🌸 Находи аниме под своё настроение.
+🎬 Возвращайся к историям, которые запали в душу.
+
+И знаешь что? Тебе совсем не обязательно заранее знать, что искать. Просто следуй за своим интересом. Возможно, совсем скоро ты найдёшь здесь своё новое любимое аниме.
+
+━━━━━━━━━━━━━━
+
+🌌 <b>Ну что, ${safeFirstName}, готов найти свою следующую историю?</b>
+
+Нажимай на кнопку ниже — и давай начнём ✨`;
   let browserLogin = false;
   const startPayload = isStartCommand ? (text.split(/\s+/)[1] ?? "") : "";
   if (isStartCommand && startPayload.startsWith("yb_")) {
@@ -134,6 +157,7 @@ export async function handleTelegramWebhook(request: Request): Promise<Response>
       body: JSON.stringify({
         chat_id: chatId,
         text: greeting,
+        parse_mode: "HTML",
         reply_markup: browserLogin
           ? { inline_keyboard: [[{ text: "🌸 Открыть YUME", url: SITE_URL }]] }
           : { inline_keyboard: [[{ text: "🎬 Открыть YUME", web_app: { url: SITE_URL } }]] },
