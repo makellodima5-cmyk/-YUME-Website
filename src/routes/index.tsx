@@ -1021,7 +1021,7 @@ function Index() {
         setHistoryItems(payload.items.filter((item): item is { animeId: string; viewedAt: string; viewCount: number } =>
           Boolean(item && typeof item === "object" &&
             typeof (item as { animeId?: unknown }).animeId === "string" &&
-            /^\\d{1,12}$/.test((item as { animeId: string }).animeId) &&
+            /^\d{1,12}$/.test((item as { animeId: string }).animeId) &&
             typeof (item as { viewedAt?: unknown }).viewedAt === "string" &&
             typeof (item as { viewCount?: unknown }).viewCount === "number"),
         ));
