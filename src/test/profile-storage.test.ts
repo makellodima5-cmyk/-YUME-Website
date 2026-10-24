@@ -30,24 +30,24 @@ describe("local profile library", () => {
 
   it("adds an ID once and removes it on the next toggle for an authenticated account", () => {
     setProfileStorageAuthenticated(true);
-    expect(toggleSavedAnimeId(FAVORITES_STORAGE_KEY, "anime-1")).toBe(true);
-    expect(toggleSavedAnimeId(FAVORITES_STORAGE_KEY, "anime-1")).toBe(false);
+    expect(toggleSavedAnimeId(FAVORITES_STORAGE_KEY, "123")).toBe(true);
+    expect(toggleSavedAnimeId(FAVORITES_STORAGE_KEY, "123")).toBe(false);
     expect(readSavedAnimeIds(FAVORITES_STORAGE_KEY)).toEqual([]);
   });
 
   it("preserves other IDs and does not duplicate an existing ID for an authenticated account", () => {
     setProfileStorageAuthenticated(true);
-    window.localStorage.setItem(WATCHLIST_STORAGE_KEY, JSON.stringify(["anime-1"]));
-    expect(readSavedAnimeIds(WATCHLIST_STORAGE_KEY)).toEqual(["anime-1"]);
-    expect(toggleSavedAnimeId(WATCHLIST_STORAGE_KEY, "anime-2")).toBe(true);
-    expect(readSavedAnimeIds(WATCHLIST_STORAGE_KEY)).toEqual(["anime-1", "anime-2"]);
+    window.localStorage.setItem(WATCHLIST_STORAGE_KEY, JSON.stringify(["123"]));
+    expect(readSavedAnimeIds(WATCHLIST_STORAGE_KEY)).toEqual(["123"]);
+    expect(toggleSavedAnimeId(WATCHLIST_STORAGE_KEY, "456")).toBe(true);
+    expect(readSavedAnimeIds(WATCHLIST_STORAGE_KEY)).toEqual(["123", "456"]);
   });
 
   it("dispatches the shared update event after a successful write", () => {
     setProfileStorageAuthenticated(true);
     const listener = vi.fn();
     window.addEventListener(PROFILE_UPDATED_EVENT, listener);
-    toggleSavedAnimeId(FAVORITES_STORAGE_KEY, "anime-1");
+    toggleSavedAnimeId(FAVORITES_STORAGE_KEY, "123");
     window.removeEventListener(PROFILE_UPDATED_EVENT, listener);
     expect(listener).toHaveBeenCalledTimes(1);
   });
@@ -72,7 +72,7 @@ describe("local profile library", () => {
     const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
       throw new Error("storage blocked");
     });
-    expect(toggleSavedAnimeId(FAVORITES_STORAGE_KEY, "anime-1")).toBe(false);
+    expect(toggleSavedAnimeId(FAVORITES_STORAGE_KEY, "123")).toBe(false);
     setItem.mockRestore();
   });
 });
