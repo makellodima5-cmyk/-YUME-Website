@@ -112,6 +112,8 @@ function ErrorComponent({ error, reset }: ErrorComponentProps) {
 }
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
+  // The Android shell must render locally without invoking Worker SSR.
+  ssr: !isAndroidBuild(),
   head: () => ({
     meta: [
       { charSet: "utf-8" },
