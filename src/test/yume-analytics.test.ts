@@ -9,7 +9,7 @@ describe("YUME analytics pageview tracking", () => {
 
   beforeEach(() => {
     window.localStorage.clear();
-    window.localStorage.setItem("yume-cookie-notice-acknowledged", "true");
+    window.localStorage.setItem("yume-cookie-consent-v1", JSON.stringify({ necessary: true, analytics: true, version: 1 }));
     window.localStorage.setItem("yume-analytics-visitor-id", visitorId);
     randomUuidDescriptor = Object.getOwnPropertyDescriptor(window.crypto, "randomUUID");
     const ids = [firstId, secondId];
@@ -29,8 +29,16 @@ describe("YUME analytics pageview tracking", () => {
     vi.restoreAllMocks();
   });
 
-  it("does not collect analytics before the site's cookie notice is acknowledged", () => {
-    window.localStorage.removeItem("yume-cookie-notice-acknowledged");
+  it("does not collect analytics without explicit optional analytics consent", () => {
+    window.localStorage.setItem("yume-cookie-consent-v1", JSON.stringify({ necessary: true, analytics: false, version: 1 }));
+    window.localStorage.removeItem("yume-analytics-visitor-id");
+    trackYumePage("/#home");
+    expect(fetch).not.toHaveBeenCalled();
+    expect(window.localStorage.getItem("yume-analytics-visitor-id")).toBeNull();
+  });
+
+  it("does not collect analytics for essential-only consent", () => {
+    window.localStorage.setItem("yume-cookie-consent-v1", JSON.stringify({ necessary: true, analytics: false, version: 1 }));
     window.localStorage.removeItem("yume-analytics-visitor-id");
     trackYumePage("/#home");
     expect(fetch).not.toHaveBeenCalled();
