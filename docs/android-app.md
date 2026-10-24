@@ -47,3 +47,7 @@ Before generating an installable APK, complete and verify the following:
 - [ ] CI build, APK artifact, and device testing.
 
 No Android APK is considered ready until the unchecked items above are implemented and validated.
+
+### Current blocker
+
+The normal Cloudflare Worker build, tests, and Android-specific lint pass in CI. The dedicated TanStack SPA build still fails during its shell-prerender step: the prerender request to `/` returns HTTP 500 before `dist/client/index.html` is emitted. Do not generate or distribute an APK until the prerender failure is diagnosed and the CI shell verification passes. This is the current blocking issue; it is not yet a working Android build.
