@@ -1,5 +1,5 @@
 import { env as cloudflareEnv } from "cloudflare:workers";
-import { completeTelegramBrowserAuth } from "@/data/telegram-auth.server";
+import { completeTelegramBrowserAuth, confirmTelegramBrowserAuth } from "@/data/telegram-auth.server";
 
 type TelegramEnvironment = Record<string, unknown> & {
   TELEGRAM_BOT_TOKEN?: string;
@@ -62,7 +62,9 @@ export async function handleTelegramWebhook(request: Request): Promise<Response>
   const message = update.message;
   const text = message?.text?.trim() ?? "";
   const chatId = message?.chat?.id;
-  if (!text.startsWith("/start") || typeof chatId !== "number" || !Number.isSafeInteger(chatId)) {
+  const isStartCommand = /^\/start(?:@\w+)?(?:\s|$)/.test(text);
+  const isConfirmationCode = /^[A-Za-z0-9_-]{8}$/.test(text);
+  if ((!isStartCommand && !isConfirmationCode) || typeof chatId !== "number" || !Number.isSafeInteger(chatId)) {
     return json({ ok: true, ignored: true });
   }
 
@@ -71,8 +73,8 @@ export async function handleTelegramWebhook(request: Request): Promise<Response>
     ? `Привет, ${firstName}! 👋 Добро пожаловать в YUME — место, где проще найти аниме под настроение. Открывай каталог, собирай список того, что хочешь посмотреть, и находи новые истории. ✨`
     : "Привет! 👋 Добро пожаловать в YUME — место, где проще найти аниме под настроение. Открывай каталог, собирай список того, что хочешь посмотреть, и находи новые истории. ✨";
   let browserLogin = false;
-  const startPayload = text.split(/\s+/)[1] ?? "";
-  if (startPayload.startsWith("yb_")) {
+  const startPayload = isStartCommand ? (text.split(/\s+/)[1] ?? "") : "";
+  if (isStartCommand && startPayload.startsWith("yb_")) {
     const sender = message?.from;
     if (typeof sender?.id !== "number" || !Number.isSafeInteger(sender.id) || !sender.first_name?.trim()) {
       return json({ ok: true, ignored: true });
@@ -85,14 +87,36 @@ export async function handleTelegramWebhook(request: Request): Promise<Response>
       ...(sender.username?.trim() ? { username: sender.username.trim() } : {}),
       ...(sender.language_code?.trim() ? { languageCode: sender.language_code.trim() } : {}),
     });
-    greeting = result === "ready"
-      ? "✅ Готово! Вернись во вкладку браузера YUME — вход будет завершён автоматически."
+    greeting = result === "awaiting_code"
+      ? "🔐 Чтобы завершить вход, отправь сюда 8-символьный код, показанный на странице YUME в браузере. Не отправляй код другим людям."
       : result === "account_not_found"
         ? "Аккаунт YUME не найден. Открой сайт, выбери «Регистрация» и повтори попытку."
         : result === "already_registered"
           ? "Этот Telegram уже зарегистрирован. Открой сайт и выбери «Вход»."
           : result === "expired"
             ? "Ссылка авторизации истекла или уже использована. Вернись на сайт YUME и начни вход заново."
+            : "Не удалось завершить авторизацию. Вернись на сайт YUME и попробуй ещё раз.";
+  } else if (isConfirmationCode) {
+    const sender = message?.from;
+    if (typeof sender?.id !== "number" || !Number.isSafeInteger(sender.id) || !sender.first_name?.trim()) {
+      return json({ ok: true, ignored: true });
+    }
+    browserLogin = true;
+    const result = await confirmTelegramBrowserAuth(text, {
+      id: sender.id,
+      firstName: sender.first_name.trim(),
+      ...(sender.last_name?.trim() ? { lastName: sender.last_name.trim() } : {}),
+      ...(sender.username?.trim() ? { username: sender.username.trim() } : {}),
+      ...(sender.language_code?.trim() ? { languageCode: sender.language_code.trim() } : {}),
+    });
+    greeting = result === "ready"
+      ? "✅ Код подтверждён! Вернись во вкладку браузера YUME — вход завершится автоматически."
+      : result === "account_not_found"
+        ? "Аккаунт YUME не найден. Открой сайт, выбери «Регистрация» и повтори попытку."
+        : result === "already_registered"
+          ? "Этот Telegram уже зарегистрирован. Открой сайт и выбери «Вход»."
+          : result === "expired"
+            ? "Код неверный, истёк или не относится к этому Telegram. Вернись на сайт YUME и начни авторизацию заново."
             : "Не удалось завершить авторизацию. Вернись на сайт YUME и попробуй ещё раз.";
   }
 
