@@ -18,6 +18,7 @@ type StateRow = { state_hash: string; nonce: string; verifier: string; flow: "lo
 type Claims = { iss?: unknown; aud?: unknown; azp?: unknown; exp?: unknown; iat?: unknown; nonce?: unknown; sub?: unknown; id?: unknown; name?: unknown; given_name?: unknown; family_name?: unknown; preferred_username?: unknown; picture?: unknown };
 type Jwk = JsonWebKey & { kid?: string; alg?: string; use?: string };
 const COOKIE = "__Host-yume-session";
+const OIDC_STATE_COOKIE = "__Host-yume-oidc-state";
 const TTL = 30 * 24 * 60 * 60;
 const encoder = new TextEncoder();
 type Runtime = typeof globalThis & { __YUME_RUNTIME_ENV__?: unknown };
@@ -49,6 +50,15 @@ function response(payload: unknown, status = 200, cookies: string[] = []): Respo
   return new Response(JSON.stringify(payload), { status, headers });
 }
 function sessionCookie(token: string): string { return COOKIE + "=" + token + "; Path=/; Max-Age=" + TTL + "; HttpOnly; Secure; SameSite=Lax"; }
+function oidcStateCookie(state: string): string { return OIDC_STATE_COOKIE + "=" + state + "; Path=/; Max-Age=600; HttpOnly; Secure; SameSite=Lax"; }
+function clearOidcStateCookie(): string { return OIDC_STATE_COOKIE + "=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax"; }
+function readCookie(request: Request, name: string): string | null {
+  for (const part of (request.headers.get("cookie") ?? "").split(";")) {
+    const index = part.indexOf("=");
+    if (index >= 0 && part.slice(0, index).trim() === name) return part.slice(index + 1).trim() || null;
+  }
+  return null;
+}
 async function createSession(db: Database, userId: string, secret: string): Promise<string> {
   const token = randomToken();
   const key = await crypto.subtle.importKey("raw", encoder.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
@@ -68,7 +78,7 @@ function redirect(url: URL, cookies: string[] = []): Response {
 }
 function errorRedirect(origin: string, code: string): Response {
   const url = new URL("/", origin); url.searchParams.set("section", "register"); url.searchParams.set("auth_error", code);
-  return redirect(url);
+  return redirect(url, [clearOidcStateCookie()]);
 }
 async function verifyIdToken(token: string, clientId: string, nonce: string): Promise<Claims | null> {
   const parts = token.split(".");
@@ -120,7 +130,8 @@ export async function handleTelegramOidc(request: Request): Promise<Response> {
       if ((flow !== "login" && flow !== "register") || (flow === "register" && !consent)) return response({ error: flow === "register" ? "consent_required" : "invalid_request" }, 400);
       await db.prepare("DELETE FROM yume_telegram_oidc_states WHERE expires_at <= ?").bind(Date.now()).run();
       const state = randomToken(); const nonce = randomToken(); const verifier = randomToken(48);
-      const stateHash = await keyedHash(state, secret);
+      if (readCookie(request, OIDC_STATE_COOKIE) !== state) return errorRedirect(origin, "telegram_login_state_mismatch");
+    const stateHash = await keyedHash(state, secret);
       await db.prepare("INSERT INTO yume_telegram_oidc_states (state_hash, nonce, verifier, flow, privacy_consent, expires_at) VALUES (?, ?, ?, ?, ?, ?)")
         .bind(stateHash, nonce, verifier, flow, consent ? 1 : 0, Date.now() + 10 * 60 * 1000).run();
       const challenge = b64url(await digest(verifier));
@@ -133,7 +144,7 @@ export async function handleTelegramOidc(request: Request): Promise<Response> {
       auth.searchParams.set("nonce", nonce);
       auth.searchParams.set("code_challenge", challenge);
       auth.searchParams.set("code_challenge_method", "S256");
-      return redirect(auth);
+      return redirect(auth, [oidcStateCookie(state)]);
     }
     const code = url.searchParams.get("code");
     const state = url.searchParams.get("state");
@@ -179,7 +190,7 @@ export async function handleTelegramOidc(request: Request): Promise<Response> {
     const success = new URL("/", origin);
     success.searchParams.set("section", "profile");
     success.searchParams.set("auth", "success");
-    return redirect(success, [cookie]);
+    return redirect(success, [cookie, clearOidcStateCookie()]);
   } catch (error) {
     console.error("[YUME][TELEGRAM_OIDC] Authentication failed:", error);
     return errorRedirect(origin, "telegram_login_failed");
