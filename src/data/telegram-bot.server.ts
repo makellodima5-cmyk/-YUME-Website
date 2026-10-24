@@ -1,4 +1,5 @@
 import { env as cloudflareEnv } from "cloudflare:workers";
+import { completeTelegramBrowserAuth } from "@/data/telegram-auth.server";
 
 type TelegramEnvironment = Record<string, unknown> & {
   TELEGRAM_BOT_TOKEN?: string;
@@ -8,7 +9,7 @@ type TelegramUpdate = {
   message?: {
     text?: string;
     chat?: { id?: number };
-    from?: { first_name?: string };
+    from?: { id?: number; first_name?: string; last_name?: string; username?: string; language_code?: string };
   };
 };
 type RuntimeGlobal = typeof globalThis & { __YUME_RUNTIME_ENV__?: unknown };
@@ -66,9 +67,34 @@ export async function handleTelegramWebhook(request: Request): Promise<Response>
   }
 
   const firstName = message?.from?.first_name?.trim();
-  const greeting = firstName
+  let greeting = firstName
     ? `Привет, ${firstName}! 👋 Добро пожаловать в YUME — место, где проще найти аниме под настроение. Открывай каталог, собирай список того, что хочешь посмотреть, и находи новые истории. ✨`
     : "Привет! 👋 Добро пожаловать в YUME — место, где проще найти аниме под настроение. Открывай каталог, собирай список того, что хочешь посмотреть, и находи новые истории. ✨";
+  let browserLogin = false;
+  const startPayload = text.split(/\\s+/)[1] ?? "";
+  if (startPayload.startsWith("yb_")) {
+    const sender = message?.from;
+    if (typeof sender?.id !== "number" || !Number.isSafeInteger(sender.id) || !sender.first_name?.trim()) {
+      return json({ ok: true, ignored: true });
+    }
+    browserLogin = true;
+    const result = await completeTelegramBrowserAuth(startPayload, {
+      id: sender.id,
+      firstName: sender.first_name.trim(),
+      ...(sender.last_name?.trim() ? { lastName: sender.last_name.trim() } : {}),
+      ...(sender.username?.trim() ? { username: sender.username.trim() } : {}),
+      ...(sender.language_code?.trim() ? { languageCode: sender.language_code.trim() } : {}),
+    });
+    greeting = result === "ready"
+      ? "✅ Готово! Вернись во вкладку браузера YUME — вход будет завершён автоматически."
+      : result === "account_not_found"
+        ? "Аккаунт YUME не найден. Открой сайт, выбери «Регистрация» и повтори попытку."
+        : result === "already_registered"
+          ? "Этот Telegram уже зарегистрирован. Открой сайт и выбери «Вход»."
+          : result === "expired"
+            ? "Ссылка авторизации истекла или уже использована. Вернись на сайт YUME и начни вход заново."
+            : "Не удалось завершить авторизацию. Вернись на сайт YUME и попробуй ещё раз.";
+  }
 
   try {
     const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
@@ -77,11 +103,9 @@ export async function handleTelegramWebhook(request: Request): Promise<Response>
       body: JSON.stringify({
         chat_id: chatId,
         text: greeting,
-        reply_markup: {
-          inline_keyboard: [[
-            { text: "🎬 Открыть YUME", web_app: { url: SITE_URL } },
-          ]],
-        },
+        reply_markup: browserLogin
+          ? { inline_keyboard: [[{ text: "🌸 Открыть YUME", url: SITE_URL }]] }
+          : { inline_keyboard: [[{ text: "🎬 Открыть YUME", web_app: { url: SITE_URL } }]] },
       }),
     });
     if (!response.ok) {
