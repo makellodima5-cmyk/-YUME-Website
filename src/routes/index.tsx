@@ -5,6 +5,7 @@ import { COLLECTIONS, type Anime } from "@/data/anime";
 import { getShikimoriCatalog } from "@/data/shikimori";
 import { getExactReleaseDate, isNewRelease, isUpcomingAnnouncement } from "@/data/anime-sections";
 import { Header, type View } from "@/components/yume/Header";
+import { AuthPage } from "@/components/yume/AuthPage";
 import { AnimeCard } from "@/components/yume/Poster";
 import { CollectionsGrid, Grid, Hero, Row } from "@/components/yume/Sections";
 import { CatalogFilters, EMPTY_CATALOG_FILTERS, type CatalogFiltersValue } from "@/components/yume/CatalogFilters";
@@ -19,7 +20,7 @@ import homeSocialImage from "@/assets/yume-hero-desktop-new.png.PNG";
 import { absoluteImageUrl, canonicalUrl } from "@/data/seo";
 import { getTelegramWebApp } from "@/lib/telegram-mini-app";
 import { trackYumePage } from "@/lib/yume-analytics";
-import { syncTelegramLibrary } from "@/data/profile-storage";
+import { clearLocalAccountLibrary, setProfileStorageAuthenticated, syncTelegramLibrary } from "@/data/profile-storage";
 import { USER_NOTIFICATIONS } from "@/data/notifications.shared";
 import { runAdminTrailerUpdate, type AdminTrailerStats } from "@/data/admin-trailer-update";
 
@@ -417,58 +418,49 @@ function Index() {
   }, [isTelegramMiniApp, telegramAuthReady, telegramDetectionComplete, telegramConsentRequired, telegramAuthError]);
 
   useEffect(() => {
-    if (!isTelegramMiniApp) return;
-    const initData = getTelegramWebApp()?.initData;
-    if (!initData) {
-      setTelegramAuthError(language === "ru" ? "Открой YUME через Telegram, чтобы войти в аккаунт." : "Open YUME through Telegram to sign in.");
-      return;
-    }
+    if (!telegramDetectionComplete) return;
     let cancelled = false;
-    fetch("/api/telegram/init-data", {
-      method: "POST",
-      credentials: "same-origin",
-      cache: "no-store",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ initData, privacyConsent: false }),
-    }).then(async (response) => {
-      const result = await response.json().catch(() => ({})) as {
-        authenticated?: boolean;
-        error?: string;
-        user?: { id?: string; firstName?: string };
-      };
-      if (cancelled) return;
-      if (response.status === 428 && result.error === "consent_required") {
-        setTelegramConsentPending(true);
-        setTelegramConsentRequired(true);
-        return;
-      }
-      if (!response.ok || result.authenticated !== true) {
-        setTelegramAuthError(language === "ru"
-          ? "Не удалось войти через Telegram. Попробуй открыть приложение ещё раз."
-          : "Telegram sign-in failed. Please reopen the app.");
-        return;
-      }
-      try {
-        if (!result.user?.id) throw new Error("Missing Telegram account ID");
-        await syncTelegramLibrary(result.user.id);
-      } catch {
-        if (!cancelled) setTelegramAuthError(language === "ru"
-          ? "Вход выполнен, но не удалось синхронизировать списки с аккаунтом. Проверь соединение и обнови приложение."
-          : "Signed in, but could not sync your lists to the account. Check your connection and reload the app.");
-        return;
-      }
-      if (cancelled) return;
-      setTelegramAuthError("");
-      setTelegramConsentPending(false);
-      setTelegramConsentRequired(false);
-      setTelegramAuthReady(true);
-    }).catch(() => {
-      if (!cancelled) setTelegramAuthError(language === "ru"
-        ? "Не удалось связаться с сервером авторизации."
-        : "Could not reach the authentication server.");
-    });
+    // Check an existing session only. Opening the Mini App as a guest must not create an account.
+    fetch("/api/telegram/init-data", { credentials: "same-origin", cache: "no-store" })
+      .then(async (response) => {
+        const result = await response.json().catch(() => ({})) as {
+          authenticated?: boolean;
+          user?: { id?: string };
+        };
+        if (cancelled) return;
+        if (!response.ok || result.authenticated !== true || !result.user?.id) {
+          setTelegramAuthReady(false);
+          setProfileStorageAuthenticated(false);
+          setTelegramAuthError("");
+          return;
+        }
+        try {
+          await syncTelegramLibrary(result.user.id);
+        } catch {
+          if (cancelled) return;
+          setTelegramAuthReady(false);
+          setProfileStorageAuthenticated(false);
+          setTelegramAuthError(language === "ru"
+            ? "Не удалось загрузить данные аккаунта. Проверь соединение и войди заново."
+            : "Could not load account data. Check the connection and sign in again.");
+          return;
+        }
+        if (cancelled) return;
+        setProfileStorageAuthenticated(true);
+        setTelegramAuthError("");
+        setTelegramConsentPending(false);
+        setTelegramConsentRequired(false);
+        setTelegramAuthReady(true);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setTelegramAuthReady(false);
+          setProfileStorageAuthenticated(false);
+          setTelegramAuthError("");
+        }
+      });
     return () => { cancelled = true; };
-  }, [isTelegramMiniApp, language]);
+  }, [telegramDetectionComplete, language]);
 
   useEffect(() => {
     if (!isTelegramMiniApp || !telegramAuthReady || telegramConsentRequired || telegramConsentPending) return;
@@ -544,7 +536,8 @@ function Index() {
 
   useEffect(() => {
     try {
-      setCookieNoticeAcknowledged(window.localStorage.getItem("yume-cookie-notice-acknowledged") === "true");
+      const consent = JSON.parse(window.localStorage.getItem("yume-cookie-consent-v1") ?? "null") as { necessary?: unknown } | null;
+      setCookieNoticeAcknowledged(consent?.necessary === true);
     } catch {
       setCookieNoticeAcknowledged(false);
     }
@@ -919,13 +912,19 @@ function Index() {
     }
   };
 
-  const acknowledgeCookieNotice = () => {
+  const acknowledgeCookieNotice = (acceptAnalytics: boolean) => {
     try {
-      window.localStorage.setItem("yume-cookie-notice-acknowledged", "true");
+      window.localStorage.setItem("yume-cookie-consent-v1", JSON.stringify({
+        necessary: true,
+        analytics: acceptAnalytics,
+        updatedAt: new Date().toISOString(),
+        version: 1,
+      }));
     } catch {
-      // The notice can still be dismissed for the current page when storage is unavailable.
+      // The choice only persists when browser storage is available.
     }
     setCookieNoticeAcknowledged(true);
+    if (acceptAnalytics) trackYumePage(window.location.pathname + "#" + String(view));
   };
 
   // Keep the selected section aligned with the URL, including browser Back/Forward.
@@ -1183,31 +1182,40 @@ function Index() {
       {isTelegramMiniApp && telegramAuthError && !telegramConsentRequired && (
         <div role="alert" className="fixed inset-x-3 bottom-3 z-[70] mx-auto max-w-lg rounded-xl border border-destructive/30 bg-background/95 px-4 py-3 text-sm text-foreground shadow-xl">{telegramAuthError}</div>
       )}
-      {view === "home" && !isTelegramMiniApp && !cookieNoticeAcknowledged && (
+      {view === "home" && !cookieNoticeAcknowledged && (
         <aside
-          aria-label="Уведомление об использовании cookie"
+          aria-label={language === "en" ? "Privacy and storage choices" : "Настройки cookies и аналитики"}
           className="fixed inset-x-3 bottom-3 z-[60] mx-auto flex max-w-5xl flex-col gap-3 rounded-2xl border border-primary/25 bg-background/95 p-4 shadow-2xl backdrop-blur-md sm:inset-x-5 sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:px-6 sm:py-4"
         >
           <p className="max-w-3xl text-center text-sm leading-relaxed text-foreground/90 sm:text-left">
             {language === "en"
-              ? "By continuing to use this site, you agree to the policy on "
-              : "Продолжая пользоваться сайтом, вы соглашаетесь с политикой в отношении "}
+              ? "YUME uses essential storage for sign-in and core features. Optional analytics uses pseudonymous identifiers in this browser's local storage. You can allow only essential storage or accept all."
+              : "YUME использует необходимые данные хранения для входа и работы основных функций. Необязательная аналитика использует псевдонимные идентификаторы в localStorage этого браузера. Можно разрешить только необходимое или принять всё."}
+            {" "}
             <button
               type="button"
               onClick={() => setView("privacy-policy")}
               className="inline cursor-pointer text-primary underline decoration-primary/70 underline-offset-4 transition-colors hover:text-primary/80"
             >
-              {language === "en" ? "personal data processing" : "обработки персональных данных"}
+              {language === "en" ? "Privacy Policy" : "Политика конфиденциальности"}
             </button>
-            {language === "en" ? " and the use of cookies." : " и использованием cookie."}
           </p>
-          <button
-            type="button"
-            onClick={acknowledgeCookieNotice}
-            className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-xl bg-primary px-6 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-          >
-            Хорошо
-          </button>
+          <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
+            <button
+              type="button"
+              onClick={() => acknowledgeCookieNotice(false)}
+              className="inline-flex min-h-10 items-center justify-center rounded-xl border border-border bg-card px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {language === "en" ? "Essential only" : "Только необходимые"}
+            </button>
+            <button
+              type="button"
+              onClick={() => acknowledgeCookieNotice(true)}
+              className="inline-flex min-h-10 items-center justify-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {language === "en" ? "Accept all" : "Принять все"}
+            </button>
+          </div>
         </aside>
       )}
       {apiError && view !== "privacy-policy" && (
