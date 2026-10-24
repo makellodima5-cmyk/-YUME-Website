@@ -68,6 +68,8 @@ function saveLocalNotificationIds(ids: string[]): boolean {
 }
 
 export const Route = createFileRoute("/")({
+  // The APK is a client-only SPA; keep SSR enabled for the website/Mini App.
+  ssr: !isAndroidBuild(),
   head: () => {
     const image = absoluteImageUrl(homeSocialImage);
     return {
