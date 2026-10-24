@@ -26,7 +26,8 @@ type SessionRow = UserRow & { expires_at: number };
 
 const SESSION_COOKIE = "__Host-yume-session";
 const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
-const PRIVACY_POLICY_VERSION = "2026-10-22";
+const PRIVACY_POLICY_VERSION = "2026-10-24";
+const TERMS_VERSION = "2026-10-24";
 const encoder = new TextEncoder();
 type RuntimeGlobal = typeof globalThis & { __YUME_RUNTIME_ENV__?: unknown };
 
@@ -111,17 +112,29 @@ function ensureSchema(db: TelegramDatabase): Promise<void> {
   return pending;
 }
 
+async function ensureTermsConsentColumns(db: TelegramDatabase): Promise<void> {
+  const result = await db.prepare("PRAGMA table_info(yume_users)").all<{ name: string }>();
+  const columns = new Set(result.results.map((column) => column.name));
+  if (!columns.has("terms_agreed_at")) {
+    await db.prepare("ALTER TABLE yume_users ADD COLUMN terms_agreed_at TEXT").run();
+  }
+  if (!columns.has("terms_version")) {
+    await db.prepare("ALTER TABLE yume_users ADD COLUMN terms_version TEXT").run();
+  }
+}
+
 async function initializeTelegramSchema(db: TelegramDatabase): Promise<void> {
   const existing = await db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'yume_users'").first<{ sql: string }>();
   // The nullable date field is a temporary compatibility bridge for older migration history.
   // Migration 0005 removes it from the final schema.
-  const createTelegramUsersTable = "CREATE TABLE IF NOT EXISTS yume_users (id TEXT PRIMARY KEY NOT NULL, provider TEXT NOT NULL CHECK (provider = 'telegram'), provider_user_id TEXT NOT NULL, telegram_user_id TEXT UNIQUE, telegram_first_name TEXT, telegram_last_name TEXT, telegram_username TEXT, telegram_language_code TEXT, birth_date TEXT, privacy_consent_at TEXT NOT NULL, privacy_policy_version TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, UNIQUE (provider, provider_user_id))";
+  const createTelegramUsersTable = "CREATE TABLE IF NOT EXISTS yume_users (id TEXT PRIMARY KEY NOT NULL, provider TEXT NOT NULL CHECK (provider = 'telegram'), provider_user_id TEXT NOT NULL, telegram_user_id TEXT UNIQUE, telegram_first_name TEXT, telegram_last_name TEXT, telegram_username TEXT, telegram_language_code TEXT, birth_date TEXT, privacy_consent_at TEXT NOT NULL, privacy_policy_version TEXT NOT NULL, terms_agreed_at TEXT, terms_version TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, UNIQUE (provider, provider_user_id))";
   if (!existing) {
     await db.batch([
       db.prepare(createTelegramUsersTable),
       db.prepare("CREATE TABLE IF NOT EXISTS yume_sessions (token_hash TEXT PRIMARY KEY NOT NULL, user_id TEXT NOT NULL REFERENCES yume_users(id) ON DELETE CASCADE, expires_at INTEGER NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)"),
       db.prepare("CREATE INDEX IF NOT EXISTS idx_yume_sessions_expiry ON yume_sessions(expires_at)"),
     ]);
+    await ensureTermsConsentColumns(db);
     return;
   }
 
@@ -138,6 +151,7 @@ async function initializeTelegramSchema(db: TelegramDatabase): Promise<void> {
       db.prepare("ALTER TABLE yume_sessions_new RENAME TO yume_sessions"),
       db.prepare("CREATE INDEX IF NOT EXISTS idx_yume_sessions_expiry ON yume_sessions(expires_at)"),
     ]);
+    await ensureTermsConsentColumns(db);
     return;
   }
 
@@ -145,6 +159,7 @@ async function initializeTelegramSchema(db: TelegramDatabase): Promise<void> {
     db.prepare("CREATE TABLE IF NOT EXISTS yume_sessions (token_hash TEXT PRIMARY KEY NOT NULL, user_id TEXT NOT NULL REFERENCES yume_users(id) ON DELETE CASCADE, expires_at INTEGER NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)"),
     db.prepare("CREATE INDEX IF NOT EXISTS idx_yume_sessions_expiry ON yume_sessions(expires_at)"),
   ]);
+  await ensureTermsConsentColumns(db);
 }
 
 async function createSession(db: TelegramDatabase, userId: string, secret: string): Promise<string> {
@@ -174,8 +189,9 @@ async function upsertTelegramUser(db: TelegramDatabase, user: TelegramValidatedU
   const telegramId = String(user.id);
   const current = await findTelegramUser(db, user.id);
   if (!current) {
-    await db.prepare("INSERT OR IGNORE INTO yume_users (id, provider, provider_user_id, telegram_user_id, telegram_first_name, telegram_last_name, telegram_username, telegram_language_code, privacy_consent_at, privacy_policy_version) VALUES (?, 'telegram', ?, ?, ?, ?, ?, ?, ?, ?)")
-      .bind(crypto.randomUUID(), telegramId, telegramId, user.firstName, user.lastName ?? null, user.username ?? null, user.languageCode ?? null, new Date().toISOString(), PRIVACY_POLICY_VERSION).run();
+    const acceptedAt = new Date().toISOString();
+    await db.prepare("INSERT OR IGNORE INTO yume_users (id, provider, provider_user_id, telegram_user_id, telegram_first_name, telegram_last_name, telegram_username, telegram_language_code, privacy_consent_at, privacy_policy_version, terms_agreed_at, terms_version) VALUES (?, 'telegram', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+      .bind(crypto.randomUUID(), telegramId, telegramId, user.firstName, user.lastName ?? null, user.username ?? null, user.languageCode ?? null, acceptedAt, PRIVACY_POLICY_VERSION, acceptedAt, TERMS_VERSION).run();
   } else {
     await db.prepare("UPDATE yume_users SET telegram_first_name = ?, telegram_last_name = ?, telegram_username = ?, telegram_language_code = ? WHERE telegram_user_id = ?")
       .bind(user.firstName, user.lastName ?? null, user.username ?? null, user.languageCode ?? null, telegramId).run();
