@@ -552,50 +552,11 @@ function Index() {
     return () => window.removeEventListener("yume-cookie-consent-updated", syncConsent);
   }, []);
 
-  const acceptTelegramConsent = async () => {
-    const initData = getTelegramWebApp()?.initData;
-    if (!initData || telegramConsentSubmitting) return;
-    setTelegramConsentSubmitting(true);
-    setTelegramAuthError("");
-    try {
-      const response = await fetch("/api/telegram/init-data", {
-        method: "POST",
-        credentials: "same-origin",
-        cache: "no-store",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ initData, mode: "register", privacyConsent: true }),
-      });
-      const result = await response.json().catch(() => ({})) as {
-        authenticated?: boolean;
-        user?: { id?: string; firstName?: string };
-      };
-      if (!response.ok || result.authenticated !== true) {
-        setTelegramAuthError(language === "ru"
-          ? "Не удалось создать аккаунт. Попробуй ещё раз."
-          : "Could not create your account. Please try again.");
-        return;
-      }
-      try {
-        if (!result.user?.id) throw new Error("Missing Telegram account ID");
-        await syncTelegramLibrary(result.user.id);
-      } catch {
-        setTelegramAuthError(language === "ru"
-          ? "Аккаунт создан, но не удалось синхронизировать списки. Проверь соединение и обнови приложение."
-          : "Account created, but could not sync your lists. Check your connection and reload the app.");
-        return;
-      }
-      setTelegramConsentPending(false);
-      setTelegramConsentRequired(false);
-      // A successful consent response creates the server session, so mark auth ready.
-      // This also triggers the admin-session check effect for newly registered users.
-      setTelegramAuthReady(true);
-    } catch {
-      setTelegramAuthError(language === "ru"
-        ? "Не удалось связаться с сервером авторизации."
-        : "Could not reach the authentication server.");
-    } finally {
-      setTelegramConsentSubmitting(false);
-    }
+  const acceptTelegramConsent = () => {
+    // Legacy consent prompt must never create an account outside the current registration form.
+    setTelegramConsentRequired(false);
+    setTelegramConsentPending(false);
+    setView("register");
   };
 
   const toggleTrailerAuto = async () => {
