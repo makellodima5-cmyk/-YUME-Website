@@ -704,6 +704,10 @@ export async function handleTelegramSession(request: Request): Promise<Response>
   }
 
   const input = body as Record<string, unknown>;
+  const authMode = input.mode;
+  if (authMode !== "login" && authMode !== "register") {
+    return jsonResponse({ error: "invalid_request" }, 400);
+  }
   const env = environment();
   const botToken = typeof env.TELEGRAM_BOT_TOKEN === "string" ? env.TELEGRAM_BOT_TOKEN.trim() : "";
   const secret = sessionSecret(env);
@@ -716,7 +720,13 @@ export async function handleTelegramSession(request: Request): Promise<Response>
   try {
     await ensureSchema(db);
     let user = await findTelegramUser(db, validated.user.id);
-    if (!user && input.privacyConsent !== true) {
+    if (authMode === "login" && !user) {
+      return jsonResponse({ error: "account_not_found" }, 404);
+    }
+    if (authMode === "register" && user) {
+      return jsonResponse({ error: "already_registered" }, 409);
+    }
+    if (authMode === "register" && input.privacyConsent !== true) {
       return jsonResponse({ error: "consent_required", user: { firstName: validated.user.firstName } }, 428);
     }
     if (!user) user = await upsertTelegramUser(db, validated.user);
