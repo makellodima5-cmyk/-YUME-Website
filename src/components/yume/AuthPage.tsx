@@ -8,13 +8,14 @@ type Props = {
   language: "ru" | "en";
   onModeChange: (mode: AuthMode) => void;
   onPrivacy: () => void;
+  onRules: () => void;
   onComplete: () => void;
 };
 
 type BrowserStart = { requestId?: string; botUrl?: string; error?: string };
 type PollResult = { status?: string; error?: string };
 
-export function AuthPage({ mode, language, onModeChange, onPrivacy, onComplete }: Props) {
+export function AuthPage({ mode, language, onModeChange, onPrivacy, onRules, onComplete }: Props) {
   const isRu = language === "ru";
   const [consentAccepted, setConsentAccepted] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -146,16 +147,16 @@ export function AuthPage({ mode, language, onModeChange, onPrivacy, onComplete }
           </p>
 
           {isRegister && (
-            <label className="mt-6 flex cursor-pointer items-start gap-3 rounded-2xl border border-border bg-background/50 p-3.5 text-sm leading-relaxed">
-              <input type="checkbox" checked={consentAccepted} onChange={(event) => setConsentAccepted(event.target.checked)} className="mt-1 h-4 w-4 accent-primary" />
-              <span>
-                {isRu ? "Я принимаю " : "I accept the "}
-                <button type="button" className="font-semibold text-primary underline underline-offset-4" onClick={(event) => { event.preventDefault(); onPrivacy(); }}>
-                  {isRu ? "Политику конфиденциальности" : "Privacy Policy"}
-                </button>
-                {isRu ? " и Пользовательское соглашение." : " and User Agreement."}
-              </span>
-            </label>
+            <div className="mt-6 rounded-2xl border border-border bg-background/50 p-3.5">
+              <label className="flex cursor-pointer items-start gap-3 text-sm leading-relaxed">
+                <input type="checkbox" checked={consentAccepted} onChange={(event) => setConsentAccepted(event.target.checked)} className="mt-1 h-4 w-4 accent-primary" />
+                <span>{isRu ? "Я принимаю Политику конфиденциальности и Пользовательское соглашение." : "I accept the Privacy Policy and User Agreement."}</span>
+              </label>
+              <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 pl-7 text-xs">
+                <button type="button" onClick={onPrivacy} className="font-semibold text-primary underline underline-offset-4">{isRu ? "Политика конфиденциальности" : "Privacy Policy"}</button>
+                <button type="button" onClick={onRules} className="font-semibold text-primary underline underline-offset-4">{isRu ? "Пользовательское соглашение" : "User Agreement"}</button>
+              </div>
+            </div>
           )}
 
           {message && (
