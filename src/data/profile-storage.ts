@@ -1,4 +1,3 @@
-import { getTelegramWebApp } from "@/lib/telegram-mini-app";
 import {
   normalizeSavedAnimeIds,
   normalizeSavedAnimeLibrary,
@@ -9,6 +8,29 @@ export const FAVORITES_STORAGE_KEY = "yume-favorite-anime-v1";
 export const WATCHLIST_STORAGE_KEY = "yume-watchlist-anime-v1";
 export const PROFILE_UPDATED_EVENT = "yume-profile-updated";
 export const PROFILE_SYNC_ERROR_EVENT = "yume-profile-sync-error";
+export const PROFILE_AUTH_REQUIRED_EVENT = "yume-profile-auth-required";
+
+let accountAuthenticated = false;
+
+export function setProfileStorageAuthenticated(authenticated: boolean): void {
+  accountAuthenticated = authenticated;
+  if (!authenticated) clearLocalAccountLibrary();
+}
+
+export function clearLocalAccountLibrary(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(FAVORITES_STORAGE_KEY);
+    window.localStorage.removeItem(WATCHLIST_STORAGE_KEY);
+    for (let index = window.localStorage.length - 1; index >= 0; index--) {
+      const key = window.localStorage.key(index);
+      if (key?.startsWith("yume-telegram-library-imported-v1:")) window.localStorage.removeItem(key);
+    }
+  } catch {
+    // Local cache cleanup is best-effort; server account data remains authoritative.
+  }
+  notifyProfileUpdated();
+}
 
 const TELEGRAM_LIBRARY_ENDPOINT = "/api/telegram/library";
 let telegramMutationQueue: Promise<void> = Promise.resolve();
@@ -39,10 +61,6 @@ function notifyProfileUpdated(): void {
   if (typeof window !== "undefined") window.dispatchEvent(new Event(PROFILE_UPDATED_EVENT));
 }
 
-function isTelegramContext(): boolean {
-  return typeof window !== "undefined" && Boolean(getTelegramWebApp()?.initData);
-}
-
 function listTypeForKey(key: string): "favorite" | "watchlist" | null {
   if (key === FAVORITES_STORAGE_KEY) return "favorite";
   if (key === WATCHLIST_STORAGE_KEY) return "watchlist";
@@ -64,8 +82,13 @@ async function fetchTelegramLibrary(): Promise<SavedAnimeLibrary> {
     credentials: "same-origin",
     cache: "no-store",
   });
-  if (!response.ok) throw new Error("Telegram library request failed: " + response.status);
-  return applyServerLibrary(await response.json());
+  if (!response.ok) {
+    if (response.status === 401) setProfileStorageAuthenticated(false);
+    throw new Error("Account library request failed: " + response.status);
+  }
+  const library = applyServerLibrary(await response.json());
+  accountAuthenticated = true;
+  return library;
 }
 
 /**
@@ -75,41 +98,9 @@ async function fetchTelegramLibrary(): Promise<SavedAnimeLibrary> {
 export async function syncTelegramLibrary(accountId: string): Promise<void> {
   if (typeof window === "undefined") return;
   if (typeof accountId !== "string" || !accountId.trim()) throw new Error("Missing Telegram account ID");
-
-  const marker = "yume-telegram-library-imported-v1:" + accountId;
-  let alreadyImported = false;
-  try {
-    alreadyImported = window.localStorage.getItem(marker) === "true";
-  } catch {
-    // Continue with server state when local storage is unavailable.
-  }
-
-  if (alreadyImported) {
-    await fetchTelegramLibrary();
-    return;
-  }
-
-  const localFavorites = Array.from(new Set(readSavedAnimeIds(FAVORITES_STORAGE_KEY).filter((id) => /^\d{1,12}$/.test(id))));
-  const favoriteIds = normalizeSavedAnimeIds(localFavorites);
-  if (!favoriteIds) throw new Error("Local favorites exceed the supported account-library limit");
-  const localWatchlist = Array.from(new Set(readSavedAnimeIds(WATCHLIST_STORAGE_KEY).filter((id) => /^\d{1,12}$/.test(id))));
-  const watchlistIds = normalizeSavedAnimeIds(localWatchlist);
-  if (!watchlistIds) throw new Error("Local watchlist exceeds the supported account-library limit");
-  const response = await fetch(TELEGRAM_LIBRARY_ENDPOINT, {
-    method: "POST",
-    credentials: "same-origin",
-    cache: "no-store",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ mode: "merge", favoriteIds, watchlistIds }),
-  });
-  if (!response.ok) throw new Error("Telegram library import failed: " + response.status);
-  const library = applyServerLibrary(await response.json());
-  try {
-    window.localStorage.setItem(marker, "true");
-  } catch {
-    // Server lists were already synchronized; failure to store this optimization is non-fatal.
-  }
-  void library;
+  // Never import guest-only local lists into an account. The signed-in server library is authoritative.
+  await fetchTelegramLibrary();
+  accountAuthenticated = true;
 }
 
 async function refreshTelegramLibraryAfterFailure(): Promise<void> {
@@ -118,6 +109,12 @@ async function refreshTelegramLibraryAfterFailure(): Promise<void> {
 
 export function toggleSavedAnimeId(key: string, animeId: string): boolean {
   if (typeof window === "undefined") return false;
+  const listType = listTypeForKey(key);
+  if (!listType || !/^\d{1,12}$/.test(animeId)) return false;
+  if (!accountAuthenticated) {
+    window.dispatchEvent(new Event(PROFILE_AUTH_REQUIRED_EVENT));
+    return false;
+  }
   const current = readSavedAnimeIds(key);
   const alreadySaved = current.includes(animeId);
   const next = alreadySaved
@@ -132,9 +129,8 @@ export function toggleSavedAnimeId(key: string, animeId: string): boolean {
     // A network save is still attempted below in Telegram even when local storage is full.
   }
 
-  const listType = listTypeForKey(key);
-  const canSyncToTelegram = Boolean(listType && isTelegramContext() && /^\d{1,12}$/.test(animeId));
-  if (canSyncToTelegram && listType) {
+  const canSyncToAccount = Boolean(listType && accountAuthenticated);
+  if (canSyncToAccount && listType) {
     telegramMutationQueue = telegramMutationQueue
       .then(async () => {
         const response = await fetch(TELEGRAM_LIBRARY_ENDPOINT, {
@@ -144,19 +140,27 @@ export function toggleSavedAnimeId(key: string, animeId: string): boolean {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ list: listType, animeId, saved: !alreadySaved }),
         });
-        if (!response.ok) throw new Error("Telegram library save failed: " + response.status);
+        if (!response.ok) {
+          if (response.status === 401) throw new Error("AUTHENTICATION_REQUIRED");
+          throw new Error("Account library save failed: " + response.status);
+        }
         applyServerLibrary(await response.json());
       })
-      .catch(async () => {
+      .catch(async (error: unknown) => {
+        if (error instanceof Error && error.message === "AUTHENTICATION_REQUIRED") {
+          setProfileStorageAuthenticated(false);
+          window.dispatchEvent(new Event(PROFILE_AUTH_REQUIRED_EVENT));
+          return;
+        }
         try {
           await refreshTelegramLibraryAfterFailure();
         } catch {
-          // Keep the local copy as a temporary fallback when the server is unreachable.
+          // Keep the last server-synchronized copy until the connection returns.
         }
         window.dispatchEvent(new Event(PROFILE_SYNC_ERROR_EVENT));
       });
   }
-  if (!localStorageWritten && !canSyncToTelegram) return alreadySaved;
+  if (!localStorageWritten && !canSyncToAccount) return alreadySaved;
   return !alreadySaved;
 }
 
