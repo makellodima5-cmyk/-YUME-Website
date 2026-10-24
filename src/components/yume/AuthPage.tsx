@@ -180,16 +180,14 @@ export function AuthPage({ mode, language, onModeChange, onPrivacy, onRules, onC
             <div className="mt-5 rounded-2xl border border-border bg-background/50 p-3.5">
               <label className="flex cursor-pointer items-start gap-3 text-sm leading-relaxed">
                 <input type="checkbox" checked={consentAccepted} onChange={(event) => setConsentAccepted(event.target.checked)} className="mt-1 h-4 w-4 accent-primary" />
-                <span>
+                <span className="min-w-0 flex-1 text-left">
                   {isRu ? "Я соглашусь с " : "I agree to the "}
-                  <button type="button" onClick={onPrivacy} className="inline font-semibold text-primary underline underline-offset-4">
+                  <button type="button" onClick={onPrivacy} className="inline break-words text-left font-semibold text-primary underline underline-offset-4">
                     {isRu ? "политикой в отношении обработки персональных данных" : "Personal Data Processing Policy"}
                   </button>
                 </span>
               </label>
-              <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 pl-7 text-xs">
-                <button type="button" onClick={onRules} className="font-semibold text-primary underline underline-offset-4">{isRu ? "Пользовательское соглашение" : "User Agreement"}</button>
-              </div>
+
             </div>
           )}
 
