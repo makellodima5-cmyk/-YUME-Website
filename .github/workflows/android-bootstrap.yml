@@ -1,0 +1,68 @@
+name: Android bootstrap and APK
+
+on:
+  push:
+    branches:
+      - feat/android-app
+    paths:
+      - package.json
+      - capacitor.config.ts
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  scaffold-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out Android branch
+        uses: actions/checkout@v4
+        with:
+          ref: feat/android-app
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Regenerate and install Bun lockfile
+        run: bun install
+      - name: Build bundled Android web client
+        run: bun run build:android:web
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Install Android SDK packages
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+      - name: Create Capacitor Android platform if missing
+        run: |
+          if [ ! -d android ]; then
+            bunx cap add android
+          fi
+      - name: Sync local web bundle into Android project
+        run: bunx cap sync android
+      - name: Persist lockfile and native Android project
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add bun.lock android
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(android): add Capacitor platform and lockfile"
+            git push origin HEAD:feat/android-app
+          fi
+      - name: Build debug APK
+        working-directory: android
+        run: ./gradlew assembleDebug
+      - name: Upload installable debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: yume-android-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
