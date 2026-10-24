@@ -42,7 +42,7 @@ describe("catalog filtering and sorting", () => {
     expect(result).toEqual([fixture]);
   });
 
-  it("matches the selected rating exactly, not every rating above it or titles containing that digit", () => {
+  it("treats the selected rating as a minimum threshold", () => {
     const items = [
       { ...ANIME[0]!, id: "rating-1", rating: 1 },
       { ...ANIME[1]!, id: "rating-4", rating: 4.5 },
@@ -51,9 +51,9 @@ describe("catalog filtering and sorting", () => {
       { ...ANIME[0]!, id: "rating-null", rating: null },
     ];
     expect(filterAndSortCatalog(items, "", filters({ minRating: 1 }), "rating", "ru", translateGenre).map((a) => a.id))
-      .toEqual(["rating-1"]);
+      .toEqual(["rating-9", "rating-4", "rating-1-5", "rating-1"]);
     expect(filterAndSortCatalog(items, "", filters({ minRating: 4.5 }), "rating", "ru", translateGenre).map((a) => a.id))
-      .toEqual(["rating-4"]);
+      .toEqual(["rating-9", "rating-4"]);
     expect(filterAndSortCatalog(items, "", filters(), "rating", "ru", translateGenre)).toHaveLength(items.length);
   });
 

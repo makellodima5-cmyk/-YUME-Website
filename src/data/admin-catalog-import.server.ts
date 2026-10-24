@@ -1,5 +1,6 @@
 import { env as cloudflareEnv } from "cloudflare:workers";
 import { invalidatePersistentCatalogCache } from "@/data/catalog-d1.server";
+import { retryAfterMilliseconds } from "@/data/retry-after";
 
 type RuntimeGlobal = typeof globalThis & { __YUME_RUNTIME_ENV__?: unknown };
 type Environment = Record<string, unknown> & { TELEGRAM_ADMIN_ID?: string; YUME_AUTH_SESSION_SECRET?: string; YUME_DB?: unknown };
@@ -27,6 +28,11 @@ const MAX_TARGET = 500;
 const PAGE_SIZE = 50;
 const REQUEST_DELAY_MS = 1500;
 const FIELDS = "id name english russian kind score status episodes episodesAired airedOn { date year } releasedOn { date year } description poster { mainUrl previewUrl originalUrl } opengraphImageUrl genres { id name russian kind } nextEpisodeAt rating studios { name }";
+
+export function normalizeAdminCatalogIds(value: unknown): string[] {
+  const rawIds = Array.isArray(value) ? value : [];
+  return Array.from(new Set(rawIds.filter((id): id is string => typeof id === "string" && /^\d{1,20}$/.test(id)))).slice(0, 100);
+}
 
 function environment(): Environment {
   try { const native = cloudflareEnv as unknown as Environment; if (native && typeof native === "object") return native; } catch {}
@@ -155,9 +161,9 @@ async function fetchPage(page: number): Promise<ShikimoriAnime[]> {
   const query = "query { animes(page: " + page + ", limit: " + PAGE_SIZE + ", order: popularity) { " + FIELDS + " } }";
   const response = await fetch(API_URL, { method:"POST", headers:{"Content-Type":"application/json",Accept:"application/json","User-Agent":"YUME/1.0"}, body:JSON.stringify({query}), signal:AbortSignal.timeout(12000) });
   if (response.status === 429) {
-    const seconds = Number(response.headers.get("Retry-After") ?? "");
+    const retryAfterMs = retryAfterMilliseconds(response.headers.get("Retry-After")) ?? 60000;
     const error = new Error("Shikimori ограничил частоту запросов.");
-    (error as Error & {retryAfterMs?:number}).retryAfterMs = Number.isFinite(seconds) && seconds > 0 ? seconds*1000 : 60000;
+    (error as Error & {retryAfterMs?:number}).retryAfterMs = retryAfterMs;
     throw error;
   }
   if (!response.ok) throw new Error("Shikimori вернул HTTP " + response.status);
@@ -166,7 +172,7 @@ async function fetchPage(page: number): Promise<ShikimoriAnime[]> {
   return (payload.data?.animes ?? []).filter(item => !(item.genres ?? []).some(g => [g.name,g.russian].some(n => clean(n).normalize("NFKC").toLowerCase() === "hentai" || clean(n).normalize("NFKC").toLowerCase() === "хентай")));
 }
 async function fetchByIds(ids: string[]): Promise<ShikimoriAnime[]> {
-  const safeIds = ids.filter(id => /^\\d{1,20}$/.test(id)).slice(0, 100);
+  const safeIds = normalizeAdminCatalogIds(ids);
   if (!safeIds.length) return [];
   const query = "query { animes(ids: " + JSON.stringify(safeIds.join(",")) + ", limit: 100) { " + FIELDS + " } }";
   const response = await fetch(API_URL, { method:"POST", headers:{"Content-Type":"application/json",Accept:"application/json","User-Agent":"YUME/1.0"}, body:JSON.stringify({query}), signal:AbortSignal.timeout(12000) });
@@ -252,8 +258,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
     if (!lockToken) return json({isAdmin:true,error:"operation_in_progress",message:"Другая административная операция ещё выполняется."},409);
     try {
       if (body.action === "delete") {
-        const rawIds = Array.isArray((body as {ids?:unknown}).ids) ? (body as {ids:unknown[]}).ids : [];
-        const safeIds = Array.from(new Set(rawIds.filter((id): id is string => typeof id === "string" && /^\d{1,20}$/.test(id)))).slice(0,100);
+        const safeIds = normalizeAdminCatalogIds((body as { ids?: unknown }).ids);
         if (!safeIds.length) return json({error:"no_valid_ids"},400);
         const result = await db.batch(safeIds.map(id => db.prepare("DELETE FROM anime_catalog WHERE id = ?").bind(id)));
         const deleted = result.reduce((sum,item) => sum + Number((item as {meta?:{changes?:number}})?.meta?.changes ?? 0),0);
@@ -263,8 +268,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
         return json({isAdmin:true,deleted,quality:quality.items,qualitySummary:quality.summary});
       }
       if (body.action === "repair") {
-        const rawIds = Array.isArray((body as {ids?:unknown}).ids) ? (body as {ids:unknown[]}).ids : [];
-        const safeIds = Array.from(new Set(rawIds.filter((id): id is string => typeof id === "string" && /^\d{1,20}$/.test(id)))).slice(0,100);
+        const safeIds = normalizeAdminCatalogIds((body as { ids?: unknown }).ids);
         if (!safeIds.length) return json({error:"no_valid_ids"},400);
         const source = await fetchByIds(safeIds);
         let repaired = 0, stillIncomplete = 0;

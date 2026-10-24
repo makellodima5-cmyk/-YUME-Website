@@ -1,5 +1,6 @@
 import { env as cloudflareEnv } from "cloudflare:workers";
 import { invalidatePersistentCatalogCache } from "@/data/catalog-d1.server";
+import { retryAfterMilliseconds } from "@/data/retry-after";
 
 type RuntimeGlobal = typeof globalThis & { __YUME_RUNTIME_ENV__?: unknown };
 type Environment = Record<string, unknown> & { TELEGRAM_ADMIN_ID?: string; YUME_AUTH_SESSION_SECRET?: string; YUME_DB?: unknown };
@@ -178,10 +179,8 @@ async function fetchBatch(ids: string[]): Promise<{ items: ShikimoriAnime[]; ret
     signal: AbortSignal.timeout(12000),
   });
   if (response.status === 429) {
-    const retry = Number(response.headers.get("Retry-After") ?? "");
-    throw Object.assign(new Error("Shikimori ограничил частоту запросов."), {
-      retryAfterMs: Number.isFinite(retry) && retry > 0 ? retry * 1000 : 60000,
-    });
+    const retryAfterMs = retryAfterMilliseconds(response.headers.get("Retry-After")) ?? 60000;
+    throw Object.assign(new Error("Shikimori ограничил частоту запросов."), { retryAfterMs });
   }
   if (!response.ok) throw new Error("Shikimori вернул HTTP " + response.status);
   const payload = await response.json() as GraphQLResponse;

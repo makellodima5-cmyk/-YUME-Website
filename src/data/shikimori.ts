@@ -1,7 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import type { Anime } from "@/data/anime";
 import { isNewRelease } from "@/data/anime-sections";
-import { getPersistentCatalog, type CatalogResult, type CatalogSeedPageResult } from "@/data/catalog-d1.server";
+import { getPersistentAnimeDetails, getPersistentCatalog, type CatalogResult, type CatalogSeedPageResult } from "@/data/catalog-d1.server";
+import { retryAfterMilliseconds } from "@/data/retry-after";
+export { retryAfterMilliseconds };
 import { filterCatalogForCurrentRequest } from "@/data/territorial-restrictions.server";
 
 const API_URL = "https://shikimori.io/api/graphql";
@@ -12,14 +14,6 @@ let shikimoriCooldownUntil = 0;
 const SHIKIMORI_429_COOLDOWN_MS = 60 * 1000;
 const SEED_REQUEST_DELAY_MS = 1250;
 const MAX_SEED_REQUESTS = 20 + (500 - 11 + 1);
-
-export function retryAfterMilliseconds(header: string | null): number | null {
-  if (!header?.trim()) return null;
-  const seconds = Number(header.trim());
-  if (Number.isFinite(seconds) && seconds >= 0) return Math.max(1000, Math.ceil(seconds * 1000));
-  const date = Date.parse(header);
-  return Number.isFinite(date) ? Math.max(1000, date - Date.now()) : null;
-}
 
 type ShikimoriRequest = {
   page?: number;
@@ -531,5 +525,41 @@ export const getShikimoriCatalog = createServerFn({ method: "GET" })
       items: [],
       error: "Каталог недоступен: база данных D1 не подключена.",
       progress: makeCatalogProgress("partial", 0),
+    };
+  });
+
+
+/** Loads one anime and a bounded set of related titles directly from D1. */
+export const getShikimoriAnimeDetails = createServerFn({ method: "GET" })
+  .validator((input: { animeId?: unknown }) => ({
+    animeId: typeof input?.animeId === "string" && /^\d{1,12}$/.test(input.animeId)
+      ? input.animeId
+      : "",
+  }))
+  .handler(async ({ data }) => {
+    const empty = { anime: null, relatedAnime: [] as Anime[], apiError: null as string | null };
+    if (!data.animeId) return empty;
+
+    let details: Awaited<ReturnType<typeof getPersistentAnimeDetails>>;
+    try {
+      details = await getPersistentAnimeDetails(data.animeId);
+    } catch (error) {
+      console.error("[YUME] Failed to load anime details from D1:", error);
+      return { ...empty, apiError: "Каталог временно недоступен." };
+    }
+    if (!details) {
+      return { ...empty, apiError: "Каталог недоступен: база данных D1 не подключена." };
+    }
+
+    const allItems = filterCatalogForCurrentRequest({
+      items: [...(details.anime ? [details.anime] : []), ...details.relatedAnime],
+    }).items;
+    const visibleById = new Map(allItems.map((anime) => [anime.id, anime]));
+    return {
+      anime: details.anime ? visibleById.get(details.anime.id) ?? null : null,
+      relatedAnime: details.relatedAnime
+        .map((anime) => visibleById.get(anime.id))
+        .filter((anime): anime is Anime => Boolean(anime)),
+      apiError: null,
     };
   });

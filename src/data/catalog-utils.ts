@@ -29,8 +29,8 @@ export function filterAndSortCatalog(
     const matchesStatus = filters.status === "Любой" || anime.status === filters.status;
     const matchesFrom = yearFrom === null || anime.year >= yearFrom;
     const matchesTo = yearTo === null || anime.year <= yearTo;
-    // Rating filter is an exact match; 0 means no rating filter.
-    const matchesRating = filters.minRating === 0 || (anime.rating !== null && Math.abs(anime.rating - filters.minRating) < 0.001);
+    // A non-zero rating filter is a minimum; 0 means no rating filter.
+    const matchesRating = filters.minRating === 0 || (anime.rating !== null && anime.rating >= filters.minRating);
     const animeType = anime.kind || (anime.episodes === 1 ? "Фильм" : "TV");
     const matchesType = filters.type === "Любой" || animeType === filters.type;
     const matchesAge = filters.ageRating === "Любой" || anime.ageRating === filters.ageRating;

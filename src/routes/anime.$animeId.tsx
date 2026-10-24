@@ -11,7 +11,7 @@ import {
   Play,
   Star,
 } from "lucide-react";
-import { getShikimoriCatalog } from "@/data/shikimori";
+import { getShikimoriAnimeDetails } from "@/data/shikimori";
 import { Header, type View } from "@/components/yume/Header";
 import { Footer } from "@/components/yume/Footer";
 import { AnimeCard, PosterArt } from "@/components/yume/Poster";
@@ -46,22 +46,8 @@ function formatAnimeDate(value: string | undefined, language: "ru" | "en", inclu
 
 export const Route = createFileRoute("/anime/$animeId")({
   loader: async ({ params }) => {
-    // D1 is the source of truth for all user-facing anime pages.
-    // Normal navigation only reads saved rows; no direct Shikimori detail request.
-    const catalog = await getShikimoriCatalog({ data: {} });
-    const pool = catalog.items;
-    const anime = pool.find((item) => item.id === params.animeId) ?? null;
-    const relatedAnime = anime
-      ? pool
-          .filter((item) => item.id !== anime.id)
-          .sort((a, b) => {
-            const aShared = a.genres.filter((genre) => anime.genres.includes(genre)).length;
-            const bShared = b.genres.filter((genre) => anime.genres.includes(genre)).length;
-            return bShared - aShared || (b.rating ?? -1) - (a.rating ?? -1);
-          })
-          .slice(0, 6)
-      : pool.slice(0, 6);
-    return { anime, relatedAnime, apiError: catalog.error };
+    // Read the current title and a bounded related-title set directly from D1.
+    return getShikimoriAnimeDetails({ data: { animeId: params.animeId } });
   },
   head: ({ loaderData }) => {
     const anime = loaderData?.anime;

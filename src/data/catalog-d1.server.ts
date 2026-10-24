@@ -1,6 +1,7 @@
 import { env as cloudflareEnv } from "cloudflare:workers";
 import type { Anime } from "@/data/anime";
 import { isNewRelease } from "@/data/anime-sections";
+import { selectRelatedAnime } from "@/data/catalog-details";
 
 // Prefer Cloudflare's request-scoped env binding; the injected value remains a
 // fallback for local adapters and tests.
@@ -258,6 +259,34 @@ function rowToAnime(row: AnimeRow): Anime {
   if (row.youtube_trailer_id) anime.youtubeTrailerId = row.youtube_trailer_id;
 
   return anime;
+}
+
+export async function getPersistentAnimeDetails(id: string): Promise<{ anime: Anime | null; relatedAnime: Anime[] } | null> {
+  const db = database();
+  if (!db) return null;
+
+  await ensureSchema(db);
+  const cached = await readCachedCatalog(db);
+  if (cached) {
+    const anime = cached.items.find((item) => item.id === id) ?? null;
+    return {
+      anime,
+      relatedAnime: anime ? selectRelatedAnime(anime, cached.items, 6) : [],
+    };
+  }
+
+  const row = await db.prepare("SELECT * FROM anime_catalog WHERE id = ?").bind(id).first<AnimeRow>();
+  if (!row) return { anime: null, relatedAnime: [] };
+
+  const anime = rowToAnime(row);
+  const candidates = await db.prepare(
+    "SELECT * FROM anime_catalog WHERE id <> ? ORDER BY COALESCE(rating, -1) DESC, position ASC LIMIT 100",
+  ).bind(id).all<AnimeRow>();
+
+  return {
+    anime,
+    relatedAnime: selectRelatedAnime(anime, candidates.results.map(rowToAnime), 6),
+  };
 }
 
 function rowValues(item: Anime, position: number): unknown[] {

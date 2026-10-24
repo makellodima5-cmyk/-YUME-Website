@@ -24,7 +24,7 @@ jobs:
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: 1.4.4
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
@@ -32,31 +32,11 @@ jobs:
       - name: Run automated tests
         run: bun run test
 
-      - name: Lint changed catalogue, SEO, accessibility, and source-data modules
-        run: >-
-          bunx eslint
-          src/data/catalog-utils.ts
-          src/data/catalog-search.ts
-          src/data/seo.ts
-          src/data/shikimori.ts
-          src/data/profile-storage.ts
-          src/data/yume-analytics.server.ts
-          src/lib/yume-analytics.ts
-          src/routes/api.analytics.ts
-          src/routes/__root.tsx
-          src/components/yume/AnimeModal.tsx
-          src/components/yume/Profile.tsx
-          src/routes/index.tsx
-          'src/routes/anime.$animeId.tsx'
-          'src/routes/sitemap[.]xml.ts'
-          src/test/catalog-utils.test.ts
-          src/test/catalog-search.test.ts
-          src/test/seo.test.ts
-          src/test/profile-storage.test.ts
-          src/test/shikimori.test.ts
-          src/test/yume-analytics.test.ts
-          src/test/yume-analytics.server.test.ts
-          --rule 'prettier/prettier: off'
+      - name: Type-check TypeScript
+        run: bun run typecheck
+
+      - name: Lint TypeScript sources
+        run: bunx eslint src --rule 'prettier/prettier: off'
 
       - name: Build Cloudflare Worker
         run: bun run build

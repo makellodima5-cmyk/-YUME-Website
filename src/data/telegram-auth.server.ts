@@ -381,6 +381,7 @@ export async function handleTelegramSession(request: Request): Promise<Response>
   }
 
   if (request.method !== "POST") return jsonResponse({ error: "method_not_allowed" }, 405);
+  if (!isSameOriginRequest(request)) return jsonResponse({ error: "cross_origin_request" }, 403);
   let body: unknown;
   try {
     body = await request.json();
