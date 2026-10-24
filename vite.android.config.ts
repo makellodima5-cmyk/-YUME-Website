@@ -29,6 +29,9 @@ export default defineConfig({
   resolve: {
     // The shell prerender runs in Node; never substitute this stub in the Worker build.
     alias: {
+      "@/lib/mobile-api": fileURLToPath(
+        new URL("./src/lib/mobile-api.android.ts", import.meta.url),
+      ),
       "cloudflare:workers": fileURLToPath(
         new URL("./scripts/android/cloudflare-workers.stub.ts", import.meta.url),
       ),
