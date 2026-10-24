@@ -22,7 +22,16 @@ export function CookieConsentBanner() {
   const isRu = language === "ru";
 
   useEffect(() => {
-    setVisible(!hasConsent());
+    const accepted = hasConsent();
+    if (!accepted) {
+      // Do not retain identifiers from the older acknowledgement-only banner without opt-in.
+      try {
+        for (const key of ANALYTICS_STORAGE_KEYS) window.localStorage.removeItem(key);
+      } catch {
+        // Analytics itself remains blocked unless a valid opt-in is stored.
+      }
+    }
+    setVisible(!accepted);
     const openSettings = () => setVisible(true);
     window.addEventListener("yume-open-cookie-settings", openSettings);
     return () => window.removeEventListener("yume-open-cookie-settings", openSettings);
