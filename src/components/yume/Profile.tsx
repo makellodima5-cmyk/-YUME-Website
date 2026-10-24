@@ -143,12 +143,9 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
     const webApp = getTelegramWebApp();
     const unsafeUser = webApp?.initData ? webApp.initDataUnsafe?.user : undefined;
     setIsTelegramMiniApp(Boolean(webApp?.initData));
-    setTelegramUser(unsafeUser ? {
-      first_name: unsafeUser.first_name,
-      last_name: unsafeUser.last_name,
-      username: unsafeUser.username,
-      photo_url: unsafeUser.photo_url,
-    } : null);
+    // Telegram's client-side profile data is not displayed for guests.
+    // It is attached to the UI only after the server confirms an account session.
+    setTelegramUser(null);
 
     let cancelled = false;
     fetch("/api/telegram/init-data", { credentials: "same-origin", cache: "no-store" })
@@ -163,12 +160,14 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
         setAuthChecked(true);
         setProfileStorageAuthenticated(signedIn);
         if (signedIn && payload.user) {
-          setTelegramUser((current) => ({
-            first_name: payload.user?.firstName ?? current?.first_name,
-            last_name: payload.user?.lastName ?? current?.last_name,
-            username: payload.user?.username ?? current?.username,
-            photo_url: current?.photo_url,
-          }));
+          setTelegramUser({
+            first_name: payload.user.firstName,
+            last_name: payload.user.lastName,
+            username: payload.user.username,
+            photo_url: unsafeUser?.photo_url,
+          });
+        } else {
+          setTelegramUser(null);
         }
       })
       .catch(() => {
@@ -799,15 +798,7 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
                 <p className="mt-4 rounded-xl bg-secondary/60 p-3 text-xs leading-relaxed text-muted-foreground">
                   {t("profile.documentComing")}
                 </p>
-                {panel === "privacy" && (
-                  <button
-                    type="button"
-                    onClick={() => window.dispatchEvent(new Event("yume-open-cookie-settings"))}
-                    className="mt-4 rounded-xl border border-border px-4 py-2.5 text-sm font-semibold hover:bg-accent"
-                  >
-                    {language === "ru" ? "Настройки cookies и аналитики" : "Cookie and analytics settings"}
-                  </button>
-                )}
+
               </article>
             )}
 
