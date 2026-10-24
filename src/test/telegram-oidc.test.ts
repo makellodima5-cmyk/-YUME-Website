@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import { env as cloudflareEnv } from "cloudflare:workers";
 import { handleTelegramOidc } from "@/data/telegram-oidc.server";
 
+const runtimeEnv = cloudflareEnv as unknown as Record<string, unknown>;
+
 class FakeStatement {
   bind(..._values: unknown[]) { return this; }
   async run() { return { meta: { changes: 1 } }; }
@@ -13,15 +15,15 @@ class FakeDb {
 }
 
 afterEach(() => {
-  delete cloudflareEnv.YUME_DB;
-  delete cloudflareEnv.YUME_AUTH_SESSION_SECRET;
-  delete cloudflareEnv.TELEGRAM_OIDC_CLIENT_ID;
-  delete cloudflareEnv.TELEGRAM_OIDC_CLIENT_SECRET;
+  delete runtimeEnv.YUME_DB;
+  delete runtimeEnv.YUME_AUTH_SESSION_SECRET;
+  delete runtimeEnv.TELEGRAM_OIDC_CLIENT_ID;
+  delete runtimeEnv.TELEGRAM_OIDC_CLIENT_SECRET;
 });
 
 describe("Telegram OIDC browser binding", () => {
   it("rejects a callback without the browser-bound state cookie", async () => {
-    Object.assign(cloudflareEnv, {
+    Object.assign(runtimeEnv, {
       YUME_DB: new FakeDb(),
       YUME_AUTH_SESSION_SECRET: "test-session-secret-with-at-least-32-characters",
       TELEGRAM_OIDC_CLIENT_ID: "test-client-id",
