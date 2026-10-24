@@ -9,7 +9,7 @@ const MOBILE_APP_ORIGINS = new Set([
 
 function corsHeaders(request: Request): Headers {
   const headers = new Headers({
-    "Vary": "Origin",
+    Vary: "Origin",
     "Access-Control-Allow-Methods": "GET, OPTIONS",
     "Access-Control-Allow-Headers": "Accept, Content-Type, Authorization",
     "Access-Control-Max-Age": "86400",
