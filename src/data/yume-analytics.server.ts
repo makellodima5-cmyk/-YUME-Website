@@ -225,7 +225,17 @@ export async function handleYumeAnalytics(request: Request): Promise<Response> {
       // Enforce the explicit optional-analytics choice on the server as well as in the client.
       // The preference cookie stores only the consent choice, not an analytics identifier.
       if (!hasAnalyticsConsent(request)) return json({ ok: true, ignored: true, reason: "analytics_consent_required" });
-      const body = await request.json().catch(() => null) as { path?: unknown; sessionId?: unknown; visitorId?: unknown } | null;
+      let body: { path?: unknown; sessionId?: unknown; visitorId?: unknown } | null = null;
+      try {
+        const raw = await request.text();
+        if (raw.length > 4_096) return json({ error: "Request too large." }, 413);
+        const parsed: unknown = JSON.parse(raw);
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+          body = parsed as { path?: unknown; sessionId?: unknown; visitorId?: unknown };
+        }
+      } catch {
+        return json({ error: "Invalid request." }, 400);
+      }
       const rawPath = typeof body?.path === "string" && body.path.startsWith("/") ? body.path : "/";
       const path = rawPath.split("?")[0].slice(0, 180);
       if (path.includes("#admin")) return json({ ok: true, ignored: true });
@@ -253,6 +263,7 @@ export async function handleYumeAnalytics(request: Request): Promise<Response> {
     if (!await isAdmin(request, env, db)) return json({ error: "Unauthorized." }, 401);
     return json({ ok: true, analytics: await cachedMetrics(db) });
   } catch (error) {
-    return json({ error: error instanceof Error ? error.message : "Analytics operation failed." }, 500);
+    console.error("[YUME][ANALYTICS] Request failed.", error);
+    return json({ error: "Analytics operation failed." }, 500);
   }
 }
