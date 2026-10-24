@@ -16,45 +16,80 @@ type SupportBindings = {
   SUPPORT_PERSONAL_URL?: string;
 };
 
-function getSupportRedirect(request: Request, env: unknown): Response | null {
-  const path = new URL(request.url).pathname;
-  const bindingName = path === "/api/support/group"
-    ? "SUPPORT_GROUP_URL"
-    : path === "/api/support/personal"
-      ? "SUPPORT_PERSONAL_URL"
-      : null;
+function normalizeSupportDestination(bindingName: keyof SupportBindings, configuredValue: string): URL | null {
+  const value = configuredValue.trim();
+  if (!value) return null;
 
-  if (!bindingName || request.method !== "GET" && request.method !== "HEAD") return null;
-
-  const bindings = env as SupportBindings;
-  const configuredUrl = bindings[bindingName]?.trim();
-  if (!configuredUrl) {
-    return new Response("Support link is not configured.", {
-      status: 503,
-      headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" },
-    });
-  }
+  // The group setting is expected to be a public Telegram URL. The personal
+  // support setting may be either a full Telegram URL or just a username.
+  const candidate = bindingName === "SUPPORT_PERSONAL_URL" && !/^https?:\/\//i.test(value)
+    ? `https://t.me/${value.replace(/^@/, "")}`
+    : value;
 
   let destination: URL;
   try {
-    destination = new URL(configuredUrl);
+    destination = new URL(candidate);
   } catch {
-    return new Response("Support link configuration is invalid.", {
+    return null;
+  }
+
+  if (
+    destination.protocol !== "https:" ||
+    !["t.me", "telegram.me", "www.telegram.me"].includes(destination.hostname.toLowerCase()) ||
+    !destination.pathname || destination.pathname === "/"
+  ) {
+    return null;
+  }
+
+  return destination;
+}
+
+function getSupportRedirect(request: Request, env: unknown): Response | null {
+  const requestUrl = new URL(request.url);
+  const bindingName = requestUrl.pathname === "/api/support/group"
+    ? "SUPPORT_GROUP_URL"
+    : requestUrl.pathname === "/api/support/personal"
+      ? "SUPPORT_PERSONAL_URL"
+      : null;
+
+  if (!bindingName || !["GET", "HEAD"].includes(request.method)) return null;
+
+  const bindings = env as SupportBindings;
+  const configuredValue = bindings[bindingName];
+  const destination = typeof configuredValue === "string"
+    ? normalizeSupportDestination(bindingName, configuredValue)
+    : null;
+
+  const headers = {
+    "cache-control": "no-store",
+    "x-content-type-options": "nosniff",
+  };
+
+  if (!destination) {
+    const message = configuredValue
+      ? "Support link configuration is invalid."
+      : "Support link is not configured.";
+    return new Response(requestUrl.searchParams.get("format") === "json" ? JSON.stringify({ error: message }) : message, {
       status: 503,
-      headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" },
+      headers: {
+        ...headers,
+        "content-type": requestUrl.searchParams.get("format") === "json" ? "application/json; charset=utf-8" : "text/plain; charset=utf-8",
+      },
     });
   }
 
-  if (destination.protocol !== "https:" || !["t.me", "telegram.me", "www.telegram.me"].includes(destination.hostname.toLowerCase())) {
-    return new Response("Support link configuration is invalid.", {
-      status: 503,
-      headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" },
+  // Mini Apps ask for the destination before a tap so the Telegram bridge can
+  // open it directly in Telegram instead of navigating through an in-app browser.
+  if (requestUrl.searchParams.get("format") === "json") {
+    return new Response(JSON.stringify({ url: destination.toString() }), {
+      status: 200,
+      headers: { ...headers, "content-type": "application/json; charset=utf-8" },
     });
   }
 
   return new Response(null, {
     status: 302,
-    headers: { location: destination.toString(), "cache-control": "no-store" },
+    headers: { ...headers, location: destination.toString() },
   });
 }
 
