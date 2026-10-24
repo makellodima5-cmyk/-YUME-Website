@@ -843,10 +843,125 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
                 </p>
               </article>
             ) : panel === "privacy" ? (
-              <article className="max-w-3xl rounded-2xl border border-border bg-card/60 p-5 sm:p-7">
-                <p className="text-sm leading-relaxed text-muted-foreground">{t("profile.privacyPlaceholder")}</p>
-                <p className="mt-4 rounded-xl bg-secondary/60 p-3 text-xs leading-relaxed text-muted-foreground">
-                  {t("profile.documentComing")}
+              <article className="max-w-3xl space-y-3">
+                <p className="text-sm leading-relaxed text-muted-foreground">
+                  {language === "ru"
+                    ? "Настоящая Политика конфиденциальности описывает, как Администрация сайта YUME обрабатывает информацию пользователей при использовании сайта и его функций."
+                    : "This Privacy Policy describes how YUME site administration processes user information when the site and its features are used."}
+                </p>
+                <div className="space-y-3">
+                  {(language === "ru" ? [
+                    { title: "Общие положения", clauses: [
+                      "Настоящая Политика конфиденциальности (далее — «Политика») объясняет, какие сведения могут обрабатываться при использовании YUME, для каких целей это делается и как пользователь может обратиться по вопросам конфиденциальности.",
+                      "Администрация сайта YUME (далее — «Администрация») стремится обрабатывать данные прозрачно, в объёме, необходимом для работы сайта, обеспечения безопасности и предоставления доступных функций.",
+                      "Политика применяется к информации, получаемой при посещении сайта, использовании учётной записи и взаимодействии с функциями YUME. Сторонние сервисы могут обрабатывать данные по собственным правилам и политикам.",
+                      "Настоящая Политика не является универсальным согласием на любую обработку данных. Если для определённой обработки требуется отдельное согласие, оно запрашивается отдельно в предусмотренном порядке.",
+                      "Действующая редакция Политики доступна по адресу: https://yume-website.yumesupport833.workers.dev/?section=privacy-policy."
+                    ]} : [
+                      { title: "General provisions", clauses: [
+                        "This Privacy Policy explains what information may be processed when using YUME, why it is processed, and how users can contact the administration about privacy.",
+                        "YUME site administration seeks to process information transparently and only as needed to operate the site, provide available features, and maintain security.",
+                        "This Policy applies to information collected while visiting the site, using an account, and interacting with YUME features. Third-party services may process information under their own policies.",
+                        "This Policy is not blanket consent to any processing. Where separate consent is required for a particular activity, it is requested separately as appropriate.",
+                        "The current version of this Policy is available at https://yume-website.yumesupport833.workers.dev/?section=privacy-policy."
+                      ]}
+                    ]),
+                    ...(language === "ru" ? [
+                      { title: "Цели и основания обработки", clauses: [
+                        "Информация может обрабатываться для обеспечения работы сайта и учётной записи, предоставления доступных функций, сохранения пользовательских настроек, обеспечения безопасности, предотвращения злоупотреблений, диагностики ошибок и ответа на обращения пользователей.",
+                        "В зависимости от используемых функций могут обрабатываться сведения, переданные при авторизации через Telegram, данные профиля, настройки и действия внутри сервиса, а также технические сведения о запросах и сбоях.",
+                        "Обработка осуществляется в объёме, необходимом для указанных целей, на соответствующем основании, включая предоставление запрошенной функции, выполнение применимых требований и согласие пользователя в тех случаях, когда оно необходимо.",
+                        "Администрация не должна использовать данные для несовместимых с указанными целями задач без надлежащего основания и информирования пользователя, когда это требуется."
+                      ]},
+                      { title: "Cookie-файлы и аналогичные технологии", clauses: [
+                        "Сайт может использовать cookie-файлы, локальное хранилище браузера и аналогичные технологии для поддержки основных функций, сохранения настроек и обеспечения безопасности.",
+                        "Строго необходимые технологии могут использоваться для работы запрошенных пользователем функций. Аналитические, рекламные и иные необязательные технологии применяются только при наличии соответствующих инструментов и с учётом выбора пользователя и применимых требований.",
+                        "Пользователь может ограничить или удалить cookie-файлы в настройках браузера. Это может повлиять на доступность отдельных функций или сохранение настроек.",
+                        "Если на сайте доступен интерфейс управления согласием на cookie, пользователь может изменить свой выбор через этот интерфейс. Закрытие уведомления или продолжение просмотра само по себе не рассматривается как согласие на необязательные технологии."
+                      ]},
+                      { title: "Хранение и защита данных", clauses: [
+                        "Администрация применяет разумные технические и организационные меры для защиты информации от неправомерного доступа, утраты, изменения или раскрытия.",
+                        "Данные хранятся не дольше, чем это необходимо для целей обработки, обеспечения безопасности, разрешения обращений и выполнения применимых требований. Конкретный срок зависит от вида данных и цели их использования.",
+                        "Доступ к данным ограничивается случаями, когда он необходим для работы и поддержки сервиса. Информация может обрабатываться поставщиками инфраструктуры и технических услуг в объёме, необходимом для функционирования YUME.",
+                        "Передача информации также возможна в случаях, предусмотренных применимым законодательством, либо для защиты прав, безопасности пользователей и работоспособности сервиса в допустимых пределах.",
+                        "Ни один способ передачи или хранения данных не может гарантировать абсолютную безопасность, однако Администрация принимает разумные меры для снижения соответствующих рисков."
+                      ]},
+                      { title: "Права пользователей", clauses: [
+                        "Пользователь может обратиться за информацией об обработке своих данных, запросить исправление неточных сведений или удаление данных, когда это применимо, а также отозвать согласие, если обработка основана на согласии и отзыв допускается.",
+                        "Для рассмотрения запроса Администрация может попросить предоставить сведения, необходимые для подтверждения того, что запрос относится к соответствующей учётной записи или данным.",
+                        "Некоторые данные могут сохраняться после запроса на удаление, если их дальнейшее хранение необходимо для безопасности, разрешения споров или выполнения требований применимого законодательства.",
+                        "Запросы по вопросам конфиденциальности можно направлять на yumesupport833@gmail.com. Администрация рассматривает их в установленном порядке."
+                      ]},
+                      { title: "Изменение политики", clauses: [
+                        "Администрация может периодически обновлять Политику при изменении функций сайта, способов обработки информации или применимых требований.",
+                        "Актуальная редакция публикуется на этой странице: https://yume-website.yumesupport833.workers.dev/?section=privacy-policy.",
+                        "При существенных изменениях Администрация может дополнительно разместить уведомление в интерфейсе сайта. Дата обновления при необходимости указывается в опубликованной редакции."
+                      ]},
+                      { title: "Контакты", clauses: [
+                        "По вопросам обработки персональных данных, конфиденциальности и реализации прав пользователя можно связаться с Администрацией сайта YUME по электронной почте: yumesupport833@gmail.com.",
+                        "В обращении рекомендуется описать вопрос и, если необходимо, указать ссылку на соответствующую страницу или сведения, позволяющие найти нужные данные. Не отправляйте пароли, коды подтверждения и другие секретные данные."
+                      ]}
+                    ] : [
+                      { title: "Purposes and legal bases for processing", clauses: [
+                        "Information may be processed to operate the site and account, provide available features, save preferences, maintain security, prevent abuse, diagnose errors, and respond to user requests.",
+                        "Depending on the features used, this may include information provided through Telegram authentication, profile details, settings and activity within the service, and technical request or error information.",
+                        "Processing is limited to what is necessary for these purposes and relies on an appropriate basis, including providing a requested feature, meeting applicable requirements, or user consent where required.",
+                        "Information should not be used for purposes incompatible with those described without an appropriate basis and user notice where required."
+                      ]},
+                      { title: "Cookies and similar technologies", clauses: [
+                        "The site may use cookies, browser local storage, and similar technologies to support core features, save preferences, and maintain security.",
+                        "Strictly necessary technologies may be used to provide features requested by the user. Analytics, advertising, and other optional technologies are used only if actually implemented and in line with user choices and applicable requirements.",
+                        "Users can restrict or delete cookies in browser settings. This may affect some features or saved preferences.",
+                        "If a cookie-consent interface is available, users can change their choices there. Closing a notice or continuing to browse is not by itself treated as consent to optional technologies."
+                      ]},
+                      { title: "Data storage and security", clauses: [
+                        "The administration applies reasonable technical and organizational safeguards to protect information against unauthorized access, loss, alteration, or disclosure.",
+                        "Information is retained no longer than necessary for the processing purposes, security, handling requests, and applicable requirements. The period depends on the type of information and its use.",
+                        "Access is limited to what is needed to operate and support the service. Infrastructure and technical service providers may process information as necessary for YUME to function.",
+                        "Information may also be disclosed where required by applicable law or, where permitted, to protect rights, user safety, and service reliability.",
+                        "No method of transmission or storage can guarantee absolute security, but reasonable measures are taken to reduce risks."
+                      ]},
+                      { title: "User rights", clauses: [
+                        "Users may ask about the processing of their information, request correction of inaccurate details or deletion where applicable, and withdraw consent where processing is based on consent and withdrawal is available.",
+                        "The administration may request information needed to verify that a request relates to the relevant account or data.",
+                        "Some information may be retained after a deletion request when necessary for security, dispute resolution, or applicable legal requirements.",
+                        "Privacy requests can be sent to yumesupport833@gmail.com and will be handled through the appropriate process."
+                      ]},
+                      { title: "Changes to this Policy", clauses: [
+                        "The administration may update this Policy as site features, processing practices, or applicable requirements change.",
+                        "The current version is published on this page: https://yume-website.yumesupport833.workers.dev/?section=privacy-policy.",
+                        "For material changes, an additional notice may be displayed in the site interface. An update date may be included in the published version."
+                      ]},
+                      { title: "Contact", clauses: [
+                        "For questions about personal information, privacy, or user rights, contact YUME site administration at yumesupport833@gmail.com.",
+                        "Please describe your question and, where helpful, include the relevant page link or details needed to locate the information. Do not send passwords, verification codes, or other secrets."
+                      ]}
+                    ])
+                  ].map((section, index) => (
+                    <details
+                      key={section.title}
+                      className="group overflow-hidden rounded-2xl border border-primary/25 bg-card/55 shadow-sm transition-colors open:border-primary/55 open:bg-card/75"
+                    >
+                      <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-4 text-left marker:hidden transition-colors hover:bg-primary/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary sm:px-5 [&::-webkit-details-marker]:hidden">
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-primary/10 text-sm font-bold text-primary">{index + 1}</span>
+                        <span className="min-w-0 flex-1 text-sm font-semibold leading-snug text-foreground sm:text-base">{section.title}</span>
+                        <ChevronDown className="h-4 w-4 shrink-0 text-primary transition-transform duration-200 group-open:rotate-180" aria-hidden="true" />
+                      </summary>
+                      <div className="border-t border-border/70 px-4 pb-5 pt-4 sm:px-5 sm:pb-6">
+                        <ol className="space-y-4">
+                          {section.clauses.map((clause, clauseIndex) => (
+                            <li key={clause} className="text-sm leading-7 text-foreground/85 sm:text-[15px]">
+                              <span className="mr-1 font-semibold text-foreground">{index + 1}.{clauseIndex + 1}.</span>{clause}
+                            </li>
+                          ))}
+                        </ol>
+                      </div>
+                    </details>
+                  ))}
+                </div>
+                <p className="pt-2 text-xs leading-relaxed text-muted-foreground">
+                  {language === "ru" ? "По вопросам конфиденциальности: " : "Privacy inquiries: "}
+                  <a className="text-primary underline underline-offset-4" href="mailto:yumesupport833@gmail.com">yumesupport833@gmail.com</a>
                 </p>
               </article>
             ) : null}
