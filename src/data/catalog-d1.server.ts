@@ -389,7 +389,7 @@ export async function getPersistentCatalog(
   try {
     await ensureSchema(db);
 
-    let state = await getMeta(db, "catalog_state");
+    const state = await getMeta(db, "catalog_state");
     let imported = await countRows(db);
 
     if (state === "ready" || state === "partial") {

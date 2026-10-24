@@ -35,7 +35,12 @@ export function normalizeAdminCatalogIds(value: unknown): string[] {
 }
 
 function environment(): Environment {
-  try { const native = cloudflareEnv as unknown as Environment; if (native && typeof native === "object") return native; } catch {}
+  try {
+    const native = cloudflareEnv as unknown as Environment;
+    if (native && typeof native === "object") return native;
+  } catch {
+    // Tests may inject a runtime environment.
+  }
   const injected = (globalThis as RuntimeGlobal).__YUME_RUNTIME_ENV__;
   return injected && typeof injected === "object" ? injected as Environment : {};
 }
@@ -216,7 +221,11 @@ async function recentAudit(db: Database) {
     .all<{id:number;action:string;status:string;details:string;created_at:string}>();
   return rows.results.map(row => {
     let details: Record<string, unknown> = {};
-    try { details = JSON.parse(row.details) as Record<string, unknown>; } catch {}
+    try {
+      details = JSON.parse(row.details) as Record<string, unknown>;
+    } catch {
+      // Keep the audit entry even if a legacy details payload is malformed.
+    }
     return {...row,details};
   });
 }

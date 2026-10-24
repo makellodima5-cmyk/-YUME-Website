@@ -415,7 +415,11 @@ export async function runScheduledTrailerUpdate(envInput: unknown): Promise<void
     }
   } catch(error) {
     const message = error instanceof Error ? error.message : String(error);
-    try { await setAutoValues(db,{retry_at:String(Date.now()+60000),last_error:message,lock_until:"0"}); } catch {}
+    try {
+      await setAutoValues(db, { retry_at: String(Date.now() + 60000), last_error: message, lock_until: "0" });
+    } catch {
+      // Preserve the original scheduled-update failure even if retry state cannot be persisted.
+    }
     console.error("[YUME][TRAILER_AUTO] Scheduled tick failed.",error);
   }
 }
