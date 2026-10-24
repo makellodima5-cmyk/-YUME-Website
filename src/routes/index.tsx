@@ -404,15 +404,15 @@ function Index() {
           setNotificationDismissedIds(Array.isArray(payload.dismissedIds) ? payload.dismissedIds.filter((id): id is string => typeof id === "string") : []);
           setNotificationRemoteAccount(true);
         } else {
-          setNotificationReadIds(readLocalNotificationIds());
-          setNotificationDismissedIds(readLocalDismissedNotificationIds());
+          setNotificationReadIds([]);
+          setNotificationDismissedIds([]);
           setNotificationRemoteAccount(false);
         }
         setNotificationStateLoaded(true);
       } catch {
         if (cancelled) return;
-        setNotificationReadIds(readLocalNotificationIds());
-        setNotificationDismissedIds(readLocalDismissedNotificationIds());
+        setNotificationReadIds([]);
+        setNotificationDismissedIds([]);
         setNotificationRemoteAccount(false);
         setNotificationStateLoaded(true);
       }
@@ -1196,7 +1196,7 @@ function Index() {
     <div className="relative isolate min-h-screen pb-8">
       {view === "home" && <HomePetals />}
       <div className="relative z-10">
-      <Header view={view} setView={setView} onProfile={() => setView(telegramAuthReady ? "profile" : "login")} isAdmin={isAdmin} unreadNotificationCount={notificationStateLoaded ? USER_NOTIFICATIONS.filter((item) => !notificationReadIds.includes(item.id) && !notificationDismissedIds.includes(item.id)).length : 0} />
+      <Header view={view} setView={setView} onProfile={() => setView(telegramAuthReady ? "profile" : "login")} isAdmin={isAdmin} unreadNotificationCount={notificationStateLoaded && notificationRemoteAccount ? USER_NOTIFICATIONS.filter((item) => !notificationReadIds.includes(item.id) && !notificationDismissedIds.includes(item.id)).length : 0} />
       {isTelegramMiniApp && telegramConsentRequired && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-background/85 px-4 py-6 backdrop-blur-md" role="dialog" aria-modal="true" aria-labelledby="telegram-consent-title">
           <section className="w-full max-w-md rounded-3xl border border-border bg-card p-6 shadow-2xl sm:p-8">
@@ -1294,6 +1294,26 @@ function Index() {
               )}
             </div>
           </div>
+        </main>
+      ) : view === "notifications" && notificationStateLoaded && !notificationRemoteAccount ? (
+        <main id="main-content" className="px-4 pb-12 pt-24 md:px-10 md:pt-24">
+          <section className="mx-auto max-w-lg rounded-3xl border border-border bg-card/70 p-6 text-center sm:p-8">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+              <ShieldCheck className="h-7 w-7" />
+            </div>
+            <h1 className="mt-4 text-2xl font-bold">{language === "ru" ? "Уведомления для зарегистрированных пользователей" : "Notifications for registered users"}</h1>
+            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+              {language === "ru" ? "Войди в аккаунт или зарегистрируйся через Telegram, чтобы получать новости и уведомления YUME." : "Sign in or register through Telegram to receive YUME news and notifications."}
+            </p>
+            <div className="mt-5 flex flex-col justify-center gap-2 sm:flex-row">
+              <button type="button" onClick={() => setView("login")} className="inline-flex min-h-11 items-center justify-center rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90">{language === "ru" ? "Войти" : "Sign in"}</button>
+              <button type="button" onClick={() => setView("register")} className="inline-flex min-h-11 items-center justify-center rounded-xl border border-border px-5 py-2.5 text-sm font-semibold hover:bg-accent">{language === "ru" ? "Зарегистрироваться" : "Register"}</button>
+            </div>
+          </section>
+        </main>
+      ) : view === "notifications" && !notificationStateLoaded ? (
+        <main id="main-content" className="px-4 pb-12 pt-24 md:px-10 md:pt-24" aria-busy="true">
+          <div className="mx-auto max-w-lg rounded-3xl border border-border bg-card/50 p-8 text-center text-sm text-muted-foreground">{language === "ru" ? "Проверяем аккаунт…" : "Checking account…"}</div>
         </main>
       ) : view === "notifications" ? (
         <main id="main-content" className="px-4 pb-12 pt-24 md:px-10 md:pt-24">
