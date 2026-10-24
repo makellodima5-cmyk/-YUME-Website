@@ -372,6 +372,10 @@ function Index() {
   const [analyticsError, setAnalyticsError] = useState("");
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
   const [cookieNoticeAcknowledged, setCookieNoticeAcknowledged] = useState(false);
+  const [historyItems, setHistoryItems] = useState<{ animeId: string; viewedAt: string; viewCount: number }[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyAuthenticated, setHistoryAuthenticated] = useState(false);
+  const [historyError, setHistoryError] = useState("");
 
   useEffect(() => {
     setIsTelegramMiniApp(Boolean(getTelegramWebApp()?.initData));
@@ -975,6 +979,63 @@ function Index() {
   const [announcementsPage, setAnnouncementsPage] = useState(1);
   const [airingPage, setAiringPage] = useState(1);
   const [collection, setCollection] = useState<string | null>(null);
+
+  useEffect(() => {
+    const openAuth = (event: Event) => {
+      const detail = (event as CustomEvent<{ mode?: unknown }>).detail;
+      setViewRaw(detail?.mode === "register" ? "register" : "login");
+    };
+    window.addEventListener("yume-open-auth", openAuth);
+    try {
+      const intent = window.sessionStorage.getItem("yume-auth-intent-v1");
+      if (intent === "login" || intent === "register") {
+        window.sessionStorage.removeItem("yume-auth-intent-v1");
+        setViewRaw(intent);
+      }
+    } catch {
+      // An auth button on this page still works when sessionStorage is disabled.
+    }
+    return () => window.removeEventListener("yume-open-auth", openAuth);
+  }, []);
+
+  useEffect(() => {
+    if (view !== "history") return;
+    let cancelled = false;
+    setHistoryLoading(true);
+    setHistoryError("");
+    fetch("/api/telegram/history", { credentials: "same-origin", cache: "no-store" })
+      .then(async (response) => {
+        const payload = await response.json().catch(() => ({})) as {
+          authenticated?: boolean;
+          items?: unknown;
+          error?: string;
+        };
+        if (cancelled) return;
+        if (response.status === 401 || payload.authenticated !== true) {
+          setHistoryAuthenticated(false);
+          setHistoryItems([]);
+          return;
+        }
+        if (!response.ok || !Array.isArray(payload.items)) throw new Error(payload.error || "history_unavailable");
+        setHistoryAuthenticated(true);
+        setHistoryItems(payload.items.filter((item): item is { animeId: string; viewedAt: string; viewCount: number } =>
+          Boolean(item && typeof item === "object" &&
+            typeof (item as { animeId?: unknown }).animeId === "string" &&
+            /^\\d{1,12}$/.test((item as { animeId: string }).animeId) &&
+            typeof (item as { viewedAt?: unknown }).viewedAt === "string" &&
+            typeof (item as { viewCount?: unknown }).viewCount === "number"),
+        ));
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setHistoryAuthenticated(false);
+          setHistoryItems([]);
+          setHistoryError(language === "ru" ? "Не удалось загрузить историю просмотров." : "Could not load viewing history.");
+        }
+      })
+      .finally(() => { if (!cancelled) setHistoryLoading(false); });
+    return () => { cancelled = true; };
+  }, [view, language]);
 
   const setView = (v: View) => {
     if (v === "login" || v === "register") {
@@ -1751,7 +1812,35 @@ function Index() {
       ) : view === "history" ? (
         <main id="main-content" className="px-4 pt-24 md:px-10 md:pt-24">
           <h1 className="mb-3 text-2xl font-bold md:text-3xl">{t("history.title")}</h1>
-          <p className="rounded-2xl border border-dashed border-border bg-card/40 px-5 py-8 text-sm text-muted-foreground">{t("history.empty")}</p>
+          {historyLoading ? (
+            <p className="rounded-2xl border border-border bg-card/40 px-5 py-8 text-sm text-muted-foreground" role="status">{language === "ru" ? "Загружаем историю…" : "Loading history…"}</p>
+          ) : !historyAuthenticated ? (
+            <section className="rounded-2xl border border-dashed border-border bg-card/40 px-5 py-8 text-center">
+              <p className="text-sm text-muted-foreground">{historyError || (language === "ru" ? "История просмотров доступна только в аккаунте YUME." : "Viewing history is available only in a YUME account.")}</p>
+              <div className="mt-4 flex flex-wrap justify-center gap-2">
+                <button type="button" onClick={() => setView("login")} className="rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground">{language === "ru" ? "Войти через Telegram" : "Sign in with Telegram"}</button>
+                <button type="button" onClick={() => setView("register")} className="rounded-xl border border-border px-4 py-2.5 text-sm font-semibold hover:bg-accent">{language === "ru" ? "Регистрация" : "Register"}</button>
+              </div>
+            </section>
+          ) : historyItems.length === 0 ? (
+            <p className="rounded-2xl border border-dashed border-border bg-card/40 px-5 py-8 text-sm text-muted-foreground">{language === "ru" ? "История пока пуста. Открывай страницы аниме — они появятся здесь." : "Your history is empty. Open anime pages and they will appear here."}</p>
+          ) : (
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
+              {historyItems.map((item) => {
+                const anime = ANIME.find((entry) => entry.id === item.animeId);
+                return (
+                  <div key={item.animeId} className="min-w-0">
+                    {anime ? <AnimeCard anime={anime} onSelect={select} /> : (
+                      <button type="button" onClick={() => navigate({ to: "/anime/$animeId", params: { animeId: item.animeId } })} className="w-full rounded-xl border border-border bg-card/50 p-4 text-left text-sm hover:bg-accent">
+                        {language === "ru" ? "Открыть тайтл" : "Open title"} #{item.animeId}
+                      </button>
+                    )}
+                    <p className="mt-2 text-xs text-muted-foreground">{language === "ru" ? "Открыт" : "Opened"}: {new Date(item.viewedAt).toLocaleString(language === "ru" ? "ru-RU" : "en-GB")}</p>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </main>
       ) : null}
       {!["profile", "favorites", "watchlist", "privacy", "privacy-policy", "rules", "rights", "login", "register"].includes(view) && (
