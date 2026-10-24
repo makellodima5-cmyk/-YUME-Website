@@ -93,13 +93,14 @@ export const Route = createFileRoute("/")({
   validateSearch: validateCatalogSearch,
   loader: async () => {
     // User-facing catalogue reads only the persistent D1 dataset.
-    const catalog = isNativeYumeApp()
-      ? await (async () => {
-          const response = await yumeApiFetch("/api/mobile/catalog");
-          if (!response.ok) throw new Error("Mobile catalogue request failed: " + response.status);
-          return await response.json() as Awaited<ReturnType<typeof getShikimoriCatalog>>;
-        })()
-      : await getShikimoriCatalog({ data: {} });
+    let catalog: Awaited<ReturnType<typeof getShikimoriCatalog>>;
+    if (isNativeYumeApp()) {
+      const response = await yumeApiFetch("/api/mobile/catalog");
+      if (!response.ok) throw new Error("Mobile catalogue request failed: " + response.status);
+      catalog = (await response.json()) as Awaited<ReturnType<typeof getShikimoriCatalog>>;
+    } else {
+      catalog = await getShikimoriCatalog({ data: {} });
+    }
     const items = catalog.items;
     const popular = [...items]
       .filter((anime) => anime.rating !== null)
