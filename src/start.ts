@@ -27,6 +27,6 @@ const csrfMiddleware = createCsrfMiddleware({
 export const startInstance = createStart(() => ({
   // The Android APK ships a client-only SPA; never run route loaders against a
   // local prerender server without Cloudflare bindings. Website builds retain SSR.
-  defaultSsr: import.meta.env.VITE_YUME_ANDROID_BUILD === "true",
+  defaultSsr: import.meta.env.VITE_YUME_ANDROID_BUILD !== "true",
   requestMiddleware: [errorMiddleware, csrfMiddleware],
 }));
