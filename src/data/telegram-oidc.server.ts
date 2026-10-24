@@ -23,7 +23,7 @@ const encoder = new TextEncoder();
 type Runtime = typeof globalThis & { __YUME_RUNTIME_ENV__?: unknown };
 
 function env(): Environment {
-  try { const value = cloudflareEnv as unknown as Environment; if (value && typeof value === "object") return value; } catch {}
+  try { const value = cloudflareEnv as unknown as Environment; if (value && typeof value === "object") return value; } catch { /* Local adapters and tests may not expose Cloudflare bindings. */ }
   const value = (globalThis as Runtime).__YUME_RUNTIME_ENV__;
   return value && typeof value === "object" ? value as Environment : {};
 }
