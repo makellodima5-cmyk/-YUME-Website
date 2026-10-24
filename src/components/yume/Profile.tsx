@@ -799,6 +799,15 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
                 <p className="mt-4 rounded-xl bg-secondary/60 p-3 text-xs leading-relaxed text-muted-foreground">
                   {t("profile.documentComing")}
                 </p>
+                {panel === "privacy" && (
+                  <button
+                    type="button"
+                    onClick={() => window.dispatchEvent(new Event("yume-open-cookie-settings"))}
+                    className="mt-4 rounded-xl border border-border px-4 py-2.5 text-sm font-semibold hover:bg-accent"
+                  >
+                    {language === "ru" ? "Настройки cookies и аналитики" : "Cookie and analytics settings"}
+                  </button>
+                )}
               </article>
             )}
 
