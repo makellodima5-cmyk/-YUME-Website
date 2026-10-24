@@ -753,7 +753,9 @@ export async function handleTelegramSession(request: Request): Promise<Response>
   if (!isSameOriginRequest(request)) return jsonResponse({ error: "cross_origin_request" }, 403);
   let body: unknown;
   try {
-    body = await request.json();
+    const raw = await request.text();
+    if (raw.length > 20_480) return jsonResponse({ error: "request_too_large" }, 413);
+    body = JSON.parse(raw);
   } catch {
     return jsonResponse({ error: "invalid_request" }, 400);
   }
