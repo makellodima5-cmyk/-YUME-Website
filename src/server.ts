@@ -11,6 +11,53 @@ type ServerEntry = {
 
 let serverEntryPromise: Promise<ServerEntry> | undefined;
 
+type SupportBindings = {
+  SUPPORT_GROUP_URL?: string;
+  SUPPORT_PERSONAL_URL?: string;
+};
+
+function getSupportRedirect(request: Request, env: unknown): Response | null {
+  const path = new URL(request.url).pathname;
+  const bindingName = path === "/api/support/group"
+    ? "SUPPORT_GROUP_URL"
+    : path === "/api/support/personal"
+      ? "SUPPORT_PERSONAL_URL"
+      : null;
+
+  if (!bindingName || request.method !== "GET" && request.method !== "HEAD") return null;
+
+  const bindings = env as SupportBindings;
+  const configuredUrl = bindings[bindingName]?.trim();
+  if (!configuredUrl) {
+    return new Response("Support link is not configured.", {
+      status: 503,
+      headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" },
+    });
+  }
+
+  let destination: URL;
+  try {
+    destination = new URL(configuredUrl);
+  } catch {
+    return new Response("Support link configuration is invalid.", {
+      status: 503,
+      headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" },
+    });
+  }
+
+  if (destination.protocol !== "https:" || !["t.me", "telegram.me", "www.telegram.me"].includes(destination.hostname.toLowerCase())) {
+    return new Response("Support link configuration is invalid.", {
+      status: 503,
+      headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" },
+    });
+  }
+
+  return new Response(null, {
+    status: 302,
+    headers: { location: destination.toString(), "cache-control": "no-store" },
+  });
+}
+
 async function getServerEntry(): Promise<ServerEntry> {
   if (!serverEntryPromise) {
     serverEntryPromise = import("@tanstack/react-start/server-entry").then(
@@ -53,6 +100,8 @@ export default {
   },
   async fetch(request: Request, env: unknown, ctx: unknown) {
     setCatalogRuntimeEnvironment(env);
+    const supportRedirect = getSupportRedirect(request, env);
+    if (supportRedirect) return supportRedirect;
     try {
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
