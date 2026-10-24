@@ -16,7 +16,7 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import { YumePreferencesProvider, useYumePreferences } from "@/data/preferences";
 import { DEFAULT_META_DESCRIPTION, SITE_NAME } from "@/data/seo";
 import { initializeTelegramMiniApp } from "@/lib/telegram-mini-app";
-import { isNativeYumeApp } from "@/lib/mobile-api";
+import { isAndroidBuild, isNativeYumeApp } from "@/lib/mobile-api";
 import { trackYumePage } from "@/lib/yume-analytics";
 
 type InterfaceLanguage = "ru" | "en";
@@ -140,7 +140,7 @@ function RootShell({ children }: { children: ReactNode }) {
   return (
     <html lang="ru">
       <head>
-        {import.meta.env.VITE_YUME_ANDROID_BUILD !== "true" ? (
+        {!isAndroidBuild() ? (
           <script src="https://telegram.org/js/telegram-web-app.js"></script>
         ) : null}
         <script
