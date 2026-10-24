@@ -31,6 +31,13 @@ jobs:
         run: bun run build
       - name: Build bundled Android web client
         run: bun run build:android:web
+      - name: Inspect generated app shell files
+        if: always()
+        run: |
+          echo 'dist/client:'
+          find dist/client -maxdepth 2 -type f -print 2>/dev/null | sort || true
+          echo '.output/public:'
+          find .output/public -maxdepth 2 -type f -print 2>/dev/null | sort || true
       - name: Verify standalone app shell
         run: |
           test -f dist/client/index.html
