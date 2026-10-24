@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 import tailwindcss from "@tailwindcss/vite";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import viteReact from "@vitejs/plugin-react";
@@ -25,6 +26,12 @@ export default defineConfig({
   ],
   define: {
     "import.meta.env.VITE_YUME_ANDROID_BUILD": JSON.stringify("true"),
+  },
+  resolve: {
+    // The shell prerender runs in Node; never substitute this stub in the Worker build.
+    alias: {
+      "cloudflare:workers": fileURLToPath(new URL("./scripts/android/cloudflare-workers.stub.ts", import.meta.url)),
+    },
   },
   build: {
     outDir: "dist",
