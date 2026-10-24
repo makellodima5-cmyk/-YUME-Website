@@ -20,8 +20,10 @@ export function trackYumePage(path: string): void {
   const safePath = path.startsWith("/") ? path.split("?")[0].slice(0, 180) : "/";
   const now = Date.now();
   try {
-    // The site's existing cookie notice must be acknowledged before persistent analytics IDs are created.
-    if (window.localStorage.getItem("yume-cookie-notice-acknowledged") !== "true") return;
+    // Analytics uses optional first-party localStorage identifiers, not essential session cookies.
+    // Only an explicit "accept all" choice enables this processing.
+    const consent = JSON.parse(window.localStorage.getItem("yume-cookie-consent-v1") ?? "null") as { analytics?: unknown } | null;
+    if (consent?.analytics !== true) return;
   } catch {
     return;
   }
