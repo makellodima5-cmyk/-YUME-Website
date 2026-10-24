@@ -156,7 +156,7 @@ describe("Telegram Mini App initData validation", () => {
       const response = await handleTelegramSession(new Request("https://yume.test/api/telegram/init-data", {
         method: "POST",
         headers: { "Content-Type": "application/json", Origin: "https://yume.test" },
-        body: JSON.stringify({ initData, privacyConsent: false }),
+        body: JSON.stringify({ initData, mode: "login", privacyConsent: false }),
       }));
       const payload = await response.json() as { authenticated?: boolean; user?: { id?: string } };
 
