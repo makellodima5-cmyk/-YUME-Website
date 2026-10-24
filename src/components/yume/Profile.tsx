@@ -467,6 +467,10 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
                 <UserPlus className="h-4 w-4" /> {language === "ru" ? "Регистрация" : "Register"}
               </button>
             </div>
+            <div className="mt-5 flex flex-wrap justify-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
+              <button type="button" onClick={() => navigatePanel("documents")} className="underline underline-offset-4 hover:text-foreground">{language === "ru" ? "Правовая информация" : "Legal information"}</button>
+              <button type="button" onClick={() => window.dispatchEvent(new Event("yume-open-cookie-settings"))} className="underline underline-offset-4 hover:text-foreground">{language === "ru" ? "Настройки cookies" : "Cookie settings"}</button>
+            </div>
           </section>
         ) : authChecked && !isAuthenticated && (panel === "overview" || panel === "favorites" || panel === "watchlist") ? (
           <section className="mx-auto max-w-xl rounded-3xl border border-border bg-card/80 p-6 text-center shadow-xl sm:p-8">
@@ -482,6 +486,10 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
             <div className="mt-5 flex flex-col justify-center gap-2 sm:flex-row">
               <button type="button" onClick={() => requestAuth("login")} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90"><LogIn className="h-4 w-4" />{language === "ru" ? "Войти" : "Sign in"}</button>
               <button type="button" onClick={() => requestAuth("register")} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-border px-5 py-2.5 text-sm font-semibold hover:bg-accent"><UserPlus className="h-4 w-4" />{language === "ru" ? "Зарегистрироваться" : "Register"}</button>
+            </div>
+            <div className="mt-5 flex flex-wrap justify-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
+              <button type="button" onClick={() => navigatePanel("documents")} className="underline underline-offset-4 hover:text-foreground">{language === "ru" ? "Правовая информация" : "Legal information"}</button>
+              <button type="button" onClick={() => window.dispatchEvent(new Event("yume-open-cookie-settings"))} className="underline underline-offset-4 hover:text-foreground">{language === "ru" ? "Настройки cookies" : "Cookie settings"}</button>
             </div>
           </section>
         ) : panel === "overview" ? (
