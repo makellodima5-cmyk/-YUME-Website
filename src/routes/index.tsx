@@ -563,7 +563,7 @@ function Index() {
         credentials: "same-origin",
         cache: "no-store",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ initData, privacyConsent: true }),
+        body: JSON.stringify({ initData, mode: "register", privacyConsent: true }),
       });
       const result = await response.json().catch(() => ({})) as {
         authenticated?: boolean;
