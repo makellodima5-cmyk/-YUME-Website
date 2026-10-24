@@ -36,7 +36,9 @@ jobs:
         run: bun run typecheck
 
       - name: Lint TypeScript sources
-        run: bunx eslint src --rule 'prettier/prettier: off'
+        run: >-
+          bunx eslint src
+          --rule 'prettier/prettier: off'
 
       - name: Build Cloudflare Worker
         run: bun run build
