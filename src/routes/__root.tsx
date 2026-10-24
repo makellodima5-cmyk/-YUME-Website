@@ -17,6 +17,7 @@ import { YumePreferencesProvider, useYumePreferences } from "@/data/preferences"
 import { DEFAULT_META_DESCRIPTION, SITE_NAME } from "@/data/seo";
 import { initializeTelegramMiniApp } from "@/lib/telegram-mini-app";
 import { trackYumePage } from "@/lib/yume-analytics";
+import { CookieConsentBanner } from "@/components/yume/CookieConsentBanner";
 
 type InterfaceLanguage = "ru" | "en";
 
@@ -186,6 +187,7 @@ function RootComponent() {
       <YumePreferencesProvider>
         <DocumentLanguageSync />
         <SkipToContent />
+        <CookieConsentBanner />
         <Outlet />
       </YumePreferencesProvider>
     </QueryClientProvider>
