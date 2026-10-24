@@ -1,0 +1,89 @@
+import { useEffect, useState } from "react";
+import { useYumePreferences } from "@/data/preferences";
+import { trackYumePage } from "@/lib/yume-analytics";
+
+type ConsentChoice = { necessary: true; analytics: boolean; updatedAt: string; version: 1 };
+
+const CONSENT_KEY = "yume-cookie-consent-v1";
+const ANALYTICS_STORAGE_KEYS = ["yume-analytics-visitor-id", "yume-analytics-session"];
+
+function hasConsent(): boolean {
+  try {
+    const value = JSON.parse(window.localStorage.getItem(CONSENT_KEY) ?? "null") as { necessary?: unknown } | null;
+    return value?.necessary === true;
+  } catch {
+    return false;
+  }
+}
+
+export function CookieConsentBanner() {
+  const { language } = useYumePreferences();
+  const [visible, setVisible] = useState(false);
+  const isRu = language === "ru";
+
+  useEffect(() => {
+    setVisible(!hasConsent());
+    const openSettings = () => setVisible(true);
+    window.addEventListener("yume-open-cookie-settings", openSettings);
+    return () => window.removeEventListener("yume-open-cookie-settings", openSettings);
+  }, []);
+
+  const saveChoice = (analytics: boolean) => {
+    const choice: ConsentChoice = {
+      necessary: true,
+      analytics,
+      updatedAt: new Date().toISOString(),
+      version: 1,
+    };
+    try {
+      window.localStorage.setItem(CONSENT_KEY, JSON.stringify(choice));
+      if (!analytics) {
+        for (const key of ANALYTICS_STORAGE_KEYS) window.localStorage.removeItem(key);
+      }
+    } catch {
+      // If consent cannot be stored, optional analytics remains blocked by its own consent check.
+    }
+    setVisible(false);
+    window.dispatchEvent(new CustomEvent("yume-cookie-consent-updated", { detail: choice }));
+    if (analytics) trackYumePage(window.location.pathname + window.location.hash);
+  };
+
+  if (!visible) return null;
+
+  return (
+    <aside
+      aria-label={isRu ? "Настройки cookies и аналитики" : "Cookie and analytics preferences"}
+      className="fixed inset-x-3 bottom-3 z-[90] mx-auto flex max-w-5xl flex-col gap-3 rounded-2xl border border-primary/25 bg-background/95 p-4 shadow-2xl backdrop-blur-md sm:inset-x-5 sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:px-6 sm:py-4"
+    >
+      <p className="max-w-3xl text-center text-sm leading-relaxed text-foreground/90 sm:text-left">
+        {isRu
+          ? "YUME использует необходимые данные хранения для входа и работы основных функций. Необязательная аналитика сохраняет псевдонимные идентификаторы в localStorage этого браузера. Можно разрешить только необходимое или принять всё."
+          : "YUME uses essential storage for sign-in and core features. Optional analytics stores pseudonymous identifiers in this browser's localStorage. You can allow only essential storage or accept all."}
+        {" "}
+        <button
+          type="button"
+          onClick={() => window.open("/?section=privacy-policy", "_blank", "noopener,noreferrer")}
+          className="inline cursor-pointer text-primary underline decoration-primary/70 underline-offset-4 transition-colors hover:text-primary/80"
+        >
+          {isRu ? "Политика конфиденциальности" : "Privacy Policy"}
+        </button>
+      </p>
+      <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
+        <button
+          type="button"
+          onClick={() => saveChoice(false)}
+          className="inline-flex min-h-10 items-center justify-center rounded-xl border border-border bg-card px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          {isRu ? "Только необходимые" : "Essential only"}
+        </button>
+        <button
+          type="button"
+          onClick={() => saveChoice(true)}
+          className="inline-flex min-h-10 items-center justify-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          {isRu ? "Принять все" : "Accept all"}
+        </button>
+      </div>
+    </aside>
+  );
+}
