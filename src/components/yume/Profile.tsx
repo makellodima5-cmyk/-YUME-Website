@@ -10,6 +10,7 @@ import {
   Info,
   LifeBuoy,
   LibraryBig,
+  Mail,
   ShieldCheck,
   UserRound,
   UsersRound,
@@ -525,9 +526,97 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
               </div>
             )}
 
-            {(panel === "privacy" || panel === "rules" || panel === "rights") && (
+            {panel === "rights" ? (
+              <article className="max-w-3xl space-y-2.5">
+                <section className="rounded-2xl border border-border bg-card/60 p-4 sm:p-5">
+                  <p className="text-sm leading-relaxed text-muted-foreground">
+                    {language === "ru"
+                      ? "Сбор информации в сети и формирование каталога на сайте YUME осуществляются в автоматическом режиме."
+                      : "Information collection across the web and catalog creation on the YUME website are carried out automatically."}
+                  </p>
+                </section>
+
+                <section className="rounded-2xl border border-border bg-card/60 p-4 sm:p-5">
+                  <p className="text-sm leading-relaxed text-muted-foreground">
+                    {language === "ru"
+                      ? "На сайте YUME представлены сведения о произведениях, а также материалы для бесплатного домашнего ознакомительного просмотра, включая фрагменты материалов, любительские переводы и озвучку. Видеофайлы не хранятся на серверах YUME. На страницах сайта могут использоваться встроенные плееры сторонних сервисов."
+                      : "YUME provides information about works and materials for free, at-home viewing for familiarization, including excerpts, fan translations and voice-overs. Video files are not stored on YUME servers. Pages may use embedded players from third-party services."}
+                  </p>
+                </section>
+
+                <section className="rounded-2xl border border-border bg-card/60 p-4 sm:p-5">
+                  <p className="text-sm leading-relaxed text-muted-foreground">
+                    {language === "ru"
+                      ? "YUME не продаёт представленные на сайте материалы. Контент предназначен исключительно для бесплатного домашнего ознакомительного просмотра."
+                      : "YUME does not sell materials presented on the website. Content is intended exclusively for free, at-home viewing for familiarization."}
+                  </p>
+                </section>
+
+                <section className="rounded-2xl border border-border bg-card/60 p-4 sm:p-5">
+                  <p className="text-sm leading-relaxed text-muted-foreground">
+                    {language === "ru"
+                      ? "Администрация YUME открыта к сотрудничеству с правообладателями и их уполномоченными представителями."
+                      : "YUME administration welcomes cooperation with copyright holders and their authorized representatives."}
+                  </p>
+                </section>
+
+                <section className="rounded-2xl border border-border bg-card/60 p-4 sm:p-5">
+                  <h3 className="text-sm font-semibold text-primary">
+                    {language === "ru" ? "Связаться с администрацией" : "Contact the administration"}
+                  </h3>
+                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                    {language === "ru"
+                      ? "Если вы обнаружили на сайте материал, который, по вашему мнению, нарушает авторские права или иные законные интересы либо содержит недостоверную или искажённую информацию о правообладателе, просим связаться с администрацией YUME по адресу:"
+                      : "If you find material on the website that you believe infringes copyright or other lawful interests, or contains inaccurate or misleading information about a rights holder, please contact YUME administration at:"}
+                  </p>
+                  <a
+                    href="mailto:yumesupport833@gmail.com"
+                    className="mt-3 inline-flex max-w-full items-center gap-2 rounded-xl bg-secondary/70 px-3 py-2.5 text-sm font-semibold text-primary underline-offset-4 transition hover:bg-secondary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  >
+                    <Mail className="h-5 w-5 shrink-0" aria-hidden="true" />
+                    <span className="break-all">yumesupport833@gmail.com</span>
+                  </a>
+                </section>
+
+                <section className="rounded-2xl border border-border bg-card/60 p-4 sm:p-5">
+                  <h3 className="text-sm font-semibold text-foreground">
+                    {language === "ru" ? "Что указать в обращении" : "What to include in your request"}
+                  </h3>
+                  <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm leading-relaxed text-muted-foreground">
+                    <li>{language === "ru" ? "Контактные данные заявителя и реквизиты организации, если обращение направляется от имени организации." : "The applicant’s contact details and organization details, if the request is submitted on behalf of an organization."}</li>
+                    <li>{language === "ru" ? "Прямую ссылку на страницу или материал, в отношении которого подаётся обращение." : "A direct link to the page or material concerned."}</li>
+                    <li>{language === "ru" ? "Сведения о произведении и описание предполагаемого нарушения." : "Information about the work and a description of the alleged infringement."}</li>
+                    <li>{language === "ru" ? "Документы или иные сведения, подтверждающие права заявителя на соответствующий материал и полномочия действовать от имени правообладателя, если это применимо." : "Documents or other information confirming the applicant’s rights to the material and authority to act on behalf of the rights holder, where applicable."}</li>
+                  </ol>
+                </section>
+
+                <section className="rounded-2xl border border-border bg-card/60 p-4 sm:p-5">
+                  <p className="text-sm leading-relaxed text-muted-foreground">
+                    {language === "ru"
+                      ? "Администрация YUME рассматривает обращения правообладателей и их уполномоченных представителей и принимает предусмотренные законодательством меры в установленные законом сроки. Для проверки обращения администрация вправе запросить дополнительные сведения и документы. Порядок рассмотрения официальных заявлений определяется применимым законодательством."
+                      : "YUME administration reviews requests from rights holders and their authorized representatives and takes measures provided by law within the applicable legal time limits. Additional information and documents may be requested to review a request. Official claims are handled in accordance with applicable law."}
+                  </p>
+                </section>
+
+                <section className="rounded-2xl border border-border bg-card/60 p-4 sm:p-5">
+                  <p className="text-sm leading-relaxed text-muted-foreground">
+                    {language === "ru"
+                      ? "Для предложений о сотрудничестве, лицензировании и других официальных обращений правообладателей используйте тот же контакт с пометкой «Сотрудничество»."
+                      : "For cooperation, licensing and other official rights-holder inquiries, use the same contact and include “Cooperation” in the subject line."}
+                  </p>
+                </section>
+
+                <section className="rounded-2xl border border-border bg-card/60 p-4 sm:p-5">
+                  <p className="text-sm leading-relaxed text-muted-foreground">
+                    {language === "ru"
+                      ? "YUME не взимает плату за просмотр материалов на сайте."
+                      : "YUME does not charge users to view materials on the website."}
+                  </p>
+                </section>
+              </article>
+            ) : (panel === "privacy" || panel === "rules") && (
               <article className="max-w-3xl rounded-2xl border border-border bg-card/60 p-5 sm:p-7">
-                <p className="text-sm leading-relaxed text-muted-foreground">{t(panel === "privacy" ? "profile.privacyPlaceholder" : panel === "rules" ? "profile.rulesPlaceholder" : "profile.rightsPlaceholder")}</p>
+                <p className="text-sm leading-relaxed text-muted-foreground">{t(panel === "privacy" ? "profile.privacyPlaceholder" : "profile.rulesPlaceholder")}</p>
                 <p className="mt-4 rounded-xl bg-secondary/60 p-3 text-xs leading-relaxed text-muted-foreground">
                   {t("profile.documentComing")}
                 </p>
