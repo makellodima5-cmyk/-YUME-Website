@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   Bookmark,
   ChevronRight,
+  ChevronDown,
   Copyright,
   FileText,
   Heart,
@@ -28,6 +29,7 @@ import { displayAnimeTitle, useYumePreferences } from "@/data/preferences";
 import { PosterArt } from "./Poster";
 import { getTelegramWebApp } from "@/lib/telegram-mini-app";
 import { Grid } from "./Sections";
+import { SITE_RULES, SITE_RULES_LAST_UPDATED } from "@/data/site-rules";
 import {
   FAVORITES_STORAGE_KEY,
   PROFILE_UPDATED_EVENT,
@@ -792,15 +794,62 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
                   </p>
                 </section>
               </article>
-            ) : (panel === "privacy" || panel === "rules") && (
+            ) : panel === "rules" ? (
+              <article className="max-w-3xl space-y-3">
+                <p className="text-sm leading-relaxed text-muted-foreground">
+                  {language === "ru"
+                    ? `Настоящие Правила использования сайта YUME. Дата последнего обновления: ${SITE_RULES_LAST_UPDATED}.`
+                    : `YUME website terms of use. Last updated: ${SITE_RULES_LAST_UPDATED}.`}
+                </p>
+                <div className="space-y-3">
+                  {SITE_RULES.map((section, index) => (
+                    <details
+                      key={section.title}
+                      className="group overflow-hidden rounded-2xl border border-primary/25 bg-card/55 shadow-sm transition-colors open:border-primary/55 open:bg-card/75"
+                    >
+                      <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-4 text-left marker:hidden transition-colors hover:bg-primary/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary sm:px-5 [&::-webkit-details-marker]:hidden">
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-primary/10 text-sm font-bold text-primary">
+                          {index + 1}
+                        </span>
+                        <span className="min-w-0 flex-1 text-sm font-semibold leading-snug text-foreground sm:text-base">
+                          {section.title}
+                        </span>
+                        <ChevronDown className="h-4 w-4 shrink-0 text-primary transition-transform duration-200 group-open:rotate-180" aria-hidden="true" />
+                      </summary>
+                      <div className="border-t border-border/70 px-4 pb-5 pt-4 sm:px-5 sm:pb-6">
+                        <ol className="space-y-4">
+                          {section.clauses.map((clause) => {
+                            const match = clause.match(/^(\d+\.\d+\.)\s*(.*)$/s);
+                            return (
+                              <li key={clause} className="text-sm leading-7 text-foreground/85 sm:text-[15px]">
+                                {match ? (
+                                  <>
+                                    <span className="mr-1 font-semibold text-foreground">{match[1]}</span>
+                                    <span>{match[2]}</span>
+                                  </>
+                                ) : clause}
+                              </li>
+                            );
+                          })}
+                        </ol>
+                      </div>
+                    </details>
+                  ))}
+                </div>
+                <p className="pt-2 text-xs leading-relaxed text-muted-foreground">
+                  {language === "ru"
+                    ? "По вопросам, связанным с использованием Сайта, можно обратиться по адресу yumesupport833@gmail.com."
+                    : "For questions about using the Site, contact yumesupport833@gmail.com."}
+                </p>
+              </article>
+            ) : panel === "privacy" ? (
               <article className="max-w-3xl rounded-2xl border border-border bg-card/60 p-5 sm:p-7">
-                <p className="text-sm leading-relaxed text-muted-foreground">{t(panel === "privacy" ? "profile.privacyPlaceholder" : "profile.rulesPlaceholder")}</p>
+                <p className="text-sm leading-relaxed text-muted-foreground">{t("profile.privacyPlaceholder")}</p>
                 <p className="mt-4 rounded-xl bg-secondary/60 p-3 text-xs leading-relaxed text-muted-foreground">
                   {t("profile.documentComing")}
                 </p>
-
               </article>
-            )}
+            ) : null}
 
             {panel === "about" && (
               <article className="max-w-3xl rounded-2xl border border-border bg-card/60 p-5 sm:p-7">
