@@ -139,19 +139,6 @@ export function AuthPage({ mode, language, onModeChange, onPrivacy, onRules, onC
               : (isRu ? "Войди через Telegram, чтобы получить доступ к своему профилю и сохранённым данным." : "Sign in through Telegram to access your profile and saved data.")}
           </p>
 
-          {isRegister && (
-            <div className="mt-6 rounded-2xl border border-border bg-background/50 p-3.5">
-              <label className="flex cursor-pointer items-start gap-3 text-sm leading-relaxed">
-                <input type="checkbox" checked={consentAccepted} onChange={(event) => setConsentAccepted(event.target.checked)} className="mt-1 h-4 w-4 accent-primary" />
-                <span>{isRu ? "Я принимаю Политику конфиденциальности и Пользовательское соглашение." : "I accept the Privacy Policy and User Agreement."}</span>
-              </label>
-              <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 pl-7 text-xs">
-                <button type="button" onClick={onPrivacy} className="font-semibold text-primary underline underline-offset-4">{isRu ? "Политика конфиденциальности" : "Privacy Policy"}</button>
-                <button type="button" onClick={onRules} className="font-semibold text-primary underline underline-offset-4">{isRu ? "Пользовательское соглашение" : "User Agreement"}</button>
-              </div>
-            </div>
-          )}
-
           {message && (
             <div className="mt-4 rounded-xl border border-primary/20 bg-primary/5 p-3 text-sm leading-relaxed text-foreground" role="status" aria-live="polite">
               <div className="flex items-start gap-2"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-primary" /><span>{message}</span></div>
@@ -189,6 +176,23 @@ export function AuthPage({ mode, language, onModeChange, onPrivacy, onRules, onC
             </button>
           )}
 
+          {isRegister && (
+            <div className="mt-5 rounded-2xl border border-border bg-background/50 p-3.5">
+              <label className="flex cursor-pointer items-start gap-3 text-sm leading-relaxed">
+                <input type="checkbox" checked={consentAccepted} onChange={(event) => setConsentAccepted(event.target.checked)} className="mt-1 h-4 w-4 accent-primary" />
+                <span>
+                  {isRu ? "Я соглашусь с " : "I agree to the "}
+                  <button type="button" onClick={onPrivacy} className="inline font-semibold text-primary underline underline-offset-4">
+                    {isRu ? "политикой в отношении обработки персональных данных" : "Personal Data Processing Policy"}
+                  </button>
+                </span>
+              </label>
+              <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 pl-7 text-xs">
+                <button type="button" onClick={onRules} className="font-semibold text-primary underline underline-offset-4">{isRu ? "Пользовательское соглашение" : "User Agreement"}</button>
+              </div>
+            </div>
+          )}
+
           <p className="mt-4 text-center text-xs leading-relaxed text-muted-foreground">
             <ShieldCheck className="mr-1 inline h-3.5 w-3.5" />
             {isRu ? "Авторизация подтверждается сервером Telegram. Мы не просим пароль от Telegram." : "Telegram authentication is verified server-side. We never ask for your Telegram password."}
@@ -200,7 +204,7 @@ export function AuthPage({ mode, language, onModeChange, onPrivacy, onRules, onC
             </button>
           </div>
           <button type="button" onClick={onPrivacy} className="mt-4 flex w-full justify-center text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground">
-            {isRu ? "Правовая информация" : "Legal information"}
+            {isRu ? "Политика конфиденциальности" : "Privacy Policy"}
           </button>
         </section>
       </div>
