@@ -12,7 +12,7 @@ type Props = {
   onComplete: () => void;
 };
 
-type BrowserStart = { requestId?: string; botUrl?: string; error?: string };
+type BrowserStart = { requestId?: string; botUrl?: string; confirmationCode?: string; error?: string };
 type PollResult = { status?: string; error?: string };
 
 export function AuthPage({ mode, language, onModeChange, onPrivacy, onRules, onComplete }: Props) {
@@ -21,6 +21,7 @@ export function AuthPage({ mode, language, onModeChange, onPrivacy, onRules, onC
   const [busy, setBusy] = useState(false);
   const [botUrl, setBotUrl] = useState("");
   const [requestId, setRequestId] = useState("");
+  const [confirmationCode, setConfirmationCode] = useState("");
   const [pollingEnabled, setPollingEnabled] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -81,6 +82,7 @@ export function AuthPage({ mode, language, onModeChange, onPrivacy, onRules, onC
     setBusy(true);
     setBotUrl("");
     setRequestId("");
+    setConfirmationCode("");
     setPollingEnabled(false);
     try {
       const webApp = getTelegramWebApp();
@@ -120,16 +122,17 @@ export function AuthPage({ mode, language, onModeChange, onPrivacy, onRules, onC
         body: JSON.stringify({ flow: mode, privacyConsent: isRegister && consentAccepted }),
       });
       const result = await response.json().catch(() => ({})) as BrowserStart;
-      if (!response.ok || !result.requestId || !result.botUrl) {
+      if (!response.ok || !result.requestId || !result.botUrl || !result.confirmationCode) {
         throw new Error(result.error === "telegram_bot_unavailable"
           ? (isRu ? "Авторизация Telegram временно недоступна." : "Telegram sign-in is temporarily unavailable.")
           : (isRu ? "Не удалось подготовить авторизацию. Попробуй ещё раз." : "Could not start authentication. Try again."));
       }
       setRequestId(result.requestId);
+      setConfirmationCode(result.confirmationCode);
       setBotUrl(result.botUrl);
       setMessage(isRu
-        ? "Открой бота YUME в Telegram и нажми Start. После подтверждения эта страница войдёт автоматически."
-        : "Open the YUME bot in Telegram and press Start. This page will sign you in automatically after confirmation.");
+        ? "Открой бота YUME и нажми Start. Затем отправь боту код, показанный ниже. Вход завершится только после подтверждения кода."
+        : "Open the YUME bot and press Start. Then send the bot the code shown below. Sign-in completes only after the code is confirmed.");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : (isRu ? "Ошибка авторизации." : "Authentication error."));
     } finally {
@@ -172,6 +175,14 @@ export function AuthPage({ mode, language, onModeChange, onPrivacy, onRules, onC
           )}
           {error && <p className="mt-4 rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-sm leading-relaxed text-foreground" role="alert">{error}</p>}
 
+          {botUrl && confirmationCode && (
+            <div className="mt-4 rounded-2xl border border-border bg-background/70 p-4 text-center">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{isRu ? "Код подтверждения" : "Confirmation code"}</p>
+              <code className="mt-2 block select-all font-mono text-2xl font-bold tracking-[0.18em] text-foreground">{confirmationCode}</code>
+              <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{isRu ? "Код действует 10 минут и подходит только для этого запроса." : "This code expires in 10 minutes and is valid only for this request."}</p>
+            </div>
+          )}
+
           {botUrl ? (
             <a
               href={botUrl}
@@ -200,7 +211,7 @@ export function AuthPage({ mode, language, onModeChange, onPrivacy, onRules, onC
           </p>
           <div className="mt-6 border-t border-border pt-5 text-center text-sm text-muted-foreground">
             {isRegister ? (isRu ? "Уже есть аккаунт? " : "Already registered? ") : (isRu ? "Нет аккаунта? " : "Don't have an account? ")}
-            <button type="button" onClick={() => { setError(""); setMessage(""); setBotUrl(""); setRequestId(""); setPollingEnabled(false); onModeChange(isRegister ? "login" : "register"); }} className="font-semibold text-primary hover:text-neon">
+            <button type="button" onClick={() => { setError(""); setMessage(""); setBotUrl(""); setRequestId(""); setConfirmationCode(""); setPollingEnabled(false); onModeChange(isRegister ? "login" : "register"); }} className="font-semibold text-primary hover:text-neon">
               {isRegister ? (isRu ? "Войти" : "Sign in") : (isRu ? "Зарегистрироваться" : "Create an account")}
             </button>
           </div>
