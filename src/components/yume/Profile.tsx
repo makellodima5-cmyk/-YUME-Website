@@ -10,6 +10,9 @@ import {
   LifeBuoy,
   ShieldCheck,
   UserRound,
+  UsersRound,
+  Headset,
+  Send,
 } from "lucide-react";
 import type { Anime } from "@/data/anime";
 import { getShikimoriAnimes } from "@/data/shikimori";
@@ -475,13 +478,79 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
             )}
 
             {panel === "support" && (
-              <div className="rounded-2xl border border-dashed border-border bg-card/40 p-6 sm:p-8">
-                <LifeBuoy className="h-7 w-7 text-primary" />
-                <h2 className="mt-3 text-lg font-semibold">{t("profile.supportComing")}</h2>
-                <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-                  {t("profile.supportText")}
+              <section className="mx-auto max-w-4xl text-white" aria-labelledby="support-title">
+                <h2 id="support-title" className="text-3xl font-bold tracking-tight sm:text-4xl">
+                  {language === "ru" ? "Поддержка" : "Support"}
+                </h2>
+                <p className="mt-3 max-w-2xl text-sm leading-relaxed text-[#9CA3AF] sm:text-base">
+                  {language === "ru"
+                    ? "Мы всегда на связи и готовы помочь. Выберите подходящий способ связи в зависимости от вашего вопроса."
+                    : "We’re here to help. Choose the right way to contact us depending on your question."}
                 </p>
-              </div>
+
+                <div className="mt-6 space-y-4 sm:mt-7 sm:space-y-5">
+                  <article className="rounded-[22px] border border-[#33264B] bg-gradient-to-br from-[#0D0A14] to-[#08080D] p-4 shadow-[0_8px_24px_rgba(0,0,0,0.16)] sm:p-5">
+                    <div className="flex items-start gap-3 sm:gap-4">
+                      <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[20px] bg-[#281747] text-[#C69BFF] sm:h-[72px] sm:w-[72px]">
+                        <UsersRound className="h-8 w-8 sm:h-9 sm:w-9" aria-hidden="true" />
+                      </div>
+                      <div className="min-w-0 flex-1 pt-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <h3 className="text-lg font-semibold sm:text-xl">{language === "ru" ? "Общая группа" : "Community group"}</h3>
+                          <ChevronRight className="h-5 w-5 shrink-0 text-[#C69BFF]" aria-hidden="true" />
+                        </div>
+                        <p className="mt-1 text-sm leading-relaxed text-[#9CA3AF] sm:text-base">
+                          {language === "ru" ? "Предложения, вопросы по аниме и общение с сообществом." : "Suggestions, anime questions, and community discussions."}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-4 flex flex-wrap gap-2 text-xs sm:text-sm">
+                      {(language === "ru" ? ["Предложения", "Вопросы по аниме", "Обсуждение"] : ["Suggestions", "Anime questions", "Discussion"]).map((label) => (
+                        <span key={label} className="rounded-full bg-[#21152F] px-3 py-1.5 font-medium text-[#C69BFF]">{label}</span>
+                      ))}
+                    </div>
+                    <a href="/api/support/group" target="_blank" rel="noopener noreferrer" className="mt-4 flex min-h-12 w-full items-center justify-between gap-3 rounded-[16px] bg-gradient-to-r from-[#7829F5] to-[#5015C9] px-4 py-3 text-sm font-semibold text-white shadow-[0_5px_18px_rgba(103,35,222,0.18)] transition hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#B78AFF] sm:min-h-[56px] sm:px-5 sm:text-base">
+                      <span className="flex min-w-0 items-center gap-3"><Send className="h-5 w-5 shrink-0" aria-hidden="true" /><span>{language === "ru" ? "Перейти в группу" : "Join the group"}</span></span>
+                      <ChevronRight className="h-5 w-5 shrink-0" aria-hidden="true" />
+                    </a>
+                  </article>
+
+                  <article className="rounded-[22px] border border-[#153653] bg-gradient-to-br from-[#071019] to-[#080B10] p-4 shadow-[0_8px_24px_rgba(0,0,0,0.16)] sm:p-5">
+                    <div className="flex items-start gap-3 sm:gap-4">
+                      <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[20px] bg-[#102E4D] text-[#7FB5FF] sm:h-[72px] sm:w-[72px]">
+                        <Headset className="h-8 w-8 sm:h-9 sm:w-9" aria-hidden="true" />
+                      </div>
+                      <div className="min-w-0 flex-1 pt-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <h3 className="text-lg font-semibold sm:text-xl">{language === "ru" ? "Личная поддержка" : "Personal support"}</h3>
+                          <ChevronRight className="h-5 w-5 shrink-0 text-[#8AB9FF]" aria-hidden="true" />
+                        </div>
+                        <p className="mt-1 text-sm leading-relaxed text-[#9CA3AF] sm:text-base">
+                          {language === "ru" ? "Технические проблемы и вопросы по работе приложения." : "Technical issues and questions about how the app works."}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-4 flex flex-wrap gap-2 text-xs sm:text-sm">
+                      {(language === "ru" ? ["Ошибки и баги", "Проблемы с аккаунтом", "Не работает"] : ["Bugs and errors", "Account issues", "Feature not working"]).map((label) => (
+                        <span key={label} className="rounded-full bg-[#101D2B] px-3 py-1.5 font-medium text-[#8AB9FF]">{label}</span>
+                      ))}
+                    </div>
+                    <a href="/api/support/personal" target="_blank" rel="noopener noreferrer" className="mt-4 flex min-h-12 w-full items-center justify-between gap-3 rounded-[16px] bg-gradient-to-r from-[#079FEA] to-[#075BC5] px-4 py-3 text-sm font-semibold text-white shadow-[0_5px_18px_rgba(0,115,224,0.16)] transition hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7FB5FF] sm:min-h-[56px] sm:px-5 sm:text-base">
+                      <span className="flex min-w-0 items-center gap-3"><Send className="h-5 w-5 shrink-0" aria-hidden="true" /><span>{language === "ru" ? "Написать в поддержку" : "Contact support"}</span></span>
+                      <ChevronRight className="h-5 w-5 shrink-0" aria-hidden="true" />
+                    </a>
+                  </article>
+
+                  <aside className="flex items-start gap-3 rounded-[20px] border border-[#1D2928] bg-[#080D0D] px-4 py-3.5 sm:px-5 sm:py-4">
+                    <ShieldCheck className="mt-0.5 h-7 w-7 shrink-0 text-[#35D7A0]" aria-hidden="true" />
+                    <p className="text-xs leading-relaxed text-[#9CA3AF] sm:text-sm">
+                      {language === "ru"
+                        ? "Не отправляйте в общую группу личные данные (пароли, коды и платёжные реквизиты). Для таких вопросов используйте личную поддержку."
+                        : "Do not share personal data (passwords, codes, or payment details) in the group. Contact personal support for private matters."}
+                    </p>
+                  </aside>
+                </div>
+              </section>
             )}
           </>
         )}
