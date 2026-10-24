@@ -10,7 +10,7 @@ import type { CapacitorConfig } from "@capacitor/cli";
 const config: CapacitorConfig = {
   appId: "app.yume.mobile",
   appName: "YUME",
-  webDir: "dist",
+  webDir: "dist/client",
   bundledWebRuntime: false,
   android: {
     allowMixedContent: false,
