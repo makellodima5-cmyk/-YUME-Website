@@ -160,7 +160,7 @@ export function toggleSavedAnimeId(key: string, animeId: string): boolean {
         window.dispatchEvent(new Event(PROFILE_SYNC_ERROR_EVENT));
       });
   }
-  if (!localStorageWritten && !canSyncToAccount) return alreadySaved;
+  if (!localStorageWritten) return alreadySaved;
   return !alreadySaved;
 }
 
