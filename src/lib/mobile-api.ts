@@ -1,5 +1,3 @@
-declare const __YUME_ANDROID_BUILD__: boolean;
-
 const DEFAULT_API_BASE_URL = "https://yume-website.yumesupport833.workers.dev";
 
 type CapacitorWindow = Window & {
