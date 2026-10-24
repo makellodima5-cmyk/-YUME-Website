@@ -492,6 +492,13 @@ function Index() {
   }, [isTelegramMiniApp, language]);
 
   useEffect(() => {
+    if (isNativeYumeApp()) {
+      // Admin tools remain exclusive to the Telegram Mini App.
+      setIsAdmin(false);
+      setAdminStats(null);
+      setAdminCheckComplete(true);
+      return;
+    }
     if (!isTelegramMiniApp || !telegramAuthReady || telegramConsentRequired || telegramConsentPending) return;
     let cancelled = false;
     setAdminCheckComplete(false);
