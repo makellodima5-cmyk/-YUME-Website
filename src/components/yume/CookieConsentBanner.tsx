@@ -73,17 +73,14 @@ export function CookieConsentBanner({ isHome }: { isHome: boolean }) {
       className="fixed inset-x-3 bottom-3 z-[90] mx-auto flex max-w-5xl flex-col gap-3 rounded-2xl border border-primary/25 bg-background/95 p-4 shadow-2xl backdrop-blur-md sm:inset-x-5 sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:px-6 sm:py-4"
     >
       <p className="max-w-3xl text-center text-sm leading-relaxed text-foreground/90 sm:text-left">
-        {isRu
-          ? "YUME использует необходимые данные хранения для входа и работы основных функций. Необязательная аналитика сохраняет псевдонимные идентификаторы в localStorage этого браузера. Можно разрешить только необходимое или принять всё."
-          : "YUME uses essential storage for sign-in and core features. Optional analytics stores pseudonymous identifiers in this browser's localStorage. You can allow only essential storage or accept all."}
-        {" "}
+        {isRu ? "Продолжая пользоваться сайтом, вы соглашаетесь с " : "By continuing to use this website, you agree to the "}
         <button
           type="button"
           onClick={() => window.open("/?section=privacy-policy", "_blank", "noopener,noreferrer")}
           className="inline cursor-pointer text-primary underline decoration-primary/70 underline-offset-4 transition-colors hover:text-primary/80"
         >
-          {isRu ? "Политика конфиденциальности" : "Privacy Policy"}
-        </button>
+          {isRu ? "политикой в отношении обработки персональных данных и использованием куки" : "the personal data processing policy and use of cookies"}
+        </button>.
       </p>
       <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
         <button
