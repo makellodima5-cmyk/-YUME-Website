@@ -90,12 +90,18 @@ export function AuthPage({ mode, language, onModeChange, onPrivacy, onRules, onC
           credentials: "same-origin",
           cache: "no-store",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ initData: webApp.initData, privacyConsent: isRegister && consentAccepted }),
+          body: JSON.stringify({ initData: webApp.initData, mode, privacyConsent: isRegister && consentAccepted }),
         });
         const result = await response.json().catch(() => ({})) as { authenticated?: boolean; error?: string };
         if (!response.ok || result.authenticated !== true) {
           if (result.error === "consent_required") {
+            throw new Error(isRu ? "Для регистрации нужно принять документы." : "Accept the documents to register.");
+          }
+          if (result.error === "account_not_found") {
             throw new Error(isRu ? "Аккаунт не найден. Переключись на регистрацию." : "No account found. Switch to registration.");
+          }
+          if (result.error === "already_registered") {
+            throw new Error(isRu ? "Этот Telegram уже зарегистрирован. Переключись на вход." : "This Telegram account is already registered. Switch to sign in.");
           }
           if (result.error === "auth_data_expired") {
             throw new Error(isRu ? "Данные Telegram устарели. Закрой и заново открой Mini App." : "Telegram authorization data expired. Reopen the Mini App.");
