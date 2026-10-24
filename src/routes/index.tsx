@@ -18,7 +18,7 @@ import { validateCatalogSearch } from "@/data/catalog-search";
 import homeSocialImage from "@/assets/yume-hero-desktop-new.png.PNG";
 import { absoluteImageUrl, canonicalUrl } from "@/data/seo";
 import { getTelegramWebApp } from "@/lib/telegram-mini-app";
-import { isNativeYumeApp, yumeApiFetch } from "@/lib/mobile-api";
+import { isAndroidBuild, isNativeYumeApp, yumeApiFetch } from "@/lib/mobile-api";
 import { trackYumePage } from "@/lib/yume-analytics";
 import { syncTelegramLibrary } from "@/data/profile-storage";
 import { USER_NOTIFICATIONS } from "@/data/notifications.shared";
@@ -94,7 +94,7 @@ export const Route = createFileRoute("/")({
   loader: async () => {
     // During SPA-shell prerender there is no Capacitor runtime and no Worker D1
     // binding. Emit an empty shell; the native client fetches live data on launch.
-    if (import.meta.env.VITE_YUME_ANDROID_BUILD === "true" && !isNativeYumeApp()) {
+    if (isAndroidBuild() && !isNativeYumeApp()) {
       return {
         anime: [],
         popular: [],
