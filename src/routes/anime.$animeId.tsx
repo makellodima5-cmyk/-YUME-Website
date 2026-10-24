@@ -18,9 +18,12 @@ import { AnimeCard, PosterArt } from "@/components/yume/Poster";
 import { useYumePreferences, displayAnimeTitle, displayAnimeStatus, displayGenre, displayAnimeKind } from "@/data/preferences";
 import {
   FAVORITES_STORAGE_KEY,
+  PROFILE_AUTH_REQUIRED_EVENT,
   PROFILE_SYNC_ERROR_EVENT,
   PROFILE_UPDATED_EVENT,
   readSavedAnimeIds,
+  setProfileStorageAuthenticated,
+  syncTelegramLibrary,
   toggleSavedAnimeId,
   WATCHLIST_STORAGE_KEY,
 } from "@/data/profile-storage";
@@ -87,6 +90,7 @@ function AnimeDetailPage() {
   const [isFavorite, setIsFavorite] = useState(false);
   const [showListNote, setShowListNote] = useState(false);
   const [saveSyncError, setSaveSyncError] = useState(false);
+  const [authRequired, setAuthRequired] = useState(false);
   const [watchMode, setWatchMode] = useState<"trailer" | "episodes">("trailer");
 
   useEffect(() => {
@@ -98,7 +102,37 @@ function AnimeDetailPage() {
     setInList(readSavedAnimeIds(WATCHLIST_STORAGE_KEY).includes(animeId));
     setIsFavorite(readSavedAnimeIds(FAVORITES_STORAGE_KEY).includes(animeId));
     setShowListNote(false);
+    setAuthRequired(false);
     window.scrollTo({ top: 0, behavior: "auto" });
+
+    let cancelled = false;
+    // Direct links to an anime page need to restore account state before enabling saves.
+    fetch("/api/telegram/init-data", { credentials: "same-origin", cache: "no-store" })
+      .then(async (response) => {
+        const result = await response.json().catch(() => ({})) as { authenticated?: boolean; user?: { id?: string } };
+        if (cancelled) return;
+        const authenticated = response.ok && result.authenticated === true && Boolean(result.user?.id);
+        setProfileStorageAuthenticated(authenticated);
+        if (authenticated && result.user?.id) {
+          try {
+            await syncTelegramLibrary(result.user.id);
+          } catch {
+            setProfileStorageAuthenticated(false);
+          }
+        }
+      })
+      .catch(() => { if (!cancelled) setProfileStorageAuthenticated(false); });
+
+    // A visit is only persisted by the server after validating the account cookie.
+    void fetch("/api/telegram/history", {
+      method: "POST",
+      credentials: "same-origin",
+      cache: "no-store",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ animeId }),
+    }).catch(() => undefined);
+
+    return () => { cancelled = true; };
   }, [animeId]);
 
   useEffect(() => {
@@ -110,16 +144,32 @@ function AnimeDetailPage() {
       setSaveSyncError(true);
       setShowListNote(true);
     };
+    const onAuthRequired = () => {
+      setAuthRequired(true);
+      setShowListNote(true);
+    };
     window.addEventListener(PROFILE_UPDATED_EVENT, syncSavedButtons);
     window.addEventListener(PROFILE_SYNC_ERROR_EVENT, onSyncError);
+    window.addEventListener(PROFILE_AUTH_REQUIRED_EVENT, onAuthRequired);
     return () => {
       window.removeEventListener(PROFILE_UPDATED_EVENT, syncSavedButtons);
       window.removeEventListener(PROFILE_SYNC_ERROR_EVENT, onSyncError);
+      window.removeEventListener(PROFILE_AUTH_REQUIRED_EVENT, onAuthRequired);
     };
   }, [animeId]);
 
   const navigateToSection = (view: View) => {
+    if (view === "login" || view === "register") {
+      try { window.sessionStorage.setItem("yume-auth-intent-v1", view); } catch { /* Root may still open auth through its event handler. */ }
+      void navigate({ to: "/", search: { section: "home" } });
+      return;
+    }
     navigate({ to: "/", search: { section: view } });
+  };
+
+  const requestAuth = (mode: "login" | "register" = "login") => {
+    try { window.sessionStorage.setItem("yume-auth-intent-v1", mode); } catch { /* Best effort; root route reads the intent on mount. */ }
+    void navigate({ to: "/", search: { section: "home" } });
   };
 
   const scrollToPlayer = () => {
@@ -317,11 +367,21 @@ function AnimeDetailPage() {
                 </div>
                 {showListNote && (
                   <p className="mt-3 text-xs text-muted-foreground" aria-live="polite">
-                    {saveSyncError
+                    {authRequired
                       ? (language === "ru"
-                        ? "Не удалось синхронизировать список с аккаунтом. Проверь соединение и повтори действие."
-                        : "Could not sync this list to your account. Check your connection and try again.")
-                      : t("anime.savedLocally")}
+                        ? "Избранное и «Смотреть позже» доступны после входа в аккаунт."
+                        : "Favorites and Watch Later are available after signing in.")
+                      : saveSyncError
+                        ? (language === "ru"
+                          ? "Не удалось синхронизировать список с аккаунтом. Проверь соединение и повтори действие."
+                          : "Could not sync this list to your account. Check your connection and try again.")
+                        : (language === "ru" ? "Сохранено в аккаунте YUME." : "Saved to your YUME account.")}
+                    {authRequired && (
+                      <span className="mt-2 flex flex-wrap gap-2">
+                        <button type="button" onClick={() => requestAuth("login")} className="font-semibold text-primary underline underline-offset-4">{language === "ru" ? "Войти через Telegram" : "Sign in with Telegram"}</button>
+                        <button type="button" onClick={() => requestAuth("register")} className="font-semibold text-primary underline underline-offset-4">{language === "ru" ? "Регистрация" : "Register"}</button>
+                      </span>
+                    )}
                   </p>
                 )}
               </div>
