@@ -4,7 +4,7 @@ import { Logo } from "./Logo";
 import { useYumePreferences } from "@/data/preferences";
 import { getTelegramWebApp } from "@/lib/telegram-mini-app";
 
-export type View = "home" | "admin" | "catalog" | "collections" | "profile" | "popular" | "new-releases" | "announcements" | "airing" | "favorites" | "watchlist" | "history" | "privacy" | "privacy-policy" | "rules" | "rights" | "notifications";
+export type View = "home" | "admin" | "catalog" | "collections" | "profile" | "login" | "register" | "popular" | "new-releases" | "announcements" | "airing" | "favorites" | "watchlist" | "history" | "privacy" | "privacy-policy" | "rules" | "rights" | "notifications";
 
 export const NAV: { id: View; label: string; icon: typeof Home }[] = [
   { id: "home", label: "Главная", icon: Home },
