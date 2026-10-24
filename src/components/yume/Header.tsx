@@ -27,9 +27,21 @@ export function Header({ view, setView, onProfile, isAdmin = false, unreadNotifi
   const [telegramPhotoFailed, setTelegramPhotoFailed] = useState(false);
 
   useEffect(() => {
-    const webApp = getTelegramWebApp();
-    const user = webApp?.initData ? webApp.initDataUnsafe?.user : undefined;
-    setTelegramPhotoUrl(user?.photo_url ?? null);
+    let cancelled = false;
+    fetch("/api/telegram/init-data", { credentials: "same-origin", cache: "no-store" })
+      .then(async (response) => {
+        const result = await response.json().catch(() => ({})) as { authenticated?: boolean };
+        if (cancelled) return;
+        if (response.ok && result.authenticated === true) {
+          const webApp = getTelegramWebApp();
+          const user = webApp?.initData ? webApp.initDataUnsafe?.user : undefined;
+          setTelegramPhotoUrl(user?.photo_url ?? null);
+        } else {
+          setTelegramPhotoUrl(null);
+        }
+      })
+      .catch(() => { if (!cancelled) setTelegramPhotoUrl(null); });
+    return () => { cancelled = true; };
   }, []);
   // Keep primary navigation labels directly tied to the active language.
   // This prevents translation-key identifiers from ever appearing in the drawer.
