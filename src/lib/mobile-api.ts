@@ -1,3 +1,5 @@
+declare const __YUME_ANDROID_BUILD__: boolean;
+
 const DEFAULT_API_BASE_URL = "https://yume-website.yumesupport833.workers.dev";
 
 type CapacitorWindow = Window & {
@@ -14,6 +16,11 @@ function normalizeApiBaseUrl(value: string): string {
     throw new Error("YUME API base URL must use HTTPS.");
   }
   return url.toString().replace(/\/+$/, "");
+}
+
+/** True in the dedicated Android build, including its prerender process. */
+export function isAndroidBuild(): boolean {
+  return typeof __YUME_ANDROID_BUILD__ !== "undefined" && __YUME_ANDROID_BUILD__ === true;
 }
 
 /**
