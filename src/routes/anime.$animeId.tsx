@@ -12,6 +12,7 @@ import {
   Star,
 } from "lucide-react";
 import { getShikimoriAnimeDetails } from "@/data/shikimori";
+import { isNativeYumeApp, yumeApiFetch } from "@/lib/mobile-api";
 import { Header, type View } from "@/components/yume/Header";
 import { Footer } from "@/components/yume/Footer";
 import { AnimeCard, PosterArt } from "@/components/yume/Poster";
@@ -46,8 +47,14 @@ function formatAnimeDate(value: string | undefined, language: "ru" | "en", inclu
 
 export const Route = createFileRoute("/anime/$animeId")({
   loader: async ({ params }) => {
-    // Read the current title and a bounded related-title set directly from D1.
-    return getShikimoriAnimeDetails({ data: { animeId: params.animeId } });
+    if (!isNativeYumeApp()) {
+      // The website and Telegram Mini App retain their existing server-function path.
+      return getShikimoriAnimeDetails({ data: { animeId: params.animeId } });
+    }
+    const query = new URLSearchParams({ id: params.animeId });
+    const response = await yumeApiFetch("/api/mobile/anime?" + query.toString());
+    if (!response.ok) throw new Error("Mobile anime details request failed: " + response.status);
+    return await response.json() as Awaited<ReturnType<typeof getShikimoriAnimeDetails>>;
   },
   head: ({ loaderData }) => {
     const anime = loaderData?.anime;
