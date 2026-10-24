@@ -25,7 +25,5 @@ const csrfMiddleware = createCsrfMiddleware({
 });
 
 export const startInstance = createStart(() => ({
-  // The native build emits a client-only shell; preserve the website's SSR.
-  defaultSsr: import.meta.env.VITE_YUME_ANDROID_BUILD === "true" ? false : undefined,
   requestMiddleware: [errorMiddleware, csrfMiddleware],
 }));
