@@ -3,6 +3,7 @@
   "name": "yume-website",
   "compatibility_date": "2026-10-20",
   "compatibility_flags": ["nodejs_compat"],
+  "keep_vars": true,
   "main": ".output/server/index.mjs",
   "triggers": {
     "crons": ["* * * * *"]
