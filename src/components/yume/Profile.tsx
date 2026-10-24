@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import appPackage from "../../../package.json";
 import {
   ArrowLeft,
   Bookmark,
@@ -8,6 +9,7 @@ import {
   Heart,
   Info,
   LifeBuoy,
+  LibraryBig,
   ShieldCheck,
   UserRound,
   UsersRound,
@@ -533,31 +535,74 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
             )}
 
             {panel === "about" && (
-              <div className="max-w-3xl rounded-2xl border border-border bg-card/60 p-5 sm:p-7">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/15 text-primary">
-                    <Info className="h-6 w-6" />
+              <article className="max-w-3xl rounded-2xl border border-border bg-card/60 p-5 sm:p-7">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-primary">
+                    About the project
+                  </p>
+                  <h2 className="mt-2 text-3xl font-bold tracking-tight text-foreground">
+                    {language === "ru" ? "О YUME" : "About YUME"}
+                  </h2>
+                  <p className="mt-3 text-base leading-relaxed text-muted-foreground sm:text-lg">
+                    {language === "ru"
+                      ? "Аниме-каталог и личное пространство в одном месте."
+                      : "An anime catalog and personal space in one place."}
+                  </p>
+                </div>
+
+                <div className="my-6 h-px w-full bg-border" />
+
+                <section>
+                  <h3 className="text-lg font-semibold text-foreground">
+                    {language === "ru" ? "Наша идея" : "Our idea"}
+                  </h3>
+                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground sm:text-base">
+                    {language === "ru"
+                      ? "Сделать знакомство с аниме удобнее, а личный опыт просмотра — более индивидуальным."
+                      : "Making anime discovery easier and your viewing experience more personal."}
+                  </p>
+                </section>
+
+                <div className="mt-5 grid grid-cols-2 gap-3">
+                  <div className="flex min-h-[132px] flex-col items-start rounded-2xl bg-secondary/70 p-4 sm:p-5">
+                    <LibraryBig className="h-6 w-6 text-primary" aria-hidden="true" />
+                    <h3 className="mt-4 text-base font-semibold text-foreground sm:text-lg">
+                      {language === "ru" ? "Каталог" : "Catalog"}
+                    </h3>
+                    <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                      {language === "ru" ? "Информация об аниме" : "Anime information"}
+                    </p>
                   </div>
-                  <div>
-                    <h2 className="font-semibold">{t("profile.aboutHeading")}</h2>
-                    <p className="mt-1 text-sm text-muted-foreground">{t("profile.aboutText")}</p>
+                  <div className="flex min-h-[132px] flex-col items-start rounded-2xl bg-secondary/70 p-4 sm:p-5">
+                    <UserRound className="h-6 w-6 text-primary" aria-hidden="true" />
+                    <h3 className="mt-4 text-base font-semibold text-foreground sm:text-lg">
+                      {language === "ru" ? "Профиль" : "Profile"}
+                    </h3>
+                    <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                      {language === "ru" ? "Личное пространство" : "Personal space"}
+                    </p>
                   </div>
                 </div>
-                <div className="mt-5 divide-y divide-border">
-                  <div className="flex items-center justify-between gap-3 py-3 text-sm">
-                    <span className="text-muted-foreground">{t("profile.version")}</span>
-                    <span className="font-medium">{t("profile.testBuild")}</span>
+
+                <dl className="mt-6 space-y-3 text-sm sm:text-base">
+                  <div className="flex items-center justify-between gap-4">
+                    <dt className="text-muted-foreground">{t("profile.animeSource")}</dt>
+                    <dd className="text-right font-medium text-foreground">Shikimori</dd>
                   </div>
-                  <div className="flex items-center justify-between gap-3 py-3 text-sm">
-                    <span className="text-muted-foreground">{t("profile.animeSource")}</span>
-                    <span className="font-medium">Shikimori</span>
+                  <div className="flex items-center justify-between gap-4">
+                    <dt className="text-muted-foreground">{t("profile.projectState")}</dt>
+                    <dd>
+                      <span className="inline-flex rounded-full bg-primary/15 px-3 py-1 text-xs font-semibold text-primary sm:text-sm">
+                        {language === "ru" ? "В разработке" : "BETA"}
+                      </span>
+                    </dd>
                   </div>
-                  <div className="flex items-center justify-between gap-3 py-3 text-sm">
-                    <span className="text-muted-foreground">{t("profile.projectState")}</span>
-                    <span className="font-medium">{t("profile.inDevelopment")}</span>
+                  <div className="flex items-center justify-between gap-4">
+                    <dt className="text-muted-foreground">{t("profile.version")}</dt>
+                    <dd className="font-medium tabular-nums text-foreground">{appPackage.version}</dd>
                   </div>
-                </div>
-              </div>
+                </dl>
+              </article>
             )}
 
             {panel === "support" && (
