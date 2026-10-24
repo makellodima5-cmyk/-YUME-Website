@@ -1274,6 +1274,7 @@ function Index() {
           language={language}
           onModeChange={(mode) => setView(mode)}
           onPrivacy={() => { window.open("/?section=privacy-policy", "_blank", "noopener,noreferrer"); }}
+          onRules={() => { window.open("/?section=rules", "_blank", "noopener,noreferrer"); }}
           onComplete={handleAuthComplete}
         />
       ) : searching ? (
