@@ -102,6 +102,7 @@ function visit(
       Origin: "https://yume.test",
       "CF-Connecting-IP": "203.0.113.20",
       "User-Agent": userAgent,
+      Cookie: "yume-analytics-consent=all",
     },
     body: JSON.stringify({ path, sessionId, visitorId }),
   });
@@ -126,6 +127,26 @@ describe("YUME server analytics", () => {
     });
     const response = await handleYumeAnalytics(request);
     expect(response.status).toBe(403);
+    expect(db.rows).toHaveLength(0);
+  });
+
+  it("does not store analytics events without the server-readable opt-in cookie", async () => {
+    const request = new Request("https://yume.test/api/analytics", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Origin: "https://yume.test",
+        "User-Agent": "YUME Analytics Test Browser",
+      },
+      body: JSON.stringify({
+        path: "/#home",
+        sessionId: "00000000-0000-4000-8000-000000000001",
+        visitorId: "00000000-0000-4000-8000-000000000099",
+      }),
+    });
+    const response = await handleYumeAnalytics(request);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ ok: true, ignored: true, reason: "analytics_consent_required" });
     expect(db.rows).toHaveLength(0);
   });
 
