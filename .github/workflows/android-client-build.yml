@@ -1,0 +1,33 @@
+name: Android client build
+
+on:
+  push:
+    branches:
+      - feat/android-app
+  pull_request:
+    branches:
+      - feat/android-app
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Install locked dependencies
+        run: bun install --frozen-lockfile
+      - name: Run tests
+        run: bun run test
+      - name: Run lint
+        run: bun run lint
+      - name: Build existing Cloudflare app
+        run: bun run build
+      - name: Build bundled Android web client
+        run: bun run build:android:web
