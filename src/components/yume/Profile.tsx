@@ -450,28 +450,13 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
     <main id="main-content" className={`px-4 pb-12 md:px-10 md:pb-16 ${panel === "support" ? "pt-20 md:pt-24" : "pt-28 md:pt-28"}`}>
       <div className="mx-auto max-w-6xl">
         {!authChecked && (panel === "overview" || panel === "favorites" || panel === "watchlist") ? (
-          <section className="mx-auto max-w-xl rounded-3xl border border-border bg-card/80 p-6 text-center shadow-xl sm:p-8" aria-live="polite">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-              <ShieldCheck className="h-7 w-7" />
+          <section className="mx-auto max-w-xl rounded-3xl border border-border bg-card/60 p-6 text-center sm:p-8" aria-live="polite" aria-busy="true">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+              <LoaderCircle className="h-6 w-6 animate-spin" aria-hidden="true" />
             </div>
-            <h1 className="mt-4 text-2xl font-bold">{language === "ru" ? "Профиль доступен после входа" : "Sign in to access your profile"}</h1>
-            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-              {language === "ru"
-                ? "Избранное, «Смотреть позже» и история просмотров сохраняются в аккаунте Telegram. Каталог доступен без регистрации."
-                : "Favorites, Watch Later, and viewing history are saved to your Telegram account. You can browse the catalog without signing in."}
+            <p className="mt-4 text-sm text-muted-foreground">
+              {language === "ru" ? "Проверяем авторизацию…" : "Checking your session…"}
             </p>
-            <div className="mt-5 flex flex-col justify-center gap-2 sm:flex-row">
-              <button type="button" onClick={() => requestAuth("login")} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90">
-                <LogIn className="h-4 w-4" /> {language === "ru" ? "Войти через Telegram" : "Sign in with Telegram"}
-              </button>
-              <button type="button" onClick={() => requestAuth("register")} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-border px-5 py-2.5 text-sm font-semibold hover:bg-accent">
-                <UserPlus className="h-4 w-4" /> {language === "ru" ? "Регистрация" : "Register"}
-              </button>
-            </div>
-            <div className="mt-5 flex flex-wrap justify-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
-              <button type="button" onClick={() => navigatePanel("documents")} className="underline underline-offset-4 hover:text-foreground">{language === "ru" ? "Правовая информация" : "Legal information"}</button>
-              <button type="button" onClick={() => window.dispatchEvent(new Event("yume-open-cookie-settings"))} className="underline underline-offset-4 hover:text-foreground">{language === "ru" ? "Настройки cookies" : "Cookie settings"}</button>
-            </div>
           </section>
         ) : authChecked && !isAuthenticated && (panel === "overview" || panel === "favorites" || panel === "watchlist") ? (
           <section className="mx-auto max-w-xl rounded-3xl border border-border bg-card/80 p-6 text-center shadow-xl sm:p-8">
