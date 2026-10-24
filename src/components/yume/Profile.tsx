@@ -474,8 +474,7 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
               <button type="button" onClick={() => requestAuth("register")} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-border px-5 py-2.5 text-sm font-semibold hover:bg-accent"><UserPlus className="h-4 w-4" />{language === "ru" ? "Зарегистрироваться" : "Register"}</button>
             </div>
             <div className="mt-5 flex flex-wrap justify-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
-              <button type="button" onClick={() => navigatePanel("documents")} className="underline underline-offset-4 hover:text-foreground">{language === "ru" ? "Правовая информация" : "Legal information"}</button>
-              <button type="button" onClick={() => window.dispatchEvent(new Event("yume-open-cookie-settings"))} className="underline underline-offset-4 hover:text-foreground">{language === "ru" ? "Настройки cookies" : "Cookie settings"}</button>
+              <button type="button" onClick={() => navigatePanel("privacy")} className="underline underline-offset-4 hover:text-foreground">{language === "ru" ? "Политика конфиденциальности" : "Privacy Policy"}</button>
             </div>
           </section>
         ) : panel === "overview" ? (
