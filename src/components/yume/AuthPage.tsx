@@ -1,0 +1,207 @@
+import { useEffect, useState } from "react";
+import { CheckCircle2, LoaderCircle, ShieldCheck, Send } from "lucide-react";
+import { getTelegramWebApp } from "@/lib/telegram-mini-app";
+
+type AuthMode = "login" | "register";
+type Props = {
+  mode: AuthMode;
+  language: "ru" | "en";
+  onModeChange: (mode: AuthMode) => void;
+  onPrivacy: () => void;
+  onComplete: () => void;
+};
+
+type BrowserStart = { requestId?: string; botUrl?: string; error?: string };
+type PollResult = { status?: string; error?: string };
+
+export function AuthPage({ mode, language, onModeChange, onPrivacy, onComplete }: Props) {
+  const isRu = language === "ru";
+  const [consentAccepted, setConsentAccepted] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [botUrl, setBotUrl] = useState("");
+  const [requestId, setRequestId] = useState("");
+  const [pollingEnabled, setPollingEnabled] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  const isRegister = mode === "register";
+
+  useEffect(() => {
+    if (!pollingEnabled || !requestId) return;
+    let cancelled = false;
+    const startedAt = Date.now();
+    const poll = async () => {
+      if (cancelled) return;
+      if (Date.now() - startedAt > 10 * 60 * 1000) {
+        setPollingEnabled(false);
+        setError(isRu ? "Ссылка истекла. Начни вход заново." : "The link expired. Start sign-in again.");
+        return;
+      }
+      try {
+        const response = await fetch("/api/telegram/browser-auth?id=" + encodeURIComponent(requestId), {
+          credentials: "same-origin",
+          cache: "no-store",
+        });
+        const result = await response.json().catch(() => ({})) as PollResult;
+        if (cancelled) return;
+        if (response.ok && result.status === "authenticated") {
+          setPollingEnabled(false);
+          setMessage(isRu ? "Вход выполнен." : "You are signed in.");
+          onComplete();
+        } else if (result.status === "error" || result.status === "expired") {
+          setPollingEnabled(false);
+          const errors: Record<string, [string, string]> = {
+            account_not_found: ["Аккаунт не найден. Переключись на регистрацию.", "No account found. Switch to registration."],
+            already_registered: ["Этот Telegram уже зарегистрирован. Переключись на вход.", "This Telegram account is already registered. Switch to sign in."],
+            consent_required: ["Для регистрации нужно принять Политику конфиденциальности.", "Accept the Privacy Policy to register."],
+          };
+          const pair = errors[result.error ?? (result.status === "expired" ? "expired" : "")];
+          setError(pair ? (isRu ? pair[0] : pair[1]) : (isRu ? "Ссылка истекла или не удалось завершить вход." : "The link expired or sign-in could not be completed."));
+        }
+      } catch {
+        if (!cancelled) setError(isRu ? "Не удалось проверить вход. Проверь соединение." : "Could not check sign-in. Check your connection.");
+      }
+    };
+    void poll();
+    const interval = window.setInterval(() => { void poll(); }, 2000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [pollingEnabled, requestId, isRu, onComplete]);
+
+  const startAuth = async () => {
+    setError("");
+    setMessage("");
+    if (isRegister && !consentAccepted) {
+      setError(isRu ? "Прими Политику конфиденциальности и Пользовательское соглашение." : "Accept the Privacy Policy and User Agreement.");
+      return;
+    }
+    if (busy) return;
+    setBusy(true);
+    setBotUrl("");
+    setRequestId("");
+    setPollingEnabled(false);
+    try {
+      const webApp = getTelegramWebApp();
+      if (webApp?.initData) {
+        const response = await fetch("/api/telegram/init-data", {
+          method: "POST",
+          credentials: "same-origin",
+          cache: "no-store",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ initData: webApp.initData, privacyConsent: isRegister && consentAccepted }),
+        });
+        const result = await response.json().catch(() => ({})) as { authenticated?: boolean; error?: string };
+        if (!response.ok || result.authenticated !== true) {
+          if (result.error === "consent_required") {
+            throw new Error(isRu ? "Аккаунт не найден. Переключись на регистрацию." : "No account found. Switch to registration.");
+          }
+          if (result.error === "auth_data_expired") {
+            throw new Error(isRu ? "Данные Telegram устарели. Закрой и заново открой Mini App." : "Telegram authorization data expired. Reopen the Mini App.");
+          }
+          throw new Error(isRu ? "Не удалось войти через Telegram. Попробуй ещё раз." : "Telegram sign-in failed. Try again.");
+        }
+        onComplete();
+        return;
+      }
+
+      const response = await fetch("/api/telegram/browser-auth", {
+        method: "POST",
+        credentials: "same-origin",
+        cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ flow: mode, privacyConsent: isRegister && consentAccepted }),
+      });
+      const result = await response.json().catch(() => ({})) as BrowserStart;
+      if (!response.ok || !result.requestId || !result.botUrl) {
+        throw new Error(result.error === "telegram_bot_unavailable"
+          ? (isRu ? "Авторизация Telegram временно недоступна." : "Telegram sign-in is temporarily unavailable.")
+          : (isRu ? "Не удалось подготовить авторизацию. Попробуй ещё раз." : "Could not start authentication. Try again."));
+      }
+      setRequestId(result.requestId);
+      setBotUrl(result.botUrl);
+      setMessage(isRu
+        ? "Открой бота YUME в Telegram и нажми Start. После подтверждения эта страница войдёт автоматически."
+        : "Open the YUME bot in Telegram and press Start. This page will sign you in automatically after confirmation.");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : (isRu ? "Ошибка авторизации." : "Authentication error."));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <main id="main-content" className="relative isolate flex min-h-[calc(100dvh-4rem)] items-center justify-center overflow-hidden px-4 pb-10 pt-24">
+      <div aria-hidden="true" className="pointer-events-none absolute -top-48 left-1/2 -z-10 h-[28rem] w-[28rem] -translate-x-1/2 rounded-full bg-primary/20 blur-[110px]" />
+      <div className="w-full max-w-md">
+        <section className="rounded-3xl border border-border bg-card/95 p-6 shadow-[0_24px_90px_rgba(0,0,0,0.42)] sm:p-8">
+          <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-sky-500/10 text-sky-400">
+            <Send className="h-7 w-7" />
+          </div>
+          <h1 className="text-center text-2xl font-bold">{isRegister ? (isRu ? "Регистрация" : "Create an account") : (isRu ? "Вход в аккаунт" : "Sign in to YUME")}</h1>
+          <p className="mx-auto mt-2 max-w-sm text-center text-sm leading-relaxed text-muted-foreground">
+            {isRegister
+              ? (isRu ? "Создай аккаунт YUME через Telegram, чтобы сохранять личные списки и историю." : "Create your YUME account through Telegram to save your lists and history.")
+              : (isRu ? "Войди через Telegram, чтобы получить доступ к своему профилю и сохранённым данным." : "Sign in through Telegram to access your profile and saved data.")}
+          </p>
+
+          {isRegister && (
+            <label className="mt-6 flex cursor-pointer items-start gap-3 rounded-2xl border border-border bg-background/50 p-3.5 text-sm leading-relaxed">
+              <input type="checkbox" checked={consentAccepted} onChange={(event) => setConsentAccepted(event.target.checked)} className="mt-1 h-4 w-4 accent-primary" />
+              <span>
+                {isRu ? "Я принимаю " : "I accept the "}
+                <button type="button" className="font-semibold text-primary underline underline-offset-4" onClick={(event) => { event.preventDefault(); onPrivacy(); }}>
+                  {isRu ? "Политику конфиденциальности" : "Privacy Policy"}
+                </button>
+                {isRu ? " и Пользовательское соглашение." : " and User Agreement."}
+              </span>
+            </label>
+          )}
+
+          {message && (
+            <div className="mt-4 rounded-xl border border-primary/20 bg-primary/5 p-3 text-sm leading-relaxed text-foreground" role="status" aria-live="polite">
+              <div className="flex items-start gap-2"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-primary" /><span>{message}</span></div>
+            </div>
+          )}
+          {error && <p className="mt-4 rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-sm leading-relaxed text-foreground" role="alert">{error}</p>}
+
+          {botUrl ? (
+            <a
+              href={botUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => setPollingEnabled(true)}
+              className="mt-5 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-sky-500 px-4 py-3 text-sm font-bold text-white transition hover:bg-sky-400"
+            >
+              <Send className="h-4 w-4" /> {isRu ? "Открыть Telegram и подтвердить" : "Open Telegram and confirm"}
+            </a>
+          ) : (
+            <button
+              type="button"
+              disabled={busy || (isRegister && !consentAccepted)}
+              onClick={() => { void startAuth(); }}
+              className="mt-5 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-sky-500 px-4 py-3 text-sm font-bold text-white transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {busy ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              {busy ? (isRu ? "Подготавливаем…" : "Preparing…") : (isRu ? "Продолжить через Telegram" : "Continue with Telegram")}
+            </button>
+          )}
+
+          <p className="mt-4 text-center text-xs leading-relaxed text-muted-foreground">
+            <ShieldCheck className="mr-1 inline h-3.5 w-3.5" />
+            {isRu ? "Авторизация подтверждается сервером Telegram. Мы не просим пароль от Telegram." : "Telegram authentication is verified server-side. We never ask for your Telegram password."}
+          </p>
+          <div className="mt-6 border-t border-border pt-5 text-center text-sm text-muted-foreground">
+            {isRegister ? (isRu ? "Уже есть аккаунт? " : "Already registered? ") : (isRu ? "Нет аккаунта? " : "Don't have an account? ")}
+            <button type="button" onClick={() => { setError(""); setMessage(""); setBotUrl(""); setRequestId(""); setPollingEnabled(false); onModeChange(isRegister ? "login" : "register"); }} className="font-semibold text-primary hover:text-neon">
+              {isRegister ? (isRu ? "Войти" : "Sign in") : (isRu ? "Зарегистрироваться" : "Create an account")}
+            </button>
+          </div>
+          <button type="button" onClick={onPrivacy} className="mt-4 flex w-full justify-center text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground">
+            {isRu ? "Правовая информация" : "Legal information"}
+          </button>
+        </section>
+      </div>
+    </main>
+  );
+}
