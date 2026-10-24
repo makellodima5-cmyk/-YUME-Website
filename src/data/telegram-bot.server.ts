@@ -71,7 +71,7 @@ export async function handleTelegramWebhook(request: Request): Promise<Response>
     ? `Привет, ${firstName}! 👋 Добро пожаловать в YUME — место, где проще найти аниме под настроение. Открывай каталог, собирай список того, что хочешь посмотреть, и находи новые истории. ✨`
     : "Привет! 👋 Добро пожаловать в YUME — место, где проще найти аниме под настроение. Открывай каталог, собирай список того, что хочешь посмотреть, и находи новые истории. ✨";
   let browserLogin = false;
-  const startPayload = text.split(/\\s+/)[1] ?? "";
+  const startPayload = text.split(/\s+/)[1] ?? "";
   if (startPayload.startsWith("yb_")) {
     const sender = message?.from;
     if (typeof sender?.id !== "number" || !Number.isSafeInteger(sender.id) || !sender.first_name?.trim()) {
