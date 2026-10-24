@@ -54,7 +54,13 @@ export async function handleTelegramWebhook(request: Request): Promise<Response>
 
   let update: TelegramUpdate;
   try {
-    update = await request.json() as TelegramUpdate;
+    const raw = await request.text();
+    if (raw.length > 65_536) return json({ ok: false, error: "Request too large" }, 413);
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return json({ ok: false, error: "Invalid update" }, 400);
+    }
+    update = parsed as TelegramUpdate;
   } catch {
     return json({ ok: false, error: "Invalid JSON" }, 400);
   }
