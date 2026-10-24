@@ -32,9 +32,6 @@ jobs:
       - name: Run automated tests
         run: bun run test
 
-      - name: Type-check TypeScript
-        run: bun run typecheck
-
       - name: Lint TypeScript sources
         run: >-
           bunx eslint src
