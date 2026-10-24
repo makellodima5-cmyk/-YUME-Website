@@ -25,7 +25,7 @@ export default defineConfig({
     tsConfigPaths(),
   ],
   define: {
-    "import.meta.env.VITE_YUME_ANDROID_BUILD": JSON.stringify("true"),
+    __YUME_ANDROID_BUILD__: JSON.stringify(true),
   },
   resolve: {
     // The shell prerender runs in Node; never substitute this stub in the Worker build.
