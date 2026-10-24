@@ -6,11 +6,21 @@ type ConsentChoice = { necessary: true; analytics: boolean; updatedAt: string; v
 
 const CONSENT_KEY = "yume-cookie-consent-v1";
 const ANALYTICS_STORAGE_KEYS = ["yume-analytics-visitor-id", "yume-analytics-session"];
+const CONSENT_COOKIE = "yume-analytics-consent";
+
+function writeConsentCookie(analytics: boolean): void {
+  // A minimal preference cookie allows the analytics endpoint to enforce opt-in.
+  // It contains no user identifier and is used only to remember the consent choice.
+  document.cookie = `${CONSENT_COOKIE}=${analytics ? "all" : "necessary"}; Path=/; Max-Age=15552000; SameSite=Lax; Secure`;
+}
 
 function hasConsent(): boolean {
   try {
-    const value = JSON.parse(window.localStorage.getItem(CONSENT_KEY) ?? "null") as { necessary?: unknown } | null;
-    return value?.necessary === true;
+    const value = JSON.parse(window.localStorage.getItem(CONSENT_KEY) ?? "null") as { necessary?: unknown; analytics?: unknown } | null;
+    if (value?.necessary !== true) return false;
+    // Migrate a previously saved explicit choice into the server-readable preference cookie.
+    writeConsentCookie(value.analytics === true);
+    return true;
   } catch {
     return false;
   }
@@ -44,6 +54,7 @@ export function CookieConsentBanner() {
       updatedAt: new Date().toISOString(),
       version: 1,
     };
+    writeConsentCookie(analytics);
     try {
       window.localStorage.setItem(CONSENT_KEY, JSON.stringify(choice));
       if (!analytics) {
