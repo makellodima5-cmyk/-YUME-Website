@@ -48,6 +48,9 @@ type Props = {
 export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overview" }: Props) {
   const { t, language } = useYumePreferences();
   const [panel, setPanel] = useState<ProfilePanel>(initialPanel);
+  const [supportLinks, setSupportLinks] = useState<{ group: string | null; personal: string | null }>({ group: null, personal: null });
+  const [supportLinksLoading, setSupportLinksLoading] = useState(false);
+  const [supportLinksError, setSupportLinksError] = useState(false);
   const [isTelegramMiniApp, setIsTelegramMiniApp] = useState(false);
   const [telegramUser, setTelegramUser] = useState<{
     first_name?: string;
@@ -57,6 +60,49 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
   } | null>(null);
 
   useEffect(() => setPanel(initialPanel), [initialPanel]);
+  useEffect(() => {
+    if (panel !== "support") return;
+
+    let cancelled = false;
+    setSupportLinksLoading(true);
+    setSupportLinksError(false);
+
+    const loadSupportUrl = async (path: string): Promise<string | null> => {
+      try {
+        const response = await fetch(`${path}?format=json`, {
+          headers: { accept: "application/json" },
+          cache: "no-store",
+        });
+        if (!response.ok) return null;
+        const payload = await response.json() as { url?: unknown };
+        return typeof payload.url === "string" ? payload.url : null;
+      } catch {
+        return null;
+      }
+    };
+
+    Promise.all([
+      loadSupportUrl("/api/support/group"),
+      loadSupportUrl("/api/support/personal"),
+    ]).then(([group, personal]) => {
+      if (cancelled) return;
+      setSupportLinks({ group, personal });
+      setSupportLinksError(!group || !personal);
+    }).finally(() => {
+      if (!cancelled) setSupportLinksLoading(false);
+    });
+
+    return () => { cancelled = true; };
+  }, [panel]);
+
+  useEffect(() => {
+    if (panel !== "support") return;
+    // Reset both the document and body scroll positions after the support panel
+    // has rendered. This avoids opening the page halfway down in Telegram's WebView.
+    window.scrollTo({ top: 0, behavior: "auto" });
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+  }, [panel]);
   useEffect(() => {
     const webApp = getTelegramWebApp();
     const user = webApp?.initData ? webApp.initDataUnsafe?.user : undefined;
@@ -195,7 +241,22 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
 
   const navigatePanel = (next: ProfilePanel) => {
     setPanel(next);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    window.scrollTo({ top: 0, behavior: "auto" });
+  };
+
+  const openSupportLink = (kind: "group" | "personal") => {
+    const url = supportLinks[kind];
+    if (!url) return;
+
+    const webApp = getTelegramWebApp();
+    if (webApp?.openTelegramLink) {
+      // Telegram opens t.me links directly in its native UI and closes the Mini App,
+      // avoiding the browser redirect flow from a normal anchor element.
+      webApp.openTelegramLink(url);
+      return;
+    }
+
+    window.location.assign(url);
   };
 
   const profileRow = (
@@ -253,7 +314,7 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
   );
 
   return (
-    <main id="main-content" className="px-4 pb-12 pt-28 md:px-10 md:pb-16 md:pt-28">
+    <main id="main-content" className={`px-4 pb-12 md:px-10 md:pb-16 ${panel === "support" ? "pt-20 md:pt-24" : "pt-28 md:pt-28"}`}>
       <div className="mx-auto max-w-6xl">
         {panel === "overview" ? (
           <>
@@ -391,8 +452,8 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
         ) : (
           <>
             {backButton()}
-            <div className="mb-6">
-              <h1 className="text-2xl font-bold sm:text-3xl">{panelTitles[panel]}</h1>
+            <div className={panel === "support" ? "mb-3" : "mb-6"}>
+              <h1 id={panel === "support" ? "support-title" : undefined} className="text-2xl font-bold sm:text-3xl">{panelTitles[panel]}</h1>
               {panel === "watchlist" && <p className="mt-1 text-sm text-muted-foreground">{t("profile.watchlistSubtitle")}</p>}
             </div>
 
@@ -506,10 +567,10 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
                         <span key={label} className="rounded-full bg-[#21152F] px-3 py-1.5 font-medium text-[#C69BFF]">{label}</span>
                       ))}
                     </div>
-                    <a href="/api/support/group" target="_blank" rel="noopener noreferrer" className="mt-4 flex min-h-12 w-full items-center justify-between gap-3 rounded-[16px] bg-gradient-to-r from-[#7829F5] to-[#5015C9] px-4 py-3 text-sm font-semibold text-white shadow-[0_5px_18px_rgba(103,35,222,0.18)] transition hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#B78AFF] sm:min-h-[56px] sm:px-5 sm:text-base">
+                    <button type="button" onClick={() => openSupportLink("group")} disabled={supportLinksLoading || !supportLinks.group} className="mt-4 flex min-h-12 w-full items-center justify-between gap-3 rounded-[16px] bg-gradient-to-r from-[#7829F5] to-[#5015C9] px-4 py-3 text-sm font-semibold text-white shadow-[0_5px_18px_rgba(103,35,222,0.18)] transition hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#B78AFF] disabled:cursor-not-allowed disabled:opacity-60 sm:min-h-[56px] sm:px-5 sm:text-base">
                       <span className="flex min-w-0 items-center gap-3"><Send className="h-5 w-5 shrink-0" aria-hidden="true" /><span>{language === "ru" ? "Перейти в группу" : "Join the group"}</span></span>
                       <ChevronRight className="h-5 w-5 shrink-0" aria-hidden="true" />
-                    </a>
+                    </button>
                   </article>
 
                   <article className="rounded-[22px] border border-[#153653] bg-gradient-to-br from-[#071019] to-[#080B10] p-4 shadow-[0_8px_24px_rgba(0,0,0,0.16)] sm:p-5">
@@ -532,11 +593,19 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
                         <span key={label} className="rounded-full bg-[#101D2B] px-3 py-1.5 font-medium text-[#8AB9FF]">{label}</span>
                       ))}
                     </div>
-                    <a href="/api/support/personal" target="_blank" rel="noopener noreferrer" className="mt-4 flex min-h-12 w-full items-center justify-between gap-3 rounded-[16px] bg-gradient-to-r from-[#079FEA] to-[#075BC5] px-4 py-3 text-sm font-semibold text-white shadow-[0_5px_18px_rgba(0,115,224,0.16)] transition hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7FB5FF] sm:min-h-[56px] sm:px-5 sm:text-base">
+                    <button type="button" onClick={() => openSupportLink("personal")} disabled={supportLinksLoading || !supportLinks.personal} className="mt-4 flex min-h-12 w-full items-center justify-between gap-3 rounded-[16px] bg-gradient-to-r from-[#079FEA] to-[#075BC5] px-4 py-3 text-sm font-semibold text-white shadow-[0_5px_18px_rgba(0,115,224,0.16)] transition hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7FB5FF] disabled:cursor-not-allowed disabled:opacity-60 sm:min-h-[56px] sm:px-5 sm:text-base">
                       <span className="flex min-w-0 items-center gap-3"><Send className="h-5 w-5 shrink-0" aria-hidden="true" /><span>{language === "ru" ? "Написать в поддержку" : "Contact support"}</span></span>
                       <ChevronRight className="h-5 w-5 shrink-0" aria-hidden="true" />
-                    </a>
+                    </button>
                   </article>
+
+                  {!supportLinksLoading && supportLinksError && (
+                    <p role="status" className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-xs leading-relaxed text-[#D1B38A]">
+                      {language === "ru"
+                        ? "Не удалось загрузить одну из ссылок. Проверьте SUPPORT_GROUP_URL и SUPPORT_PERSONAL_URL в Cloudflare."
+                        : "A support link could not be loaded. Check SUPPORT_GROUP_URL and SUPPORT_PERSONAL_URL in Cloudflare."}
+                    </p>
+                  )}
 
                   <aside className="flex items-start gap-3 rounded-[20px] border border-[#1D2928] bg-[#080D0D] px-4 py-3.5 sm:px-5 sm:py-4">
                     <ShieldCheck className="mt-0.5 h-7 w-7 shrink-0 text-[#35D7A0]" aria-hidden="true" />
