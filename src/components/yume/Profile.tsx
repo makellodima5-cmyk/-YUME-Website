@@ -16,6 +16,11 @@ import {
   UsersRound,
   Headset,
   Send,
+  LogIn,
+  UserPlus,
+  LogOut,
+  Trash2,
+  LoaderCircle,
 } from "lucide-react";
 import type { Anime } from "@/data/anime";
 import { getShikimoriAnimes } from "@/data/shikimori";
@@ -28,6 +33,7 @@ import {
   PROFILE_UPDATED_EVENT,
   readSavedAnimeIds,
   WATCHLIST_STORAGE_KEY,
+  setProfileStorageAuthenticated,
 } from "@/data/profile-storage";
 
 type ProfilePanel =
@@ -55,6 +61,11 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
   const [supportLinksLoading, setSupportLinksLoading] = useState(false);
   const [supportLinksError, setSupportLinksError] = useState(false);
   const [isTelegramMiniApp, setIsTelegramMiniApp] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
+  const [accountBusy, setAccountBusy] = useState(false);
+  const [accountMessage, setAccountMessage] = useState("");
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [telegramUser, setTelegramUser] = useState<{
     first_name?: string;
     last_name?: string;
@@ -130,14 +141,43 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
   }, [panel]);
   useEffect(() => {
     const webApp = getTelegramWebApp();
-    const user = webApp?.initData ? webApp.initDataUnsafe?.user : undefined;
+    const unsafeUser = webApp?.initData ? webApp.initDataUnsafe?.user : undefined;
     setIsTelegramMiniApp(Boolean(webApp?.initData));
-    setTelegramUser(user ? {
-      first_name: user.first_name,
-      last_name: user.last_name,
-      username: user.username,
-      photo_url: user.photo_url,
+    setTelegramUser(unsafeUser ? {
+      first_name: unsafeUser.first_name,
+      last_name: unsafeUser.last_name,
+      username: unsafeUser.username,
+      photo_url: unsafeUser.photo_url,
     } : null);
+
+    let cancelled = false;
+    fetch("/api/telegram/init-data", { credentials: "same-origin", cache: "no-store" })
+      .then(async (response) => {
+        const payload = await response.json().catch(() => ({})) as {
+          authenticated?: boolean;
+          user?: { id?: string; firstName?: string; lastName?: string; username?: string };
+        };
+        if (cancelled) return;
+        const signedIn = response.ok && payload.authenticated === true && Boolean(payload.user?.id);
+        setIsAuthenticated(signedIn);
+        setAuthChecked(true);
+        setProfileStorageAuthenticated(signedIn);
+        if (signedIn && payload.user) {
+          setTelegramUser((current) => ({
+            first_name: payload.user?.firstName ?? current?.first_name,
+            last_name: payload.user?.lastName ?? current?.last_name,
+            username: payload.user?.username ?? current?.username,
+            photo_url: current?.photo_url,
+          }));
+        }
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setIsAuthenticated(false);
+        setAuthChecked(true);
+        setProfileStorageAuthenticated(false);
+      });
+    return () => { cancelled = true; };
   }, []);
 
   const telegramDisplayName = [
@@ -269,6 +309,67 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
     window.scrollTo({ top: 0, behavior: "auto" });
   };
 
+  const requestAuth = (mode: "login" | "register") => {
+    window.dispatchEvent(new CustomEvent("yume-open-auth", { detail: { mode } }));
+  };
+
+  const signOut = async () => {
+    if (accountBusy) return;
+    setAccountBusy(true);
+    setAccountMessage("");
+    try {
+      const response = await fetch("/api/telegram/init-data", {
+        method: "DELETE",
+        credentials: "same-origin",
+        cache: "no-store",
+      });
+      if (!response.ok) throw new Error("logout_failed");
+      setProfileStorageAuthenticated(false);
+      setIsAuthenticated(false);
+      setTelegramUser(null);
+      setFavoriteIds([]);
+      setWatchlistIds([]);
+      setSavedAnime([]);
+      setAccountMessage(language === "ru" ? "Вы вышли из аккаунта." : "You have signed out.");
+    } catch {
+      setAccountMessage(language === "ru" ? "Не удалось выйти. Попробуй ещё раз." : "Could not sign out. Try again.");
+    } finally {
+      setAccountBusy(false);
+    }
+  };
+
+  const deleteAccount = async () => {
+    if (accountBusy) return;
+    setAccountBusy(true);
+    setAccountMessage("");
+    try {
+      const response = await fetch("/api/telegram/account", {
+        method: "DELETE",
+        credentials: "same-origin",
+        cache: "no-store",
+      });
+      const payload = await response.json().catch(() => ({})) as { deleted?: boolean };
+      if (!response.ok || payload.deleted !== true) throw new Error("delete_failed");
+      setProfileStorageAuthenticated(false);
+      setIsAuthenticated(false);
+      setTelegramUser(null);
+      setFavoriteIds([]);
+      setWatchlistIds([]);
+      setSavedAnime([]);
+      setCheckedSavedIds([]);
+      setShowDeleteConfirm(false);
+      setAccountMessage(language === "ru"
+        ? "Аккаунт и связанные с ним данные удалены. Можно зарегистрироваться заново."
+        : "The account and its linked data have been deleted. You can register again.");
+    } catch {
+      setAccountMessage(language === "ru"
+        ? "Не удалось удалить аккаунт. Данные не считаются удалёнными — попробуй ещё раз."
+        : "Account deletion failed. Your data has not been confirmed deleted. Please try again.");
+    } finally {
+      setAccountBusy(false);
+    }
+  };
+
   const openSupportLink = (kind: "group" | "personal") => {
     const url = supportLinks[kind];
     if (!url) return;
@@ -341,7 +442,43 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
   return (
     <main id="main-content" className={`px-4 pb-12 md:px-10 md:pb-16 ${panel === "support" ? "pt-20 md:pt-24" : "pt-28 md:pt-28"}`}>
       <div className="mx-auto max-w-6xl">
-        {panel === "overview" ? (
+        {!authChecked && (panel === "overview" || panel === "favorites" || panel === "watchlist") ? (
+          <section className="mx-auto max-w-xl rounded-3xl border border-border bg-card/80 p-6 text-center shadow-xl sm:p-8" aria-live="polite">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+              <ShieldCheck className="h-7 w-7" />
+            </div>
+            <h1 className="mt-4 text-2xl font-bold">{language === "ru" ? "Профиль доступен после входа" : "Sign in to access your profile"}</h1>
+            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+              {language === "ru"
+                ? "Избранное, «Смотреть позже» и история просмотров сохраняются в аккаунте Telegram. Каталог доступен без регистрации."
+                : "Favorites, Watch Later, and viewing history are saved to your Telegram account. You can browse the catalog without signing in."}
+            </p>
+            <div className="mt-5 flex flex-col justify-center gap-2 sm:flex-row">
+              <button type="button" onClick={() => requestAuth("login")} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90">
+                <LogIn className="h-4 w-4" /> {language === "ru" ? "Войти через Telegram" : "Sign in with Telegram"}
+              </button>
+              <button type="button" onClick={() => requestAuth("register")} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-border px-5 py-2.5 text-sm font-semibold hover:bg-accent">
+                <UserPlus className="h-4 w-4" /> {language === "ru" ? "Регистрация" : "Register"}
+              </button>
+            </div>
+          </section>
+        ) : authChecked && !isAuthenticated && (panel === "overview" || panel === "favorites" || panel === "watchlist") ? (
+          <section className="mx-auto max-w-xl rounded-3xl border border-border bg-card/80 p-6 text-center shadow-xl sm:p-8">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+              <ShieldCheck className="h-7 w-7" />
+            </div>
+            <h1 className="mt-4 text-2xl font-bold">{language === "ru" ? "Личный профиль" : "Your profile"}</h1>
+            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+              {language === "ru"
+                ? "Войди или зарегистрируйся через Telegram, чтобы пользоваться избранным, списком «Смотреть позже» и историей просмотров."
+                : "Sign in or register through Telegram to use Favorites, Watch Later, and viewing history."}
+            </p>
+            <div className="mt-5 flex flex-col justify-center gap-2 sm:flex-row">
+              <button type="button" onClick={() => requestAuth("login")} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90"><LogIn className="h-4 w-4" />{language === "ru" ? "Войти" : "Sign in"}</button>
+              <button type="button" onClick={() => requestAuth("register")} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-border px-5 py-2.5 text-sm font-semibold hover:bg-accent"><UserPlus className="h-4 w-4" />{language === "ru" ? "Зарегистрироваться" : "Register"}</button>
+            </div>
+          </section>
+        ) : panel === "overview" ? (
           <>
             <div className="relative isolate overflow-hidden rounded-[20px] border border-primary/20 bg-[#08050f]/95 shadow-[0_10px_34px_rgba(0,0,0,0.24)]">
               <div className="relative h-28 overflow-hidden sm:h-40">
@@ -472,6 +609,34 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
               {profileRow(ShieldCheck, t("profile.legal"), t("profile.legalDescription"), "documents")}
               {profileRow(Info, t("profile.about"), t("profile.aboutDescription"), "about")}
               {profileRow(LifeBuoy, t("profile.support"), t("profile.supportDescription"), "support")}
+            </section>
+            <section className="mt-6 rounded-2xl border border-border bg-card/50 p-4">
+              <h2 className="text-base font-semibold">{language === "ru" ? "Аккаунт Telegram" : "Telegram account"}</h2>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                {language === "ru" ? "Выход завершит текущий сеанс. Удаление аккаунта необратимо удалит избранное, список и историю просмотров." : "Signing out ends this session. Account deletion permanently removes favorites, your list, and viewing history."}
+              </p>
+              <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                <button type="button" disabled={accountBusy} onClick={() => void signOut()} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-border px-4 py-2 text-sm font-semibold hover:bg-accent disabled:opacity-50">
+                  {accountBusy ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />}
+                  {language === "ru" ? "Выйти" : "Sign out"}
+                </button>
+                <button type="button" disabled={accountBusy} onClick={() => setShowDeleteConfirm(true)} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-destructive/40 px-4 py-2 text-sm font-semibold text-destructive hover:bg-destructive/10 disabled:opacity-50">
+                  <Trash2 className="h-4 w-4" /> {language === "ru" ? "Удалить аккаунт" : "Delete account"}
+                </button>
+              </div>
+              {accountMessage && <p className="mt-3 text-xs leading-relaxed text-muted-foreground" role="status">{accountMessage}</p>}
+              {showDeleteConfirm && (
+                <div className="mt-4 rounded-xl border border-destructive/30 bg-destructive/5 p-4" role="alertdialog" aria-labelledby="delete-account-title" aria-describedby="delete-account-description">
+                  <h3 id="delete-account-title" className="font-semibold text-destructive">{language === "ru" ? "Удалить аккаунт без возможности восстановления?" : "Permanently delete your account?"}</h3>
+                  <p id="delete-account-description" className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                    {language === "ru" ? "Будут удалены аккаунт YUME, все сеансы, избранное, «Смотреть позже», история просмотров и связанные данные. Telegram-аккаунт не удаляется. Восстановить данные нельзя." : "Your YUME account, sessions, favorites, Watch Later, viewing history, and linked data will be deleted. Your Telegram account will not be deleted. This cannot be undone."}
+                  </p>
+                  <div className="mt-4 flex flex-wrap justify-end gap-2">
+                    <button type="button" disabled={accountBusy} onClick={() => setShowDeleteConfirm(false)} className="rounded-lg border border-border px-3 py-2 text-sm font-semibold hover:bg-accent">{language === "ru" ? "Отмена" : "Cancel"}</button>
+                    <button type="button" disabled={accountBusy} onClick={() => void deleteAccount()} className="rounded-lg bg-destructive px-3 py-2 text-sm font-semibold text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50">{accountBusy ? (language === "ru" ? "Удаляем…" : "Deleting…") : (language === "ru" ? "Удалить навсегда" : "Delete permanently")}</button>
+                  </div>
+                </div>
+              )}
             </section>
           </>
         ) : (
