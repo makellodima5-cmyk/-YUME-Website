@@ -819,7 +819,7 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
                       <div className="border-t border-border/70 px-4 pb-5 pt-4 sm:px-5 sm:pb-6">
                         <ol className="space-y-4">
                           {section.clauses.map((clause) => {
-                            const match = clause.match(/^(\\d+\\.\\d+\\.)\\s*(.*)$/s);
+                            const match = clause.match(/^(\d+\.\d+\.)\s*(.*)$/s);
                             return (
                               <li key={clause} className="text-sm leading-7 text-foreground/85 sm:text-[15px]">
                                 {match ? (
