@@ -64,7 +64,7 @@ function sameOrigin(request: Request): boolean {
   if (referer) {
     try { return new URL(referer).origin === new URL(request.url).origin; } catch { return false; }
   }
-  return request.headers.get("sec-fetch-site") !== "cross-site";
+  return request.headers.get("sec-fetch-site") === "same-origin";
 }
 
 async function authenticatedUserId(request: Request, db: Database, env: Environment): Promise<string | null> {
@@ -139,8 +139,14 @@ export async function handleNotifications(request: Request): Promise<Response> {
     }
 
     if (!userId) return json({ error: "authentication_required", authenticated: false }, 401);
-    let body: { action?: unknown };
-    try { body = await request.json() as { action?: unknown }; } catch { return json({ error: "invalid_request" }, 400); }
+    let body: { action?: unknown; notificationId?: unknown };
+    try {
+      const raw = await request.text();
+      if (raw.length > 2_048) return json({ error: "request_too_large" }, 413);
+      const parsed: unknown = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return json({ error: "invalid_request" }, 400);
+      body = parsed as { action?: unknown; notificationId?: unknown };
+    } catch { return json({ error: "invalid_request" }, 400); }
     if (body.action === "read-one" || body.action === "dismiss-one") {
       const notificationId = typeof body.notificationId === "string" ? body.notificationId : "";
       if (!USER_NOTIFICATIONS.some((notification) => notification.id === notificationId)) return json({ error: "invalid_notification" }, 400);
