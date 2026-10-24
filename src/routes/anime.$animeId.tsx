@@ -92,6 +92,41 @@ function AnimeDetailPage() {
   const [saveSyncError, setSaveSyncError] = useState(false);
   const [authRequired, setAuthRequired] = useState(false);
   const [watchMode, setWatchMode] = useState<"trailer" | "episodes">("trailer");
+  const [kodikResults, setKodikResults] = useState<Array<{ title: string; translation: string; link: string }>>([]);
+  const [kodikLoading, setKodikLoading] = useState(false);
+  const [kodikError, setKodikError] = useState<string | null>(null);
+  const [selectedKodikIndex, setSelectedKodikIndex] = useState(0);
+
+  useEffect(() => {
+    if (watchMode !== "episodes") return;
+    let cancelled = false;
+    setKodikLoading(true);
+    setKodikError(null);
+    setKodikResults([]);
+    setSelectedKodikIndex(0);
+    fetch("/api/kodik?shikimoriId=" + encodeURIComponent(animeId), {
+      credentials: "same-origin",
+      cache: "no-store",
+    })
+      .then(async (response) => {
+        const payload = await response.json().catch(() => ({})) as {
+          results?: Array<{ title: string; translation: string; link: string }>;
+          error?: string;
+        };
+        if (!response.ok) throw new Error(payload.error || (language === "en" ? "Kodik player is unavailable." : "Плеер Kodik недоступен."));
+        if (!Array.isArray(payload.results) || payload.results.length === 0) {
+          throw new Error(language === "en" ? "No Kodik player was found for this title." : "В Kodik не найден плеер для этого тайтла.");
+        }
+        if (!cancelled) setKodikResults(payload.results);
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) setKodikError(error instanceof Error ? error.message : (language === "en" ? "Could not load Kodik player." : "Не удалось загрузить плеер Kodik."));
+      })
+      .finally(() => {
+        if (!cancelled) setKodikLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [watchMode, animeId, language]);
 
   useEffect(() => {
     if (anime) document.title = displayAnimeTitle(anime, language) + (language === "en" ? " — watch anime | YUME" : " — смотреть аниме | YUME");
@@ -500,13 +535,49 @@ function AnimeDetailPage() {
             </div>
             <div className="mx-auto w-full max-w-6xl min-w-0">
               {watchMode === "episodes" ? (
-                <div className="relative mx-auto flex aspect-video w-full min-w-0 flex-col items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-[#080710] p-5 text-center sm:min-h-[300px] lg:min-h-[420px]" style={{ background: "radial-gradient(ellipse at 50% 40%, oklch(0.19 0.08 " + anime.hue + ") 0%, #080710 63%)" }}>
-                  <div aria-hidden="true" className="mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-primary/35 bg-primary/10 text-primary">
-                    <CirclePlay className="h-9 w-9" />
-                  </div>
-                  <h3 className="text-lg font-semibold text-white">{language === "en" ? "Episode player is not connected yet" : "Плеер для серий пока не подключён"}</h3>
-                  <p className="mt-2 max-w-md text-sm leading-relaxed text-white/60">{language === "en" ? "This viewing mode is prepared for the future player. No fake playback is started." : "Этот режим подготовлен для будущего плеера. Воспроизведение не имитируется."}</p>
-                  <button type="button" onClick={() => setWatchMode("trailer")} className="mt-5 rounded-full border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/10">{language === "en" ? "Back to trailer" : "Вернуться к трейлеру"}</button>
+                <div className="space-y-3">
+                  {kodikLoading ? (
+                    <div className="flex aspect-video items-center justify-center rounded-2xl border border-white/10 bg-[#080710] p-5 text-center text-sm text-white/70">
+                      {language === "en" ? "Searching Kodik for this title…" : "Ищем тайтл в Kodik…"}
+                    </div>
+                  ) : kodikError ? (
+                    <div className="flex aspect-video flex-col items-center justify-center rounded-2xl border border-white/10 bg-[#080710] p-5 text-center" role="status">
+                      <CirclePlay className="mb-3 h-9 w-9 text-primary" />
+                      <h3 className="text-lg font-semibold text-white">{language === "en" ? "Kodik player could not be loaded" : "Не удалось загрузить плеер Kodik"}</h3>
+                      <p className="mt-2 max-w-lg text-sm leading-relaxed text-white/65">{kodikError}</p>
+                      <p className="mt-2 max-w-lg text-xs leading-relaxed text-white/45">{language === "en" ? "The server needs the KODIK_API_TOKEN secret configured, and Kodik must have a playable source for this title." : "На сервере должен быть настроен секрет KODIK_API_TOKEN, а в Kodik должен быть доступный источник для этого тайтла."}</p>
+                      <button type="button" onClick={() => setWatchMode("trailer")} className="mt-5 rounded-full border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/10">{language === "en" ? "Back to trailer" : "Вернуться к трейлеру"}</button>
+                    </div>
+                  ) : kodikResults[selectedKodikIndex] ? (
+                    <>
+                      {kodikResults.length > 1 && (
+                        <label className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                          <span>{language === "en" ? "Voice-over / source" : "Озвучка / источник"}</span>
+                          <select
+                            value={String(selectedKodikIndex)}
+                            onChange={(event) => setSelectedKodikIndex(Number(event.target.value))}
+                            className="min-w-0 rounded-full border border-border bg-card px-3 py-2 text-foreground"
+                          >
+                            {kodikResults.map((result, index) => (
+                              <option key={result.link} value={String(index)}>{result.translation || result.title}</option>
+                            ))}
+                          </select>
+                        </label>
+                      )}
+                      <div className="relative mx-auto aspect-video w-full min-w-0 overflow-hidden rounded-2xl border border-white/10 bg-[#080710] shadow-2xl">
+                        <iframe
+                          title={displayAnimeTitle(anime, language) + " — Kodik"}
+                          src={kodikResults[selectedKodikIndex].link}
+                          className="absolute inset-0 h-full w-full"
+                          loading="lazy"
+                          allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
+                          referrerPolicy="strict-origin-when-cross-origin"
+                          allowFullScreen
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground">{language === "en" ? "The video is provided by the third-party Kodik player." : "Видео предоставляется сторонним плеером Kodik."}</p>
+                    </>
+                  ) : null}
                 </div>
               ) : anime.youtubeTrailerId ? (
                 <div className="relative mx-auto aspect-video w-full min-w-0 overflow-hidden rounded-2xl border border-white/10 bg-[#080710] shadow-2xl">

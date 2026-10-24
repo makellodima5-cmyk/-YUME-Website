@@ -5,6 +5,7 @@ import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
 import { setCatalogRuntimeEnvironment } from "./data/catalog-d1.server";
 import { runScheduledTrailerUpdate } from "./data/admin-trailers.server";
+import { handleKodikRequest } from "./data/kodik.server";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -171,6 +172,8 @@ export default {
     setCatalogRuntimeEnvironment(env);
     const supportRedirect = getSupportRedirect(request, env);
     if (supportRedirect) return supportRedirect;
+    const kodikResponse = await handleKodikRequest(request, env);
+    if (kodikResponse) return kodikResponse;
     try {
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
