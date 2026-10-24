@@ -4,6 +4,7 @@ import { completeTelegramBrowserAuth, confirmTelegramBrowserAuth } from "@/data/
 type TelegramEnvironment = Record<string, unknown> & {
   TELEGRAM_BOT_TOKEN?: string;
   TELEGRAM_WEBHOOK_SECRET?: string;
+  TELEGRAM_ALLOWED_USERNAMES?: string;
 };
 type TelegramUpdate = {
   message?: {
@@ -42,8 +43,12 @@ export async function handleTelegramWebhook(request: Request): Promise<Response>
   const env = environment();
   const token = typeof env.TELEGRAM_BOT_TOKEN === "string" ? env.TELEGRAM_BOT_TOKEN.trim() : "";
   const secret = typeof env.TELEGRAM_WEBHOOK_SECRET === "string" ? env.TELEGRAM_WEBHOOK_SECRET.trim() : "";
-  if (!token || !secret) {
-    console.error("[YUME][TELEGRAM_BOT] Missing TELEGRAM_BOT_TOKEN or TELEGRAM_WEBHOOK_SECRET.");
+  const allowedUsernames = (typeof env.TELEGRAM_ALLOWED_USERNAMES === "string" ? env.TELEGRAM_ALLOWED_USERNAMES : "")
+    .split(",")
+    .map((username) => username.trim().replace(/^@/, "").toLowerCase())
+    .filter(Boolean);
+  if (!token || !secret || allowedUsernames.length === 0) {
+    console.error("[YUME][TELEGRAM_BOT] Missing TELEGRAM_BOT_TOKEN, TELEGRAM_WEBHOOK_SECRET, or TELEGRAM_ALLOWED_USERNAMES.");
     return json({ ok: false, error: "Webhook is not configured" }, 503);
   }
 
@@ -66,6 +71,13 @@ export async function handleTelegramWebhook(request: Request): Promise<Response>
   }
 
   const message = update.message;
+  const senderUsername = message?.from?.username?.trim().replace(/^@/, "").toLowerCase() ?? "";
+  // Fail closed: Telegram usernames are used as requested, but users without a
+  // username or outside the Cloudflare allowlist cannot invoke any bot action.
+  if (!senderUsername || !allowedUsernames.includes(senderUsername)) {
+    return json({ ok: true, ignored: true });
+  }
+
   const text = message?.text?.trim() ?? "";
   const chatId = message?.chat?.id;
   const isStartCommand = /^\/start(?:@\w+)?(?:\s|$)/.test(text);
