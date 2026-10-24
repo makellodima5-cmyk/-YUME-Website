@@ -13,6 +13,8 @@ export default defineConfig({
   base: "./",
   plugins: [
     tanstackStart({
+      // Reuse the project SSR wrapper for prerender diagnostics and safe error handling.
+      server: { entry: "server" },
       spa: {
         enabled: true,
         prerender: {
