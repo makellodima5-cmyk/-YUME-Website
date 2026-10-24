@@ -172,6 +172,15 @@ function AnimeDetailPage() {
     void navigate({ to: "/", search: { section: "home" } });
   };
 
+  const navigateToProfile = () => {
+    void fetch("/api/telegram/init-data", { credentials: "same-origin", cache: "no-store" })
+      .then(async (response) => {
+        const result = await response.json().catch(() => ({})) as { authenticated?: boolean };
+        navigateToSection(response.ok && result.authenticated === true ? "profile" : "login");
+      })
+      .catch(() => navigateToSection("login"));
+  };
+
   const scrollToPlayer = () => {
     playerSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
@@ -182,7 +191,7 @@ function AnimeDetailPage() {
         <Header
           view="catalog"
           setView={navigateToSection}
-          onProfile={() => navigateToSection("profile")}
+          onProfile={navigateToProfile}
         />
         <main id="main-content" className="px-4 pt-28 md:px-10 md:pt-32">
           <div className="mx-auto max-w-3xl rounded-3xl border border-border bg-card p-8 text-center">
