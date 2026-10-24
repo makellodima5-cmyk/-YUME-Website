@@ -357,6 +357,12 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
       setWatchlistIds([]);
       setSavedAnime([]);
       setCheckedSavedIds([]);
+      try {
+        window.localStorage.removeItem("yume-user-notifications-read-v1");
+        window.localStorage.removeItem("yume-user-notifications-dismissed-v1");
+      } catch {
+        // Local notification state is optional browser-side data.
+      }
       setShowDeleteConfirm(false);
       setAccountMessage(language === "ru"
         ? "Аккаунт и связанные с ним данные удалены. Можно зарегистрироваться заново."
