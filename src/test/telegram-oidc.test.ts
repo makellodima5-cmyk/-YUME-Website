@@ -1,0 +1,39 @@
+import { afterEach, describe, expect, it } from "vitest";
+import { env as cloudflareEnv } from "cloudflare:workers";
+import { handleTelegramOidc } from "@/data/telegram-oidc.server";
+
+class FakeStatement {
+  bind(..._values: unknown[]) { return this; }
+  async run() { return { meta: { changes: 1 } }; }
+  async first<T = Record<string, unknown>>(): Promise<T | null> { return null; }
+}
+class FakeDb {
+  prepare(_sql: string) { return new FakeStatement(); }
+  async batch(_statements: unknown[]) { return []; }
+}
+
+afterEach(() => {
+  delete cloudflareEnv.YUME_DB;
+  delete cloudflareEnv.YUME_AUTH_SESSION_SECRET;
+  delete cloudflareEnv.TELEGRAM_OIDC_CLIENT_ID;
+  delete cloudflareEnv.TELEGRAM_OIDC_CLIENT_SECRET;
+});
+
+describe("Telegram OIDC browser binding", () => {
+  it("rejects a callback without the browser-bound state cookie", async () => {
+    Object.assign(cloudflareEnv, {
+      YUME_DB: new FakeDb(),
+      YUME_AUTH_SESSION_SECRET: "test-session-secret-with-at-least-32-characters",
+      TELEGRAM_OIDC_CLIENT_ID: "test-client-id",
+      TELEGRAM_OIDC_CLIENT_SECRET: "test-client-secret",
+    });
+
+    const response = await handleTelegramOidc(new Request(
+      "https://yume.test/api/telegram/oidc/callback?code=attacker-code&state=attacker-state",
+    ));
+
+    expect(response.status).toBe(302);
+    expect(response.headers.get("location")).toContain("telegram_login_state_mismatch");
+    expect(response.headers.get("set-cookie")).toContain("__Host-yume-oidc-state=;");
+  });
+});
