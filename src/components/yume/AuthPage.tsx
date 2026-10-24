@@ -114,25 +114,9 @@ export function AuthPage({ mode, language, onModeChange, onPrivacy, onRules, onC
         return;
       }
 
-      const response = await fetch("/api/telegram/browser-auth", {
-        method: "POST",
-        credentials: "same-origin",
-        cache: "no-store",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ flow: mode, privacyConsent: isRegister && consentAccepted }),
-      });
-      const result = await response.json().catch(() => ({})) as BrowserStart;
-      if (!response.ok || !result.requestId || !result.botUrl || !result.confirmationCode) {
-        throw new Error(result.error === "telegram_bot_unavailable"
-          ? (isRu ? "Авторизация Telegram временно недоступна." : "Telegram sign-in is temporarily unavailable.")
-          : (isRu ? "Не удалось подготовить авторизацию. Попробуй ещё раз." : "Could not start authentication. Try again."));
-      }
-      setRequestId(result.requestId);
-      setConfirmationCode(result.confirmationCode);
-      setBotUrl(result.botUrl);
-      setMessage(isRu
-        ? "Открой бота YUME и нажми Start. Затем отправь боту код, показанный ниже. Вход завершится только после подтверждения кода."
-        : "Open the YUME bot and press Start. Then send the bot the code shown below. Sign-in completes only after the code is confirmed.");
+      // Browser authentication uses Telegram's official OIDC Authorization Code + PKCE flow.
+      window.location.assign("/api/telegram/oidc?flow=" + encodeURIComponent(mode) + (isRegister ? "&consent=1" : ""));
+      return;
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : (isRu ? "Ошибка авторизации." : "Authentication error."));
     } finally {
