@@ -26,9 +26,6 @@ export default defineConfig({
     tailwindcss(),
     tsConfigPaths(),
   ],
-  define: {
-    __YUME_ANDROID_BUILD__: JSON.stringify(true),
-  },
   resolve: {
     // The shell prerender runs in Node; never substitute this stub in the Worker build.
     alias: {
