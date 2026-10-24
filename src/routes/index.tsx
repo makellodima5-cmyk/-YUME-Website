@@ -539,12 +539,17 @@ function Index() {
   }, [isTelegramMiniApp, telegramConsentPending, view]);
 
   useEffect(() => {
-    try {
-      const consent = JSON.parse(window.localStorage.getItem("yume-cookie-consent-v1") ?? "null") as { necessary?: unknown } | null;
-      setCookieNoticeAcknowledged(consent?.necessary === true);
-    } catch {
-      setCookieNoticeAcknowledged(false);
-    }
+    const syncConsent = () => {
+      try {
+        const consent = JSON.parse(window.localStorage.getItem("yume-cookie-consent-v1") ?? "null") as { necessary?: unknown } | null;
+        setCookieNoticeAcknowledged(consent?.necessary === true);
+      } catch {
+        setCookieNoticeAcknowledged(false);
+      }
+    };
+    syncConsent();
+    window.addEventListener("yume-cookie-consent-updated", syncConsent);
+    return () => window.removeEventListener("yume-cookie-consent-updated", syncConsent);
   }, []);
 
   const acceptTelegramConsent = async () => {
@@ -916,20 +921,7 @@ function Index() {
     }
   };
 
-  const acknowledgeCookieNotice = (acceptAnalytics: boolean) => {
-    try {
-      window.localStorage.setItem("yume-cookie-consent-v1", JSON.stringify({
-        necessary: true,
-        analytics: acceptAnalytics,
-        updatedAt: new Date().toISOString(),
-        version: 1,
-      }));
-    } catch {
-      // The choice only persists when browser storage is available.
-    }
-    setCookieNoticeAcknowledged(true);
-    if (acceptAnalytics) trackYumePage(window.location.pathname + "#" + String(view));
-  };
+
 
   // Keep the selected section aligned with the URL, including browser Back/Forward.
   useEffect(() => {
@@ -1268,42 +1260,7 @@ function Index() {
       {isTelegramMiniApp && telegramAuthError && !telegramConsentRequired && (
         <div role="alert" className="fixed inset-x-3 bottom-3 z-[70] mx-auto max-w-lg rounded-xl border border-destructive/30 bg-background/95 px-4 py-3 text-sm text-foreground shadow-xl">{telegramAuthError}</div>
       )}
-      {view === "home" && !cookieNoticeAcknowledged && (
-        <aside
-          aria-label={language === "en" ? "Privacy and storage choices" : "Настройки cookies и аналитики"}
-          className="fixed inset-x-3 bottom-3 z-[60] mx-auto flex max-w-5xl flex-col gap-3 rounded-2xl border border-primary/25 bg-background/95 p-4 shadow-2xl backdrop-blur-md sm:inset-x-5 sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:px-6 sm:py-4"
-        >
-          <p className="max-w-3xl text-center text-sm leading-relaxed text-foreground/90 sm:text-left">
-            {language === "en"
-              ? "YUME uses essential storage for sign-in and core features. Optional analytics uses pseudonymous identifiers in this browser's local storage. You can allow only essential storage or accept all."
-              : "YUME использует необходимые данные хранения для входа и работы основных функций. Необязательная аналитика использует псевдонимные идентификаторы в localStorage этого браузера. Можно разрешить только необходимое или принять всё."}
-            {" "}
-            <button
-              type="button"
-              onClick={() => setView("privacy-policy")}
-              className="inline cursor-pointer text-primary underline decoration-primary/70 underline-offset-4 transition-colors hover:text-primary/80"
-            >
-              {language === "en" ? "Privacy Policy" : "Политика конфиденциальности"}
-            </button>
-          </p>
-          <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
-            <button
-              type="button"
-              onClick={() => acknowledgeCookieNotice(false)}
-              className="inline-flex min-h-10 items-center justify-center rounded-xl border border-border bg-card px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              {language === "en" ? "Essential only" : "Только необходимые"}
-            </button>
-            <button
-              type="button"
-              onClick={() => acknowledgeCookieNotice(true)}
-              className="inline-flex min-h-10 items-center justify-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              {language === "en" ? "Accept all" : "Принять все"}
-            </button>
-          </div>
-        </aside>
-      )}
+
       {apiError && view !== "privacy-policy" && (
         <div role="alert" className="mx-4 mt-20 rounded-xl border border-amber-400/25 bg-amber-400/10 px-4 py-3 text-sm text-amber-100 md:mx-10">
           {t("source.errorBanner")}
