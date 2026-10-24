@@ -20,7 +20,9 @@ function normalizeApiBaseUrl(value: string): string {
 
 /** True in the dedicated Android build, including its prerender process. */
 export function isAndroidBuild(): boolean {
+  const runtimeMode = typeof process !== "undefined" ? process.env?.YUME_ANDROID_BUILD : undefined;
   return (
+    runtimeMode === "true" ||
     import.meta.env?.MODE === "android" ||
     (typeof __YUME_ANDROID_BUILD__ !== "undefined" && __YUME_ANDROID_BUILD__ === true)
   );
