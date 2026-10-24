@@ -132,10 +132,9 @@ export async function handleNotifications(request: Request): Promise<Response> {
     const userId = await authenticatedUserId(request, db, environment());
 
     if (request.method === "GET") {
-      const state = userId
-        ? await readNotificationState(db, userId)
-        : { readIds: [] as string[], dismissedIds: [] as string[] };
-      return json({ notifications: USER_NOTIFICATIONS, authenticated: Boolean(userId), ...state });
+      if (!userId) return json({ error: "authentication_required", authenticated: false }, 401);
+      const state = await readNotificationState(db, userId);
+      return json({ notifications: USER_NOTIFICATIONS, authenticated: true, ...state });
     }
 
     if (!userId) return json({ error: "authentication_required", authenticated: false }, 401);
