@@ -29,5 +29,10 @@ export default defineConfig({
   build: {
     outDir: "dist",
     emptyOutDir: true,
+    rolldownOptions: {
+      // The server bundle is emitted by TanStack Start but never runs in the APK.
+      // Cloudflare provides this runtime module only when deployed as a Worker.
+      external: ["cloudflare:workers"],
+    },
   },
 });
