@@ -187,7 +187,7 @@ function RootComponent() {
       <YumePreferencesProvider>
         <DocumentLanguageSync />
         <SkipToContent />
-        <CookieConsentBanner />
+        <CookieConsentBanner isHome={pathname === "/"} />
         <Outlet />
       </YumePreferencesProvider>
     </QueryClientProvider>
