@@ -147,6 +147,7 @@ export async function handleTelegramOidc(request: Request): Promise<Response> {
       method: "POST", cache: "no-store",
       headers: { "Content-Type": "application/x-www-form-urlencoded", Authorization: "Basic " + btoa(clientId + ":" + clientSecret) },
       body: new URLSearchParams({ grant_type: "authorization_code", code, redirect_uri: redirectUri, client_id: clientId, code_verifier: pending.verifier }),
+      signal: AbortSignal.timeout(5_000),
     });
     if (!tokenResponse.ok) return errorRedirect(origin, "telegram_login_failed");
     const tokenPayload = await tokenResponse.json() as { id_token?: unknown };
