@@ -15,7 +15,7 @@ type Statement = {
 };
 type Database = { prepare(sql: string): Statement; batch(statements: Statement[]): Promise<unknown[]> };
 type StateRow = { state_hash: string; nonce: string; verifier: string; flow: "login" | "register"; privacy_consent: number; expires_at: number };
-type Claims = { iss?: unknown; aud?: unknown; exp?: unknown; iat?: unknown; nonce?: unknown; sub?: unknown; id?: unknown; name?: unknown; given_name?: unknown; family_name?: unknown; preferred_username?: unknown; picture?: unknown };
+type Claims = { iss?: unknown; aud?: unknown; azp?: unknown; exp?: unknown; iat?: unknown; nonce?: unknown; sub?: unknown; id?: unknown; name?: unknown; given_name?: unknown; family_name?: unknown; preferred_username?: unknown; picture?: unknown };
 type Jwk = JsonWebKey & { kid?: string; alg?: string; use?: string };
 const COOKIE = "__Host-yume-session";
 const TTL = 30 * 24 * 60 * 60;
@@ -79,18 +79,21 @@ async function verifyIdToken(token: string, clientId: string, nonce: string): Pr
     claims = JSON.parse(atob(parts[1]!.replace(/-/g, "+").replace(/_/g, "/"))) as Claims;
   } catch { return null; }
   if (header.alg !== "RS256" || !header.kid) return null;
-  const jwksResponse = await fetch("https://oauth.telegram.org/.well-known/jwks.json", { cache: "no-store" });
+  const jwksResponse = await fetch("https://oauth.telegram.org/.well-known/jwks.json", { cache: "no-store", signal: AbortSignal.timeout(5_000) });
   if (!jwksResponse.ok) return null;
   const jwks = await jwksResponse.json() as { keys?: Jwk[] };
-  const jwk = jwks.keys?.find(key => key.kid === header.kid && key.alg !== "ES256" && key.use !== "enc");
+  const jwk = jwks.keys?.find(key => key.kid === header.kid && key.kty === "RSA" && (key.alg === undefined || key.alg === "RS256") && (key.use === undefined || key.use === "sig"));
   if (!jwk) return null;
   const key = await crypto.subtle.importKey("jwk", jwk, { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["verify"]);
   const signature = Uint8Array.from(atob(parts[2]!.replace(/-/g, "+").replace(/_/g, "/")), c => c.charCodeAt(0));
   const validSignature = await crypto.subtle.verify("RSASSA-PKCS1-v1_5", key, signature, encoder.encode(parts[0] + "." + parts[1]));
   const aud = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
-  if (!validSignature || claims.iss !== "https://oauth.telegram.org" || !aud.includes(clientId) || claims.nonce !== nonce ||
-      typeof claims.exp !== "number" || claims.exp <= Math.floor(Date.now() / 1000) ||
-      typeof claims.iat !== "number" || claims.iat > Math.floor(Date.now() / 1000) + 60) return null;
+  const now = Math.floor(Date.now() / 1000);
+  const multipleAudiences = aud.length > 1;
+  if (!validSignature || claims.iss !== "https://oauth.telegram.org" || !aud.includes(clientId) ||
+      (multipleAudiences && claims.azp !== clientId) || claims.nonce !== nonce ||
+      typeof claims.exp !== "number" || claims.exp <= now ||
+      typeof claims.iat !== "number" || claims.iat > now + 60 || now - claims.iat > 600) return null;
   return claims;
 }
 
