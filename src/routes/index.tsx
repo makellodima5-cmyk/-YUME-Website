@@ -92,6 +92,17 @@ export const Route = createFileRoute("/")({
   },
   validateSearch: validateCatalogSearch,
   loader: async () => {
+    // During SPA-shell prerender there is no Capacitor runtime and no Worker D1
+    // binding. Emit an empty shell; the native client fetches live data on launch.
+    if (import.meta.env.VITE_YUME_ANDROID_BUILD === "true" && !isNativeYumeApp()) {
+      return {
+        anime: [],
+        popular: [],
+        apiError: null,
+        catalogProgress: { status: "seeding" as const, imported: 0, target: 1000 },
+      };
+    }
+
     // User-facing catalogue reads only the persistent D1 dataset.
     let catalog: Awaited<ReturnType<typeof getShikimoriCatalog>>;
     if (isNativeYumeApp()) {
