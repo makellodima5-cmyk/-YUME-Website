@@ -24,6 +24,7 @@ export interface TelegramWebApp {
   contentSafeAreaInset?: { top?: number; right?: number; bottom?: number; left?: number };
   ready(): void;
   expand(): void;
+  openTelegramLink?(url: string): void;
   disableVerticalSwipes?(): void;
   onEvent?(eventType: string, eventHandler: () => void): void;
   offEvent?(eventType: string, eventHandler: () => void): void;
