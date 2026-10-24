@@ -1,4 +1,5 @@
 import "./lib/error-capture";
+import { env as cloudflareEnv } from "cloudflare:workers";
 
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
@@ -15,6 +16,39 @@ type SupportBindings = {
   SUPPORT_GROUP_URL?: string;
   SUPPORT_PERSONAL_URL?: string;
 };
+
+type RuntimeGlobal = typeof globalThis & { __YUME_RUNTIME_ENV__?: unknown };
+
+function supportEnvironment(fallbackEnv: unknown): SupportBindings {
+  let nativeEnv: Record<string, unknown> | null = null;
+  try {
+    const value = cloudflareEnv as unknown as Record<string, unknown>;
+    if (value && typeof value === "object") nativeEnv = value;
+  } catch {
+    // Local adapters and tests may not provide Cloudflare's request-scoped env.
+  }
+
+  const globalEnv = (globalThis as RuntimeGlobal).__YUME_RUNTIME_ENV__;
+  const injectedEnv = globalEnv && typeof globalEnv === "object"
+    ? globalEnv as Record<string, unknown>
+    : null;
+  const passedEnv = fallbackEnv && typeof fallbackEnv === "object"
+    ? fallbackEnv as Record<string, unknown>
+    : null;
+
+  const readValue = (key: keyof SupportBindings): string | undefined => {
+    for (const candidate of [nativeEnv, passedEnv, injectedEnv]) {
+      const value = candidate?.[key];
+      if (typeof value === "string" && value.trim()) return value;
+    }
+    return undefined;
+  };
+
+  return {
+    SUPPORT_GROUP_URL: readValue("SUPPORT_GROUP_URL"),
+    SUPPORT_PERSONAL_URL: readValue("SUPPORT_PERSONAL_URL"),
+  };
+}
 
 function normalizeSupportDestination(bindingName: keyof SupportBindings, configuredValue: string): URL | null {
   const value = configuredValue.trim();
@@ -54,7 +88,7 @@ function getSupportRedirect(request: Request, env: unknown): Response | null {
 
   if (!bindingName || !["GET", "HEAD"].includes(request.method)) return null;
 
-  const bindings = env as SupportBindings;
+  const bindings = supportEnvironment(env);
   const configuredValue = bindings[bindingName];
   const destination = typeof configuredValue === "string"
     ? normalizeSupportDestination(bindingName, configuredValue)
