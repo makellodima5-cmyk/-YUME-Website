@@ -185,6 +185,17 @@ describe("Telegram Mini App initData validation", () => {
     expect(await response.json()).toEqual({ error: "cross_origin_request" });
   });
 
+  it("rejects session creation when browser origin signals are absent", async () => {
+    const response = await handleTelegramSession(new Request("https://yume.test/api/telegram/init-data", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{not-json",
+    }));
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: "cross_origin_request" });
+  });
+
   it("rejects missing or malformed user identity", async () => {
     const now = Date.now();
     const initData = await signInitData({

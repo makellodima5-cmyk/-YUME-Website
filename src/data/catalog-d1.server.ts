@@ -280,8 +280,15 @@ export async function getPersistentAnimeDetails(id: string): Promise<{ anime: An
 
   const anime = rowToAnime(row);
   const candidates = await db.prepare(
-    "SELECT * FROM anime_catalog WHERE id <> ? ORDER BY COALESCE(rating, -1) DESC, position ASC LIMIT 100",
-  ).bind(id).all<AnimeRow>();
+    `SELECT a.* FROM anime_catalog AS a
+     WHERE a.id <> ?
+     ORDER BY (
+       SELECT COUNT(*)
+       FROM json_each(CASE WHEN json_valid(a.genres_json) THEN a.genres_json ELSE '[]' END) AS candidate_genre
+       WHERE candidate_genre.value IN (SELECT value FROM json_each(?))
+     ) DESC, COALESCE(a.rating, -1) DESC, a.position ASC
+     LIMIT 100`,
+  ).bind(id, JSON.stringify(anime.genres)).all<AnimeRow>();
 
   return {
     anime,

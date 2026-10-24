@@ -209,15 +209,26 @@ type SavedAnimeRow = { anime_id: string };
 type AuthenticatedSessionRow = { user_id: string; expires_at: number };
 
 function isSameOriginRequest(request: Request): boolean {
+  const expectedOrigin = new URL(request.url).origin;
   const origin = request.headers.get("origin");
   if (origin) {
     try {
-      return new URL(origin).origin === new URL(request.url).origin;
+      return new URL(origin).origin === expectedOrigin;
     } catch {
       return false;
     }
   }
-  return request.headers.get("sec-fetch-site") !== "cross-site";
+
+  const referer = request.headers.get("referer");
+  if (referer) {
+    try {
+      return new URL(referer).origin === expectedOrigin;
+    } catch {
+      return false;
+    }
+  }
+
+  return request.headers.get("sec-fetch-site") === "same-origin";
 }
 
 async function authenticatedTelegramUserId(request: Request, db: TelegramDatabase, secret: string): Promise<string | null> {
