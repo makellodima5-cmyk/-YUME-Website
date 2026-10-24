@@ -354,6 +354,223 @@ export async function handleTelegramLibrary(request: Request): Promise<Response>
   }
 }
 
+
+
+type BrowserAuthRow = {
+  token_hash: string;
+  flow: "login" | "register";
+  privacy_consent: number;
+  status: "pending" | "ready" | "consuming" | "consumed" | "error";
+  user_id: string | null;
+  error_code: string | null;
+  expires_at: number;
+};
+
+const browserAuthSchemaPromises = new WeakMap<object, Promise<void>>();
+
+async function ensureBrowserAuthSchema(db: TelegramDatabase): Promise<void> {
+  const key = db as object;
+  const cached = browserAuthSchemaPromises.get(key);
+  if (cached) return cached;
+  const pending = db.batch([
+    db.prepare("CREATE TABLE IF NOT EXISTS yume_browser_auth (token_hash TEXT PRIMARY KEY NOT NULL, flow TEXT NOT NULL CHECK (flow IN ('login','register')), privacy_consent INTEGER NOT NULL DEFAULT 0 CHECK (privacy_consent IN (0,1)), status TEXT NOT NULL CHECK (status IN ('pending','ready','consuming','consumed','error')), user_id TEXT REFERENCES yume_users(id) ON DELETE CASCADE, error_code TEXT, expires_at INTEGER NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)"),
+    db.prepare("CREATE INDEX IF NOT EXISTS idx_yume_browser_auth_expiry ON yume_browser_auth(expires_at)"),
+  ]).then(() => undefined).catch((error) => {
+    browserAuthSchemaPromises.delete(key);
+    throw error;
+  });
+  browserAuthSchemaPromises.set(key, pending);
+  return pending;
+}
+
+/**
+ * Completes a short-lived browser login request from a Telegram /start update.
+ * The raw browser token is never stored in D1; Telegram's webhook is authenticated
+ * separately with TELEGRAM_WEBHOOK_SECRET before this function is called.
+ */
+export async function completeTelegramBrowserAuth(
+  startParameter: string,
+  telegramUser: TelegramValidatedUser,
+): Promise<"ready" | "account_not_found" | "already_registered" | "expired" | "unavailable"> {
+  const token = startParameter.startsWith("yb_") ? startParameter.slice(3) : "";
+  if (!/^[A-Za-z0-9_-]{30,60}$/.test(token)) return "expired";
+  const env = environment();
+  const db = database(env);
+  const secret = sessionSecret(env);
+  if (!db || !secret) return "unavailable";
+  try {
+    await ensureSchema(db);
+    await ensureBrowserAuthSchema(db);
+    const tokenHash = await sessionTokenHash(token, secret);
+    const pending = await db.prepare("SELECT token_hash, flow, privacy_consent, status, user_id, error_code, expires_at FROM yume_browser_auth WHERE token_hash = ?")
+      .bind(tokenHash).first<BrowserAuthRow>();
+    if (!pending || pending.status !== "pending" || pending.expires_at <= Date.now()) return "expired";
+
+    let user = await findTelegramUser(db, telegramUser.id);
+    let errorCode: string | null = null;
+    if (pending.flow === "login" && !user) {
+      errorCode = "account_not_found";
+    } else if (pending.flow === "register" && user) {
+      errorCode = "already_registered";
+    } else if (pending.flow === "register" && pending.privacy_consent !== 1) {
+      errorCode = "consent_required";
+    } else if (!user) {
+      user = await upsertTelegramUser(db, telegramUser);
+      if (!user) throw new Error("TELEGRAM_BROWSER_USER_UPSERT_FAILED");
+    } else {
+      await db.prepare("UPDATE yume_users SET telegram_first_name = ?, telegram_last_name = ?, telegram_username = ?, telegram_language_code = ? WHERE telegram_user_id = ?")
+        .bind(telegramUser.firstName, telegramUser.lastName ?? null, telegramUser.username ?? null, telegramUser.languageCode ?? null, String(telegramUser.id)).run();
+    }
+
+    if (errorCode) {
+      await db.prepare("UPDATE yume_browser_auth SET status = 'error', error_code = ? WHERE token_hash = ? AND status = 'pending'")
+        .bind(errorCode, tokenHash).run();
+      return errorCode === "account_not_found" ? "account_not_found" : "already_registered";
+    }
+    if (!user) throw new Error("TELEGRAM_BROWSER_USER_MISSING");
+    await db.prepare("UPDATE yume_browser_auth SET status = 'ready', user_id = ? WHERE token_hash = ? AND status = 'pending' AND expires_at > ?")
+      .bind(user.id, tokenHash, Date.now()).run();
+    return "ready";
+  } catch (error) {
+    console.error("[YUME] Telegram browser auth completion failed:", error);
+    return "unavailable";
+  }
+}
+
+/** Browser login/register handshake using an expiring single-use Telegram bot deep link. */
+export async function handleTelegramBrowserAuth(request: Request): Promise<Response> {
+  if (request.method !== "POST" && request.method !== "GET") {
+    return jsonResponse({ error: "method_not_allowed" }, 405);
+  }
+
+  const env = environment();
+  const db = database(env);
+  const secret = sessionSecret(env);
+  const botToken = typeof env.TELEGRAM_BOT_TOKEN === "string" ? env.TELEGRAM_BOT_TOKEN.trim() : "";
+  if (!db || !secret || !botToken) return jsonResponse({ error: "telegram_auth_not_configured" }, 503);
+
+  try {
+    await ensureSchema(db);
+    await ensureBrowserAuthSchema(db);
+
+    if (request.method === "POST") {
+      if (!isSameOriginRequest(request)) return jsonResponse({ error: "cross_origin_request" }, 403);
+      let input: Record<string, unknown>;
+      try {
+        const raw = await request.text();
+        if (raw.length > 4_096) return jsonResponse({ error: "request_too_large" }, 413);
+        const parsed: unknown = JSON.parse(raw);
+        if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return jsonResponse({ error: "invalid_request" }, 400);
+        input = parsed as Record<string, unknown>;
+      } catch {
+        return jsonResponse({ error: "invalid_request" }, 400);
+      }
+      const flow = input.flow;
+      const consent = flow === "register" && input.privacyConsent === true;
+      if ((flow !== "login" && flow !== "register") || (flow === "register" && !consent)) {
+        return jsonResponse({ error: flow === "register" ? "consent_required" : "invalid_request" }, 400);
+      }
+
+      const meResponse = await fetch("https://api.telegram.org/bot" + botToken + "/getMe", { method: "GET", cache: "no-store" });
+      if (!meResponse.ok) return jsonResponse({ error: "telegram_bot_unavailable" }, 503);
+      const me = await meResponse.json() as { ok?: boolean; result?: { username?: unknown } };
+      const username = me.ok === true && typeof me.result?.username === "string" ? me.result.username : "";
+      if (!/^[A-Za-z0-9_]{5,32}$/.test(username)) return jsonResponse({ error: "telegram_bot_unavailable" }, 503);
+
+      const token = randomToken();
+      const tokenHash = await sessionTokenHash(token, secret);
+      const now = Date.now();
+      await db.prepare("DELETE FROM yume_browser_auth WHERE expires_at <= ? OR status IN ('consumed','error')")
+        .bind(now).run();
+      await db.prepare("INSERT INTO yume_browser_auth (token_hash, flow, privacy_consent, status, expires_at) VALUES (?, ?, ?, 'pending', ?)")
+        .bind(tokenHash, flow, consent ? 1 : 0, now + 10 * 60 * 1000).run();
+      return jsonResponse({
+        requestId: token,
+        expiresInSeconds: 600,
+        botUrl: "https://t.me/" + username + "?start=yb_" + token,
+      });
+    }
+
+    const url = new URL(request.url);
+    const token = url.searchParams.get("id") ?? "";
+    if (!/^[A-Za-z0-9_-]{30,60}$/.test(token)) return jsonResponse({ error: "invalid_request" }, 400);
+    const tokenHash = await sessionTokenHash(token, secret);
+    const row = await db.prepare("SELECT token_hash, flow, privacy_consent, status, user_id, error_code, expires_at FROM yume_browser_auth WHERE token_hash = ?")
+      .bind(tokenHash).first<BrowserAuthRow>();
+    if (!row || row.expires_at <= Date.now()) return jsonResponse({ status: "expired" });
+    if (row.status === "error") return jsonResponse({ status: "error", error: row.error_code ?? "auth_failed" });
+    if (row.status !== "ready" || !row.user_id) return jsonResponse({ status: row.status === "consumed" ? "expired" : "pending" });
+    const claim = await db.prepare("UPDATE yume_browser_auth SET status = 'consuming' WHERE token_hash = ? AND status = 'ready' AND expires_at > ?")
+      .bind(tokenHash, Date.now()).run();
+    if (Number(claim.meta?.changes ?? 0) !== 1) return jsonResponse({ status: "pending" });
+    const userExists = await db.prepare("SELECT id FROM yume_users WHERE id = ? AND provider = 'telegram'").bind(row.user_id).first<{ id: string }>();
+    if (!userExists) {
+      await db.prepare("DELETE FROM yume_browser_auth WHERE token_hash = ?").bind(tokenHash).run();
+      return jsonResponse({ status: "error", error: "account_not_found" });
+    }
+    const cookie = await createSession(db, row.user_id, secret);
+    await db.prepare("DELETE FROM yume_browser_auth WHERE token_hash = ?").bind(tokenHash).run();
+    return jsonResponse({ status: "authenticated" }, 200, [cookie]);
+  } catch (error) {
+    console.error("[YUME] Telegram browser auth request failed:", error);
+    return jsonResponse({ error: "browser_auth_unavailable" }, 503);
+  }
+}
+
+/** Permanently removes the current account and all account-linked records. */
+export async function handleTelegramAccountDelete(request: Request): Promise<Response> {
+  if (request.method !== "DELETE") return jsonResponse({ error: "method_not_allowed" }, 405);
+  if (!isSameOriginRequest(request)) return jsonResponse({ error: "cross_origin_request" }, 403);
+  const env = environment();
+  const db = database(env);
+  const secret = sessionSecret(env);
+  const token = readCookie(request, SESSION_COOKIE);
+  if (!db || !secret) return jsonResponse({ error: "telegram_auth_not_configured" }, 503);
+  if (!token) return jsonResponse({ error: "authentication_required" }, 401);
+  try {
+    await ensureSchema(db);
+    await ensureBrowserAuthSchema(db);
+    await ensureSavedAnimeSchema(db);
+    const tokenHash = await sessionTokenHash(token, secret);
+    const session = await db.prepare("SELECT user_id, expires_at FROM yume_sessions WHERE token_hash = ?")
+      .bind(tokenHash).first<AuthenticatedSessionRow>();
+    if (!session || session.expires_at <= Date.now()) {
+      await db.prepare("DELETE FROM yume_sessions WHERE token_hash = ?").bind(tokenHash).run();
+      return jsonResponse({ error: "authentication_required" }, 401, [clearSessionCookie()]);
+    }
+    const userId = session.user_id;
+    // Delete known account-owned tables explicitly as well as relying on FK cascades.
+    await db.batch([
+      db.prepare("DELETE FROM yume_notification_reads WHERE user_id = ?").bind(userId),
+      db.prepare("DELETE FROM yume_notification_dismissals WHERE user_id = ?").bind(userId),
+      db.prepare("DELETE FROM yume_view_history WHERE user_id = ?").bind(userId),
+      db.prepare("DELETE FROM yume_saved_anime WHERE user_id = ?").bind(userId),
+      db.prepare("DELETE FROM yume_sessions WHERE user_id = ?").bind(userId),
+      db.prepare("DELETE FROM yume_users WHERE id = ?").bind(userId),
+    ]);
+    return jsonResponse({ deleted: true }, 200, [clearSessionCookie()]);
+  } catch (error) {
+    // A missing future table should not block account deletion; retry without history-table access.
+    try {
+      const tokenHash = await sessionTokenHash(token, secret);
+      const session = await db.prepare("SELECT user_id, expires_at FROM yume_sessions WHERE token_hash = ?")
+        .bind(tokenHash).first<AuthenticatedSessionRow>();
+      if (!session || session.expires_at <= Date.now()) return jsonResponse({ error: "authentication_required" }, 401, [clearSessionCookie()]);
+      await db.batch([
+        db.prepare("DELETE FROM yume_notification_reads WHERE user_id = ?").bind(session.user_id),
+        db.prepare("DELETE FROM yume_notification_dismissals WHERE user_id = ?").bind(session.user_id),
+        db.prepare("DELETE FROM yume_saved_anime WHERE user_id = ?").bind(session.user_id),
+        db.prepare("DELETE FROM yume_sessions WHERE user_id = ?").bind(session.user_id),
+        db.prepare("DELETE FROM yume_users WHERE id = ?").bind(session.user_id),
+      ]);
+      return jsonResponse({ deleted: true }, 200, [clearSessionCookie()]);
+    } catch (retryError) {
+      console.error("[YUME] Account deletion failed:", retryError, error);
+      return jsonResponse({ error: "account_deletion_failed" }, 503);
+    }
+  }
+}
+
 export async function handleTelegramSession(request: Request): Promise<Response> {
   if (request.method === "DELETE") {
     const env = environment();
