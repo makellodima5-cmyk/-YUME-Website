@@ -31,3 +31,10 @@ jobs:
         run: bun run build
       - name: Build bundled Android web client
         run: bun run build:android:web
+      - name: Verify standalone app shell
+        run: |
+          test -f dist/client/index.html
+          if grep -q 'telegram.org/js/telegram-web-app.js' dist/client/index.html; then
+            echo 'Android shell must not load the Telegram WebApp script.'
+            exit 1
+          fi
