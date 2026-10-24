@@ -376,6 +376,8 @@ type BrowserAuthRow = {
   token_hash: string;
   flow: "login" | "register";
   privacy_consent: number;
+  confirmation_code_hash: string | null;
+  telegram_user_id: string | null;
   status: "pending" | "ready" | "consuming" | "consumed" | "error";
   user_id: string | null;
   error_code: string | null;
@@ -388,10 +390,21 @@ async function ensureBrowserAuthSchema(db: TelegramDatabase): Promise<void> {
   const key = db as object;
   const cached = browserAuthSchemaPromises.get(key);
   if (cached) return cached;
-  const pending = db.batch([
-    db.prepare("CREATE TABLE IF NOT EXISTS yume_browser_auth (token_hash TEXT PRIMARY KEY NOT NULL, flow TEXT NOT NULL CHECK (flow IN ('login','register')), privacy_consent INTEGER NOT NULL DEFAULT 0 CHECK (privacy_consent IN (0,1)), status TEXT NOT NULL CHECK (status IN ('pending','ready','consuming','consumed','error')), user_id TEXT REFERENCES yume_users(id) ON DELETE CASCADE, error_code TEXT, expires_at INTEGER NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)"),
-    db.prepare("CREATE INDEX IF NOT EXISTS idx_yume_browser_auth_expiry ON yume_browser_auth(expires_at)"),
-  ]).then(() => undefined).catch((error) => {
+  const pending = (async () => {
+    await db.batch([
+      db.prepare("CREATE TABLE IF NOT EXISTS yume_browser_auth (token_hash TEXT PRIMARY KEY NOT NULL, flow TEXT NOT NULL CHECK (flow IN ('login','register')), privacy_consent INTEGER NOT NULL DEFAULT 0 CHECK (privacy_consent IN (0,1)), confirmation_code_hash TEXT, telegram_user_id TEXT, status TEXT NOT NULL CHECK (status IN ('pending','ready','consuming','consumed','error')), user_id TEXT REFERENCES yume_users(id) ON DELETE CASCADE, error_code TEXT, expires_at INTEGER NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)"),
+      db.prepare("CREATE INDEX IF NOT EXISTS idx_yume_browser_auth_expiry ON yume_browser_auth(expires_at)"),
+    ]);
+    const columnsResult = await db.prepare("PRAGMA table_info(yume_browser_auth)").all<{ name: string }>();
+    const columns = new Set(columnsResult.results.map((column) => column.name));
+    if (!columns.has("confirmation_code_hash")) {
+      await db.prepare("ALTER TABLE yume_browser_auth ADD COLUMN confirmation_code_hash TEXT").run();
+    }
+    if (!columns.has("telegram_user_id")) {
+      await db.prepare("ALTER TABLE yume_browser_auth ADD COLUMN telegram_user_id TEXT").run();
+    }
+    await db.prepare("CREATE INDEX IF NOT EXISTS idx_yume_browser_auth_confirmation ON yume_browser_auth(confirmation_code_hash, telegram_user_id, status)").run();
+  })().catch((error) => {
     browserAuthSchemaPromises.delete(key);
     throw error;
   });
@@ -400,14 +413,14 @@ async function ensureBrowserAuthSchema(db: TelegramDatabase): Promise<void> {
 }
 
 /**
- * Completes a short-lived browser login request from a Telegram /start update.
- * The raw browser token is never stored in D1; Telegram's webhook is authenticated
- * separately with TELEGRAM_WEBHOOK_SECRET before this function is called.
+ * Associates a Telegram user with a short-lived browser request, but does not
+ * sign them in yet. A separate confirmation code shown only in the initiating
+ * browser must be sent by that same Telegram account to prevent login CSRF.
  */
 export async function completeTelegramBrowserAuth(
   startParameter: string,
   telegramUser: TelegramValidatedUser,
-): Promise<"ready" | "account_not_found" | "already_registered" | "expired" | "unavailable"> {
+): Promise<"awaiting_code" | "account_not_found" | "already_registered" | "expired" | "unavailable"> {
   const token = startParameter.startsWith("yb_") ? startParameter.slice(3) : "";
   if (!/^[A-Za-z0-9_-]{30,60}$/.test(token)) return "expired";
   const env = environment();
@@ -418,42 +431,85 @@ export async function completeTelegramBrowserAuth(
     await ensureSchema(db);
     await ensureBrowserAuthSchema(db);
     const tokenHash = await sessionTokenHash(token, secret);
-    const pending = await db.prepare("SELECT token_hash, flow, privacy_consent, status, user_id, error_code, expires_at FROM yume_browser_auth WHERE token_hash = ?")
+    const pending = await db.prepare("SELECT token_hash, flow, privacy_consent, confirmation_code_hash, telegram_user_id, status, user_id, error_code, expires_at FROM yume_browser_auth WHERE token_hash = ?")
       .bind(tokenHash).first<BrowserAuthRow>();
     if (!pending || pending.status !== "pending" || pending.expires_at <= Date.now()) return "expired";
+    const telegramId = String(telegramUser.id);
+    if (pending.telegram_user_id && pending.telegram_user_id !== telegramId) return "expired";
 
-    let user = await findTelegramUser(db, telegramUser.id);
+    const user = await findTelegramUser(db, telegramUser.id);
     let errorCode: string | null = null;
-    if (pending.flow === "login" && !user) {
-      errorCode = "account_not_found";
-    } else if (pending.flow === "register" && user) {
-      errorCode = "already_registered";
-    } else if (pending.flow === "register" && pending.privacy_consent !== 1) {
-      errorCode = "consent_required";
-    } else if (!user) {
-      user = await upsertTelegramUser(db, telegramUser);
-      if (!user) throw new Error("TELEGRAM_BROWSER_USER_UPSERT_FAILED");
-    } else {
-      await db.prepare("UPDATE yume_users SET telegram_first_name = ?, telegram_last_name = ?, telegram_username = ?, telegram_language_code = ? WHERE telegram_user_id = ?")
-        .bind(telegramUser.firstName, telegramUser.lastName ?? null, telegramUser.username ?? null, telegramUser.languageCode ?? null, String(telegramUser.id)).run();
-    }
+    if (pending.flow === "login" && !user) errorCode = "account_not_found";
+    else if (pending.flow === "register" && user) errorCode = "already_registered";
+    else if (pending.flow === "register" && pending.privacy_consent !== 1) errorCode = "consent_required";
 
     if (errorCode) {
       await db.prepare("UPDATE yume_browser_auth SET status = 'error', error_code = ? WHERE token_hash = ? AND status = 'pending'")
         .bind(errorCode, tokenHash).run();
       return errorCode === "account_not_found" ? "account_not_found" : "already_registered";
     }
-    if (!user) throw new Error("TELEGRAM_BROWSER_USER_MISSING");
-    await db.prepare("UPDATE yume_browser_auth SET status = 'ready', user_id = ? WHERE token_hash = ? AND status = 'pending' AND expires_at > ?")
-      .bind(user.id, tokenHash, Date.now()).run();
-    return "ready";
+
+    const association = await db.prepare("UPDATE yume_browser_auth SET telegram_user_id = ? WHERE token_hash = ? AND status = 'pending' AND expires_at > ? AND (telegram_user_id IS NULL OR telegram_user_id = ?)")
+      .bind(telegramId, tokenHash, Date.now(), telegramId).run();
+    if (Number(association.meta?.changes ?? 0) !== 1) return "expired";
+    return "awaiting_code";
   } catch (error) {
-    console.error("[YUME] Telegram browser auth completion failed:", error);
+    console.error("[YUME] Telegram browser auth association failed:", error);
     return "unavailable";
   }
 }
 
-/** Browser login/register handshake using an expiring single-use Telegram bot deep link. */
+/** Validates a browser-only code sent by the same Telegram account that opened the deep link. */
+export async function confirmTelegramBrowserAuth(
+  confirmationCode: string,
+  telegramUser: TelegramValidatedUser,
+): Promise<"ready" | "account_not_found" | "already_registered" | "expired" | "unavailable"> {
+  const code = confirmationCode.trim();
+  if (!/^[A-Za-z0-9_-]{8}$/.test(code)) return "expired";
+  const env = environment();
+  const db = database(env);
+  const secret = sessionSecret(env);
+  if (!db || !secret) return "unavailable";
+  try {
+    await ensureSchema(db);
+    await ensureBrowserAuthSchema(db);
+    const codeHash = await sessionTokenHash(code, secret);
+    const telegramId = String(telegramUser.id);
+    const pending = await db.prepare("SELECT token_hash, flow, privacy_consent, confirmation_code_hash, telegram_user_id, status, user_id, error_code, expires_at FROM yume_browser_auth WHERE confirmation_code_hash = ? AND telegram_user_id = ? ORDER BY expires_at DESC LIMIT 1")
+      .bind(codeHash, telegramId).first<BrowserAuthRow>();
+    if (!pending || pending.status !== "pending" || pending.expires_at <= Date.now()) return "expired";
+
+    let user = await findTelegramUser(db, telegramUser.id);
+    let errorCode: string | null = null;
+    if (pending.flow === "login" && !user) errorCode = "account_not_found";
+    else if (pending.flow === "register" && user) errorCode = "already_registered";
+    else if (pending.flow === "register" && pending.privacy_consent !== 1) errorCode = "consent_required";
+
+    if (errorCode) {
+      await db.prepare("UPDATE yume_browser_auth SET status = 'error', error_code = ? WHERE token_hash = ? AND status = 'pending'")
+        .bind(errorCode, pending.token_hash).run();
+      return errorCode === "account_not_found" ? "account_not_found" : "already_registered";
+    }
+
+    if (!user) {
+      user = await upsertTelegramUser(db, telegramUser);
+    } else {
+      await db.prepare("UPDATE yume_users SET telegram_first_name = ?, telegram_last_name = ?, telegram_username = ?, telegram_language_code = ? WHERE telegram_user_id = ?")
+        .bind(telegramUser.firstName, telegramUser.lastName ?? null, telegramUser.username ?? null, telegramUser.languageCode ?? null, telegramId).run();
+    }
+    if (!user) throw new Error("TELEGRAM_BROWSER_USER_MISSING");
+
+    const ready = await db.prepare("UPDATE yume_browser_auth SET status = 'ready', user_id = ? WHERE token_hash = ? AND status = 'pending' AND telegram_user_id = ? AND expires_at > ?")
+      .bind(user.id, pending.token_hash, telegramId, Date.now()).run();
+    if (Number(ready.meta?.changes ?? 0) !== 1) return "expired";
+    return "ready";
+  } catch (error) {
+    console.error("[YUME] Telegram browser auth confirmation failed:", error);
+    return "unavailable";
+  }
+}
+
+/** Browser login/register handshake using an expiring, one-time Telegram deep link. */
 export async function handleTelegramBrowserAuth(request: Request): Promise<Response> {
   if (request.method !== "POST" && request.method !== "GET") {
     return jsonResponse({ error: "method_not_allowed" }, 405);
@@ -494,14 +550,17 @@ export async function handleTelegramBrowserAuth(request: Request): Promise<Respo
       if (!/^[A-Za-z0-9_]{5,32}$/.test(username)) return jsonResponse({ error: "telegram_bot_unavailable" }, 503);
 
       const token = randomToken();
+      const confirmationCode = randomToken(6);
       const tokenHash = await sessionTokenHash(token, secret);
+      const confirmationCodeHash = await sessionTokenHash(confirmationCode, secret);
       const now = Date.now();
       await db.prepare("DELETE FROM yume_browser_auth WHERE expires_at <= ? OR status IN ('consumed','error')")
         .bind(now).run();
-      await db.prepare("INSERT INTO yume_browser_auth (token_hash, flow, privacy_consent, status, expires_at) VALUES (?, ?, ?, 'pending', ?)")
-        .bind(tokenHash, flow, consent ? 1 : 0, now + 10 * 60 * 1000).run();
+      await db.prepare("INSERT INTO yume_browser_auth (token_hash, flow, privacy_consent, confirmation_code_hash, status, expires_at) VALUES (?, ?, ?, ?, 'pending', ?)")
+        .bind(tokenHash, flow, consent ? 1 : 0, confirmationCodeHash, now + 10 * 60 * 1000).run();
       return jsonResponse({
         requestId: token,
+        confirmationCode,
         expiresInSeconds: 600,
         botUrl: "https://t.me/" + username + "?start=yb_" + token,
       });
@@ -511,7 +570,7 @@ export async function handleTelegramBrowserAuth(request: Request): Promise<Respo
     const token = url.searchParams.get("id") ?? "";
     if (!/^[A-Za-z0-9_-]{30,60}$/.test(token)) return jsonResponse({ error: "invalid_request" }, 400);
     const tokenHash = await sessionTokenHash(token, secret);
-    const row = await db.prepare("SELECT token_hash, flow, privacy_consent, status, user_id, error_code, expires_at FROM yume_browser_auth WHERE token_hash = ?")
+    const row = await db.prepare("SELECT token_hash, flow, privacy_consent, confirmation_code_hash, telegram_user_id, status, user_id, error_code, expires_at FROM yume_browser_auth WHERE token_hash = ?")
       .bind(tokenHash).first<BrowserAuthRow>();
     if (!row || row.expires_at <= Date.now()) return jsonResponse({ status: "expired" });
     if (row.status === "error") return jsonResponse({ status: "error", error: row.error_code ?? "auth_failed" });
@@ -532,7 +591,6 @@ export async function handleTelegramBrowserAuth(request: Request): Promise<Respo
     return jsonResponse({ error: "browser_auth_unavailable" }, 503);
   }
 }
-
 
 
 const viewHistorySchemaPromises = new WeakMap<object, Promise<void>>();
