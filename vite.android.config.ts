@@ -16,8 +16,8 @@ export default defineConfig({
   },
   plugins: [
     tanstackStart({
-      // Reuse the project SSR wrapper for prerender diagnostics and safe error handling.
-      server: { entry: "server" },
+      // Use TanStack Start's default Node-compatible entry for the static shell.
+      // src/server.ts is the production Cloudflare Worker entry and expects Worker bindings.
       spa: {
         enabled: true,
         prerender: {
