@@ -543,7 +543,7 @@ export async function handleTelegramBrowserAuth(request: Request): Promise<Respo
         return jsonResponse({ error: flow === "register" ? "consent_required" : "invalid_request" }, 400);
       }
 
-      const meResponse = await fetch("https://api.telegram.org/bot" + botToken + "/getMe", { method: "GET", cache: "no-store" });
+      const meResponse = await fetch("https://api.telegram.org/bot" + botToken + "/getMe", { method: "GET", cache: "no-store", signal: AbortSignal.timeout(5_000) });
       if (!meResponse.ok) return jsonResponse({ error: "telegram_bot_unavailable" }, 503);
       const me = await meResponse.json() as { ok?: boolean; result?: { username?: unknown } };
       const username = me.ok === true && typeof me.result?.username === "string" ? me.result.username : "";
