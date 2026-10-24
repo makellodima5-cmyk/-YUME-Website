@@ -2,52 +2,39 @@
 
 ## Product boundary
 
-The Android application is a separately installed app with its own bundled UI. It must not open the hosted YUME website as its application screen and must not require the website HTML to start. The React interface, styles, fonts/assets, navigation, and animations are packaged into the APK.
+YUME for Android is a Capacitor app that packages the React UI, styles, routing, and static assets locally. The app's initial screen is not the hosted website and Capacitor has no `server.url` configured. Network access is used for live data only.
 
-The Android client may call public HTTPS endpoints on the existing Cloudflare Workers deployment. Those endpoints remain the only supported route to shared server data; the APK must never contain Cloudflare credentials, D1 credentials, or a Telegram bot token.
+The Android client must never contain Cloudflare/D1 credentials or a Telegram bot token. Shared server data must be accessed through HTTPS APIs.
 
 ## Branch isolation
 
-All Android work belongs to `feat/android-app`, created from `feat/telegram-mini-app`. Do not commit Android work to `main` or `feat/telegram-mini-app`, and do not merge either branch as part of this task.
+All Android work belongs to `feat/android-app`, created from `feat/telegram-mini-app`. Do not commit Android work to `main` or `feat/telegram-mini-app`, and do not merge either branch as part of this task. Do not deploy the Worker to production without separate approval.
 
-## Data and authentication
+## Current build architecture
 
-- The existing Cloudflare Worker and D1 database (`YUME_DB`) remain the source of truth for the catalogue.
-- The mobile client must use an explicit HTTPS API base URL. It must not assume that same-origin TanStack Start server-function requests can reach the Worker from Capacitor's local app origin.
-- TanStack Start server functions are same-origin RPC endpoints and use request-origin/CSRF protections. Do not expose them to the native app by weakening these protections globally.
-- Define dedicated, versioned mobile-facing API routes for cross-origin/mobile calls where needed. Add strict CORS allow-listing, request validation, rate limits where appropriate, and server-side authentication.
-- Telegram sign-in must validate Telegram Web App `initData` on the server. Never trust the client-provided `initDataUnsafe` user object as authentication.
-- Shared user lists should sync to server storage only through authenticated endpoints. Local-only preferences may remain on-device.
+- `capacitor.config.ts` uses application ID `app.yume.mobile`, display name `YUME`, `webDir: "dist/client"`, HTTPS Android scheme, and disallows cleartext traffic.
+- `vite.android.config.ts` builds the React app in TanStack Start SPA mode. A build-only alias stubs `cloudflare:workers` for Node shell prerendering; the existing Cloudflare build continues to use its normal runtime.
+- The shell build writes `dist/client/index.html`; CI verifies that it exists and does not contain the Telegram WebApp JavaScript SDK.
+- Capacitor 8 packages, generated Android platform files, and the Bun lockfile are in the branch.
+- `bun run build:android:web` builds the local web client. `bun run build:android:apk` builds and syncs the client, then runs Gradle `assembleDebug`.
+- GitHub Actions runs tests, lint, the existing Cloudflare build, the Android shell verification, and the Android debug APK build. It uploads the installable debug APK as `yume-android-debug-apk`.
 
-## Admin separation
+## API and authentication boundary
 
-The Android user interface must not expose admin-only pages, buttons, or operations. Do not remove or change the Telegram Mini App admin panel. Server-side authorization must remain authoritative even if admin controls are hidden from the Android UI.
+The branch contains read-only mobile endpoints for catalogue and anime details, plus a mobile API client that targets the existing HTTPS Worker origin. These new endpoint routes are **not deployed to the production Worker**. Until the routes are deployed through an approved release, live catalogue/details requests from the APK may fail. No Worker deployment is performed by the Android build workflow.
 
-## Build architecture
+Telegram Mini App initialization remains conditional so the native app does not load Telegram's WebApp script or invoke its initialization. The separate native-app Telegram sign-in handoff and secure server-side validation are not yet implemented. Admin operations must remain protected on the server and Telegram-only.
 
-`capacitor.config.ts` is the initial Capacitor configuration. Its `webDir` is `dist`, reserved for the dedicated Android client build. The current repository is a TanStack Start full-stack application whose normal build includes a server runtime; it is not yet safe to assume that the current production build is a static, offline-loadable SPA.
+## Status and verification
 
-Before generating an installable APK, complete and verify the following:
+- [x] Work isolated to `feat/android-app`.
+- [x] Dedicated local SPA shell build passes CI.
+- [x] Automated tests, Android-specific lint, and normal Cloudflare Worker build pass CI.
+- [x] Capacitor Android platform and Bun lockfile generated and committed.
+- [x] Debug APK built successfully in GitHub Actions and uploaded as an artifact.
+- [ ] Install and test on an Android emulator or physical device, including cold start, navigation, preferences, back button, and network errors.
+- [ ] Deploy the mobile API routes through an approved Worker release and verify catalogue/details in the installed app.
+- [ ] Implement and test native authentication/user-data sync if those features are required.
+- [ ] Configure and verify release signing before distribution.
 
-1. Create a dedicated client-only build entry/configuration that bundles the existing React UI into `dist`, including route handling and assets.
-2. Audit and adapt every route loader and `createServerFn` usage required by the mobile UI. Replace assumptions about same-origin server functions with an explicit mobile API client or another verified approach.
-3. Add only the required Capacitor packages and regenerate `bun.lock` using Bun; do not hand-edit lockfile dependency metadata.
-4. Add Android platform files using Capacitor and configure application identity, icons, status/navigation bars, back-button behavior, deep links, and safe-area handling.
-5. Build and test on a real Android device/emulator, including cold start without the website loaded, catalogue loading, navigation, theme/language preferences, Telegram login, and network/API failures.
-6. Run existing tests, lint, and the normal Cloudflare Worker build to detect regressions. Do not deploy Worker changes as part of the APK build.
-
-## Current implementation status
-
-- [x] Isolated `feat/android-app` branch created from `feat/telegram-mini-app`.
-- [x] Initial Capacitor configuration added with bundled-assets intent and a dedicated `dist` web directory.
-- [ ] Dedicated client-only build and route fallback.
-- [ ] Mobile API boundary and cross-origin policy.
-- [ ] Telegram sign-in handoff and secure server validation for native app.
-- [ ] Android platform project, assets, and native behavior.
-- [ ] CI build, APK artifact, and device testing.
-
-No Android APK is considered ready until the unchecked items above are implemented and validated.
-
-### Current blocker
-
-The normal Cloudflare Worker build, tests, and Android-specific lint pass in CI. The dedicated TanStack SPA build still fails during its shell-prerender step: the prerender request to `/` returns HTTP 500 before `dist/client/index.html` is emitted. Do not generate or distribute an APK until the prerender failure is diagnosed and the CI shell verification passes. This is the current blocking issue; it is not yet a working Android build.
+The debug APK is a build artifact, not a device-tested or store-ready release. Keep the production Worker unchanged until a separate deployment is explicitly approved.
