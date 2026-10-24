@@ -18,6 +18,7 @@ import { validateCatalogSearch } from "@/data/catalog-search";
 import homeSocialImage from "@/assets/yume-hero-desktop-new.png.PNG";
 import { absoluteImageUrl, canonicalUrl } from "@/data/seo";
 import { getTelegramWebApp } from "@/lib/telegram-mini-app";
+import { isNativeYumeApp, yumeApiFetch } from "@/lib/mobile-api";
 import { trackYumePage } from "@/lib/yume-analytics";
 import { syncTelegramLibrary } from "@/data/profile-storage";
 import { USER_NOTIFICATIONS } from "@/data/notifications.shared";
@@ -92,7 +93,13 @@ export const Route = createFileRoute("/")({
   validateSearch: validateCatalogSearch,
   loader: async () => {
     // User-facing catalogue reads only the persistent D1 dataset.
-    const catalog = await getShikimoriCatalog({ data: {} });
+    const catalog = isNativeYumeApp()
+      ? await (async () => {
+          const response = await yumeApiFetch("/api/mobile/catalog");
+          if (!response.ok) throw new Error("Mobile catalogue request failed: " + response.status);
+          return await response.json() as Awaited<ReturnType<typeof getShikimoriCatalog>>;
+        })()
+      : await getShikimoriCatalog({ data: {} });
     const items = catalog.items;
     const popular = [...items]
       .filter((anime) => anime.rating !== null)
