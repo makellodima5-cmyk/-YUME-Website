@@ -478,17 +478,14 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
             )}
 
             {panel === "support" && (
-              <section className="mx-auto max-w-4xl text-white" aria-labelledby="support-title">
-                <h2 id="support-title" className="text-3xl font-bold tracking-tight sm:text-4xl">
-                  {language === "ru" ? "Поддержка" : "Support"}
-                </h2>
-                <p className="mt-3 max-w-2xl text-sm leading-relaxed text-[#9CA3AF] sm:text-base">
+              <section className="mx-auto max-w-4xl -mt-3 text-white sm:-mt-4" aria-labelledby="support-title">
+                <p className="max-w-2xl text-sm leading-relaxed text-[#9CA3AF] sm:text-base">
                   {language === "ru"
                     ? "Мы всегда на связи и готовы помочь. Выберите подходящий способ связи в зависимости от вашего вопроса."
                     : "We’re here to help. Choose the right way to contact us depending on your question."}
                 </p>
 
-                <div className="mt-6 space-y-4 sm:mt-7 sm:space-y-5">
+                <div className="mt-5 space-y-4 sm:mt-6 sm:space-y-5">
                   <article className="rounded-[22px] border border-[#33264B] bg-gradient-to-br from-[#0D0A14] to-[#08080D] p-4 shadow-[0_8px_24px_rgba(0,0,0,0.16)] sm:p-5">
                     <div className="flex items-start gap-3 sm:gap-4">
                       <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[20px] bg-[#281747] text-[#C69BFF] sm:h-[72px] sm:w-[72px]">
@@ -497,7 +494,7 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
                       <div className="min-w-0 flex-1 pt-1">
                         <div className="flex items-center justify-between gap-2">
                           <h3 className="text-lg font-semibold sm:text-xl">{language === "ru" ? "Общая группа" : "Community group"}</h3>
-                          <ChevronRight className="h-5 w-5 shrink-0 text-[#C69BFF]" aria-hidden="true" />
+                          
                         </div>
                         <p className="mt-1 text-sm leading-relaxed text-[#9CA3AF] sm:text-base">
                           {language === "ru" ? "Предложения, вопросы по аниме и общение с сообществом." : "Suggestions, anime questions, and community discussions."}
@@ -523,7 +520,7 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
                       <div className="min-w-0 flex-1 pt-1">
                         <div className="flex items-center justify-between gap-2">
                           <h3 className="text-lg font-semibold sm:text-xl">{language === "ru" ? "Личная поддержка" : "Personal support"}</h3>
-                          <ChevronRight className="h-5 w-5 shrink-0 text-[#8AB9FF]" aria-hidden="true" />
+                          
                         </div>
                         <p className="mt-1 text-sm leading-relaxed text-[#9CA3AF] sm:text-base">
                           {language === "ru" ? "Технические проблемы и вопросы по работе приложения." : "Technical issues and questions about how the app works."}
