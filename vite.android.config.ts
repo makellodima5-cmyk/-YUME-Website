@@ -11,6 +11,9 @@ import tsConfigPaths from "vite-tsconfig-paths";
  */
 export default defineConfig({
   base: "./",
+  define: {
+    "import.meta.env.VITE_YUME_ANDROID_BUILD": JSON.stringify("true"),
+  },
   plugins: [
     tanstackStart({
       // Reuse the project SSR wrapper for prerender diagnostics and safe error handling.
