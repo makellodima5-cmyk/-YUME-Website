@@ -54,7 +54,7 @@ export const Route = createFileRoute("/anime/$animeId")({
     const query = new URLSearchParams({ id: params.animeId });
     const response = await yumeApiFetch("/api/mobile/anime?" + query.toString());
     if (!response.ok) throw new Error("Mobile anime details request failed: " + response.status);
-    return await response.json() as Awaited<ReturnType<typeof getShikimoriAnimeDetails>>;
+    return (await response.json()) as Awaited<ReturnType<typeof getShikimoriAnimeDetails>>;
   },
   head: ({ loaderData }) => {
     const anime = loaderData?.anime;
