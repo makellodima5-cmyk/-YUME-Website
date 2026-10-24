@@ -97,11 +97,33 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
 
   useEffect(() => {
     if (panel !== "support") return;
-    // Reset both the document and body scroll positions after the support panel
-    // has rendered. This avoids opening the page halfway down in Telegram's WebView.
-    window.scrollTo({ top: 0, behavior: "auto" });
-    document.documentElement.scrollTop = 0;
-    document.body.scrollTop = 0;
+
+    // Telegram's WebView and mobile browsers can restore an old scroll offset
+    // just after the panel changes. Reset all common scroll roots on two frames
+    // so the support heading and both contact options are shown from the top.
+    let secondFrame = 0;
+    const resetScroll = () => {
+      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+      document.documentElement.scrollTop = 0;
+      document.documentElement.scrollLeft = 0;
+      document.body.scrollTop = 0;
+      document.body.scrollLeft = 0;
+      const main = document.getElementById("main-content");
+      if (main) {
+        main.scrollTop = 0;
+        main.scrollLeft = 0;
+      }
+    };
+
+    const firstFrame = window.requestAnimationFrame(() => {
+      resetScroll();
+      secondFrame = window.requestAnimationFrame(resetScroll);
+    });
+
+    return () => {
+      window.cancelAnimationFrame(firstFrame);
+      if (secondFrame) window.cancelAnimationFrame(secondFrame);
+    };
   }, [panel]);
   useEffect(() => {
     const webApp = getTelegramWebApp();
