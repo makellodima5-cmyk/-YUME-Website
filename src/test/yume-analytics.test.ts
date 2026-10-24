@@ -30,7 +30,7 @@ describe("YUME analytics pageview tracking", () => {
   });
 
   it("does not collect analytics without explicit optional analytics consent", () => {
-    window.localStorage.setItem("yume-cookie-consent-v1", JSON.stringify({ necessary: true, analytics: false, version: 1 }));
+    window.localStorage.removeItem("yume-cookie-consent-v1");
     window.localStorage.removeItem("yume-analytics-visitor-id");
     trackYumePage("/#home");
     expect(fetch).not.toHaveBeenCalled();
