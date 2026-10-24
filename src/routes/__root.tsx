@@ -140,7 +140,9 @@ function RootShell({ children }: { children: ReactNode }) {
   return (
     <html lang="ru">
       <head>
-        {import.meta.env.VITE_YUME_ANDROID_BUILD !== "true" ? (\n          <script src="https://telegram.org/js/telegram-web-app.js"></script>\n        ) : null}
+        {import.meta.env.VITE_YUME_ANDROID_BUILD !== "true" ? (
+          <script src="https://telegram.org/js/telegram-web-app.js"></script>
+        ) : null}
         <script
           dangerouslySetInnerHTML={{
             __html: `(function(){try{var t=localStorage.getItem("yume-theme")||"dark";var r=t==="system"?(matchMedia("(prefers-color-scheme: light)").matches?"light":"dark"):t;document.documentElement.dataset.theme=r;document.documentElement.style.colorScheme=r;document.documentElement.classList.toggle("dark",r==="dark")}catch(e){document.documentElement.dataset.theme="dark";document.documentElement.classList.add("dark")}})();`,
