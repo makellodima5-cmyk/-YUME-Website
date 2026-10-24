@@ -106,9 +106,23 @@ export const Route = createFileRoute("/")({
     // User-facing catalogue reads only the persistent D1 dataset.
     let catalog: Awaited<ReturnType<typeof getShikimoriCatalog>>;
     if (isNativeYumeApp()) {
-      const response = await yumeApiFetch("/api/mobile/catalog");
-      if (!response.ok) throw new Error("Mobile catalogue request failed: " + response.status);
-      catalog = (await response.json()) as Awaited<ReturnType<typeof getShikimoriCatalog>>;
+      try {
+        const response = await yumeApiFetch("/api/mobile/catalog");
+        if (!response.ok) {
+          throw new Error("Mobile catalogue request failed: " + response.status);
+        }
+        catalog = (await response.json()) as Awaited<ReturnType<typeof getShikimoriCatalog>>;
+      } catch (error) {
+        // A missing or temporarily unavailable Worker endpoint must not crash
+        // the entire native app. Keep the UI interactive and show its catalog
+        // error state so a later retry can recover without reinstalling.
+        console.error("[YUME][ANDROID] Mobile catalogue request failed.", error);
+        catalog = {
+          items: [],
+          error: "Каталог временно недоступен. Проверь подключение и попробуй позже.",
+          progress: { status: "partial", imported: 0, target: 1000 },
+        };
+      }
     } else {
       catalog = await getShikimoriCatalog({ data: {} });
     }
