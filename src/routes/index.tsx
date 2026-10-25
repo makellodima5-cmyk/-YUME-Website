@@ -1714,16 +1714,10 @@ function Index() {
                   <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
                 </summary>
                 <div className="border-t border-border/70 p-3 sm:p-4">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex min-w-0 items-start gap-3">
-                    <Database className="mt-0.5 h-5 w-5 shrink-0 text-[#BE65FF]" />
-                    <div className="min-w-0">
-                      <h3 className="font-semibold text-[#F8F4FF]">{language === "ru" ? "Обновление метаданных каталога" : "Refresh catalogue metadata"}</h3>
-                      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{language === "ru" ? "Обновляет существующие названия, описания, постеры, баннеры, жанры, возрастные категории, студии и сведения о сериях. Не добавляет и не удаляет записи. ID трейлеров обновляются отдельным инструментом; скриншоты загружаются по запросу." : "Refreshes saved titles, descriptions, posters, banners, genres, age ratings, studios, and episode counts. It does not add or delete records. Trailer IDs use the separate tool; screenshots load on demand."}</p>
-                    </div>
-                  </div>
-                  <button type="button" onClick={runMetadataRefresh} disabled={metadataRefreshRunning || adminImportRunning || adminRunning} className="shrink-0 rounded-xl bg-gradient-to-r from-[#AC4EFC] to-[#8736FA] px-4 py-2.5 text-sm font-semibold text-white shadow-[0_0_16px_rgba(155,65,245,0.18)] transition hover:brightness-110 disabled:cursor-wait disabled:opacity-50">
-                    {metadataRefreshRunning ? (language === "ru" ? "Обновление…" : "Refreshing…") : (language === "ru" ? "Обновить данные" : "Refresh data")}
+                <div className="flex flex-col gap-3">
+                  <p className="text-xs leading-relaxed text-muted-foreground">{language === "ru" ? "Дозаполняет отсутствующие метаданные и кадры из Shikimori для существующих тайтлов. Уже заполненные поля не перезаписываются; новые записи не добавляются." : "Fills missing metadata and screenshot URLs from Shikimori for existing titles. Existing populated fields are preserved; no records are added."}</p>
+                  <button type="button" onClick={runMetadataRefresh} disabled={metadataRefreshRunning || adminImportRunning || adminRunning} className="w-full rounded-xl bg-gradient-to-r from-[#AC4EFC] to-[#8736FA] px-4 py-2.5 text-sm font-semibold text-white shadow-[0_0_16px_rgba(155,65,245,0.18)] transition hover:brightness-110 disabled:cursor-wait disabled:opacity-50">
+                    {metadataRefreshRunning ? (language === "ru" ? "Обновление…" : "Refresh in progress…") : (language === "ru" ? "Обновить данные" : "Refresh data")}
                   </button>
                 </div>
                 {metadataRefreshProgress.total > 0 && (
