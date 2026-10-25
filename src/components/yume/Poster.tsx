@@ -2,6 +2,7 @@ import { Star } from "lucide-react";
 import type { Anime } from "@/data/anime";
 import { useYumePreferences, displayAnimeTitle, displayGenre, displayAnimeKind, displayAnimeStatus } from "@/data/preferences";
 import { isNewRelease } from "@/data/anime-sections";
+import { telegramHapticImpact } from "@/lib/telegram-mini-app";
 
 export function PosterArt({ anime, className = "" }: { anime: Anime; className?: string }) {
   const h = anime.hue;
@@ -46,8 +47,8 @@ export function AnimeCard({ anime, onSelect }: { anime: Anime; onSelect: (a: Ani
   return (
     <button
       type="button"
-      onClick={() => onSelect(anime)}
-      className="group w-36 shrink-0 text-left focus-visible:outline-none sm:w-44"
+      onClick={() => { telegramHapticImpact("light"); onSelect(anime); }}
+      className="yume-tactile-control group w-36 shrink-0 text-left focus-visible:outline-none sm:w-44"
     >
       <div className="relative aspect-[2/3] overflow-hidden rounded-xl ring-1 ring-border transition duration-300 group-hover:-translate-y-1 group-hover:shadow-neon group-focus-visible:ring-2 group-focus-visible:ring-ring">
         <PosterArt anime={anime} className="h-full w-full transition duration-500 group-hover:scale-105" />
