@@ -258,6 +258,66 @@ async function updateCatalogMetadata(db: Database, item: ReturnType<typeof mapIt
   return Number(result.meta?.changes ?? 0);
 }
 
+type ScreenshotStatus = "done" | "retry" | "failed";
+type ScreenshotFetchResult = { status: ScreenshotStatus; attempts: number; saved: number; error: string | null; statements: Statement[] };
+
+function screenshotStatusStatement(db: Database, animeId: string, status: ScreenshotStatus, attempts: number, error: string | null): Statement {
+  return db.prepare("INSERT INTO anime_catalog_screenshot_status (anime_id,status,attempts,last_error,updated_at) VALUES (?,?,?,?,CURRENT_TIMESTAMP) ON CONFLICT(anime_id) DO UPDATE SET status=excluded.status,attempts=excluded.attempts,last_error=excluded.last_error,updated_at=CURRENT_TIMESTAMP")
+    .bind(animeId, status, attempts, error?.slice(0, 500) ?? null);
+}
+
+async function fetchAndStoreScreenshots(db: Database, animeId: string, previousAttempts: number): Promise<ScreenshotFetchResult> {
+  try {
+    const response = await fetch("https://shikimori.one/api/animes/" + encodeURIComponent(animeId) + "/screenshots", {
+      headers: { Accept: "application/json", "User-Agent": "YUME/1.0" },
+      signal: AbortSignal.timeout(12000),
+    });
+    if (!response.ok) {
+      const retryAfter = response.headers.get("Retry-After");
+      throw new Error(response.status === 429
+        ? "Shikimori ограничил частоту запросов" + (retryAfter ? " (Retry-After: " + retryAfter + ")" : "")
+        : "Shikimori вернул HTTP " + response.status + " для кадров");
+    }
+    const payload = await response.json() as unknown;
+    if (!Array.isArray(payload)) throw new Error("Shikimori вернул некорректный список кадров");
+    const shots = payload.map((shot) => {
+      if (!shot || typeof shot !== "object") return null;
+      const candidate = shot as { original?: unknown; preview?: unknown };
+      const valid = (value: unknown): string | null => {
+        if (typeof value !== "string") return null;
+        try {
+          const url = new URL(value);
+          return ["https:", "http:"].includes(url.protocol) ? url.toString() : null;
+        } catch { return null; }
+      };
+      const original = valid(candidate.original), preview = valid(candidate.preview) ?? original;
+      return original && preview ? { original, preview } : null;
+    }).filter((shot): shot is { original: string; preview: string } => shot !== null)
+      .filter((shot, index, all) => all.findIndex(other => other.original === shot.original) === index)
+      .slice(0, 24);
+    const statements: Statement[] = shots.map((shot, index) =>
+      db.prepare("INSERT OR IGNORE INTO anime_catalog_screenshots (anime_id,original_url,preview_url,position,updated_at) VALUES (?,?,?,?,CURRENT_TIMESTAMP)")
+        .bind(animeId, shot.original, shot.preview, index));
+    statements.push(screenshotStatusStatement(db, animeId, "done", 0, null));
+    return { status: "done", attempts: 0, saved: shots.length, error: null, statements };
+  } catch (error) {
+    const attempts = previousAttempts + 1;
+    const message = error instanceof Error ? error.message : "Неизвестная ошибка получения кадров";
+    const status: ScreenshotStatus = attempts >= SCREENSHOT_RETRY_LIMIT ? "failed" : "retry";
+    return {
+      status, attempts, saved: 0, error: message,
+      statements: [screenshotStatusStatement(db, animeId, status, attempts, message)],
+    };
+  }
+}
+
+async function screenshotProgress(db: Database): Promise<{ processed: number; failed: number; retry: number; done: number }> {
+  const row = await db.prepare("SELECT SUM(CASE WHEN status='done' THEN 1 ELSE 0 END) AS done, SUM(CASE WHEN status='failed' THEN 1 ELSE 0 END) AS failed, SUM(CASE WHEN status='retry' THEN 1 ELSE 0 END) AS retry FROM anime_catalog_screenshot_status")
+    .first<{ done: number | null; failed: number | null; retry: number | null }>();
+  const done = Number(row?.done ?? 0), failed = Number(row?.failed ?? 0), retry = Number(row?.retry ?? 0);
+  return { processed: done + failed + retry, failed, retry, done };
+}
+
 async function catalogQuality(db: Database, requestedOffset = 0) {
   const offset = Number.isFinite(requestedOffset) ? Math.max(0,Math.min(100000,Math.floor(requestedOffset))) : 0;
   const [rows, aggregate] = await Promise.all([
