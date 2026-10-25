@@ -290,11 +290,9 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
         // completed run, the next click starts a fresh full pass from the beginning.
         const storedState = await getMeta(db, "metadata_refresh_state") ?? "idle";
         const storedCursor = Math.max(0, Number(await getMeta(db, "metadata_refresh_cursor") ?? "0") || 0);
+        // The server cursor is authoritative. Never trust a client offset after an
+        // upstream error, otherwise the same failing batch can be skipped or replayed.
         const offset = storedState === "done" ? 0 : storedCursor;
-        const requestedOffset = body.offset == null ? offset : Number(body.offset);
-        if (!Number.isInteger(requestedOffset) || requestedOffset < 0 || requestedOffset > 100000) {
-          return json({ error: "invalid_offset", max: 100000 }, 400);
-        }
         const [catalogPage, totalRow] = await Promise.all([
           db.prepare("SELECT id FROM anime_catalog ORDER BY position ASC,id ASC LIMIT ? OFFSET ?")
             .bind(METADATA_REFRESH_BATCH_SIZE, offset).all<{ id: string }>(),
