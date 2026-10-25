@@ -1,14 +1,26 @@
 import { useEffect, useRef, useState } from "react";
 import { Bookmark, Play, Star, X } from "lucide-react";
 import type { Anime } from "@/data/anime";
+import { getShikimoriAnimeScreenshots, type ShikimoriScreenshot } from "@/data/shikimori";
 import { PosterArt } from "./Poster";
 
 export function AnimeModal({ anime, note, onClose }: { anime: Anime | null; note?: string | undefined; onClose: () => void }) {
   const [msg, setMsg] = useState<string | null>(null);
+  const [screenshots, setScreenshots] = useState<ShikimoriScreenshot[]>([]);
   const dialogRef = useRef<HTMLDivElement>(null);
   const restoreFocusRef = useRef<HTMLElement | null>(null);
   useEffect(() => {
     setMsg(null);
+    setScreenshots([]);
+    if (!anime || !/^\d{1,12}$/.test(anime.id)) return;
+    let cancelled = false;
+    getShikimoriAnimeScreenshots({ data: { animeId: anime.id } })
+      .then((result) => { if (!cancelled) setScreenshots(result.items ?? []); })
+      .catch(() => { if (!cancelled) setScreenshots([]); });
+    return () => { cancelled = true; };
+  }, [anime?.id]);
+
+  useEffect(() => {
     if (!anime) return;
 
     restoreFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -81,6 +93,18 @@ export function AnimeModal({ anime, note, onClose }: { anime: Anime | null; note
             {msg && <div className="mt-4 rounded-xl bg-accent/60 px-4 py-2.5 text-sm" role="status" aria-live="polite">{msg}</div>}
           </div>
         </div>
+        {screenshots.length > 0 && (
+          <section className="border-t border-border px-6 py-5" aria-label="Кадры аниме">
+            <h3 className="mb-3 text-sm font-semibold">Кадры из аниме</h3>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              {screenshots.map((shot) => (
+                <a key={shot.originalUrl} href={shot.originalUrl} target="_blank" rel="noreferrer" className="group block overflow-hidden rounded-xl ring-1 ring-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                  <img src={shot.previewUrl} alt={`Кадр из аниме ${anime.title}`} loading="lazy" className="aspect-video w-full object-cover transition-transform group-hover:scale-[1.03]" />
+                </a>
+              ))}
+            </div>
+          </section>
+        )}
       </div>
     </div>
   );

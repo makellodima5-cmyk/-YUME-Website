@@ -11,6 +11,8 @@ The refresh runs these phases:
 3. Retry temporary screenshot failures in later scheduled invocations, up to the existing three-attempt limit.
 4. Mark the job done and turn off automatic mode when the retry queue is exhausted.
 
+When the separate admin import reaches a terminal state, it starts this durable enrichment pass if no pass is already active. That ensures newly added titles also get trailer backfill and screenshot processing without making the import request issue dozens of upstream calls at once. Announced/future-release titles are marked as intentionally skipped for screenshots; trailers are still mapped from the metadata response.
+
 Existing populated metadata fields are preserved. Image bytes are not copied into R2; only image URLs are stored in D1. A successful empty screenshot response is recorded as done so that titles with no available shots are not fetched repeatedly. Failed requests are tracked in `anime_catalog_screenshot_status`.
 
 ## Deployment and use
