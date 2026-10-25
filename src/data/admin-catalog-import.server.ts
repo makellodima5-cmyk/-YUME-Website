@@ -38,6 +38,14 @@ export function normalizeAdminCatalogIds(value: unknown): string[] {
   return Array.from(new Set(rawIds.filter((id): id is string => typeof id === "string" && /^\d{1,20}$/.test(id)))).slice(0, 100);
 }
 
+export function chunkAdminCatalogIds(value: unknown, size = METADATA_LOOKUP_BATCH_SIZE): string[][] {
+  const ids = normalizeAdminCatalogIds(value);
+  const chunkSize = Number.isInteger(size) && size > 0 ? Math.min(size, METADATA_LOOKUP_BATCH_SIZE) : METADATA_LOOKUP_BATCH_SIZE;
+  const chunks: string[][] = [];
+  for (let offset = 0; offset < ids.length; offset += chunkSize) chunks.push(ids.slice(offset, offset + chunkSize));
+  return chunks;
+}
+
 function environment(): Environment {
   try {
     const native = cloudflareEnv as unknown as Environment;
@@ -254,9 +262,10 @@ async function fetchByIds(ids: string[]): Promise<ShikimoriAnime[]> {
   // requests have timed out in production). Keep each query below its practical
   // result cap, while respecting the upstream request rate limit.
   const resultById = new Map<string, ShikimoriAnime>();
-  for (let offset = 0; offset < safeIds.length; offset += METADATA_LOOKUP_BATCH_SIZE) {
-    if (offset > 0) await new Promise(resolve => setTimeout(resolve, REQUEST_DELAY_MS));
-    const batchIds = safeIds.slice(offset, offset + METADATA_LOOKUP_BATCH_SIZE);
+  const batches = chunkAdminCatalogIds(safeIds);
+  for (let index = 0; index < batches.length; index++) {
+    if (index > 0) await new Promise(resolve => setTimeout(resolve, REQUEST_DELAY_MS));
+    const batchIds = batches[index]!;
     const query = "query { animes(ids: " + JSON.stringify(batchIds.join(",")) + ", limit: 50) { " + FIELDS + " } }";
     const response = await fetch(API_URL, { method:"POST", headers:{"Content-Type":"application/json",Accept:"application/json","User-Agent":"YUME/1.0"}, body:JSON.stringify({query}), signal:AbortSignal.timeout(12000) });
     if (response.status === 429) {
