@@ -20,6 +20,7 @@ type ShikimoriAnime = {
   description?: string | null; poster?: { mainUrl?: string | null; previewUrl?: string | null; originalUrl?: string | null } | null;
   opengraphImageUrl?: string | null; genres?: { name?: string; russian?: string; kind?: string }[] | null;
   rating?: string | null; studios?: { name?: string }[] | null; nextEpisodeAt?: string | null;
+  videos?: { url?: string | null; playerUrl?: string | null; name?: string | null; kind?: string | null }[] | null;
 };
 type Payload = { data?: { animes?: ShikimoriAnime[] | null }; errors?: { message?: string }[] };
 const API_URL = "https://shikimori.io/api/graphql";
@@ -28,7 +29,7 @@ const MAX_TARGET = 500;
 const PAGE_SIZE = 50;
 const REQUEST_DELAY_MS = 1500;
 const METADATA_REFRESH_BATCH_SIZE = 50;
-const FIELDS = "id name english russian kind score status episodes episodesAired airedOn { date year } releasedOn { date year } description poster { mainUrl previewUrl originalUrl } opengraphImageUrl genres { id name russian kind } nextEpisodeAt rating studios { name }";
+const FIELDS = "id name english russian kind score status episodes episodesAired airedOn { date year } releasedOn { date year } description poster { mainUrl previewUrl originalUrl } opengraphImageUrl genres { id name russian kind } nextEpisodeAt rating studios { name } videos { url playerUrl name kind }";
 
 export function normalizeAdminCatalogIds(value: unknown): string[] {
   const rawIds = Array.isArray(value) ? value : [];
@@ -130,6 +131,30 @@ function safeImage(value: string | null | undefined): string | null {
   if (!value) return null;
   try { const u = new URL(value); if (!["http:", "https:"].includes(u.protocol)) return null; u.protocol = "https:"; return u.toString(); } catch { return null; }
 }
+function youtubeVideoId(value: string | null | undefined): string | null {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    const host = url.hostname.toLowerCase().replace(/^www\./, "");
+    let id = "";
+    if (host === "youtu.be") id = url.pathname.split("/").filter(Boolean)[0] ?? "";
+    else if (["youtube.com", "m.youtube.com", "music.youtube.com", "youtube-nocookie.com"].includes(host)) {
+      if (url.pathname === "/watch") id = url.searchParams.get("v") ?? "";
+      else id = /^\/(?:embed|shorts|live|v)\/([^/?#]+)/.exec(url.pathname)?.[1] ?? "";
+    }
+    return /^[A-Za-z0-9_-]{11}$/.test(id) ? id : null;
+  } catch { return null; }
+}
+function mapTrailer(item: ShikimoriAnime): string | null {
+  const videos = (item.videos ?? []).map(video => {
+    const id = youtubeVideoId(video.playerUrl) ?? youtubeVideoId(video.url);
+    if (!id) return null;
+    const kind = (video.kind ?? "").toLowerCase(), name = (video.name ?? "").toLowerCase();
+    return { id, trailer: kind === "pv" || kind === "character_trailer" || /trailer|preview|\bpv\b|промо|трейлер|тизер|予告/i.test(name) };
+  }).filter((video): video is { id: string; trailer: boolean } => video !== null);
+  return videos.find(video => video.trailer)?.id ?? videos[0]?.id ?? null;
+}
+
 function mapItem(item: ShikimoriAnime) {
   const original = clean(item.name) || "Без названия";
   const english = Array.isArray(item.english) ? clean(item.english[0]) : clean(item.english);
@@ -157,7 +182,7 @@ function mapItem(item: ShikimoriAnime) {
     popular: rating !== null && rating >= 8.5 ? 1 : 0, poster_url: poster, banner_url: banner,
     kind, age_rating: age, next_episode_at: item.nextEpisodeAt || null,
     episodes_aired: Math.max(0, Math.floor(Number(item.episodesAired ?? 0) || 0)),
-    aired_on: airedOn, studios_json: JSON.stringify(studios), youtube_trailer_id: null,
+    aired_on: airedOn, studios_json: JSON.stringify(studios), youtube_trailer_id: mapTrailer(item),
   };
 }
 function incomplete(item: ReturnType<typeof mapItem>): boolean {
@@ -189,8 +214,8 @@ async function fetchByIds(ids: string[]): Promise<ShikimoriAnime[]> {
 }
 
 async function updateCatalogMetadata(db: Database, item: ReturnType<typeof mapItem>): Promise<number> {
-  const result = await db.prepare("UPDATE anime_catalog SET title=COALESCE(NULLIF(?,'Без названия'),title),english_title=COALESCE(NULLIF(?,'Без названия'),english_title),original_title=COALESCE(NULLIF(?,'Без названия'),original_title),year=CASE WHEN ?>0 THEN ? ELSE year END,episodes=CASE WHEN ?>0 THEN ? ELSE episodes END,rating=COALESCE(?,rating),genres_json=CASE WHEN ?<>'[]' THEN ? ELSE genres_json END,status=CASE WHEN ?<>'Неизвестно' THEN ? ELSE status END,description=COALESCE(NULLIF(? ,''),description),hue=?,glyph=?,is_new=?,popular=?,poster_url=COALESCE(?,poster_url),banner_url=COALESCE(?,banner_url),kind=COALESCE(?,kind),age_rating=COALESCE(?,age_rating),next_episode_at=COALESCE(?,next_episode_at),episodes_aired=CASE WHEN ?>0 THEN ? ELSE episodes_aired END,aired_on=COALESCE(?,aired_on),studios_json=CASE WHEN ?<>'[]' THEN ? ELSE studios_json END,updated_at=CURRENT_TIMESTAMP WHERE id=?")
-    .bind(item.title,item.english_title,item.original_title,item.year,item.year,item.episodes,item.episodes,item.rating,item.genres_json,item.genres_json,item.status,item.status,item.description,item.hue,item.glyph,item.is_new,item.popular,item.poster_url,item.banner_url,item.kind,item.age_rating,item.next_episode_at,item.episodes_aired,item.episodes_aired,item.aired_on,item.studios_json,item.studios_json,item.id)
+  const result = await db.prepare("UPDATE anime_catalog SET title=COALESCE(NULLIF(?,'Без названия'),title),english_title=COALESCE(NULLIF(?,'Без названия'),english_title),original_title=COALESCE(NULLIF(?,'Без названия'),original_title),year=CASE WHEN ?>0 THEN ? ELSE year END,episodes=CASE WHEN ?>0 THEN ? ELSE episodes END,rating=COALESCE(?,rating),genres_json=CASE WHEN ?<>'[]' THEN ? ELSE genres_json END,status=CASE WHEN ?<>'Неизвестно' THEN ? ELSE status END,description=COALESCE(NULLIF(? ,''),description),hue=?,glyph=?,is_new=?,popular=?,poster_url=COALESCE(?,poster_url),banner_url=COALESCE(?,banner_url),kind=COALESCE(?,kind),age_rating=COALESCE(?,age_rating),next_episode_at=COALESCE(?,next_episode_at),episodes_aired=CASE WHEN ?>0 THEN ? ELSE episodes_aired END,aired_on=COALESCE(?,aired_on),studios_json=CASE WHEN ?<>'[]' THEN ? ELSE studios_json END,youtube_trailer_id=COALESCE(?,youtube_trailer_id),updated_at=CURRENT_TIMESTAMP WHERE id=?")
+    .bind(item.title,item.english_title,item.original_title,item.year,item.year,item.episodes,item.episodes,item.rating,item.genres_json,item.genres_json,item.status,item.status,item.description,item.hue,item.glyph,item.is_new,item.popular,item.poster_url,item.banner_url,item.kind,item.age_rating,item.next_episode_at,item.episodes_aired,item.episodes_aired,item.aired_on,item.studios_json,item.studios_json,item.youtube_trailer_id,item.id)
     .run();
   return Number(result.meta?.changes ?? 0);
 }
