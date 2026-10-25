@@ -219,10 +219,42 @@ async function fetchByIds(ids: string[]): Promise<ShikimoriAnime[]> {
 }
 
 async function updateCatalogMetadata(db: Database, item: ReturnType<typeof mapItem>): Promise<number> {
-  // Only fill gaps. Keep every non-empty field intact to avoid unnecessary writes.
-  const result = await db.prepare("UPDATE anime_catalog SET title=CASE WHEN trim(title)='' OR title='Без названия' THEN ? ELSE title END,english_title=CASE WHEN english_title IS NULL OR trim(english_title)='' THEN ? ELSE english_title END,original_title=CASE WHEN trim(original_title)='' OR original_title='Без названия' THEN ? ELSE original_title END,year=CASE WHEN year<=0 THEN ? ELSE year END,episodes=CASE WHEN episodes<=0 THEN ? ELSE episodes END,rating=CASE WHEN rating IS NULL THEN ? ELSE rating END,genres_json=CASE WHEN genres_json IS NULL OR trim(genres_json)='' OR genres_json='[]' THEN ? ELSE genres_json END,status=CASE WHEN status IS NULL OR trim(status)='' OR status='Неизвестно' THEN ? ELSE status END,description=CASE WHEN description IS NULL OR trim(description)='' THEN ? ELSE description END,poster_url=CASE WHEN poster_url IS NULL OR trim(poster_url)='' THEN ? ELSE poster_url END,banner_url=CASE WHEN banner_url IS NULL OR trim(banner_url)='' THEN ? ELSE banner_url END,kind=CASE WHEN kind IS NULL OR trim(kind)='' THEN ? ELSE kind END,age_rating=CASE WHEN age_rating IS NULL OR trim(age_rating)='' THEN ? ELSE age_rating END,next_episode_at=CASE WHEN next_episode_at IS NULL OR trim(next_episode_at)='' THEN ? ELSE next_episode_at END,episodes_aired=CASE WHEN episodes_aired<=0 THEN ? ELSE episodes_aired END,aired_on=CASE WHEN aired_on IS NULL OR trim(aired_on)='' THEN ? ELSE aired_on END,studios_json=CASE WHEN studios_json IS NULL OR trim(studios_json)='' OR studios_json='[]' THEN ? ELSE studios_json END,youtube_trailer_id=COALESCE(NULLIF(youtube_trailer_id,''),?),updated_at=CURRENT_TIMESTAMP WHERE id=?")
-    .bind(item.title,item.english_title,item.original_title,item.year,item.episodes,item.rating,item.genres_json,item.status,item.description,item.poster_url,item.banner_url,item.kind,item.age_rating,item.next_episode_at,item.episodes_aired,item.aired_on,item.studios_json,item.youtube_trailer_id,item.id)
-    .run();
+  const row = await db.prepare("SELECT title,english_title,original_title,year,episodes,rating,genres_json,status,description,poster_url,banner_url,kind,age_rating,next_episode_at,episodes_aired,aired_on,studios_json,youtube_trailer_id FROM anime_catalog WHERE id = ?")
+    .bind(item.id).first<{
+      title: string; english_title: string | null; original_title: string; year: number; episodes: number;
+      rating: number | null; genres_json: string | null; status: string | null; description: string;
+      poster_url: string | null; banner_url: string | null; kind: string | null; age_rating: string | null;
+      next_episode_at: string | null; episodes_aired: number; aired_on: string | null; studios_json: string | null;
+      youtube_trailer_id: string | null;
+    }>();
+  if (!row) return 0;
+  const changes: Array<[string, unknown]> = [];
+  const blank = (value: string | null | undefined) => !value || !value.trim();
+  const fill = (column: string, missing: boolean, value: unknown) => {
+    if (missing && value !== null && value !== undefined && !(typeof value === "string" && !value.trim())) changes.push([column, value]);
+  };
+  fill("title", blank(row.title) || row.title === "Без названия", item.title !== "Без названия" ? item.title : null);
+  fill("english_title", blank(row.english_title), item.english_title);
+  fill("original_title", blank(row.original_title) || row.original_title === "Без названия", item.original_title !== "Без названия" ? item.original_title : null);
+  fill("year", row.year <= 0, item.year > 0 ? item.year : null);
+  fill("episodes", row.episodes <= 0, item.episodes > 0 ? item.episodes : null);
+  fill("rating", row.rating == null, item.rating);
+  fill("genres_json", blank(row.genres_json) || row.genres_json === "[]", item.genres_json !== "[]" ? item.genres_json : null);
+  fill("status", blank(row.status) || row.status === "Неизвестно", item.status !== "Неизвестно" ? item.status : null);
+  fill("description", blank(row.description), item.description);
+  fill("poster_url", blank(row.poster_url), item.poster_url);
+  fill("banner_url", blank(row.banner_url), item.banner_url);
+  fill("kind", blank(row.kind), item.kind);
+  fill("age_rating", blank(row.age_rating), item.age_rating);
+  fill("next_episode_at", blank(row.next_episode_at), item.next_episode_at);
+  fill("episodes_aired", row.episodes_aired <= 0, item.episodes_aired > 0 ? item.episodes_aired : null);
+  fill("aired_on", blank(row.aired_on), item.aired_on);
+  fill("studios_json", blank(row.studios_json) || row.studios_json === "[]", item.studios_json !== "[]" ? item.studios_json : null);
+  fill("youtube_trailer_id", blank(row.youtube_trailer_id), item.youtube_trailer_id);
+  if (!changes.length) return 0;
+  const assignments = changes.map(([column]) => column + " = ?").join(", ");
+  const result = await db.prepare("UPDATE anime_catalog SET " + assignments + ", updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+    .bind(...changes.map(([, value]) => value), item.id).run();
   return Number(result.meta?.changes ?? 0);
 }
 
