@@ -357,7 +357,7 @@ function Index() {
   const [adminImport, setAdminImport] = useState<{target:number;cursor:number;added:number;skipped:number;incomplete:number;errors:number;state:string;delayMs?:number}>({target:0,cursor:1,added:0,skipped:0,incomplete:0,errors:0,state:"idle"});
   const [adminImportMessage, setAdminImportMessage] = useState("");
   const [metadataRefreshRunning, setMetadataRefreshRunning] = useState(false);
-  const [metadataRefreshProgress, setMetadataRefreshProgress] = useState({ offset: 0, total: 0, updated: 0, screenshotsSaved: 0 });
+  const [metadataRefreshProgress, setMetadataRefreshProgress] = useState({ offset: 0, total: 0, updated: 0, screenshotsSaved: 0, phase: "metadata", metadataOffset: 0, screenshotOffset: 0, screenshotFailures: 0, screenshotRetries: 0 });
   const [metadataRefreshMessage, setMetadataRefreshMessage] = useState("");
   const [catalogQuality, setCatalogQuality] = useState<{id:string;title:string;year:number;missingYear:boolean;missingPoster:boolean;missingDescription:boolean}[]>([]);
   const [catalogQualityOffset, setCatalogQualityOffset] = useState(0);
@@ -821,51 +821,76 @@ function Index() {
   const runMetadataRefresh = async () => {
     if (!isAdmin || metadataRefreshRunning || adminImportRunning || adminRunning) return;
     const confirmed = window.confirm(language === "ru"
-      ? "Дозаполнить отсутствующие метаданные и кадры из Shikimori для существующих тайтлов? Уже заполненные поля не будут перезаписаны. Новые записи не добавляются, записи не удаляются. Процесс может занять много времени; при ошибке его можно запустить повторно."
-      : "Fill missing metadata and screenshots from Shikimori for existing titles? Already populated fields will not be overwritten. No records will be added or deleted. This may take a long time; after an error you can resume by running it again.");
+      ? "Дозаполнить отсутствующие метаданные и кадры из Shikimori для существующих тайтлов? Уже заполненные поля не перезаписываются; новые записи не добавляются. Процесс может занять много времени. При временной ошибке запуск можно повторить."
+      : "Fill missing metadata and screenshot URLs from Shikimori for existing titles? Populated fields will be preserved and no records added. This may take a long time. You can resume after a temporary error.");
     if (!confirmed) return;
     setMetadataRefreshRunning(true);
     setMetadataRefreshMessage("");
-    setMetadataRefreshProgress({ offset: 0, total: 0, updated: 0, screenshotsSaved: 0 });
-    let offset = 0;
+    setMetadataRefreshProgress({ offset: 0, total: 0, updated: 0, screenshotsSaved: 0, phase: "metadata", metadataOffset: 0, screenshotOffset: 0, screenshotFailures: 0, screenshotRetries: 0 });
     let total = 0;
     let updated = 0;
     let screenshotsSaved = 0;
-    let processed = 0;
+    let screenshotFailures = 0;
+    let screenshotRetries = 0;
+    let currentPhase = "metadata";
+    let metadataOffset = 0;
+    let screenshotOffset = 0;
     try {
       while (true) {
         const response = await fetch("/api/admin/catalog-import", {
           method: "POST", credentials: "same-origin", cache: "no-store",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "refresh_metadata", offset }),
+          body: JSON.stringify({ action: "refresh_metadata" }),
         });
         const payload = await response.json().catch(() => ({})) as {
           isAdmin?: boolean; error?: string; message?: string; offset?: number; nextOffset?: number;
-          processed?: number; updated?: number; screenshotsSaved?: number; total?: number; done?: boolean;
+          metadataOffset?: number; screenshotOffset?: number; phase?: string; phaseChanged?: boolean;
+          processed?: number; updated?: number; screenshotsSaved?: number; screenshotFailures?: number;
+          screenshotRetries?: number; screenshotWarning?: string | null; total?: number; done?: boolean;
         };
+        if (typeof payload.total === "number") total = payload.total;
+        if (typeof payload.updated === "number") updated += payload.updated;
+        if (typeof payload.screenshotsSaved === "number") screenshotsSaved += payload.screenshotsSaved;
+        if (typeof payload.screenshotFailures === "number") screenshotFailures = payload.screenshotFailures;
+        if (typeof payload.screenshotRetries === "number") screenshotRetries = payload.screenshotRetries;
+        if (typeof payload.phase === "string") currentPhase = payload.phase;
+        if (typeof payload.metadataOffset === "number") metadataOffset = payload.metadataOffset;
+        if (typeof payload.screenshotOffset === "number") screenshotOffset = payload.screenshotOffset;
+        const displayOffset = currentPhase === "metadata"
+          ? metadataOffset
+          : currentPhase === "screenshots_retry"
+            ? Math.max(0, total - screenshotRetries)
+            : screenshotOffset;
+        setMetadataRefreshProgress({
+          offset: displayOffset, total, updated, screenshotsSaved, phase: currentPhase,
+          metadataOffset, screenshotOffset, screenshotFailures, screenshotRetries,
+        });
         if (!response.ok || payload.isAdmin !== true) {
-          if (typeof payload.total === "number") {
-            total = payload.total;
-            offset = typeof payload.offset === "number" ? payload.offset : offset;
-            setMetadataRefreshProgress({ offset, total, updated, screenshotsSaved });
-          }
           throw new Error(payload.message ?? payload.error ?? (language === "ru" ? "Не удалось обновить метаданные." : "Metadata refresh failed."));
         }
-        total = payload.total ?? total;
-        updated += payload.updated ?? 0;
-        screenshotsSaved += payload.screenshotsSaved ?? 0;
-        offset = payload.nextOffset ?? offset;
-        processed = offset;
-        setMetadataRefreshProgress({ offset, total, updated, screenshotsSaved });
-        if (payload.done || payload.processed === 0) break;
-        setMetadataRefreshMessage(language === "ru"
-          ? "Обработано " + processed + " из " + total + "; заполнено метаданных: " + updated + "; добавлено URL кадров: " + screenshotsSaved + "."
-          : "Processed " + processed + " of " + total + "; metadata fields filled: " + updated + "; screenshot URLs added: " + screenshotsSaved + ".");
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        const phaseLabel = currentPhase === "metadata"
+          ? (language === "ru" ? "Метаданные" : "Metadata")
+          : currentPhase === "screenshots"
+            ? (language === "ru" ? "Кадры" : "Screenshots")
+            : currentPhase === "screenshots_retry"
+              ? (language === "ru" ? "Повтор кадров" : "Screenshot retries")
+              : (language === "ru" ? "Завершено" : "Completed");
+        const statusMessage = (language === "ru"
+          ? phaseLabel + ": " + displayOffset + " / " + total + "; заполнено полей: " + updated + "; добавлено URL кадров: " + screenshotsSaved + "; неудачных кадров: " + screenshotFailures + "; повторов в очереди: " + screenshotRetries + "."
+          : phaseLabel + ": " + displayOffset + " / " + total + "; fields filled: " + updated + "; screenshot URLs added: " + screenshotsSaved + "; failed screenshots: " + screenshotFailures + "; retries queued: " + screenshotRetries + ".");
+        setMetadataRefreshMessage(payload.screenshotWarning
+          ? statusMessage + " " + (language === "ru" ? "Последняя ошибка кадров: " : "Latest screenshot error: ") + payload.screenshotWarning
+          : statusMessage);
+        if (payload.done) break;
+        if (!(payload.processed && payload.processed > 0) && !payload.phaseChanged) {
+          throw new Error(language === "ru" ? "Сервер не продвинул курсор. Повтори запуск — сохранённая позиция останется прежней." : "The server did not advance the cursor. Retry; the saved position will be preserved.");
+        }
+        await new Promise(resolve => setTimeout(resolve, currentPhase === "metadata" ? 500 : 800));
       }
+      setMetadataRefreshProgress(current => ({ ...current, phase: "done", offset: total }));
       setMetadataRefreshMessage(language === "ru"
-        ? "Готово: обработано " + processed + " из " + total + "; заполнено метаданных: " + updated + "; добавлено URL кадров: " + screenshotsSaved + "."
-        : "Completed: processed " + processed + " of " + total + "; metadata fields filled: " + updated + "; screenshot URLs added: " + screenshotsSaved + ".");
+        ? "Готово: обработано тайтлов: " + total + "; заполнено отсутствующих полей: " + updated + "; добавлено URL кадров: " + screenshotsSaved + "; тайтлов с кадрами, не полученными после 3 попыток: " + screenshotFailures + "."
+        : "Completed: titles processed: " + total + "; missing fields filled: " + updated + "; screenshot URLs added: " + screenshotsSaved + "; titles with screenshots still unavailable after 3 attempts: " + screenshotFailures + ".");
       await refreshCatalogQuality();
     } catch (error) {
       setMetadataRefreshMessage(error instanceof Error ? error.message : (language === "ru" ? "Обновление остановлено." : "Refresh stopped."));
@@ -1728,8 +1753,8 @@ function Index() {
                 {(metadataRefreshRunning || metadataRefreshProgress.total > 0) && (
                   <div className="mt-3">
                     <div className="mb-1 flex flex-wrap justify-between gap-2 text-xs text-muted-foreground">
-                      <span>{language === "ru" ? "Обработано" : "Processed"}: {metadataRefreshProgress.offset} / {metadataRefreshProgress.total}</span>
-                      <span>{language === "ru" ? "Заполнено полей" : "Fields filled"}: {metadataRefreshProgress.updated} · {language === "ru" ? "URL кадров" : "Screenshot URLs"}: {metadataRefreshProgress.screenshotsSaved}</span>
+                      <span>{metadataRefreshProgress.phase === "metadata" ? (language === "ru" ? "Метаданные" : "Metadata") : metadataRefreshProgress.phase === "screenshots" ? (language === "ru" ? "Кадры" : "Screenshots") : metadataRefreshProgress.phase === "screenshots_retry" ? (language === "ru" ? "Повтор кадров" : "Screenshot retries") : (language === "ru" ? "Завершено" : "Completed")}: {metadataRefreshProgress.offset} / {metadataRefreshProgress.total}</span>
+                      <span>{language === "ru" ? "Дополнено тайтлов" : "Titles enriched"}: {metadataRefreshProgress.updated} · {language === "ru" ? "URL кадров" : "Screenshot URLs"}: {metadataRefreshProgress.screenshotsSaved} · {language === "ru" ? "Ошибок кадров" : "Failed shots"}: {metadataRefreshProgress.screenshotFailures}</span>
                     </div>
                     <div role="progressbar" aria-valuemin={0} aria-valuemax={metadataRefreshProgress.total} aria-valuenow={metadataRefreshProgress.offset} className="h-1.5 overflow-hidden rounded-full bg-muted">
                       <div className="h-full rounded-full bg-gradient-to-r from-[#A83BFA] to-[#D08AFF] transition-all" style={{ width: (metadataRefreshProgress.total ? Math.min(100, metadataRefreshProgress.offset / metadataRefreshProgress.total * 100) : 0) + "%" }} />

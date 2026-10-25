@@ -28,7 +28,8 @@ const SESSION_COOKIE = "__Host-yume-session";
 const MAX_TARGET = 500;
 const PAGE_SIZE = 50;
 const REQUEST_DELAY_MS = 1500;
-const METADATA_REFRESH_BATCH_SIZE = 2;
+const METADATA_REFRESH_BATCH_SIZE = 20;
+const SCREENSHOT_RETRY_LIMIT = 3;
 const FIELDS = "id name english russian kind score status episodes episodesAired airedOn { date year } releasedOn { date year } description poster { mainUrl previewUrl originalUrl } opengraphImageUrl genres { id name russian kind } nextEpisodeAt rating studios { name } videos { url playerUrl name kind }";
 
 export function normalizeAdminCatalogIds(value: unknown): string[] {
@@ -99,6 +100,8 @@ function ensureSchema(db: Database): Promise<void> {
     db.prepare("CREATE TABLE IF NOT EXISTS anime_catalog (id TEXT PRIMARY KEY NOT NULL, title TEXT NOT NULL, english_title TEXT, original_title TEXT NOT NULL, year INTEGER NOT NULL DEFAULT 0, episodes INTEGER NOT NULL DEFAULT 0, rating REAL, genres_json TEXT NOT NULL DEFAULT '[]', status TEXT NOT NULL DEFAULT 'Неизвестно', description TEXT NOT NULL DEFAULT '', hue INTEGER NOT NULL DEFAULT 280, glyph TEXT NOT NULL DEFAULT 'Y', is_new INTEGER NOT NULL DEFAULT 0, popular INTEGER NOT NULL DEFAULT 0, poster_url TEXT, banner_url TEXT, kind TEXT, age_rating TEXT, next_episode_at TEXT, episodes_aired INTEGER NOT NULL DEFAULT 0, aired_on TEXT, studios_json TEXT NOT NULL DEFAULT '[]', youtube_trailer_id TEXT, position INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)"),
     db.prepare("CREATE TABLE IF NOT EXISTS anime_catalog_meta (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL)"),
     db.prepare("CREATE TABLE IF NOT EXISTS anime_catalog_screenshots (anime_id TEXT NOT NULL, original_url TEXT NOT NULL, preview_url TEXT NOT NULL, position INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (anime_id, original_url))"),
+    db.prepare("CREATE TABLE IF NOT EXISTS anime_catalog_screenshot_status (anime_id TEXT PRIMARY KEY NOT NULL, status TEXT NOT NULL CHECK (status IN ('done','retry','failed')), attempts INTEGER NOT NULL DEFAULT 0, last_error TEXT, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)"),
+    db.prepare("CREATE INDEX IF NOT EXISTS idx_anime_catalog_screenshot_status_state ON anime_catalog_screenshot_status(status, attempts, updated_at)"),
     db.prepare("CREATE INDEX IF NOT EXISTS idx_anime_catalog_screenshots_position ON anime_catalog_screenshots(anime_id, position)"),
     db.prepare("CREATE INDEX IF NOT EXISTS idx_anime_catalog_missing_trailer ON anime_catalog(id) WHERE youtube_trailer_id IS NULL OR youtube_trailer_id = ''"),
     db.prepare("CREATE TABLE IF NOT EXISTS yume_admin_audit_log (id INTEGER PRIMARY KEY AUTOINCREMENT, action TEXT NOT NULL, status TEXT NOT NULL, details TEXT NOT NULL DEFAULT '{}', actor_telegram_id TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)"),
@@ -216,11 +219,104 @@ async function fetchByIds(ids: string[]): Promise<ShikimoriAnime[]> {
 }
 
 async function updateCatalogMetadata(db: Database, item: ReturnType<typeof mapItem>): Promise<number> {
-  // Only fill gaps. Keep every non-empty field intact to avoid unnecessary writes.
-  const result = await db.prepare("UPDATE anime_catalog SET title=CASE WHEN trim(title)='' OR title='Без названия' THEN ? ELSE title END,english_title=CASE WHEN english_title IS NULL OR trim(english_title)='' THEN ? ELSE english_title END,original_title=CASE WHEN trim(original_title)='' OR original_title='Без названия' THEN ? ELSE original_title END,year=CASE WHEN year<=0 THEN ? ELSE year END,episodes=CASE WHEN episodes<=0 THEN ? ELSE episodes END,rating=CASE WHEN rating IS NULL THEN ? ELSE rating END,genres_json=CASE WHEN genres_json IS NULL OR trim(genres_json)='' OR genres_json='[]' THEN ? ELSE genres_json END,status=CASE WHEN status IS NULL OR trim(status)='' OR status='Неизвестно' THEN ? ELSE status END,description=CASE WHEN description IS NULL OR trim(description)='' THEN ? ELSE description END,poster_url=CASE WHEN poster_url IS NULL OR trim(poster_url)='' THEN ? ELSE poster_url END,banner_url=CASE WHEN banner_url IS NULL OR trim(banner_url)='' THEN ? ELSE banner_url END,kind=CASE WHEN kind IS NULL OR trim(kind)='' THEN ? ELSE kind END,age_rating=CASE WHEN age_rating IS NULL OR trim(age_rating)='' THEN ? ELSE age_rating END,next_episode_at=CASE WHEN next_episode_at IS NULL OR trim(next_episode_at)='' THEN ? ELSE next_episode_at END,episodes_aired=CASE WHEN episodes_aired<=0 THEN ? ELSE episodes_aired END,aired_on=CASE WHEN aired_on IS NULL OR trim(aired_on)='' THEN ? ELSE aired_on END,studios_json=CASE WHEN studios_json IS NULL OR trim(studios_json)='' OR studios_json='[]' THEN ? ELSE studios_json END,youtube_trailer_id=COALESCE(NULLIF(youtube_trailer_id,''),?),updated_at=CURRENT_TIMESTAMP WHERE id=?")
-    .bind(item.title,item.english_title,item.original_title,item.year,item.episodes,item.rating,item.genres_json,item.status,item.description,item.poster_url,item.banner_url,item.kind,item.age_rating,item.next_episode_at,item.episodes_aired,item.aired_on,item.studios_json,item.youtube_trailer_id,item.id)
-    .run();
+  const row = await db.prepare("SELECT title,english_title,original_title,year,episodes,rating,genres_json,status,description,poster_url,banner_url,kind,age_rating,next_episode_at,episodes_aired,aired_on,studios_json,youtube_trailer_id FROM anime_catalog WHERE id = ?")
+    .bind(item.id).first<{
+      title: string; english_title: string | null; original_title: string; year: number; episodes: number;
+      rating: number | null; genres_json: string | null; status: string | null; description: string;
+      poster_url: string | null; banner_url: string | null; kind: string | null; age_rating: string | null;
+      next_episode_at: string | null; episodes_aired: number; aired_on: string | null; studios_json: string | null;
+      youtube_trailer_id: string | null;
+    }>();
+  if (!row) return 0;
+  const changes: Array<[string, unknown]> = [];
+  const blank = (value: string | null | undefined) => !value || !value.trim();
+  const fill = (column: string, missing: boolean, value: unknown) => {
+    if (missing && value !== null && value !== undefined && !(typeof value === "string" && !value.trim())) changes.push([column, value]);
+  };
+  fill("title", blank(row.title) || row.title === "Без названия", item.title !== "Без названия" ? item.title : null);
+  fill("english_title", blank(row.english_title), item.english_title);
+  fill("original_title", blank(row.original_title) || row.original_title === "Без названия", item.original_title !== "Без названия" ? item.original_title : null);
+  fill("year", row.year <= 0, item.year > 0 ? item.year : null);
+  fill("episodes", row.episodes <= 0, item.episodes > 0 ? item.episodes : null);
+  fill("rating", row.rating == null, item.rating);
+  fill("genres_json", blank(row.genres_json) || row.genres_json === "[]", item.genres_json !== "[]" ? item.genres_json : null);
+  fill("status", blank(row.status) || row.status === "Неизвестно", item.status !== "Неизвестно" ? item.status : null);
+  fill("description", blank(row.description), item.description);
+  fill("poster_url", blank(row.poster_url), item.poster_url);
+  fill("banner_url", blank(row.banner_url), item.banner_url);
+  fill("kind", blank(row.kind), item.kind);
+  fill("age_rating", blank(row.age_rating), item.age_rating);
+  fill("next_episode_at", blank(row.next_episode_at), item.next_episode_at);
+  fill("episodes_aired", row.episodes_aired <= 0, item.episodes_aired > 0 ? item.episodes_aired : null);
+  fill("aired_on", blank(row.aired_on), item.aired_on);
+  fill("studios_json", blank(row.studios_json) || row.studios_json === "[]", item.studios_json !== "[]" ? item.studios_json : null);
+  fill("youtube_trailer_id", blank(row.youtube_trailer_id), item.youtube_trailer_id);
+  if (!changes.length) return 0;
+  const assignments = changes.map(([column]) => column + " = ?").join(", ");
+  const result = await db.prepare("UPDATE anime_catalog SET " + assignments + ", updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+    .bind(...changes.map(([, value]) => value), item.id).run();
   return Number(result.meta?.changes ?? 0);
+}
+
+type ScreenshotStatus = "done" | "retry" | "failed";
+type ScreenshotFetchResult = { status: ScreenshotStatus; attempts: number; saved: number; error: string | null; statements: Statement[] };
+
+function screenshotStatusStatement(db: Database, animeId: string, status: ScreenshotStatus, attempts: number, error: string | null): Statement {
+  return db.prepare("INSERT INTO anime_catalog_screenshot_status (anime_id,status,attempts,last_error,updated_at) VALUES (?,?,?,?,CURRENT_TIMESTAMP) ON CONFLICT(anime_id) DO UPDATE SET status=excluded.status,attempts=excluded.attempts,last_error=excluded.last_error,updated_at=CURRENT_TIMESTAMP")
+    .bind(animeId, status, attempts, error?.slice(0, 500) ?? null);
+}
+
+async function fetchAndStoreScreenshots(db: Database, animeId: string, previousAttempts: number): Promise<ScreenshotFetchResult> {
+  try {
+    const response = await fetch("https://shikimori.one/api/animes/" + encodeURIComponent(animeId) + "/screenshots", {
+      headers: { Accept: "application/json", "User-Agent": "YUME/1.0" },
+      signal: AbortSignal.timeout(12000),
+    });
+    if (!response.ok) {
+      const retryAfter = response.headers.get("Retry-After");
+      throw new Error(response.status === 429
+        ? "Shikimori ограничил частоту запросов" + (retryAfter ? " (Retry-After: " + retryAfter + ")" : "")
+        : "Shikimori вернул HTTP " + response.status + " для кадров");
+    }
+    const payload = await response.json() as unknown;
+    if (!Array.isArray(payload)) throw new Error("Shikimori вернул некорректный список кадров");
+    const shots = payload.map((shot) => {
+      if (!shot || typeof shot !== "object") return null;
+      const candidate = shot as { original?: unknown; preview?: unknown };
+      const valid = (value: unknown): string | null => {
+        if (typeof value !== "string") return null;
+        try {
+          const url = new URL(value);
+          return ["https:", "http:"].includes(url.protocol) ? url.toString() : null;
+        } catch { return null; }
+      };
+      const original = valid(candidate.original), preview = valid(candidate.preview) ?? original;
+      return original && preview ? { original, preview } : null;
+    }).filter((shot): shot is { original: string; preview: string } => shot !== null)
+      .filter((shot, index, all) => all.findIndex(other => other.original === shot.original) === index)
+      .slice(0, 24);
+    const statements: Statement[] = shots.map((shot, index) =>
+      db.prepare("INSERT OR IGNORE INTO anime_catalog_screenshots (anime_id,original_url,preview_url,position,updated_at) VALUES (?,?,?,?,CURRENT_TIMESTAMP)")
+        .bind(animeId, shot.original, shot.preview, index));
+    statements.push(screenshotStatusStatement(db, animeId, "done", 0, null));
+    return { status: "done", attempts: 0, saved: shots.length, error: null, statements };
+  } catch (error) {
+    const attempts = previousAttempts + 1;
+    const message = error instanceof Error ? error.message : "Неизвестная ошибка получения кадров";
+    const status: ScreenshotStatus = attempts >= SCREENSHOT_RETRY_LIMIT ? "failed" : "retry";
+    console.warn("[YUME][SCREENSHOT_BACKFILL] Screenshot fetch failed.", { animeId, attempts, status, error: message });
+    return {
+      status, attempts, saved: 0, error: message,
+      statements: [screenshotStatusStatement(db, animeId, status, attempts, message)],
+    };
+  }
+}
+
+async function screenshotProgress(db: Database): Promise<{ processed: number; failed: number; retry: number; done: number }> {
+  const row = await db.prepare("SELECT SUM(CASE WHEN status='done' THEN 1 ELSE 0 END) AS done, SUM(CASE WHEN status='failed' THEN 1 ELSE 0 END) AS failed, SUM(CASE WHEN status='retry' THEN 1 ELSE 0 END) AS retry FROM anime_catalog_screenshot_status")
+    .first<{ done: number | null; failed: number | null; retry: number | null }>();
+  const done = Number(row?.done ?? 0), failed = Number(row?.failed ?? 0), retry = Number(row?.retry ?? 0);
+  return { processed: done + failed + retry, failed, retry, done };
 }
 
 async function catalogQuality(db: Database, requestedOffset = 0) {
@@ -316,73 +412,126 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
         return json({isAdmin:true,deleted,quality:quality.items,qualitySummary:quality.summary});
       }
       if (body.action === "refresh_metadata") {
-        // Persist the cursor in D1. A retry resumes the failed batch; after a
-        // completed run, the next click starts a fresh full pass from the beginning.
-        const storedState = await getMeta(db, "metadata_refresh_state") ?? "idle";
-        const storedCursor = Math.max(0, Number(await getMeta(db, "metadata_refresh_cursor") ?? "0") || 0);
-        // The server cursor is authoritative. Never trust a client offset after an
-        // upstream error, otherwise the same failing batch can be skipped or replayed.
-        const offset = storedState === "done" ? 0 : storedCursor;
-        const [catalogPage, totalRow] = await Promise.all([
-          db.prepare("SELECT id FROM anime_catalog ORDER BY position ASC,id ASC LIMIT ? OFFSET ?")
-            .bind(METADATA_REFRESH_BATCH_SIZE, offset).all<{ id: string }>(),
-          db.prepare("SELECT COUNT(*) AS total FROM anime_catalog").first<{ total: number }>(),
-        ]);
-        const ids = normalizeAdminCatalogIds(catalogPage.results.map(row => row.id)).slice(0, METADATA_REFRESH_BATCH_SIZE);
+        let state = await getMeta(db, "metadata_refresh_state") ?? "metadata";
+        if (state === "done") {
+          await db.batch([
+            setMeta(db, "metadata_refresh_state", "metadata"),
+            setMeta(db, "metadata_refresh_cursor", "0"),
+            setMeta(db, "metadata_refresh_screenshot_cursor", "0"),
+            db.prepare("UPDATE anime_catalog_screenshot_status SET status='retry',attempts=0,last_error=NULL,updated_at=CURRENT_TIMESTAMP WHERE status='failed'"),
+          ]);
+          state = "metadata";
+        } else if (state === "idle" || state === "running") {
+          state = "metadata";
+          await setMeta(db, "metadata_refresh_state", state);
+        }
+
+        const totalRow = await db.prepare("SELECT COUNT(*) AS total FROM anime_catalog").first<{ total: number }>();
         const total = Number(totalRow?.total ?? 0);
-        if (!ids.length) {
-          await db.batch([setMeta(db, "metadata_refresh_state", "done"), setMeta(db, "metadata_refresh_cursor", "0")]);
-          return json({ isAdmin: true, offset, nextOffset: offset, processed: 0, updated: 0, total, done: true });
-        }
-        const source = await fetchByIds(ids);
-        const sourceById = new Map(source.map(item => [String(item.id), item]));
-        let updated = 0, screenshotsSaved = 0, missingFromSource = 0;
-        for (const id of ids) {
-          const sourceItem = sourceById.get(id);
-          if (!sourceItem) { missingFromSource++; continue; }
-          updated += await updateCatalogMetadata(db, mapItem(sourceItem));
-          const existing = await db.prepare("SELECT COUNT(*) AS count FROM anime_catalog_screenshots WHERE anime_id = ?").bind(id).first<{count:number}>();
-          if (Number(existing?.count ?? 0) > 0) continue;
-          const shotResponse = await fetch("https://shikimori.one/api/animes/" + encodeURIComponent(id) + "/screenshots", {
-            headers: { Accept: "application/json", "User-Agent": "YUME/1.0" },
-            signal: AbortSignal.timeout(6000),
-          });
-          if (shotResponse.status === 429) {
-            const retryAfterMs = retryAfterMilliseconds(shotResponse.headers.get("Retry-After")) ?? 60000;
-            const error = new Error("Shikimori ограничил частоту запросов при получении кадров.");
-            (error as Error & {retryAfterMs?:number}).retryAfterMs = retryAfterMs;
-            throw error;
+
+        if (state === "metadata") {
+          const cursor = Math.max(0, Number(await getMeta(db, "metadata_refresh_cursor") ?? "0") || 0);
+          if (cursor >= total) {
+            const nextState = total > 0 ? "screenshots" : "done";
+            await db.batch([
+              setMeta(db, "metadata_refresh_state", nextState),
+              setMeta(db, "metadata_refresh_screenshot_cursor", "0"),
+            ]);
+            const shots = await screenshotProgress(db);
+            return json({ isAdmin: true, phase: nextState, phaseChanged: true, processed: 0, offset: total, nextOffset: total, metadataOffset: total, screenshotOffset: 0, total, updated: 0, screenshotsSaved: 0, screenshotFailures: shots.failed, screenshotRetries: shots.retry, done: nextState === "done" });
           }
-          if (!shotResponse.ok) throw new Error("Shikimori не вернул кадры для аниме " + id + " (HTTP " + shotResponse.status + "). Повторите запуск — обработка продолжится с этого места.");
-          const shotPayload = await shotResponse.json() as unknown;
-          if (!Array.isArray(shotPayload)) throw new Error("Shikimori вернул некорректный список кадров для аниме " + id + ". Повторите запуск.");
-          const shots = shotPayload.map((shot) => {
-            if (!shot || typeof shot !== "object") return null;
-            const item = shot as {original?:unknown;preview?:unknown};
-            const valid = (value: unknown): string | null => {
-              if (typeof value !== "string") return null;
-              try { const url = new URL(value); return ["https:","http:"].includes(url.protocol) ? url.toString() : null; } catch { return null; }
-            };
-            const original = valid(item.original), preview = valid(item.preview) ?? original;
-            return original && preview ? { original, preview } : null;
-          }).filter((shot): shot is {original:string;preview:string} => shot !== null).filter((shot,index,all)=>all.findIndex(other=>other.original===shot.original)===index).slice(0,24);
-          if (shots.length) {
-            await db.batch(shots.map((shot,index)=>db.prepare("INSERT OR IGNORE INTO anime_catalog_screenshots (anime_id, original_url, preview_url, position, updated_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)").bind(id,shot.original,shot.preview,index)));
-            screenshotsSaved += shots.length;
+          const catalogPage = await db.prepare("SELECT id FROM anime_catalog ORDER BY position ASC,id ASC LIMIT ? OFFSET ?")
+            .bind(METADATA_REFRESH_BATCH_SIZE, cursor).all<{ id: string }>();
+          const ids = normalizeAdminCatalogIds(catalogPage.results.map(row => row.id)).slice(0, METADATA_REFRESH_BATCH_SIZE);
+          if (!ids.length) {
+            await db.batch([
+              setMeta(db, "metadata_refresh_state", "screenshots"),
+              setMeta(db, "metadata_refresh_screenshot_cursor", "0"),
+            ]);
+            const shots = await screenshotProgress(db);
+            return json({ isAdmin: true, phase: "screenshots", phaseChanged: true, processed: 0, offset: total, nextOffset: total, metadataOffset: total, screenshotOffset: 0, total, updated: 0, screenshotsSaved: 0, screenshotFailures: shots.failed, screenshotRetries: shots.retry, done: false });
           }
+          const source = await fetchByIds(ids);
+          const sourceById = new Map(source.map(item => [String(item.id), item]));
+          const missingIds = ids.filter(id => !sourceById.has(id));
+          if (missingIds.length) throw new Error("Shikimori не вернул метаданные для ID: " + missingIds.join(", ") + ". Курсор сохранён; повторите запуск позже.");
+          let updated = 0;
+          for (const id of ids) {
+            const sourceItem = sourceById.get(id);
+            if (sourceItem) updated += await updateCatalogMetadata(db, mapItem(sourceItem));
+          }
+          const nextOffset = cursor + ids.length;
+          const nextState = nextOffset >= total ? "screenshots" : "metadata";
+          await db.batch([
+            setMeta(db, "metadata_refresh_cursor", String(nextOffset)),
+            setMeta(db, "metadata_refresh_state", nextState),
+            ...(nextState === "screenshots" ? [setMeta(db, "metadata_refresh_screenshot_cursor", "0")] : []),
+          ]);
+          if (updated > 0) await invalidatePersistentCatalogCache();
+          await audit(db, "catalog.metadata.backfill", "success", { phase: "metadata", offset: cursor, processed: ids.length, titlesChanged: updated, total });
+          const shots = await screenshotProgress(db);
+          return json({ isAdmin: true, phase: nextState, phaseChanged: nextState !== "metadata", processed: ids.length, offset: nextOffset, nextOffset, metadataOffset: nextOffset, screenshotOffset: 0, total, updated, screenshotsSaved: 0, screenshotFailures: shots.failed, screenshotRetries: shots.retry, done: false });
         }
-        if (missingFromSource > 0) throw new Error("Shikimori не вернул данные для " + missingFromSource + " тайтл(ов) текущей пачки. Прогресс сохранён; повторите запуск позже.");
-        if (updated > 0) await invalidatePersistentCatalogCache();
-        const nextOffset = offset + ids.length;
-        const done = nextOffset >= total;
-        await db.batch([setMeta(db, "metadata_refresh_cursor", String(done ? 0 : nextOffset)), setMeta(db, "metadata_refresh_state", done ? "done" : "running")]);
-        await audit(db, "catalog.metadata.refresh", "success", {
-          offset, processed: ids.length, updated, screenshotsSaved, missingFromSource, total,
-        });
-        return json({
-          isAdmin: true, offset, nextOffset, processed: ids.length, updated, total,
-          screenshotsSaved, missingFromSource, done,
-        });
+
+        if (state === "screenshots") {
+          const cursor = Math.max(0, Number(await getMeta(db, "metadata_refresh_screenshot_cursor") ?? "0") || 0);
+          if (cursor >= total) {
+            const retryRow = await db.prepare("SELECT COUNT(*) AS count FROM anime_catalog_screenshot_status WHERE status='retry' AND attempts < ?")
+              .bind(SCREENSHOT_RETRY_LIMIT).first<{ count: number }>();
+            const nextState = Number(retryRow?.count ?? 0) > 0 ? "screenshots_retry" : "done";
+            await setMeta(db, "metadata_refresh_state", nextState);
+            const shots = await screenshotProgress(db);
+            return json({ isAdmin: true, phase: nextState, phaseChanged: true, processed: 0, offset: total, nextOffset: total, metadataOffset: total, screenshotOffset: total, total, updated: 0, screenshotsSaved: 0, screenshotFailures: shots.failed, screenshotRetries: shots.retry, done: nextState === "done" });
+          }
+          const row = await db.prepare("SELECT id FROM anime_catalog ORDER BY position ASC,id ASC LIMIT 1 OFFSET ?")
+            .bind(cursor).first<{ id: string }>();
+          if (!row) {
+            await setMeta(db, "metadata_refresh_screenshot_cursor", String(total));
+            return json({ isAdmin: true, phase: "screenshots", phaseChanged: true, processed: 0, offset: total, nextOffset: total, metadataOffset: total, screenshotOffset: total, total, updated: 0, screenshotsSaved: 0, done: false });
+          }
+          const animeId = row.id;
+          const statusRow = await db.prepare("SELECT status,attempts FROM anime_catalog_screenshot_status WHERE anime_id = ?")
+            .bind(animeId).first<{ status: ScreenshotStatus; attempts: number }>();
+          const existing = await db.prepare("SELECT COUNT(*) AS count FROM anime_catalog_screenshots WHERE anime_id = ?")
+            .bind(animeId).first<{ count: number }>();
+          let saved = 0;
+          let screenshotWarning: string | null = null;
+          let statements: Statement[] = [];
+          if (statusRow?.status === "done" || Number(existing?.count ?? 0) > 0) {
+            statements.push(screenshotStatusStatement(db, animeId, "done", 0, null));
+          } else {
+            const attempt = await fetchAndStoreScreenshots(db, animeId, Number(statusRow?.attempts ?? 0));
+            saved = attempt.saved;
+            screenshotWarning = attempt.error;
+            statements.push(...attempt.statements);
+          }
+          const nextCursor = cursor + 1;
+          statements.push(setMeta(db, "metadata_refresh_screenshot_cursor", String(nextCursor)));
+          await db.batch(statements);
+          const shots = await screenshotProgress(db);
+          return json({ isAdmin: true, phase: "screenshots", phaseChanged: false, processed: 1, offset: nextCursor, nextOffset: nextCursor, metadataOffset: total, screenshotOffset: nextCursor, total, updated: 0, screenshotsSaved: saved, screenshotFailures: shots.failed, screenshotRetries: shots.retry, screenshotWarning, done: false });
+        }
+
+        if (state === "screenshots_retry") {
+          const retryItem = await db.prepare("SELECT anime_id,attempts FROM anime_catalog_screenshot_status WHERE status='retry' AND attempts < ? ORDER BY attempts ASC,updated_at ASC,anime_id ASC LIMIT 1")
+            .bind(SCREENSHOT_RETRY_LIMIT).first<{ anime_id: string; attempts: number }>();
+          if (!retryItem) {
+            await setMeta(db, "metadata_refresh_state", "done");
+            const shots = await screenshotProgress(db);
+            return json({ isAdmin: true, phase: "done", phaseChanged: true, processed: 0, offset: shots.processed, nextOffset: shots.processed, metadataOffset: total, screenshotOffset: shots.processed, total, updated: 0, screenshotsSaved: 0, screenshotFailures: shots.failed, screenshotRetries: 0, done: true });
+          }
+          const attempt = await fetchAndStoreScreenshots(db, retryItem.anime_id, Number(retryItem.attempts ?? 0));
+          await db.batch(attempt.statements);
+          const remaining = await db.prepare("SELECT COUNT(*) AS count FROM anime_catalog_screenshot_status WHERE status='retry' AND attempts < ?")
+            .bind(SCREENSHOT_RETRY_LIMIT).first<{ count: number }>();
+          const done = Number(remaining?.count ?? 0) === 0;
+          if (done) await setMeta(db, "metadata_refresh_state", "done");
+          const shots = await screenshotProgress(db);
+          return json({ isAdmin: true, phase: done ? "done" : "screenshots_retry", phaseChanged: done, processed: 1, offset: shots.processed, nextOffset: shots.processed, metadataOffset: total, screenshotOffset: shots.processed, total, updated: 0, screenshotsSaved: attempt.saved, screenshotFailures: shots.failed, screenshotRetries: Number(remaining?.count ?? 0), screenshotWarning: attempt.error, done });
+        }
+
+        await setMeta(db, "metadata_refresh_state", "metadata");
+        return json({ isAdmin: true, phase: "metadata", phaseChanged: true, processed: 0, offset: 0, nextOffset: 0, metadataOffset: 0, screenshotOffset: 0, total, updated: 0, screenshotsSaved: 0, done: false });
       }
       if (body.action === "repair") {
         const safeIds = normalizeAdminCatalogIds((body as { ids?: unknown }).ids);
@@ -516,17 +665,26 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
     }
   } catch (error) {
     console.error("[YUME][ADMIN_CATALOG_IMPORT] Operation failed.",error);
-    let progress: { offset?: number; total?: number } = {};
+    let progress: Record<string, unknown> = {};
     if (requestedAction === "refresh_metadata") {
       try {
-        const [cursorValue, stateValue, totalRow] = await Promise.all([
+        const [metadataCursor, screenshotCursor, stateValue, totalRow, screenshots] = await Promise.all([
           getMeta(db, "metadata_refresh_cursor"),
+          getMeta(db, "metadata_refresh_screenshot_cursor"),
           getMeta(db, "metadata_refresh_state"),
           db.prepare("SELECT COUNT(*) AS total FROM anime_catalog").first<{ total: number }>(),
+          screenshotProgress(db),
         ]);
+        const total = Number(totalRow?.total ?? 0);
+        const phase = stateValue ?? "metadata";
         progress = {
-          offset: stateValue === "done" ? 0 : Math.max(0, Number(cursorValue ?? "0") || 0),
-          total: Number(totalRow?.total ?? 0),
+          phase,
+          metadataOffset: phase === "done" || phase.startsWith("screenshots") ? total : Math.max(0, Number(metadataCursor ?? "0") || 0),
+          screenshotOffset: phase === "metadata" ? 0 : Math.max(0, Number(screenshotCursor ?? "0") || 0),
+          offset: phase === "metadata" ? Math.max(0, Number(metadataCursor ?? "0") || 0) : Math.max(0, Number(screenshotCursor ?? "0") || 0),
+          total,
+          screenshotFailures: screenshots.failed,
+          screenshotRetries: screenshots.retry,
         };
       } catch (progressError) {
         console.warn("[YUME][ADMIN_CATALOG_IMPORT] Could not read refresh progress.", progressError);
