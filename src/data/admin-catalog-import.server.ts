@@ -451,7 +451,7 @@ export async function runScheduledCatalogMetadataRefresh(env: unknown): Promise<
 
       if (state === "screenshots") {
         let cursor = Math.max(0, Number(await getMeta(db, "metadata_refresh_screenshot_cursor") ?? "0") || 0);
-        const end = Math.min(total, cursor + 35);
+        const end = Math.min(total, cursor + 8);
         while (cursor < end) {
           const row = await db.prepare("SELECT id FROM anime_catalog ORDER BY position ASC,id ASC LIMIT 1 OFFSET ?")
             .bind(cursor).first<{ id: string }>();
@@ -486,7 +486,7 @@ export async function runScheduledCatalogMetadataRefresh(env: unknown): Promise<
 
       if (state === "screenshots_retry") {
         let processed = 0;
-        while (processed < 35) {
+        while (processed < 8) {
           const retryItem = await db.prepare("SELECT anime_id,attempts FROM anime_catalog_screenshot_status WHERE status='retry' AND attempts < ? ORDER BY attempts ASC,updated_at ASC,anime_id ASC LIMIT 1")
             .bind(SCREENSHOT_RETRY_LIMIT).first<{ anime_id: string; attempts: number }>();
           if (!retryItem) break;
