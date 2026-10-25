@@ -335,11 +335,11 @@ async function catalogQuality(db: Database, requestedOffset = 0) {
     hasMore:offset + rows.results.length < summary.incomplete,
   };
 }
-async function acquireLock(db: Database): Promise<string | null> {
+async function acquireLock(db: Database, ttlMs = 45000): Promise<string | null> {
   const token = crypto.randomUUID();
   const now = Date.now();
   const result = await db.prepare("UPDATE admin_catalog_import_lock SET token = ?, expires_at = ? WHERE id = 1 AND expires_at < ?")
-    .bind(token, now + 45000, now).run();
+    .bind(token, now + ttlMs, now).run();
   return Number(result.meta?.changes ?? 0) === 1 ? token : null;
 }
 async function releaseLock(db: Database, token: string): Promise<void> {
@@ -388,128 +388,259 @@ async function snapshot(db: Database) {
 }
 
 /**
+ * Process exactly one durable catalog-refresh step.
+ * Both the browser-driven manual loop and the Nitro Cron hook call this
+ * function so their phase transitions, retries, and progress cursors cannot drift.
+ * The caller must hold the shared catalog-operation lock and have ensured the schema.
+ */
+async function runCatalogMetadataRefreshStep(db: Database): Promise<Response> {
+    let state = await getMeta(db, "metadata_refresh_state") ?? "metadata";
+    if (state === "done") {
+      await db.batch([
+        setMeta(db, "metadata_refresh_state", "metadata"),
+        setMeta(db, "metadata_refresh_cursor", "0"),
+        setMeta(db, "metadata_refresh_screenshot_cursor", "0"),
+        db.prepare("UPDATE anime_catalog_screenshot_status SET status='retry',attempts=0,last_error=NULL,updated_at=CURRENT_TIMESTAMP WHERE status='failed'"),
+      ]);
+      state = "metadata";
+    } else if (state === "idle" || state === "running") {
+      state = "metadata";
+      await setMeta(db, "metadata_refresh_state", state);
+    }
+
+    const totalRow = await db.prepare("SELECT COUNT(*) AS total FROM anime_catalog").first<{ total: number }>();
+    const total = Number(totalRow?.total ?? 0);
+
+    if (state === "metadata") {
+      const cursor = Math.max(0, Number(await getMeta(db, "metadata_refresh_cursor") ?? "0") || 0);
+      if (cursor >= total) {
+        const nextState = total > 0 ? "screenshots" : "done";
+        await db.batch([
+          setMeta(db, "metadata_refresh_state", nextState),
+          setMeta(db, "metadata_refresh_screenshot_cursor", "0"),
+        ]);
+        const shots = await screenshotProgress(db);
+        return json({ isAdmin: true, phase: nextState, phaseChanged: true, processed: 0, offset: total, nextOffset: total, metadataOffset: total, screenshotOffset: 0, total, updated: 0, screenshotsSaved: 0, screenshotFailures: shots.failed, screenshotRetries: shots.retry, done: nextState === "done" });
+      }
+      const catalogPage = await db.prepare("SELECT id FROM anime_catalog ORDER BY position ASC,id ASC LIMIT ? OFFSET ?")
+        .bind(METADATA_REFRESH_BATCH_SIZE, cursor).all<{ id: string }>();
+      const ids = normalizeAdminCatalogIds(catalogPage.results.map(row => row.id)).slice(0, METADATA_REFRESH_BATCH_SIZE);
+      if (!ids.length) {
+        await db.batch([
+          setMeta(db, "metadata_refresh_state", "screenshots"),
+          setMeta(db, "metadata_refresh_screenshot_cursor", "0"),
+        ]);
+        const shots = await screenshotProgress(db);
+        return json({ isAdmin: true, phase: "screenshots", phaseChanged: true, processed: 0, offset: total, nextOffset: total, metadataOffset: total, screenshotOffset: 0, total, updated: 0, screenshotsSaved: 0, screenshotFailures: shots.failed, screenshotRetries: shots.retry, done: false });
+      }
+      const source = await fetchByIds(ids);
+      const sourceById = new Map(source.map(item => [String(item.id), item]));
+      const missingIds = ids.filter(id => !sourceById.has(id));
+      if (missingIds.length) throw new Error("Shikimori не вернул метаданные для ID: " + missingIds.join(", ") + ". Курсор сохранён; повторите запуск позже.");
+      let updated = 0;
+      for (const id of ids) {
+        const sourceItem = sourceById.get(id);
+        if (sourceItem) updated += await updateCatalogMetadata(db, mapItem(sourceItem));
+      }
+      const nextOffset = cursor + ids.length;
+      const nextState = nextOffset >= total ? "screenshots" : "metadata";
+      await db.batch([
+        setMeta(db, "metadata_refresh_cursor", String(nextOffset)),
+        setMeta(db, "metadata_refresh_state", nextState),
+        ...(nextState === "screenshots" ? [setMeta(db, "metadata_refresh_screenshot_cursor", "0")] : []),
+      ]);
+      if (updated > 0) await invalidatePersistentCatalogCache();
+      await audit(db, "catalog.metadata.backfill", "success", { phase: "metadata", offset: cursor, processed: ids.length, titlesChanged: updated, total });
+      const shots = await screenshotProgress(db);
+      return json({ isAdmin: true, phase: nextState, phaseChanged: nextState !== "metadata", processed: ids.length, offset: nextOffset, nextOffset, metadataOffset: nextOffset, screenshotOffset: 0, total, updated, screenshotsSaved: 0, screenshotFailures: shots.failed, screenshotRetries: shots.retry, done: false });
+    }
+
+    if (state === "screenshots") {
+      const cursor = Math.max(0, Number(await getMeta(db, "metadata_refresh_screenshot_cursor") ?? "0") || 0);
+      if (cursor >= total) {
+        const retryRow = await db.prepare("SELECT COUNT(*) AS count FROM anime_catalog_screenshot_status ss WHERE status='retry' AND attempts < ? AND EXISTS (SELECT 1 FROM anime_catalog a WHERE a.id = ss.anime_id)")
+          .bind(SCREENSHOT_RETRY_LIMIT).first<{ count: number }>();
+        const nextState = Number(retryRow?.count ?? 0) > 0 ? "screenshots_retry" : "done";
+        await setMeta(db, "metadata_refresh_state", nextState);
+        const shots = await screenshotProgress(db);
+        return json({ isAdmin: true, phase: nextState, phaseChanged: true, processed: 0, offset: total, nextOffset: total, metadataOffset: total, screenshotOffset: total, total, updated: 0, screenshotsSaved: 0, screenshotFailures: shots.failed, screenshotRetries: shots.retry, done: nextState === "done" });
+      }
+      const row = await db.prepare("SELECT id FROM anime_catalog ORDER BY position ASC,id ASC LIMIT 1 OFFSET ?")
+        .bind(cursor).first<{ id: string }>();
+      if (!row) {
+        await setMeta(db, "metadata_refresh_screenshot_cursor", String(total));
+        return json({ isAdmin: true, phase: "screenshots", phaseChanged: true, processed: 0, offset: total, nextOffset: total, metadataOffset: total, screenshotOffset: total, total, updated: 0, screenshotsSaved: 0, done: false });
+      }
+      const animeId = row.id;
+      const statusRow = await db.prepare("SELECT status,attempts FROM anime_catalog_screenshot_status WHERE anime_id = ?")
+        .bind(animeId).first<{ status: ScreenshotStatus; attempts: number }>();
+      const existing = await db.prepare("SELECT COUNT(*) AS count FROM anime_catalog_screenshots WHERE anime_id = ?")
+        .bind(animeId).first<{ count: number }>();
+      let saved = 0;
+      let screenshotWarning: string | null = null;
+      const statements: Statement[] = [];
+      if (statusRow?.status === "done" || Number(existing?.count ?? 0) > 0) {
+        statements.push(screenshotStatusStatement(db, animeId, "done", 0, null));
+      } else {
+        const attempt = await fetchAndStoreScreenshots(db, animeId, Number(statusRow?.attempts ?? 0));
+        saved = attempt.saved;
+        screenshotWarning = attempt.error;
+        statements.push(...attempt.statements);
+      }
+      const nextCursor = cursor + 1;
+      statements.push(setMeta(db, "metadata_refresh_screenshot_cursor", String(nextCursor)));
+      await db.batch(statements);
+      const shots = await screenshotProgress(db);
+      return json({ isAdmin: true, phase: "screenshots", phaseChanged: false, processed: 1, offset: nextCursor, nextOffset: nextCursor, metadataOffset: total, screenshotOffset: nextCursor, total, updated: 0, screenshotsSaved: saved, screenshotFailures: shots.failed, screenshotRetries: shots.retry, screenshotWarning, done: false });
+    }
+
+    if (state === "screenshots_retry") {
+      const retryItem = await db.prepare("SELECT ss.anime_id,ss.attempts FROM anime_catalog_screenshot_status ss WHERE ss.status='retry' AND ss.attempts < ? AND EXISTS (SELECT 1 FROM anime_catalog a WHERE a.id = ss.anime_id) ORDER BY ss.attempts ASC,ss.updated_at ASC,ss.anime_id ASC LIMIT 1")
+        .bind(SCREENSHOT_RETRY_LIMIT).first<{ anime_id: string; attempts: number }>();
+      if (!retryItem) {
+        await setMeta(db, "metadata_refresh_state", "done");
+        const shots = await screenshotProgress(db);
+        return json({ isAdmin: true, phase: "done", phaseChanged: true, processed: 0, offset: shots.processed, nextOffset: shots.processed, metadataOffset: total, screenshotOffset: shots.processed, total, updated: 0, screenshotsSaved: 0, screenshotFailures: shots.failed, screenshotRetries: 0, done: true });
+      }
+      const attempt = await fetchAndStoreScreenshots(db, retryItem.anime_id, Number(retryItem.attempts ?? 0));
+      await db.batch(attempt.statements);
+      const remaining = await db.prepare("SELECT COUNT(*) AS count FROM anime_catalog_screenshot_status WHERE status='retry' AND attempts < ?")
+        .bind(SCREENSHOT_RETRY_LIMIT).first<{ count: number }>();
+      const done = Number(remaining?.count ?? 0) === 0;
+      if (done) await setMeta(db, "metadata_refresh_state", "done");
+      const shots = await screenshotProgress(db);
+      return json({ isAdmin: true, phase: done ? "done" : "screenshots_retry", phaseChanged: done, processed: 1, offset: shots.processed, nextOffset: shots.processed, metadataOffset: total, screenshotOffset: shots.processed, total, updated: 0, screenshotsSaved: attempt.saved, screenshotFailures: shots.failed, screenshotRetries: Number(remaining?.count ?? 0), screenshotWarning: attempt.error, done });
+    }
+
+    await setMeta(db, "metadata_refresh_state", "metadata");
+    return json({ isAdmin: true, phase: "metadata", phaseChanged: true, processed: 0, offset: 0, nextOffset: 0, metadataOffset: 0, screenshotOffset: 0, total, updated: 0, screenshotsSaved: 0, done: false });
+}
+
+/**
  * One durable cron tick. All progress lives in D1, so the browser is only a
  * control panel and may be closed without interrupting the refresh.
  */
+/**
+ * Process one bounded Cron slice by repeatedly calling the same step used by
+ * the manual mode. The loop stops before the invocation gets close to the
+ * shared lock's expiry or Cloudflare's Cron wall-time limit.
+ */
 export async function runScheduledCatalogMetadataRefresh(env: unknown): Promise<void> {
   const db = database(env as Environment);
-  if (!db) return;
+  if (!db) {
+    console.error("[YUME][CATALOG_AUTO_REFRESH] Cron hook has no D1 binding.");
+    return;
+  }
+
   try {
     await ensureSchema(db);
     if (await getMeta(db, "metadata_refresh_auto_enabled") !== "1") return;
-    const lockToken = await acquireLock(db);
-    if (!lockToken) return;
+
+    // A separate TTL lets the Cron slice safely perform several shared steps.
+    const lockToken = await acquireLock(db, 75_000);
+    if (!lockToken) {
+      console.info("[YUME][CATALOG_AUTO_REFRESH] Cron slice skipped; another catalog operation holds the lock.");
+      return;
+    }
+
+    const startedAt = Date.now();
+    const startedIso = new Date(startedAt).toISOString();
+    let steps = 0;
+    let phase = await getMeta(db, "metadata_refresh_state") ?? "metadata";
+    let completed = false;
+    let stopped = false;
+
+    await setMeta(db, "metadata_refresh_last_tick_at", startedIso).run();
     try {
-      const totalRow = await db.prepare("SELECT COUNT(*) AS total FROM anime_catalog").first<{ total: number }>();
-      const total = Number(totalRow?.total ?? 0);
-      const state = await getMeta(db, "metadata_refresh_state") ?? "metadata";
-      if (state === "done" || state === "idle") {
-        await db.batch([
-          setMeta(db, "metadata_refresh_auto_enabled", "0"),
-          setMeta(db, "metadata_refresh_state", "done"),
-        ]);
-        return;
+      console.info("[YUME][CATALOG_AUTO_REFRESH] Cron slice started.", { phase, budgetMs: 28_000 });
+
+      // Each step makes at most one upstream request (metadata is one batched GraphQL request).
+      // A short pause between requests keeps YUME below Shikimori's published 5 RPS / 90 RPM limits.
+      while (steps < 35 && Date.now() - startedAt < 28_000) {
+        if (await getMeta(db, "metadata_refresh_auto_enabled") !== "1") {
+          stopped = true;
+          break;
+        }
+
+        const stepResponse = await runCatalogMetadataRefreshStep(db);
+        const stepResult = await stepResponse.json().catch(() => ({})) as {
+          isAdmin?: boolean;
+          error?: string;
+          message?: string;
+          phase?: string;
+          processed?: number;
+          updated?: number;
+          screenshotsSaved?: number;
+          done?: boolean;
+          offset?: number;
+          total?: number;
+          screenshotFailures?: number;
+          screenshotRetries?: number;
+          screenshotWarning?: string | null;
+        };
+        if (!stepResponse.ok || stepResult.isAdmin !== true) {
+          throw new Error(stepResult.message ?? stepResult.error ?? "The shared catalog refresh step failed.");
+        }
+
+        steps++;
+        phase = stepResult.phase ?? phase;
+
+        if (stepResult.screenshotWarning) {
+          console.warn("[YUME][CATALOG_AUTO_REFRESH] Screenshot will be retried.", {
+            phase, offset: stepResult.offset, warning: stepResult.screenshotWarning,
+          });
+        }
+
+        if (stepResult.done === true || phase === "done") {
+          completed = true;
+          await setMeta(db, "metadata_refresh_auto_enabled", "0").run();
+          break;
+        }
+
+        // Successful/failed provider attempts are reflected in D1 by the shared step.
+        // Delay after any step that actually made an upstream request.
+        if (Number(stepResult.processed ?? 0) > 0) {
+          await new Promise(resolve => setTimeout(resolve, REQUEST_DELAY_MS));
+        }
       }
 
-      if (state === "metadata") {
-        const cursor = Math.max(0, Number(await getMeta(db, "metadata_refresh_cursor") ?? "0") || 0);
-        if (cursor >= total || total === 0) {
-          await db.batch([
-            setMeta(db, "metadata_refresh_state", total > 0 ? "screenshots" : "done"),
-            setMeta(db, "metadata_refresh_screenshot_cursor", "0"),
-            ...(total === 0 ? [setMeta(db, "metadata_refresh_auto_enabled", "0")] : []),
-          ]);
-          return;
-        }
-        const page = await db.prepare("SELECT id FROM anime_catalog ORDER BY position ASC,id ASC LIMIT ? OFFSET ?")
-          .bind(METADATA_REFRESH_BATCH_SIZE, cursor).all<{ id: string }>();
-        const ids = normalizeAdminCatalogIds(page.results.map(row => row.id)).slice(0, METADATA_REFRESH_BATCH_SIZE);
-        if (!ids.length) {
-          await db.batch([setMeta(db, "metadata_refresh_state", "screenshots"), setMeta(db, "metadata_refresh_screenshot_cursor", "0")]);
-          return;
-        }
-        const source = await fetchByIds(ids);
-        const byId = new Map(source.map(item => [String(item.id), item]));
-        const missing = ids.filter(id => !byId.has(id));
-        if (missing.length) throw new Error("Shikimori metadata missing for IDs: " + missing.join(", "));
-        let updated = 0;
-        for (const id of ids) {
-          const item = byId.get(id);
-          if (item) updated += await updateCatalogMetadata(db, mapItem(item));
-        }
-        const next = cursor + ids.length;
-        const nextState = next >= total ? "screenshots" : "metadata";
-        await db.batch([
-          setMeta(db, "metadata_refresh_cursor", String(next)),
-          setMeta(db, "metadata_refresh_state", nextState),
-          ...(nextState === "screenshots" ? [setMeta(db, "metadata_refresh_screenshot_cursor", "0")] : []),
-        ]);
-        if (updated > 0) await invalidatePersistentCatalogCache();
-        await audit(db, "catalog.metadata.auto_tick", "success", { phase: "metadata", offset: cursor, processed: ids.length, total, updated });
-        return;
-      }
-
-      if (state === "screenshots") {
-        let cursor = Math.max(0, Number(await getMeta(db, "metadata_refresh_screenshot_cursor") ?? "0") || 0);
-        const end = Math.min(total, cursor + 8);
-        while (cursor < end) {
-          const row = await db.prepare("SELECT id FROM anime_catalog ORDER BY position ASC,id ASC LIMIT 1 OFFSET ?")
-            .bind(cursor).first<{ id: string }>();
-          cursor++;
-          if (!row) continue;
-          const existingStatus = await db.prepare("SELECT status,attempts FROM anime_catalog_screenshot_status WHERE anime_id = ?")
-            .bind(row.id).first<{ status: ScreenshotStatus; attempts: number }>();
-          const existingShots = await db.prepare("SELECT COUNT(*) AS count FROM anime_catalog_screenshots WHERE anime_id = ?")
-            .bind(row.id).first<{ count: number }>();
-          if (existingStatus?.status === "done" || Number(existingShots?.count ?? 0) > 0) {
-            await screenshotStatusStatement(db, row.id, "done", 0, null).run();
-          } else {
-            const result = await fetchAndStoreScreenshots(db, row.id, Number(existingStatus?.attempts ?? 0));
-            await db.batch(result.statements);
-            // Keep well below Shikimori's documented request-per-second ceiling.
-            await new Promise(resolve => setTimeout(resolve, 1200));
-          }
-          await setMeta(db, "metadata_refresh_screenshot_cursor", String(cursor)).run();
-        }
-        if (cursor >= total) {
-          const retryRow = await db.prepare("SELECT COUNT(*) AS count FROM anime_catalog_screenshot_status WHERE status='retry' AND attempts < ?")
-            .bind(SCREENSHOT_RETRY_LIMIT).first<{ count: number }>();
-          const nextState = Number(retryRow?.count ?? 0) > 0 ? "screenshots_retry" : "done";
-          await db.batch([
-            setMeta(db, "metadata_refresh_state", nextState),
-            ...(nextState === "done" ? [setMeta(db, "metadata_refresh_auto_enabled", "0")] : []),
-          ]);
-        }
-        await audit(db, "catalog.metadata.auto_tick", "success", { phase: "screenshots", offset: cursor, total });
-        return;
-      }
-
-      if (state === "screenshots_retry") {
-        let processed = 0;
-        while (processed < 8) {
-          const retryItem = await db.prepare("SELECT anime_id,attempts FROM anime_catalog_screenshot_status WHERE status='retry' AND attempts < ? ORDER BY attempts ASC,updated_at ASC,anime_id ASC LIMIT 1")
-            .bind(SCREENSHOT_RETRY_LIMIT).first<{ anime_id: string; attempts: number }>();
-          if (!retryItem) break;
-          const result = await fetchAndStoreScreenshots(db, retryItem.anime_id, Number(retryItem.attempts ?? 0));
-          await db.batch(result.statements);
-          processed++;
-          await new Promise(resolve => setTimeout(resolve, 1200));
-        }
-        const remaining = await db.prepare("SELECT COUNT(*) AS count FROM anime_catalog_screenshot_status WHERE status='retry' AND attempts < ?")
-          .bind(SCREENSHOT_RETRY_LIMIT).first<{ count: number }>();
-        if (Number(remaining?.count ?? 0) === 0) {
-          await db.batch([setMeta(db, "metadata_refresh_state", "done"), setMeta(db, "metadata_refresh_auto_enabled", "0")]);
-        }
-        await audit(db, "catalog.metadata.auto_tick", "success", { phase: "screenshots_retry", processed, remaining: Number(remaining?.count ?? 0) });
-      }
+      const finishedAt = Date.now();
+      const durationMs = finishedAt - startedAt;
+      await db.batch([
+        setMeta(db, "metadata_refresh_last_tick_at", new Date(finishedAt).toISOString()),
+        setMeta(db, "metadata_refresh_last_error", ""),
+        setMeta(db, "metadata_refresh_last_phase", phase),
+        setMeta(db, "metadata_refresh_last_steps", String(steps)),
+        setMeta(db, "metadata_refresh_last_duration_ms", String(durationMs)),
+        ...(steps > 0 ? [setMeta(db, "metadata_refresh_last_success_at", new Date(finishedAt).toISOString())] : []),
+      ]);
+      await audit(db, "catalog.metadata.auto_tick", completed ? "success" : stopped ? "paused" : "success", {
+        phase, steps, durationMs, completed, stopped,
+      });
+      console.info("[YUME][CATALOG_AUTO_REFRESH] Cron slice finished.", {
+        phase, steps, durationMs, completed, stopped,
+      });
+    } catch (error) {
+      const finishedAt = Date.now();
+      const message = error instanceof Error ? error.message : "Unknown scheduled refresh error";
+      await db.batch([
+        setMeta(db, "metadata_refresh_last_tick_at", new Date(finishedAt).toISOString()),
+        setMeta(db, "metadata_refresh_last_error", message.slice(0, 1000)),
+        setMeta(db, "metadata_refresh_last_phase", phase),
+        setMeta(db, "metadata_refresh_last_steps", String(steps)),
+        setMeta(db, "metadata_refresh_last_duration_ms", String(finishedAt - startedAt)),
+      ]);
+      await audit(db, "catalog.metadata.auto_tick", "warning", {
+        phase, steps, durationMs: finishedAt - startedAt, message,
+      });
+      console.error("[YUME][CATALOG_AUTO_REFRESH] Cron slice failed; progress is preserved.", {
+        phase, steps, message,
+      });
     } finally {
       await releaseLock(db, lockToken);
     }
   } catch (error) {
-    console.error("[YUME][CATALOG_AUTO_REFRESH] Scheduled tick failed; D1 progress is preserved.", error);
-    try {
-      await audit(db, "catalog.metadata.auto_tick", "warning", { message: error instanceof Error ? error.message : "Unknown error" });
-    } catch { /* best effort */ }
+    console.error("[YUME][CATALOG_AUTO_REFRESH] Cron setup failed.", error);
   }
 }
 
@@ -522,7 +653,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
   try {
     if (!await authorize(request,env,db)) return json({isAdmin:false,error:"admin_required"},403);
     await ensureSchema(db);
-    if (request.method === "GET") { const url = new URL(request.url); const qualityOffset = Number(url.searchParams.get("qualityOffset") ?? "0"); const quality = await catalogQuality(db,qualityOffset); const [refreshState, metadataCursor, screenshotCursor, totalRow, shots, autoEnabled] = await Promise.all([getMeta(db,"metadata_refresh_state"),getMeta(db,"metadata_refresh_cursor"),getMeta(db,"metadata_refresh_screenshot_cursor"),db.prepare("SELECT COUNT(*) AS total FROM anime_catalog").first<{total:number}>(),screenshotProgress(db),getMeta(db,"metadata_refresh_auto_enabled")]); const refreshTotal = Number(totalRow?.total ?? 0); const phase = refreshState ?? "idle"; const metadataOffset = phase === "done" || phase.startsWith("screenshots") ? refreshTotal : Math.max(0,Number(metadataCursor ?? "0") || 0); const screenshotOffset = phase === "metadata" ? 0 : Math.max(0,Number(screenshotCursor ?? "0") || 0); return json({isAdmin:true,...await snapshot(db),metadataRefresh:{autoEnabled:autoEnabled === "1",phase,metadataOffset,screenshotOffset,total:refreshTotal,screenshotFailures:shots.failed,screenshotRetries:shots.retry,done:phase === "done"},quality:quality.items,qualitySummary:quality.summary,qualityLimit:quality.limit,qualityOffset:quality.offset,qualityHasMore:quality.hasMore,auditLog:await recentAudit(db)}); }
+    if (request.method === "GET") { const url = new URL(request.url); const qualityOffset = Number(url.searchParams.get("qualityOffset") ?? "0"); const quality = await catalogQuality(db,qualityOffset); const [refreshState, metadataCursor, screenshotCursor, totalRow, shots, autoEnabled] = await Promise.all([getMeta(db,"metadata_refresh_state"),getMeta(db,"metadata_refresh_cursor"),getMeta(db,"metadata_refresh_screenshot_cursor"),db.prepare("SELECT COUNT(*) AS total FROM anime_catalog").first<{total:number}>(),screenshotProgress(db),getMeta(db,"metadata_refresh_auto_enabled")]); const refreshTotal = Number(totalRow?.total ?? 0); const phase = refreshState ?? "idle"; const metadataOffset = phase === "done" || phase.startsWith("screenshots") ? refreshTotal : Math.max(0,Number(metadataCursor ?? "0") || 0); const screenshotOffset = phase === "metadata" ? 0 : Math.max(0,Number(screenshotCursor ?? "0") || 0); return json({isAdmin:true,...await snapshot(db),metadataRefresh:{autoEnabled:autoEnabled === "1",phase,metadataOffset,screenshotOffset,total:refreshTotal,screenshotFailures:shots.failed,screenshotRetries:shots.retry,done:phase === "done",lastTickAt:await getMeta(db,"metadata_refresh_last_tick_at"),lastSuccessAt:await getMeta(db,"metadata_refresh_last_success_at"),lastError:await getMeta(db,"metadata_refresh_last_error"),lastPhase:await getMeta(db,"metadata_refresh_last_phase"),lastSteps:Number(await getMeta(db,"metadata_refresh_last_steps") ?? "0"),lastDurationMs:Number(await getMeta(db,"metadata_refresh_last_duration_ms") ?? "0")},quality:quality.items,qualitySummary:quality.summary,qualityLimit:quality.limit,qualityOffset:quality.offset,qualityHasMore:quality.hasMore,auditLog:await recentAudit(db)}); }
     let body: {action?:unknown; target?:unknown};
     try { body = await request.json() as {action?:unknown;target?:unknown}; } catch { return json({error:"invalid_request"},400); }
     requestedAction = body.action;
@@ -559,128 +690,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
         await audit(db, "catalog.metadata.auto_stop", "success", { phase: await getMeta(db,"metadata_refresh_state") ?? "idle" });
         return json({isAdmin:true,autoEnabled:false,phase:await getMeta(db,"metadata_refresh_state") ?? "idle",message:"Автоматическое обновление остановлено. Прогресс сохранён."});
       }
-      if (body.action === "refresh_metadata") {
-        let state = await getMeta(db, "metadata_refresh_state") ?? "metadata";
-        if (state === "done") {
-          await db.batch([
-            setMeta(db, "metadata_refresh_state", "metadata"),
-            setMeta(db, "metadata_refresh_cursor", "0"),
-            setMeta(db, "metadata_refresh_screenshot_cursor", "0"),
-            db.prepare("UPDATE anime_catalog_screenshot_status SET status='retry',attempts=0,last_error=NULL,updated_at=CURRENT_TIMESTAMP WHERE status='failed'"),
-          ]);
-          state = "metadata";
-        } else if (state === "idle" || state === "running") {
-          state = "metadata";
-          await setMeta(db, "metadata_refresh_state", state);
-        }
-
-        const totalRow = await db.prepare("SELECT COUNT(*) AS total FROM anime_catalog").first<{ total: number }>();
-        const total = Number(totalRow?.total ?? 0);
-
-        if (state === "metadata") {
-          const cursor = Math.max(0, Number(await getMeta(db, "metadata_refresh_cursor") ?? "0") || 0);
-          if (cursor >= total) {
-            const nextState = total > 0 ? "screenshots" : "done";
-            await db.batch([
-              setMeta(db, "metadata_refresh_state", nextState),
-              setMeta(db, "metadata_refresh_screenshot_cursor", "0"),
-            ]);
-            const shots = await screenshotProgress(db);
-            return json({ isAdmin: true, phase: nextState, phaseChanged: true, processed: 0, offset: total, nextOffset: total, metadataOffset: total, screenshotOffset: 0, total, updated: 0, screenshotsSaved: 0, screenshotFailures: shots.failed, screenshotRetries: shots.retry, done: nextState === "done" });
-          }
-          const catalogPage = await db.prepare("SELECT id FROM anime_catalog ORDER BY position ASC,id ASC LIMIT ? OFFSET ?")
-            .bind(METADATA_REFRESH_BATCH_SIZE, cursor).all<{ id: string }>();
-          const ids = normalizeAdminCatalogIds(catalogPage.results.map(row => row.id)).slice(0, METADATA_REFRESH_BATCH_SIZE);
-          if (!ids.length) {
-            await db.batch([
-              setMeta(db, "metadata_refresh_state", "screenshots"),
-              setMeta(db, "metadata_refresh_screenshot_cursor", "0"),
-            ]);
-            const shots = await screenshotProgress(db);
-            return json({ isAdmin: true, phase: "screenshots", phaseChanged: true, processed: 0, offset: total, nextOffset: total, metadataOffset: total, screenshotOffset: 0, total, updated: 0, screenshotsSaved: 0, screenshotFailures: shots.failed, screenshotRetries: shots.retry, done: false });
-          }
-          const source = await fetchByIds(ids);
-          const sourceById = new Map(source.map(item => [String(item.id), item]));
-          const missingIds = ids.filter(id => !sourceById.has(id));
-          if (missingIds.length) throw new Error("Shikimori не вернул метаданные для ID: " + missingIds.join(", ") + ". Курсор сохранён; повторите запуск позже.");
-          let updated = 0;
-          for (const id of ids) {
-            const sourceItem = sourceById.get(id);
-            if (sourceItem) updated += await updateCatalogMetadata(db, mapItem(sourceItem));
-          }
-          const nextOffset = cursor + ids.length;
-          const nextState = nextOffset >= total ? "screenshots" : "metadata";
-          await db.batch([
-            setMeta(db, "metadata_refresh_cursor", String(nextOffset)),
-            setMeta(db, "metadata_refresh_state", nextState),
-            ...(nextState === "screenshots" ? [setMeta(db, "metadata_refresh_screenshot_cursor", "0")] : []),
-          ]);
-          if (updated > 0) await invalidatePersistentCatalogCache();
-          await audit(db, "catalog.metadata.backfill", "success", { phase: "metadata", offset: cursor, processed: ids.length, titlesChanged: updated, total });
-          const shots = await screenshotProgress(db);
-          return json({ isAdmin: true, phase: nextState, phaseChanged: nextState !== "metadata", processed: ids.length, offset: nextOffset, nextOffset, metadataOffset: nextOffset, screenshotOffset: 0, total, updated, screenshotsSaved: 0, screenshotFailures: shots.failed, screenshotRetries: shots.retry, done: false });
-        }
-
-        if (state === "screenshots") {
-          const cursor = Math.max(0, Number(await getMeta(db, "metadata_refresh_screenshot_cursor") ?? "0") || 0);
-          if (cursor >= total) {
-            const retryRow = await db.prepare("SELECT COUNT(*) AS count FROM anime_catalog_screenshot_status ss WHERE status='retry' AND attempts < ? AND EXISTS (SELECT 1 FROM anime_catalog a WHERE a.id = ss.anime_id)")
-              .bind(SCREENSHOT_RETRY_LIMIT).first<{ count: number }>();
-            const nextState = Number(retryRow?.count ?? 0) > 0 ? "screenshots_retry" : "done";
-            await setMeta(db, "metadata_refresh_state", nextState);
-            const shots = await screenshotProgress(db);
-            return json({ isAdmin: true, phase: nextState, phaseChanged: true, processed: 0, offset: total, nextOffset: total, metadataOffset: total, screenshotOffset: total, total, updated: 0, screenshotsSaved: 0, screenshotFailures: shots.failed, screenshotRetries: shots.retry, done: nextState === "done" });
-          }
-          const row = await db.prepare("SELECT id FROM anime_catalog ORDER BY position ASC,id ASC LIMIT 1 OFFSET ?")
-            .bind(cursor).first<{ id: string }>();
-          if (!row) {
-            await setMeta(db, "metadata_refresh_screenshot_cursor", String(total));
-            return json({ isAdmin: true, phase: "screenshots", phaseChanged: true, processed: 0, offset: total, nextOffset: total, metadataOffset: total, screenshotOffset: total, total, updated: 0, screenshotsSaved: 0, done: false });
-          }
-          const animeId = row.id;
-          const statusRow = await db.prepare("SELECT status,attempts FROM anime_catalog_screenshot_status WHERE anime_id = ?")
-            .bind(animeId).first<{ status: ScreenshotStatus; attempts: number }>();
-          const existing = await db.prepare("SELECT COUNT(*) AS count FROM anime_catalog_screenshots WHERE anime_id = ?")
-            .bind(animeId).first<{ count: number }>();
-          let saved = 0;
-          let screenshotWarning: string | null = null;
-          const statements: Statement[] = [];
-          if (statusRow?.status === "done" || Number(existing?.count ?? 0) > 0) {
-            statements.push(screenshotStatusStatement(db, animeId, "done", 0, null));
-          } else {
-            const attempt = await fetchAndStoreScreenshots(db, animeId, Number(statusRow?.attempts ?? 0));
-            saved = attempt.saved;
-            screenshotWarning = attempt.error;
-            statements.push(...attempt.statements);
-          }
-          const nextCursor = cursor + 1;
-          statements.push(setMeta(db, "metadata_refresh_screenshot_cursor", String(nextCursor)));
-          await db.batch(statements);
-          const shots = await screenshotProgress(db);
-          return json({ isAdmin: true, phase: "screenshots", phaseChanged: false, processed: 1, offset: nextCursor, nextOffset: nextCursor, metadataOffset: total, screenshotOffset: nextCursor, total, updated: 0, screenshotsSaved: saved, screenshotFailures: shots.failed, screenshotRetries: shots.retry, screenshotWarning, done: false });
-        }
-
-        if (state === "screenshots_retry") {
-          const retryItem = await db.prepare("SELECT ss.anime_id,ss.attempts FROM anime_catalog_screenshot_status ss WHERE ss.status='retry' AND ss.attempts < ? AND EXISTS (SELECT 1 FROM anime_catalog a WHERE a.id = ss.anime_id) ORDER BY ss.attempts ASC,ss.updated_at ASC,ss.anime_id ASC LIMIT 1")
-            .bind(SCREENSHOT_RETRY_LIMIT).first<{ anime_id: string; attempts: number }>();
-          if (!retryItem) {
-            await setMeta(db, "metadata_refresh_state", "done");
-            const shots = await screenshotProgress(db);
-            return json({ isAdmin: true, phase: "done", phaseChanged: true, processed: 0, offset: shots.processed, nextOffset: shots.processed, metadataOffset: total, screenshotOffset: shots.processed, total, updated: 0, screenshotsSaved: 0, screenshotFailures: shots.failed, screenshotRetries: 0, done: true });
-          }
-          const attempt = await fetchAndStoreScreenshots(db, retryItem.anime_id, Number(retryItem.attempts ?? 0));
-          await db.batch(attempt.statements);
-          const remaining = await db.prepare("SELECT COUNT(*) AS count FROM anime_catalog_screenshot_status WHERE status='retry' AND attempts < ?")
-            .bind(SCREENSHOT_RETRY_LIMIT).first<{ count: number }>();
-          const done = Number(remaining?.count ?? 0) === 0;
-          if (done) await setMeta(db, "metadata_refresh_state", "done");
-          const shots = await screenshotProgress(db);
-          return json({ isAdmin: true, phase: done ? "done" : "screenshots_retry", phaseChanged: done, processed: 1, offset: shots.processed, nextOffset: shots.processed, metadataOffset: total, screenshotOffset: shots.processed, total, updated: 0, screenshotsSaved: attempt.saved, screenshotFailures: shots.failed, screenshotRetries: Number(remaining?.count ?? 0), screenshotWarning: attempt.error, done });
-        }
-
-        await setMeta(db, "metadata_refresh_state", "metadata");
-        return json({ isAdmin: true, phase: "metadata", phaseChanged: true, processed: 0, offset: 0, nextOffset: 0, metadataOffset: 0, screenshotOffset: 0, total, updated: 0, screenshotsSaved: 0, done: false });
-      }
+      if (body.action === "refresh_metadata") return await runCatalogMetadataRefreshStep(db);
       if (body.action === "repair") {
         const safeIds = normalizeAdminCatalogIds((body as { ids?: unknown }).ids);
         if (!safeIds.length) return json({error:"no_valid_ids"},400);
