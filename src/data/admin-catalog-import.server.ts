@@ -514,6 +514,6 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
     }
   } catch (error) {
     console.error("[YUME][ADMIN_CATALOG_IMPORT] Operation failed.",error);
-    return json({error:"admin_operation_failed"},503);
+    return json({error:"admin_operation_failed",message:error instanceof Error ? error.message : "Unknown administrative operation error."},503);
   }
 }

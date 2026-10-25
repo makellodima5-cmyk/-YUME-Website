@@ -357,7 +357,7 @@ function Index() {
   const [adminImport, setAdminImport] = useState<{target:number;cursor:number;added:number;skipped:number;incomplete:number;errors:number;state:string;delayMs?:number}>({target:0,cursor:1,added:0,skipped:0,incomplete:0,errors:0,state:"idle"});
   const [adminImportMessage, setAdminImportMessage] = useState("");
   const [metadataRefreshRunning, setMetadataRefreshRunning] = useState(false);
-  const [metadataRefreshProgress, setMetadataRefreshProgress] = useState({ offset: 0, total: 0, updated: 0 });
+  const [metadataRefreshProgress, setMetadataRefreshProgress] = useState({ offset: 0, total: 0, updated: 0, screenshotsSaved: 0 });
   const [metadataRefreshMessage, setMetadataRefreshMessage] = useState("");
   const [catalogQuality, setCatalogQuality] = useState<{id:string;title:string;year:number;missingYear:boolean;missingPoster:boolean;missingDescription:boolean}[]>([]);
   const [catalogQualityOffset, setCatalogQualityOffset] = useState(0);
@@ -826,7 +826,7 @@ function Index() {
     if (!confirmed) return;
     setMetadataRefreshRunning(true);
     setMetadataRefreshMessage("");
-    setMetadataRefreshProgress({ offset: 0, total: 0, updated: 0 });
+    setMetadataRefreshProgress({ offset: 0, total: 0, updated: 0, screenshotsSaved: 0 });
     let offset = 0;
     let total = 0;
     let updated = 0;
@@ -851,7 +851,7 @@ function Index() {
         screenshotsSaved += payload.screenshotsSaved ?? 0;
         offset = payload.nextOffset ?? offset;
         processed = offset;
-        setMetadataRefreshProgress({ offset, total, updated });
+        setMetadataRefreshProgress({ offset, total, updated, screenshotsSaved });
         if (payload.done || payload.processed === 0) break;
         setMetadataRefreshMessage(language === "ru"
           ? "Обработано " + processed + " из " + total + "; заполнено метаданных: " + updated + "; добавлено URL кадров: " + screenshotsSaved + "."
@@ -1724,7 +1724,7 @@ function Index() {
                   <div className="mt-3">
                     <div className="mb-1 flex flex-wrap justify-between gap-2 text-xs text-muted-foreground">
                       <span>{language === "ru" ? "Обработано" : "Processed"}: {metadataRefreshProgress.offset} / {metadataRefreshProgress.total}</span>
-                      <span>{language === "ru" ? "Обновлено" : "Updated"}: {metadataRefreshProgress.updated}</span>
+                      <span>{language === "ru" ? "Заполнено полей" : "Fields filled"}: {metadataRefreshProgress.updated} · {language === "ru" ? "URL кадров" : "Screenshot URLs"}: {metadataRefreshProgress.screenshotsSaved}</span>
                     </div>
                     <div role="progressbar" aria-valuemin={0} aria-valuemax={metadataRefreshProgress.total} aria-valuenow={metadataRefreshProgress.offset} className="h-1.5 overflow-hidden rounded-full bg-muted">
                       <div className="h-full rounded-full bg-gradient-to-r from-[#A83BFA] to-[#D08AFF] transition-all" style={{ width: (metadataRefreshProgress.total ? Math.min(100, metadataRefreshProgress.offset / metadataRefreshProgress.total * 100) : 0) + "%" }} />
