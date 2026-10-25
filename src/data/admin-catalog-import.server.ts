@@ -28,7 +28,7 @@ const SESSION_COOKIE = "__Host-yume-session";
 const MAX_TARGET = 500;
 const PAGE_SIZE = 50;
 const REQUEST_DELAY_MS = 1500;
-const METADATA_REFRESH_BATCH_SIZE = 50;
+const METADATA_REFRESH_BATCH_SIZE = 2;
 const FIELDS = "id name english russian kind score status episodes episodesAired airedOn { date year } releasedOn { date year } description poster { mainUrl previewUrl originalUrl } opengraphImageUrl genres { id name russian kind } nextEpisodeAt rating studios { name } videos { url playerUrl name kind }";
 
 export function normalizeAdminCatalogIds(value: unknown): string[] {
@@ -98,6 +98,8 @@ function ensureSchema(db: Database): Promise<void> {
     await db.batch([
     db.prepare("CREATE TABLE IF NOT EXISTS anime_catalog (id TEXT PRIMARY KEY NOT NULL, title TEXT NOT NULL, english_title TEXT, original_title TEXT NOT NULL, year INTEGER NOT NULL DEFAULT 0, episodes INTEGER NOT NULL DEFAULT 0, rating REAL, genres_json TEXT NOT NULL DEFAULT '[]', status TEXT NOT NULL DEFAULT 'Неизвестно', description TEXT NOT NULL DEFAULT '', hue INTEGER NOT NULL DEFAULT 280, glyph TEXT NOT NULL DEFAULT 'Y', is_new INTEGER NOT NULL DEFAULT 0, popular INTEGER NOT NULL DEFAULT 0, poster_url TEXT, banner_url TEXT, kind TEXT, age_rating TEXT, next_episode_at TEXT, episodes_aired INTEGER NOT NULL DEFAULT 0, aired_on TEXT, studios_json TEXT NOT NULL DEFAULT '[]', youtube_trailer_id TEXT, position INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)"),
     db.prepare("CREATE TABLE IF NOT EXISTS anime_catalog_meta (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL)"),
+    db.prepare("CREATE TABLE IF NOT EXISTS anime_catalog_screenshots (anime_id TEXT NOT NULL, original_url TEXT NOT NULL, preview_url TEXT NOT NULL, position INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (anime_id, original_url))"),
+    db.prepare("CREATE INDEX IF NOT EXISTS idx_anime_catalog_screenshots_position ON anime_catalog_screenshots(anime_id, position)"),
     db.prepare("CREATE INDEX IF NOT EXISTS idx_anime_catalog_missing_trailer ON anime_catalog(id) WHERE youtube_trailer_id IS NULL OR youtube_trailer_id = ''"),
     db.prepare("CREATE TABLE IF NOT EXISTS yume_admin_audit_log (id INTEGER PRIMARY KEY AUTOINCREMENT, action TEXT NOT NULL, status TEXT NOT NULL, details TEXT NOT NULL DEFAULT '{}', actor_telegram_id TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)"),
     db.prepare("CREATE TABLE IF NOT EXISTS admin_catalog_import_lock (id INTEGER PRIMARY KEY CHECK (id = 1), token TEXT NOT NULL DEFAULT '', expires_at INTEGER NOT NULL DEFAULT 0)"),
@@ -214,8 +216,9 @@ async function fetchByIds(ids: string[]): Promise<ShikimoriAnime[]> {
 }
 
 async function updateCatalogMetadata(db: Database, item: ReturnType<typeof mapItem>): Promise<number> {
-  const result = await db.prepare("UPDATE anime_catalog SET title=COALESCE(NULLIF(?,'Без названия'),title),english_title=COALESCE(NULLIF(?,'Без названия'),english_title),original_title=COALESCE(NULLIF(?,'Без названия'),original_title),year=CASE WHEN ?>0 THEN ? ELSE year END,episodes=CASE WHEN ?>0 THEN ? ELSE episodes END,rating=COALESCE(?,rating),genres_json=CASE WHEN ?<>'[]' THEN ? ELSE genres_json END,status=CASE WHEN ?<>'Неизвестно' THEN ? ELSE status END,description=COALESCE(NULLIF(? ,''),description),hue=?,glyph=?,is_new=?,popular=?,poster_url=COALESCE(?,poster_url),banner_url=COALESCE(?,banner_url),kind=COALESCE(?,kind),age_rating=COALESCE(?,age_rating),next_episode_at=COALESCE(?,next_episode_at),episodes_aired=CASE WHEN ?>0 THEN ? ELSE episodes_aired END,aired_on=COALESCE(?,aired_on),studios_json=CASE WHEN ?<>'[]' THEN ? ELSE studios_json END,youtube_trailer_id=COALESCE(?,youtube_trailer_id),updated_at=CURRENT_TIMESTAMP WHERE id=?")
-    .bind(item.title,item.english_title,item.original_title,item.year,item.year,item.episodes,item.episodes,item.rating,item.genres_json,item.genres_json,item.status,item.status,item.description,item.hue,item.glyph,item.is_new,item.popular,item.poster_url,item.banner_url,item.kind,item.age_rating,item.next_episode_at,item.episodes_aired,item.episodes_aired,item.aired_on,item.studios_json,item.studios_json,item.youtube_trailer_id,item.id)
+  // Only fill gaps. Keep every non-empty field intact to avoid unnecessary writes.
+  const result = await db.prepare("UPDATE anime_catalog SET title=CASE WHEN trim(title)='' OR title='Без названия' THEN ? ELSE title END,english_title=CASE WHEN english_title IS NULL OR trim(english_title)='' THEN ? ELSE english_title END,original_title=CASE WHEN trim(original_title)='' OR original_title='Без названия' THEN ? ELSE original_title END,year=CASE WHEN year<=0 THEN ? ELSE year END,episodes=CASE WHEN episodes<=0 THEN ? ELSE episodes END,rating=CASE WHEN rating IS NULL THEN ? ELSE rating END,genres_json=CASE WHEN genres_json IS NULL OR trim(genres_json)='' OR genres_json='[]' THEN ? ELSE genres_json END,status=CASE WHEN status IS NULL OR trim(status)='' OR status='Неизвестно' THEN ? ELSE status END,description=CASE WHEN description IS NULL OR trim(description)='' THEN ? ELSE description END,poster_url=CASE WHEN poster_url IS NULL OR trim(poster_url)='' THEN ? ELSE poster_url END,banner_url=CASE WHEN banner_url IS NULL OR trim(banner_url)='' THEN ? ELSE banner_url END,kind=CASE WHEN kind IS NULL OR trim(kind)='' THEN ? ELSE kind END,age_rating=CASE WHEN age_rating IS NULL OR trim(age_rating)='' THEN ? ELSE age_rating END,next_episode_at=CASE WHEN next_episode_at IS NULL OR trim(next_episode_at)='' THEN ? ELSE next_episode_at END,episodes_aired=CASE WHEN episodes_aired<=0 THEN ? ELSE episodes_aired END,aired_on=CASE WHEN aired_on IS NULL OR trim(aired_on)='' THEN ? ELSE aired_on END,studios_json=CASE WHEN studios_json IS NULL OR trim(studios_json)='' OR studios_json='[]' THEN ? ELSE studios_json END,youtube_trailer_id=COALESCE(NULLIF(youtube_trailer_id,''),?),updated_at=CURRENT_TIMESTAMP WHERE id=?")
+    .bind(item.title,item.english_title,item.original_title,item.year,item.episodes,item.rating,item.genres_json,item.status,item.description,item.poster_url,item.banner_url,item.kind,item.age_rating,item.next_episode_at,item.episodes_aired,item.aired_on,item.studios_json,item.youtube_trailer_id,item.id)
     .run();
   return Number(result.meta?.changes ?? 0);
 }
@@ -331,22 +334,52 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
         }
         const source = await fetchByIds(ids);
         const sourceById = new Map(source.map(item => [String(item.id), item]));
-        let updated = 0;
+        let updated = 0, screenshotsSaved = 0, missingFromSource = 0;
         for (const id of ids) {
           const sourceItem = sourceById.get(id);
-          if (!sourceItem) continue;
+          if (!sourceItem) { missingFromSource++; continue; }
           updated += await updateCatalogMetadata(db, mapItem(sourceItem));
+          const existing = await db.prepare("SELECT COUNT(*) AS count FROM anime_catalog_screenshots WHERE anime_id = ?").bind(id).first<{count:number}>();
+          if (Number(existing?.count ?? 0) > 0) continue;
+          const shotResponse = await fetch("https://shikimori.one/api/animes/" + encodeURIComponent(id) + "/screenshots", {
+            headers: { Accept: "application/json", "User-Agent": "YUME/1.0" },
+            signal: AbortSignal.timeout(6000),
+          });
+          if (shotResponse.status === 429) {
+            const retryAfterMs = retryAfterMilliseconds(shotResponse.headers.get("Retry-After")) ?? 60000;
+            const error = new Error("Shikimori ограничил частоту запросов при получении кадров.");
+            (error as Error & {retryAfterMs?:number}).retryAfterMs = retryAfterMs;
+            throw error;
+          }
+          if (!shotResponse.ok) throw new Error("Shikimori не вернул кадры для аниме " + id + " (HTTP " + shotResponse.status + "). Повторите запуск — обработка продолжится с этого места.");
+          const shotPayload = await shotResponse.json() as unknown;
+          if (!Array.isArray(shotPayload)) throw new Error("Shikimori вернул некорректный список кадров для аниме " + id + ". Повторите запуск.");
+          const shots = shotPayload.map((shot) => {
+            if (!shot || typeof shot !== "object") return null;
+            const item = shot as {original?:unknown;preview?:unknown};
+            const valid = (value: unknown): string | null => {
+              if (typeof value !== "string") return null;
+              try { const url = new URL(value); return ["https:","http:"].includes(url.protocol) ? url.toString() : null; } catch { return null; }
+            };
+            const original = valid(item.original), preview = valid(item.preview) ?? original;
+            return original && preview ? { original, preview } : null;
+          }).filter((shot): shot is {original:string;preview:string} => shot !== null).filter((shot,index,all)=>all.findIndex(other=>other.original===shot.original)===index).slice(0,24);
+          if (shots.length) {
+            await db.batch(shots.map((shot,index)=>db.prepare("INSERT OR IGNORE INTO anime_catalog_screenshots (anime_id, original_url, preview_url, position, updated_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)").bind(id,shot.original,shot.preview,index)));
+            screenshotsSaved += shots.length;
+          }
         }
+        if (missingFromSource > 0) throw new Error("Shikimori не вернул данные для " + missingFromSource + " тайтл(ов) текущей пачки. Прогресс сохранён; повторите запуск позже.");
         if (updated > 0) await invalidatePersistentCatalogCache();
         const nextOffset = offset + ids.length;
         const done = nextOffset >= total;
         await db.batch([setMeta(db, "metadata_refresh_cursor", String(done ? 0 : nextOffset)), setMeta(db, "metadata_refresh_state", done ? "done" : "running")]);
         await audit(db, "catalog.metadata.refresh", "success", {
-          offset, processed: ids.length, updated, missingFromSource: ids.length - source.length, total,
+          offset, processed: ids.length, updated, screenshotsSaved, missingFromSource, total,
         });
         return json({
           isAdmin: true, offset, nextOffset, processed: ids.length, updated, total,
-          missingFromSource: ids.length - source.length, done,
+          screenshotsSaved, missingFromSource, done,
         });
       }
       if (body.action === "repair") {

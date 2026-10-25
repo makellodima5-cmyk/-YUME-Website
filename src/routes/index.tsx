@@ -821,8 +821,8 @@ function Index() {
   const runMetadataRefresh = async () => {
     if (!isAdmin || metadataRefreshRunning || adminImportRunning || adminRunning) return;
     const confirmed = window.confirm(language === "ru"
-      ? "Обновить сохранённые метаданные всех записей каталога из Shikimori? Новые записи не добавляются, записи не удаляются. Скриншоты загружаются отдельно при открытии страницы."
-      : "Refresh metadata for all saved catalogue records from Shikimori? No records will be added or deleted. Screenshots load on demand when an anime page is opened.");
+      ? "Дозаполнить отсутствующие метаданные и кадры из Shikimori для существующих тайтлов? Уже заполненные поля не будут перезаписаны. Новые записи не добавляются, записи не удаляются. Процесс может занять много времени; при ошибке его можно запустить повторно."
+      : "Fill missing metadata and screenshots from Shikimori for existing titles? Already populated fields will not be overwritten. No records will be added or deleted. This may take a long time; after an error you can resume by running it again.");
     if (!confirmed) return;
     setMetadataRefreshRunning(true);
     setMetadataRefreshMessage("");
@@ -830,6 +830,7 @@ function Index() {
     let offset = 0;
     let total = 0;
     let updated = 0;
+    let screenshotsSaved = 0;
     let processed = 0;
     try {
       while (true) {
@@ -840,25 +841,26 @@ function Index() {
         });
         const payload = await response.json().catch(() => ({})) as {
           isAdmin?: boolean; error?: string; message?: string; offset?: number; nextOffset?: number;
-          processed?: number; updated?: number; total?: number; done?: boolean;
+          processed?: number; updated?: number; screenshotsSaved?: number; total?: number; done?: boolean;
         };
         if (!response.ok || payload.isAdmin !== true) {
           throw new Error(payload.message ?? payload.error ?? (language === "ru" ? "Не удалось обновить метаданные." : "Metadata refresh failed."));
         }
         total = payload.total ?? total;
         updated += payload.updated ?? 0;
+        screenshotsSaved += payload.screenshotsSaved ?? 0;
         offset = payload.nextOffset ?? offset;
         processed = offset;
         setMetadataRefreshProgress({ offset, total, updated });
         if (payload.done || payload.processed === 0) break;
         setMetadataRefreshMessage(language === "ru"
-          ? "Обработано " + processed + " из " + total + "; обновлено записей: " + updated + "."
-          : "Processed " + processed + " of " + total + "; updated records: " + updated + ".");
+          ? "Обработано " + processed + " из " + total + "; заполнено метаданных: " + updated + "; добавлено URL кадров: " + screenshotsSaved + "."
+          : "Processed " + processed + " of " + total + "; metadata fields filled: " + updated + "; screenshot URLs added: " + screenshotsSaved + ".");
         await new Promise(resolve => setTimeout(resolve, 1500));
       }
       setMetadataRefreshMessage(language === "ru"
-        ? "Готово: обработано " + processed + " из " + total + "; обновлено записей: " + updated + ". Кадры заполняются при открытии страниц аниме."
-        : "Completed: processed " + processed + " of " + total + "; updated records: " + updated + ". Screenshots populate when anime pages are opened.");
+        ? "Готово: обработано " + processed + " из " + total + "; заполнено метаданных: " + updated + "; добавлено URL кадров: " + screenshotsSaved + "."
+        : "Completed: processed " + processed + " of " + total + "; metadata fields filled: " + updated + "; screenshot URLs added: " + screenshotsSaved + ".");
       await refreshCatalogQuality();
     } catch (error) {
       setMetadataRefreshMessage(error instanceof Error ? error.message : (language === "ru" ? "Обновление остановлено." : "Refresh stopped."));
