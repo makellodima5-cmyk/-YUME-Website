@@ -844,6 +844,11 @@ function Index() {
           processed?: number; updated?: number; screenshotsSaved?: number; total?: number; done?: boolean;
         };
         if (!response.ok || payload.isAdmin !== true) {
+          if (typeof payload.total === "number") {
+            total = payload.total;
+            offset = typeof payload.offset === "number" ? payload.offset : offset;
+            setMetadataRefreshProgress({ offset, total, updated, screenshotsSaved });
+          }
           throw new Error(payload.message ?? payload.error ?? (language === "ru" ? "Не удалось обновить метаданные." : "Metadata refresh failed."));
         }
         total = payload.total ?? total;
@@ -1720,7 +1725,7 @@ function Index() {
                     {metadataRefreshRunning ? (language === "ru" ? "Обновление…" : "Refresh in progress…") : (language === "ru" ? "Обновить данные" : "Refresh data")}
                   </button>
                 </div>
-                {metadataRefreshProgress.total > 0 && (
+                {(metadataRefreshRunning || metadataRefreshProgress.total > 0) && (
                   <div className="mt-3">
                     <div className="mb-1 flex flex-wrap justify-between gap-2 text-xs text-muted-foreground">
                       <span>{language === "ru" ? "Обработано" : "Processed"}: {metadataRefreshProgress.offset} / {metadataRefreshProgress.total}</span>
