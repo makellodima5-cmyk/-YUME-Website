@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { Check, ChevronDown, SlidersHorizontal, X } from "lucide-react";
 import { ALL_GENRES } from "@/data/anime";
 import { useYumePreferences, displayGenre, displayAnimeKind, displayAnimeStatus } from "@/data/preferences";
+import { telegramHapticImpact, telegramHapticSelection } from "@/lib/telegram-mini-app";
 
 export type CatalogFiltersValue = {
   genres: string[];
@@ -118,7 +119,7 @@ export function CatalogFilters({
               const active = draft.genres.includes(genre);
               return (
                 <label key={genre} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-2 text-sm text-foreground hover:bg-accent hover:text-accent-foreground">
-                  <input type="checkbox" checked={active} onChange={() => toggleGenre(genre)} className="h-4 w-4 shrink-0 accent-fuchsia-400" />
+                  <input type="checkbox" checked={active} onChange={() => { telegramHapticSelection(); toggleGenre(genre); }} className="h-4 w-4 shrink-0 accent-fuchsia-400" />
                   <span>{displayGenre(genre, language)}</span>
                 </label>
               );
@@ -128,8 +129,8 @@ export function CatalogFilters({
       </div>
 
       <div className="grid grid-cols-2 gap-2.5">
-        <label><span className={labelClass}>{t("filters.status")}</span><span className="relative block"><select className={selectClass} value={draft.status} onChange={(e) => update({ status: e.target.value })}><option value="Любой">{t("filters.any")}</option>{statuses.map((status) => <option key={status} value={status}>{displayAnimeStatus(status, language)}</option>)}</select><ChevronDown className="pointer-events-none absolute right-2.5 top-3 h-3.5 w-3.5 text-muted-foreground" /></span></label>
-        <label><span className={labelClass}>{t("filters.type")}</span><span className="relative block"><select className={selectClass} value={draft.type} onChange={(e) => update({ type: e.target.value })}><option value="Любой">{t("filters.any")}</option>{types.map((kind) => <option key={kind} value={kind}>{displayAnimeKind(kind, language)}</option>)}</select><ChevronDown className="pointer-events-none absolute right-2.5 top-3 h-3.5 w-3.5 text-muted-foreground" /></span></label>
+        <label><span className={labelClass}>{t("filters.status")}</span><span className="relative block"><select className={selectClass} value={draft.status} onChange={(e) => { telegramHapticSelection(); update({ status: e.target.value }); }}><option value="Любой">{t("filters.any")}</option>{statuses.map((status) => <option key={status} value={status}>{displayAnimeStatus(status, language)}</option>)}</select><ChevronDown className="pointer-events-none absolute right-2.5 top-3 h-3.5 w-3.5 text-muted-foreground" /></span></label>
+        <label><span className={labelClass}>{t("filters.type")}</span><span className="relative block"><select className={selectClass} value={draft.type} onChange={(e) => { telegramHapticSelection(); update({ type: e.target.value }); }}><option value="Любой">{t("filters.any")}</option>{types.map((kind) => <option key={kind} value={kind}>{displayAnimeKind(kind, language)}</option>)}</select><ChevronDown className="pointer-events-none absolute right-2.5 top-3 h-3.5 w-3.5 text-muted-foreground" /></span></label>
         <label><span className={labelClass}>{t("filters.yearFrom")}</span><input className={selectClass} inputMode="numeric" type="number" min={yearMin} max={yearMax} placeholder={String(yearMin)} value={draft.yearFrom} onChange={(e) => update({ yearFrom: e.target.value })} /></label>
         <label><span className={labelClass}>{t("filters.yearTo")}</span><input className={selectClass} inputMode="numeric" type="number" min={yearMin} max={yearMax} placeholder={String(yearMax)} value={draft.yearTo} onChange={(e) => update({ yearTo: e.target.value })} /></label>
       </div>
@@ -140,11 +141,11 @@ export function CatalogFilters({
         <div className="flex justify-between text-[10px] text-muted-foreground"><span>0</span><span>9</span></div>
       </div>
 
-      <label className="mt-3 block"><span className={labelClass}>{t("filters.ageRating")}</span><span className="relative block"><select className={selectClass} value={draft.ageRating} onChange={(e) => update({ ageRating: e.target.value })}><option value="Любой">{t("filters.any")}</option>{ageRatings.map((rating) => <option key={rating} value={rating}>{rating === "Без ограничений" ? t("filters.unrestricted") : rating}</option>)}</select><ChevronDown className="pointer-events-none absolute right-2.5 top-3 h-3.5 w-3.5 text-muted-foreground" /></span></label>
+      <label className="mt-3 block"><span className={labelClass}>{t("filters.ageRating")}</span><span className="relative block"><select className={selectClass} value={draft.ageRating} onChange={(e) => { telegramHapticSelection(); update({ ageRating: e.target.value }); }}><option value="Любой">{t("filters.any")}</option>{ageRatings.map((rating) => <option key={rating} value={rating}>{rating === "Без ограничений" ? t("filters.unrestricted") : rating}</option>)}</select><ChevronDown className="pointer-events-none absolute right-2.5 top-3 h-3.5 w-3.5 text-muted-foreground" /></span></label>
 
       <div className="mt-4 flex gap-2">
-        <button type="button" onClick={onReset} className="h-9 flex-1 rounded-lg border border-border bg-secondary text-sm transition hover:bg-accent">{t("catalog.reset")}</button>
-        <button type="button" onClick={onApply} className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg bg-neon text-sm font-semibold text-primary-foreground transition hover:brightness-110"><Check className="h-4 w-4" /> {t("filters.show")}</button>
+        <button type="button" onClick={() => { telegramHapticImpact("light"); onReset(); }} className="h-9 flex-1 rounded-lg border border-border bg-secondary text-sm transition hover:bg-accent">{t("catalog.reset")}</button>
+        <button type="button" onClick={() => { telegramHapticImpact("light"); onApply(); }} className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg bg-neon text-sm font-semibold text-primary-foreground transition hover:brightness-110"><Check className="h-4 w-4" /> {t("filters.show")}</button>
       </div>
     </div>
   );
