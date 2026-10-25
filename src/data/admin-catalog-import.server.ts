@@ -473,20 +473,22 @@ async function runCatalogMetadataRefreshStep(db: Database): Promise<Response> {
         return json({ isAdmin: true, phase: "screenshots", phaseChanged: true, processed: 0, offset: total, nextOffset: total, metadataOffset: total, screenshotOffset: total, total, updated: 0, screenshotsSaved: 0, done: false });
       }
       const animeId = row.id;
-      const statusRow = await db.prepare("SELECT status,attempts,last_error FROM anime_catalog_screenshot_status WHERE anime_id = ?")
-        .bind(animeId).first<{ status: ScreenshotStatus; attempts: number; last_error: string | null }>();
+      const statusRow = await db.prepare("SELECT status,attempts,last_error,updated_at FROM anime_catalog_screenshot_status WHERE anime_id = ?")
+        .bind(animeId).first<{ status: ScreenshotStatus; attempts: number; last_error: string | null; updated_at: string }>();
       const existing = await db.prepare("SELECT COUNT(*) AS count FROM anime_catalog_screenshots WHERE anime_id = ? AND original_url NOT LIKE '%example.com%' AND preview_url NOT LIKE '%example.com%'")
         .bind(animeId).first<{ count: number }>();
       let saved = 0;
       let screenshotWarning: string | null = null;
       const statements: Statement[] = [db.prepare("DELETE FROM anime_catalog_screenshots WHERE anime_id = ? AND (original_url LIKE '%example.com%' OR preview_url LIKE '%example.com%')").bind(animeId)];
       const unreleased = row.status === "Анонс" || Boolean(row.aired_on && /^\\d{4}-\\d{2}-\\d{2}/.test(row.aired_on) && row.aired_on.slice(0, 10) > new Date().toISOString().slice(0, 10));
-      const previouslyResolvedEmpty = statusRow?.status === "done" && statusRow.last_error === "Источник не вернул кадров";
-      const previouslySkipped = statusRow?.status === "done" && statusRow.last_error === "Пропущено: аниме ещё не вышло; запрос кадров не выполнялся";
+      const recentlyResolvedEmpty = statusRow?.status === "done"
+        && statusRow.last_error === "Источник не вернул кадров"
+        && Number.isFinite(Date.parse(statusRow.updated_at))
+        && Date.parse(statusRow.updated_at) > Date.now() - 30 * 24 * 60 * 60 * 1000;
       if (unreleased) {
         statements.push(screenshotStatusStatement(db, animeId, "done", 0, "Пропущено: аниме ещё не вышло; запрос кадров не выполнялся"));
-      } else if (Number(existing?.count ?? 0) > 0 || previouslyResolvedEmpty || previouslySkipped) {
-        statements.push(screenshotStatusStatement(db, animeId, "done", 0, previouslyResolvedEmpty ? "Источник не вернул кадров" : previouslySkipped ? statusRow?.last_error ?? null : null));
+      } else if (Number(existing?.count ?? 0) > 0 || recentlyResolvedEmpty) {
+        statements.push(screenshotStatusStatement(db, animeId, "done", 0, recentlyResolvedEmpty ? "Источник не вернул кадров" : null));
       } else {
         const attempt = await fetchAndStoreScreenshots(db, animeId, Number(statusRow?.attempts ?? 0));
         saved = attempt.saved;
