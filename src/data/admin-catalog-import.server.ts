@@ -28,7 +28,7 @@ const SESSION_COOKIE = "__Host-yume-session";
 const MAX_TARGET = 500;
 const PAGE_SIZE = 50;
 const REQUEST_DELAY_MS = 1500;
-const METADATA_REFRESH_BATCH_SIZE = 10;
+const METADATA_REFRESH_BATCH_SIZE = 2;
 const FIELDS = "id name english russian kind score status episodes episodesAired airedOn { date year } releasedOn { date year } description poster { mainUrl previewUrl originalUrl } opengraphImageUrl genres { id name russian kind } nextEpisodeAt rating studios { name } videos { url playerUrl name kind }";
 
 export function normalizeAdminCatalogIds(value: unknown): string[] {
@@ -343,7 +343,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
           if (Number(existing?.count ?? 0) > 0) continue;
           const shotResponse = await fetch("https://shikimori.one/api/animes/" + encodeURIComponent(id) + "/screenshots", {
             headers: { Accept: "application/json", "User-Agent": "YUME/1.0" },
-            signal: AbortSignal.timeout(8000),
+            signal: AbortSignal.timeout(6000),
           });
           if (shotResponse.status === 429) {
             const retryAfterMs = retryAfterMilliseconds(shotResponse.headers.get("Retry-After")) ?? 60000;
@@ -369,6 +369,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
             screenshotsSaved += shots.length;
           }
         }
+        if (missingFromSource > 0) throw new Error("Shikimori не вернул данные для " + missingFromSource + " тайтл(ов) текущей пачки. Прогресс сохранён; повторите запуск позже.");
         if (updated > 0) await invalidatePersistentCatalogCache();
         const nextOffset = offset + ids.length;
         const done = nextOffset >= total;
