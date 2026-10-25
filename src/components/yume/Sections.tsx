@@ -6,6 +6,7 @@ import { type Anime, CONTINUE, COLLECTIONS, byId } from "@/data/anime";
 import { AnimeCard, PosterArt } from "./Poster";
 import { CatalogFilters, type CatalogFiltersValue } from "./CatalogFilters";
 import { useYumePreferences, displayAnimeTitle, type TranslationKey } from "@/data/preferences";
+import { telegramHapticImpact } from "@/lib/telegram-mini-app";
 
 export function Row({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
   return (
@@ -76,7 +77,7 @@ export function Hero({
       <div className="absolute inset-0 bg-gradient-to-t from-[#090714]/95 via-[#090714]/20 to-transparent md:from-transparent md:via-transparent" />
       <div data-filter-anchor className="absolute left-4 top-4 z-30 w-[min(76vw,360px)] md:left-8 md:top-7 md:w-[min(36vw,420px)]">
         <div className="flex h-11 items-center rounded-xl border border-white/25 bg-black/30 shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_8px_28px_rgba(0,0,0,0.18)] backdrop-blur-xl transition focus-within:border-white/55 focus-within:bg-black/40">
-          <button type="button" onClick={onSubmitSearch} aria-label={t("search.apply")} className="ml-3 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-white/80 transition hover:bg-white/10 hover:text-white"><Search className="h-4 w-4" /></button>
+          <button type="button" onClick={() => { telegramHapticImpact("light"); onSubmitSearch(); }} aria-label={t("search.apply")} className="yume-tactile-control ml-3 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-white/80 transition hover:bg-white/10 hover:text-white"><Search className="h-4 w-4" /></button>
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -86,7 +87,7 @@ export function Hero({
             className="h-full min-w-0 flex-1 appearance-none bg-transparent px-2.5 text-sm text-white outline-none ring-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 placeholder:text-white/70"
           />
           {query && <button type="button" aria-label={t("search.clear")} onClick={() => setQuery("")} className="rounded-full p-1.5 text-white/70 hover:text-white"><X className="h-4 w-4" /></button>}
-          <button type="button" onClick={() => setFiltersOpen(!filtersOpen)} aria-label={t("filters.open")} aria-expanded={filtersOpen} data-filter-trigger className={`relative mr-1.5 flex h-8 w-9 shrink-0 items-center justify-center rounded-lg transition ${filtersOpen || activeFilterCount ? "bg-white/20 text-white" : "text-white/75 hover:bg-white/15 hover:text-white"}`}>
+          <button type="button" onClick={() => { telegramHapticImpact("light"); setFiltersOpen(!filtersOpen); }} aria-label={t("filters.open")} aria-expanded={filtersOpen} data-filter-trigger className={`yume-tactile-control relative mr-1.5 flex h-8 w-9 shrink-0 items-center justify-center rounded-lg transition ${filtersOpen || activeFilterCount ? "bg-white/20 text-white" : "text-white/75 hover:bg-white/15 hover:text-white"}`}>
             <SlidersHorizontal className="h-4 w-4" />
             {activeFilterCount > 0 && <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-neon px-1 text-[10px] font-bold text-primary-foreground">{activeFilterCount}</span>}
           </button>
@@ -101,10 +102,10 @@ export function Hero({
           {t("hero.description")}
         </p>
         <div className="mt-4 flex flex-row flex-wrap gap-2 sm:mt-5 md:mt-6">
-          <button onClick={onRandom} className="inline-flex w-fit items-center justify-center gap-1.5 rounded-full bg-neon px-3.5 py-2 text-xs font-semibold text-primary-foreground shadow-neon transition hover:brightness-110 sm:gap-2 sm:px-5 sm:py-2.5 sm:text-sm">
+          <button onClick={() => { telegramHapticImpact("light"); onRandom(); }} className="yume-tactile-control inline-flex w-fit items-center justify-center gap-1.5 rounded-full bg-neon px-3.5 py-2 text-xs font-semibold text-primary-foreground shadow-neon transition hover:brightness-110 sm:gap-2 sm:px-5 sm:py-2.5 sm:text-sm">
             <Play className="h-4 w-4 fill-current" /> {t("hero.random")}
           </button>
-          <button onClick={onCatalog} className="inline-flex w-fit items-center justify-center gap-1.5 rounded-full bg-[#0b0a19]/65 px-3.5 py-2 text-xs font-semibold text-white ring-1 ring-white/25 backdrop-blur-md transition hover:bg-accent sm:gap-2 sm:px-5 sm:py-2.5 sm:text-sm">
+          <button onClick={() => { telegramHapticImpact("light"); onCatalog(); }} className="yume-tactile-control inline-flex w-fit items-center justify-center gap-1.5 rounded-full bg-[#0b0a19]/65 px-3.5 py-2 text-xs font-semibold text-white ring-1 ring-white/25 backdrop-blur-md transition hover:bg-accent sm:gap-2 sm:px-5 sm:py-2.5 sm:text-sm">
             <Shuffle className="h-4 w-4" /> {t("hero.catalog")}
           </button>
         </div>
@@ -120,7 +121,7 @@ export function ContinueRow({ onSelect }: { onSelect: (a: Anime) => void }) {
       {CONTINUE.map((c) => {
         const a = byId(c.id);
         return (
-          <button key={c.id} onClick={() => onSelect(a)} className="group w-64 shrink-0 overflow-hidden rounded-xl bg-card text-left ring-1 ring-border transition hover:ring-primary sm:w-72">
+          <button key={c.id} onClick={() => { telegramHapticImpact("light"); onSelect(a); }} className="yume-tactile-control group w-64 shrink-0 overflow-hidden rounded-xl bg-card text-left ring-1 ring-border transition hover:ring-primary sm:w-72">
             <div className="relative aspect-video">
               <PosterArt anime={a} className="h-full w-full" />
               <div className="absolute inset-0 flex items-center justify-center opacity-0 transition group-hover:opacity-100">
@@ -155,8 +156,8 @@ export function CollectionsGrid({ onOpen, animeList }: { onOpen: (id: string) =>
         return (
           <button
             key={c.id}
-            onClick={() => onOpen(c.id)}
-            className="group relative h-44 overflow-hidden rounded-2xl p-5 text-left ring-1 ring-border transition hover:shadow-neon"
+            onClick={() => { telegramHapticImpact("light"); onOpen(c.id); }}
+            className="yume-tactile-control group relative h-44 overflow-hidden rounded-2xl p-5 text-left ring-1 ring-border transition hover:shadow-neon"
             style={{ background: "linear-gradient(135deg, oklch(0.35 0.16 " + c.hue + "), oklch(0.15 0.05 285))" }}
           >
             <div className="absolute -right-3 bottom-3 flex max-w-[54%]">
