@@ -356,3 +356,39 @@ html.telegram-mini-app :where(button, a, [role="button"]) {
   -webkit-user-select: none;
   user-select: none;
 }
+
+/* YUME tactile controls: subtle press feedback, with motion-safe fallbacks. */
+.yume-tactile-control {
+  -webkit-tap-highlight-color: transparent;
+  transform-origin: center;
+  transition:
+    transform 120ms ease,
+    filter 150ms ease,
+    background-color 150ms ease,
+    border-color 150ms ease;
+}
+
+.yume-tactile-control:active {
+  transform: scale(0.97);
+  filter: brightness(1.04);
+}
+
+.yume-tactile-button:active {
+  transform: scale(0.96);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .yume-tactile-control:hover {
+    filter: brightness(1.035);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .yume-tactile-control {
+    transition: none !important;
+  }
+  .yume-tactile-control:active {
+    transform: none;
+  }
+}
+
