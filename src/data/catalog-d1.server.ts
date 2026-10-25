@@ -107,6 +107,8 @@ const CREATE_SCHEMA_STATEMENTS = [
   "CREATE INDEX IF NOT EXISTS idx_anime_catalog_title ON anime_catalog(title)",
   "CREATE INDEX IF NOT EXISTS idx_anime_catalog_position ON anime_catalog(position)",
   "CREATE INDEX IF NOT EXISTS idx_anime_catalog_missing_trailer ON anime_catalog(id) WHERE youtube_trailer_id IS NULL OR youtube_trailer_id = ''",
+  `CREATE TABLE IF NOT EXISTS anime_catalog_screenshots (anime_id TEXT NOT NULL, original_url TEXT NOT NULL, preview_url TEXT NOT NULL, position INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (anime_id, original_url))`,
+  "CREATE INDEX IF NOT EXISTS idx_anime_catalog_screenshots_position ON anime_catalog_screenshots(anime_id, position)",
   `CREATE TABLE IF NOT EXISTS anime_catalog_meta (
     key TEXT PRIMARY KEY NOT NULL,
     value TEXT NOT NULL
@@ -578,4 +580,23 @@ export async function getPersistentCatalog(
       progress: makeProgress("cooldown", 0, DEFAULT_RETRY_MS),
     };
   }
+}
+
+
+export type PersistentAnimeScreenshot = { originalUrl: string; previewUrl: string };
+
+export async function getPersistentAnimeScreenshots(animeId: string): Promise<PersistentAnimeScreenshot[] | null> {
+  const db = database();
+  if (!db) return null;
+  await ensureSchema(db);
+  const result = await db.prepare("SELECT original_url, preview_url FROM anime_catalog_screenshots WHERE anime_id = ? ORDER BY position ASC, original_url ASC LIMIT 24").bind(animeId).all<{ original_url: string; preview_url: string }>();
+  return result.results.map((row) => ({ originalUrl: row.original_url, previewUrl: row.preview_url }));
+}
+
+export async function savePersistentAnimeScreenshots(animeId: string, items: PersistentAnimeScreenshot[]): Promise<void> {
+  const db = database();
+  if (!db || !items.length) return;
+  await ensureSchema(db);
+  const statements: D1Statement[] = [db.prepare("DELETE FROM anime_catalog_screenshots WHERE anime_id = ?").bind(animeId), ...items.slice(0, 24).map((item, index) => db.prepare("INSERT OR IGNORE INTO anime_catalog_screenshots (anime_id, original_url, preview_url, position, updated_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)").bind(animeId, item.originalUrl, item.previewUrl, index))];
+  await db.batch(statements);
 }
