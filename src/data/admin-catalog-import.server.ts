@@ -402,7 +402,7 @@ export async function runScheduledCatalogMetadataRefresh(env: unknown): Promise<
     try {
       const totalRow = await db.prepare("SELECT COUNT(*) AS total FROM anime_catalog").first<{ total: number }>();
       const total = Number(totalRow?.total ?? 0);
-      let state = await getMeta(db, "metadata_refresh_state") ?? "metadata";
+      const state = await getMeta(db, "metadata_refresh_state") ?? "metadata";
       if (state === "done" || state === "idle") {
         await db.batch([
           setMeta(db, "metadata_refresh_auto_enabled", "0"),
@@ -644,7 +644,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
             .bind(animeId).first<{ count: number }>();
           let saved = 0;
           let screenshotWarning: string | null = null;
-          let statements: Statement[] = [];
+          const statements: Statement[] = [];
           if (statusRow?.status === "done" || Number(existing?.count ?? 0) > 0) {
             statements.push(screenshotStatusStatement(db, animeId, "done", 0, null));
           } else {
