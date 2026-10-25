@@ -194,6 +194,43 @@ function mapItem(item: ShikimoriAnime) {
 function incomplete(item: ReturnType<typeof mapItem>): boolean {
   return item.year === 0 || !item.poster_url || !item.description || !item.title || !item.original_title;
 }
+
+type CatalogMetadataCompleteness = {
+  title: string | null;
+  english_title: string | null;
+  original_title: string | null;
+  year: number;
+  episodes: number;
+  rating: number | null;
+  genres_json: string | null;
+  status: string | null;
+  description: string | null;
+  poster_url: string | null;
+  banner_url: string | null;
+  kind: string | null;
+  age_rating: string | null;
+  aired_on: string | null;
+  studios_json: string | null;
+  youtube_trailer_id: string | null;
+};
+
+/** True only when a YUME-supported metadata field is absent and could be enriched. */
+export function isCatalogMetadataIncomplete(row: CatalogMetadataCompleteness): boolean {
+  const blank = (value: string | null | undefined) => !value?.trim();
+  const announced = row.status === "Анонс";
+  return blank(row.title) || row.title === "Без названия" ||
+    blank(row.english_title) || blank(row.original_title) || row.original_title === "Без названия" ||
+    (!announced && Number(row.year) <= 0) ||
+    (!announced && Number(row.episodes) <= 0) ||
+    row.rating == null ||
+    blank(row.genres_json) || row.genres_json === "[]" ||
+    blank(row.status) || row.status === "Неизвестно" ||
+    blank(row.description) || blank(row.poster_url) || blank(row.banner_url) ||
+    blank(row.kind) || blank(row.age_rating) ||
+    (!announced && blank(row.aired_on)) ||
+    blank(row.studios_json) ||
+    blank(row.youtube_trailer_id);
+}
 async function fetchPage(page: number): Promise<ShikimoriAnime[]> {
   const query = "query { animes(page: " + page + ", limit: " + PAGE_SIZE + ", order: popularity) { " + FIELDS + " } }";
   const response = await fetch(API_URL, { method:"POST", headers:{"Content-Type":"application/json",Accept:"application/json","User-Agent":"YUME/1.0"}, body:JSON.stringify({query}), signal:AbortSignal.timeout(12000) });
@@ -444,18 +481,7 @@ async function runCatalogMetadataRefreshStep(db: Database): Promise<Response> {
       // Only query Shikimori for rows that are missing a field YUME already supports.
       // Fully populated rows are deliberately skipped, including their existing posters,
       // episode counts, ratings, descriptions, and other user-visible metadata.
-      const needsEnrichment = (row: typeof catalogPage.results[number]) =>
-        !row.title?.trim() || row.title === "Без названия" ||
-        !row.english_title?.trim() ||
-        !row.original_title?.trim() || row.original_title === "Без названия" ||
-        Number(row.year) <= 0 || Number(row.episodes) <= 0 || row.rating == null ||
-        !row.genres_json?.trim() || row.genres_json === "[]" ||
-        !row.status?.trim() || row.status === "Неизвестно" ||
-        !row.description?.trim() || !row.poster_url?.trim() || !row.banner_url?.trim() ||
-        !row.kind?.trim() || !row.age_rating?.trim() ||
-        !row.aired_on?.trim() || !row.studios_json?.trim() || row.studios_json === "[]" ||
-        !row.youtube_trailer_id?.trim();
-      const ids = catalogPage.results.filter(needsEnrichment).map(row => row.id);
+      const ids = catalogPage.results.filter(isCatalogMetadataIncomplete).map(row => row.id);
       let updated = 0;
       if (ids.length) {
         const source = await fetchByIds(ids);
