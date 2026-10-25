@@ -4,8 +4,6 @@ import { env as cloudflareEnv } from "cloudflare:workers";
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
 import { setCatalogRuntimeEnvironment } from "./data/catalog-d1.server";
-import { runScheduledTrailerUpdate } from "./data/admin-trailers.server";
-import { runScheduledCatalogMetadataRefresh } from "./data/admin-catalog-import.server";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -19,26 +17,6 @@ type SupportBindings = {
 };
 
 type RuntimeGlobal = typeof globalThis & { __YUME_RUNTIME_ENV__?: unknown };
-type WorkerBindings = Record<string, unknown>;
-
-function hasDatabaseBinding(value: unknown): value is WorkerBindings {
-  return Boolean(value && typeof value === "object" && "YUME_DB" in value && (value as WorkerBindings).YUME_DB);
-}
-
-function resolveScheduledEnvironment(fallbackEnv: unknown): unknown {
-  // Prefer an environment that actually exposes the D1 binding needed by scheduled jobs.
-  try {
-    const nativeEnv = cloudflareEnv as unknown as WorkerBindings;
-    if (hasDatabaseBinding(nativeEnv)) return nativeEnv;
-  } catch {
-    // Local adapters and tests may not expose the native Cloudflare env binding.
-  }
-  if (hasDatabaseBinding(fallbackEnv)) return fallbackEnv;
-  const injectedEnv = (globalThis as RuntimeGlobal).__YUME_RUNTIME_ENV__;
-  if (hasDatabaseBinding(injectedEnv)) return injectedEnv;
-  return fallbackEnv ?? injectedEnv ?? {};
-}
-
 function supportEnvironment(fallbackEnv: unknown): SupportBindings {
   let nativeEnv: Record<string, unknown> | null = null;
   try {
@@ -183,21 +161,6 @@ function isH3SwallowedErrorBody(body: string): boolean {
 }
 
 export default {
-  async scheduled(controller: { scheduledTime: number; cron: string }, env: unknown) {
-    const runtimeEnv = resolveScheduledEnvironment(env);
-    const databaseAvailable = hasDatabaseBinding(runtimeEnv);
-    console.info("[YUME][CRON] Scheduled tick received.", { cron: controller.cron, databaseAvailable });
-    setCatalogRuntimeEnvironment(runtimeEnv);
-    const [trailersResult, catalogRefreshResult] = await Promise.allSettled([
-      runScheduledTrailerUpdate(runtimeEnv),
-      runScheduledCatalogMetadataRefresh(runtimeEnv),
-    ]);
-    console.info("[YUME][CRON] Scheduled jobs finished.", {
-      cron: controller.cron,
-      trailerJob: trailersResult.status,
-      catalogRefreshJob: catalogRefreshResult.status,
-    });
-  },
   async fetch(request: Request, env: unknown, ctx: unknown) {
     setCatalogRuntimeEnvironment(env);
     const supportRedirect = getSupportRedirect(request, env);
