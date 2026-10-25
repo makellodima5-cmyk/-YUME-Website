@@ -604,6 +604,7 @@ export async function savePersistentAnimeScreenshots(animeId: string, items: Per
     } catch { return false; }
   }).slice(0, 24);
   if (!validItems.length) return;
-  const statements: D1Statement[] = [db.prepare("DELETE FROM anime_catalog_screenshots WHERE anime_id = ?").bind(animeId), ...validItems.map((item, index) => db.prepare("INSERT OR IGNORE INTO anime_catalog_screenshots (anime_id, original_url, preview_url, position, updated_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)").bind(animeId, item.originalUrl, item.previewUrl, index))];
+  // Enrichment is additive: never delete screenshots already saved for this anime.
+  const statements: D1Statement[] = validItems.map((item, index) => db.prepare("INSERT OR IGNORE INTO anime_catalog_screenshots (anime_id, original_url, preview_url, position, updated_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)").bind(animeId, item.originalUrl, item.previewUrl, index));
   await db.batch(statements);
 }
