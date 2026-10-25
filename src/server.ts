@@ -5,6 +5,7 @@ import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
 import { setCatalogRuntimeEnvironment } from "./data/catalog-d1.server";
 import { runScheduledTrailerUpdate } from "./data/admin-trailers.server";
+import { runScheduledCatalogMetadataRefresh } from "./data/admin-catalog-import.server";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -165,7 +166,7 @@ function isH3SwallowedErrorBody(body: string): boolean {
 export default {
   async scheduled(controller: { scheduledTime: number; cron: string }, env: unknown, ctx: { waitUntil(promise: Promise<unknown>): void }) {
     setCatalogRuntimeEnvironment(env);
-    ctx.waitUntil(runScheduledTrailerUpdate(env));
+    ctx.waitUntil(Promise.allSettled([runScheduledTrailerUpdate(env), runScheduledCatalogMetadataRefresh(env)]));
   },
   async fetch(request: Request, env: unknown, ctx: unknown) {
     setCatalogRuntimeEnvironment(env);
