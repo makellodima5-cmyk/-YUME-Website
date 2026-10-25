@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Home, LayoutGrid, Library, User, Menu, X, Bell, Moon, Sun, ShieldCheck, Heart, Clock3, Star, Languages, Bookmark, Megaphone, Radio, Sparkles } from "lucide-react"
 import { Logo } from "./Logo";
 import { useYumePreferences } from "@/data/preferences";
-import { getTelegramWebApp } from "@/lib/telegram-mini-app";
+import { getTelegramWebApp, telegramHapticImpact } from "@/lib/telegram-mini-app";
 
 export type View = "home" | "admin" | "catalog" | "collections" | "profile" | "login" | "register" | "popular" | "new-releases" | "announcements" | "airing" | "favorites" | "watchlist" | "history" | "privacy" | "privacy-policy" | "rules" | "rights" | "notifications";
 
@@ -116,28 +116,28 @@ export function Header({ view, setView, onProfile, isAdmin = false, unreadNotifi
         <div className="flex h-16 items-center gap-3 px-4 md:px-6 lg:px-8">
           <button
             type="button"
-            onClick={() => setMenuOpen((open) => !open)}
+            onClick={() => { telegramHapticImpact("light"); setMenuOpen((open) => !open); }}
             aria-label={menuOpen ? t("nav.closeMenu") : t("nav.openMenu")}
             aria-expanded={menuOpen}
             aria-controls="yume-navigation-drawer"
-            className="mt-5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-foreground transition hover:bg-primary/10"
+            className="yume-tactile-control mt-5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-foreground transition hover:bg-primary/10"
           >
             {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
-          <button type="button" onClick={() => goToView("home")} aria-label={t("nav.home")} className="mt-5 shrink-0">
+          <button type="button" onClick={() => { telegramHapticImpact("light"); goToView("home"); }} aria-label={t("nav.home")} className="yume-tactile-control mt-5 shrink-0">
             <Logo />
           </button>
           <div className="hidden min-w-0 flex-1 md:block" />
           <div className="ml-auto mt-5 flex items-center gap-1 sm:gap-2">
             <button
               type="button"
-              onClick={() => setView("notifications")}
+              onClick={() => { telegramHapticImpact("light"); setView("notifications"); }}
               aria-label={language === "ru"
                 ? `Уведомления${unreadNotificationCount > 0 ? `, непрочитанных: ${unreadNotificationCount}` : ""}`
                 : `Notifications${unreadNotificationCount > 0 ? `, unread: ${unreadNotificationCount}` : ""}`}
               aria-current={view === "notifications" ? "page" : undefined}
               title={language === "ru" ? "Уведомления" : "Notifications"}
-              className={`relative flex h-10 w-10 items-center justify-center rounded-full text-foreground/80 transition hover:bg-primary/10 ${view === "notifications" ? "bg-primary/10 text-primary" : ""}`}
+              className={`yume-tactile-control relative flex h-10 w-10 items-center justify-center rounded-full text-foreground/80 transition hover:bg-primary/10 ${view === "notifications" ? "bg-primary/10 text-primary" : ""}`}
             >
               <Bell className="h-5 w-5" />
               {unreadNotificationCount > 0 && <span aria-hidden="true" className="absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-background" />}
@@ -145,9 +145,9 @@ export function Header({ view, setView, onProfile, isAdmin = false, unreadNotifi
             </button>
             <button
               type="button"
-              onClick={onProfile}
+              onClick={() => { telegramHapticImpact("light"); onProfile(); }}
               aria-label={t("nav.profileButton")}
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-primary/20 bg-primary/10 text-foreground transition hover:bg-primary/20"
+              className="yume-tactile-control flex h-10 w-10 items-center justify-center rounded-full border border-primary/20 bg-primary/10 text-foreground transition hover:bg-primary/20"
             >
               {telegramPhotoUrl && !telegramPhotoFailed ? (
                 <img
@@ -172,7 +172,7 @@ export function Header({ view, setView, onProfile, isAdmin = false, unreadNotifi
           <button
             type="button"
             aria-label={t("nav.closeMenu")}
-            onClick={() => setMenuOpen(false)}
+            onClick={() => { telegramHapticImpact("light"); setMenuOpen(false); }}
             className="fixed inset-0 z-40 cursor-default bg-black/45"
           />
           <aside
@@ -201,7 +201,7 @@ export function Header({ view, setView, onProfile, isAdmin = false, unreadNotifi
                   <button
                     key={item.id}
                     type="button"
-                    onClick={() => goToView(item.id)}
+                    onClick={() => { telegramHapticImpact("light"); goToView(item.id); }}
                     aria-current={view === item.id ? "page" : undefined}
                     className={navButtonClass(view === item.id)}
                   >
@@ -210,29 +210,29 @@ export function Header({ view, setView, onProfile, isAdmin = false, unreadNotifi
                   </button>
                 );
               })}
-              {isAdmin && <button type="button" onClick={() => goToView("admin")} aria-current={view === "admin" ? "page" : undefined} className={navButtonClass(view === "admin")}><ShieldCheck className="h-5 w-5 shrink-0" /><span>{navigationText.adminPanel}</span></button>}
-              <button type="button" onClick={() => goToView("popular")} className={navButtonClass(view === "popular")}>
+              {isAdmin && <button type="button" onClick={() => { telegramHapticImpact("light"); goToView("admin"); }} aria-current={view === "admin" ? "page" : undefined} className={navButtonClass(view === "admin")}><ShieldCheck className="h-5 w-5 shrink-0" /><span>{navigationText.adminPanel}</span></button>}
+              <button type="button" onClick={() => { telegramHapticImpact("light"); goToView("popular"); }} className={navButtonClass(view === "popular")}>
                 <Star className="h-5 w-5 shrink-0" /><span>{navigationText.popular}</span>
               </button>
-              <button type="button" onClick={() => goToView("new-releases")} className={navButtonClass(view === "new-releases")}>
+              <button type="button" onClick={() => { telegramHapticImpact("light"); goToView("new-releases"); }} className={navButtonClass(view === "new-releases")}>
                 <Sparkles className="h-5 w-5 shrink-0" /><span>{navigationText.newReleases}</span>
               </button>
-              <button type="button" onClick={() => goToView("announcements")} className={navButtonClass(view === "announcements")}>
+              <button type="button" onClick={() => { telegramHapticImpact("light"); goToView("announcements"); }} className={navButtonClass(view === "announcements")}>
                 <Megaphone className="h-5 w-5 shrink-0" /><span>{navigationText.announcements}</span>
               </button>
-              <button type="button" onClick={() => goToView("airing")} className={navButtonClass(view === "airing")}>
+              <button type="button" onClick={() => { telegramHapticImpact("light"); goToView("airing"); }} className={navButtonClass(view === "airing")}>
                 <Radio className="h-5 w-5 shrink-0" /><span>{navigationText.airing}</span>
               </button>
-              <button type="button" onClick={() => goToView("favorites")} className={navButtonClass(view === "favorites")}>
+              <button type="button" onClick={() => { telegramHapticImpact("light"); goToView("favorites"); }} className={navButtonClass(view === "favorites")}>
                 <Heart className="h-5 w-5 shrink-0" /><span>{navigationText.favorites}</span>
               </button>
-              <button type="button" onClick={() => goToView("watchlist")} className={navButtonClass(view === "watchlist")}>
+              <button type="button" onClick={() => { telegramHapticImpact("light"); goToView("watchlist"); }} className={navButtonClass(view === "watchlist")}>
                 <Bookmark className="h-5 w-5 shrink-0" /><span>{navigationText.watchlist}</span>
               </button>
-              <button type="button" onClick={() => goToView("history")} className={navButtonClass(view === "history")}>
+              <button type="button" onClick={() => { telegramHapticImpact("light"); goToView("history"); }} className={navButtonClass(view === "history")}>
                 <Clock3 className="h-5 w-5 shrink-0" /><span>{navigationText.history}</span>
               </button>
-              <button type="button" onClick={() => goToView("privacy")} className={navButtonClass(view === "privacy")}>
+              <button type="button" onClick={() => { telegramHapticImpact("light"); goToView("privacy"); }} className={navButtonClass(view === "privacy")}>
                 <ShieldCheck className="h-5 w-5 shrink-0" /><span>{navigationText.legal}</span>
               </button>
             </nav>
@@ -240,14 +240,14 @@ export function Header({ view, setView, onProfile, isAdmin = false, unreadNotifi
             <div className="mt-8 space-y-3 border-t border-border pt-3">
               <div className="flex items-center justify-between gap-2">
                 <span className="flex items-center gap-2 text-xs font-medium text-muted-foreground"><Moon className="h-4 w-4" />{navigationText.theme}</span>
-                <button type="button" role="switch" aria-label={t("nav.toggleTheme")} aria-checked={theme === "light"} onClick={() => setTheme(theme === "light" ? "dark" : "light")} className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${theme === "light" ? "bg-primary" : "bg-muted"}`}>
+                <button type="button" role="switch" aria-label={t("nav.toggleTheme")} aria-checked={theme === "light"} onClick={() => { telegramHapticImpact("light"); setTheme(theme === "light" ? "dark" : "light"); }} className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${theme === "light" ? "bg-primary" : "bg-muted"}`}>
                   <span className={`absolute top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-background shadow transition-transform ${theme === "light" ? "translate-x-[22px]" : "translate-x-0.5"}`}>{theme === "light" ? <Sun className="h-3 w-3" /> : <Moon className="h-3 w-3" />}</span>
                 </button>
               </div>
               <div className="flex items-center justify-between gap-2">
                 <span className="flex items-center gap-2 text-xs font-medium text-muted-foreground"><Languages className="h-4 w-4" />{navigationText.language}</span>
                 <div className="flex rounded-lg border border-border bg-muted p-0.5">
-                  {(["ru", "en"] as const).map((value) => <button key={value} type="button" aria-pressed={language === value} onClick={() => setLanguage(value)} className={`rounded-md px-2.5 py-1 text-[11px] font-semibold uppercase transition ${language === value ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}>{value}</button>)}
+                  {(["ru", "en"] as const).map((value) => <button key={value} type="button" aria-pressed={language === value} onClick={() => { telegramHapticImpact("light"); setLanguage(value); }} className={`rounded-md px-2.5 py-1 text-[11px] font-semibold uppercase transition ${language === value ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}>{value}</button>)}
                 </div>
               </div>
             </div>
