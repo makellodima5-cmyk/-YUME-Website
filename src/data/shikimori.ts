@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import type { Anime } from "@/data/anime";
 import { isNewRelease } from "@/data/anime-sections";
-import { getPersistentAnimeDetails, getPersistentCatalog, type CatalogResult, type CatalogSeedPageResult } from "@/data/catalog-d1.server";
+import { getPersistentAnimeDetails, getPersistentCatalog, getPersistentAnimeScreenshots, savePersistentAnimeScreenshots, type CatalogResult, type CatalogSeedPageResult } from "@/data/catalog-d1.server";
 import { retryAfterMilliseconds } from "@/data/retry-after";
 export { retryAfterMilliseconds };
 import { filterCatalogForCurrentRequest } from "@/data/territorial-restrictions.server";
@@ -593,39 +593,32 @@ export const getShikimoriAnimeDetails = createServerFn({ method: "GET" })
   });
 
 /**
- * Loads screenshots only when a detail page is opened.
- * Screenshot URLs are not added to the permanent catalogue; successful responses are cached in the Worker isolate.
+ * Prefer persistent screenshot URLs in D1; populate lazily from Shikimori when absent.
  */
 export const getShikimoriAnimeScreenshots = createServerFn({ method: "GET" })
   .validator((input: { animeId?: unknown }) => ({
-    animeId: typeof input?.animeId === "string" && /^\d{1,12}$/.test(input.animeId)
-      ? input.animeId
-      : "",
+    animeId: typeof input?.animeId === "string" && /^\d{1,12}$/.test(input.animeId) ? input.animeId : "",
   }))
   .handler(async ({ data }) => {
     if (!data.animeId) return { items: [] as ShikimoriScreenshot[] };
-    const now = Date.now();
-    const cached = screenshotCache.get(data.animeId);
-    if (cached && cached.expiresAt > now) return { items: cached.items };
-    screenshotCache.delete(data.animeId);
-
     try {
+      const persisted = await getPersistentAnimeScreenshots(data.animeId);
+      if (persisted?.length) return { items: persisted };
+      const cached = screenshotCache.get(data.animeId);
+      if (cached && cached.expiresAt > Date.now() && cached.items.length) return { items: cached.items };
       const response = await fetch(SCREENSHOT_API_URL + encodeURIComponent(data.animeId) + "/screenshots", {
         headers: { Accept: "application/json", "User-Agent": "YUME/0.2.0" },
         signal: AbortSignal.timeout(8000),
       });
-      if (!response.ok) return { items: [] as ShikimoriScreenshot[] };
+      if (!response.ok) return { items: cached?.items ?? [] as ShikimoriScreenshot[] };
       const items = normalizeShikimoriScreenshots(await response.json());
-      screenshotCache.set(data.animeId, { expiresAt: now + SCREENSHOT_CACHE_TTL_MS, items });
-      if (screenshotCache.size > 300) {
-        for (const [key, entry] of screenshotCache) {
-          if (entry.expiresAt <= now || screenshotCache.size > 300) screenshotCache.delete(key);
-          if (screenshotCache.size <= 250) break;
-        }
+      if (items.length) {
+        screenshotCache.set(data.animeId, { expiresAt: Date.now() + SCREENSHOT_CACHE_TTL_MS, items });
+        await savePersistentAnimeScreenshots(data.animeId, items);
       }
       return { items };
-    } catch {
-      // Screenshots are optional; source failures must not break the anime page.
-      return { items: [] as ShikimoriScreenshot[] };
+    } catch (error) {
+      console.warn("[YUME] Could not load or persist anime screenshots:", error);
+      return { items: screenshotCache.get(data.animeId)?.items ?? [] as ShikimoriScreenshot[] };
     }
   });
