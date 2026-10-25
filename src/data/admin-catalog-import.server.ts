@@ -480,7 +480,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
             const nextState = Number(retryRow?.count ?? 0) > 0 ? "screenshots_retry" : "done";
             await setMeta(db, "metadata_refresh_state", nextState);
             const shots = await screenshotProgress(db);
-            return json({ isAdmin: true, phase: nextState, phaseChanged: true, processed: 0, offset: shots.processed, nextOffset: shots.processed, metadataOffset: total, screenshotOffset: shots.processed, total, updated: 0, screenshotsSaved: 0, screenshotFailures: shots.failed, screenshotRetries: shots.retry, done: nextState === "done" });
+            return json({ isAdmin: true, phase: nextState, phaseChanged: true, processed: 0, offset: total, nextOffset: total, metadataOffset: total, screenshotOffset: total, total, updated: 0, screenshotsSaved: 0, screenshotFailures: shots.failed, screenshotRetries: shots.retry, done: nextState === "done" });
           }
           const row = await db.prepare("SELECT id FROM anime_catalog ORDER BY position ASC,id ASC LIMIT 1 OFFSET ?")
             .bind(cursor).first<{ id: string }>();
@@ -494,19 +494,21 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
           const existing = await db.prepare("SELECT COUNT(*) AS count FROM anime_catalog_screenshots WHERE anime_id = ?")
             .bind(animeId).first<{ count: number }>();
           let saved = 0;
+          let screenshotWarning: string | null = null;
           let statements: Statement[] = [];
           if (statusRow?.status === "done" || Number(existing?.count ?? 0) > 0) {
             statements.push(screenshotStatusStatement(db, animeId, "done", 0, null));
           } else {
             const attempt = await fetchAndStoreScreenshots(db, animeId, Number(statusRow?.attempts ?? 0));
             saved = attempt.saved;
+            screenshotWarning = attempt.error;
             statements.push(...attempt.statements);
           }
           const nextCursor = cursor + 1;
           statements.push(setMeta(db, "metadata_refresh_screenshot_cursor", String(nextCursor)));
           await db.batch(statements);
           const shots = await screenshotProgress(db);
-          return json({ isAdmin: true, phase: "screenshots", phaseChanged: false, processed: 1, offset: nextCursor, nextOffset: nextCursor, metadataOffset: total, screenshotOffset: nextCursor, total, updated: 0, screenshotsSaved: saved, screenshotFailures: shots.failed, screenshotRetries: shots.retry, done: false });
+          return json({ isAdmin: true, phase: "screenshots", phaseChanged: false, processed: 1, offset: nextCursor, nextOffset: nextCursor, metadataOffset: total, screenshotOffset: nextCursor, total, updated: 0, screenshotsSaved: saved, screenshotFailures: shots.failed, screenshotRetries: shots.retry, screenshotWarning, done: false });
         }
 
         if (state === "screenshots_retry") {
