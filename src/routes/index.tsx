@@ -18,7 +18,7 @@ import { filterAndSortCatalog, getCatalogPageCount, paginateCatalog } from "@/da
 import { validateCatalogSearch } from "@/data/catalog-search";
 import homeSocialImage from "@/assets/yume-hero-desktop-new.png.PNG";
 import { absoluteImageUrl, canonicalUrl } from "@/data/seo";
-import { getTelegramWebApp } from "@/lib/telegram-mini-app";
+import { getTelegramWebApp, telegramHapticImpact } from "@/lib/telegram-mini-app";
 import { trackYumePage } from "@/lib/yume-analytics";
 import { setProfileStorageAuthenticated, syncTelegramLibrary } from "@/data/profile-storage";
 import { USER_NOTIFICATIONS } from "@/data/notifications.shared";
@@ -991,6 +991,7 @@ function Index() {
   }, [view, language]);
 
   const setView = (v: View) => {
+    telegramHapticImpact("light");
     if (v === "login" || v === "register") {
       setViewRaw(v);
       window.scrollTo({ top: 0, behavior: "smooth" });
