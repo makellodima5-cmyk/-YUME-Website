@@ -21,7 +21,7 @@ describe("Cloudflare Worker scheduled entrypoint", () => {
     expect(cronPlugin).not.toContain('from "../../src/data/');
 
     expect(catalogImporter).toMatch(/export async function runScheduledCatalogMetadataRefresh\(/);
-    expect(catalogImporter).toContain("/^\d{4}-\d{2}-\d{2}/");
+    expect(catalogImporter).toContain("/^\\d{4}-\\d{2}-\\d{2}/");
     expect(cronPlugin).toContain("runScheduledCatalogMetadataRefresh(env)");
     expect(cronPlugin).toContain("runScheduledTrailerUpdate(env)");
     expect(cronPlugin).toContain("[YUME][CATALOG_AUTO_REFRESH] Nitro scheduled hook received.");
