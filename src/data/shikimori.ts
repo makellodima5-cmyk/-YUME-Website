@@ -7,7 +7,12 @@ export { retryAfterMilliseconds };
 import { filterCatalogForCurrentRequest } from "@/data/territorial-restrictions.server";
 
 const API_URL = "https://shikimori.io/api/graphql";
+const SCREENSHOT_API_URL = "https://shikimori.one/api/animes/";
 const CACHE_TTL_MS = 5 * 60 * 1000;
+const SCREENSHOT_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+
+export type ShikimoriScreenshot = { originalUrl: string; previewUrl: string };
+const screenshotCache = new Map<string, { expiresAt: number; items: ShikimoriScreenshot[] }>();
 const responseCache = new Map<string, { expiresAt: number; items: Anime[] }>();
 // A 429 opens a per-isolate circuit breaker to avoid repeated upstream bursts.
 let shikimoriCooldownUntil = 0;
@@ -133,6 +138,29 @@ function safeImageUrl(value: string | null | undefined): string | undefined {
   } catch {
     return undefined;
   }
+}
+
+export function normalizeShikimoriScreenshots(payload: unknown): ShikimoriScreenshot[] {
+  if (!Array.isArray(payload)) return [];
+  const result: ShikimoriScreenshot[] = [];
+  const seen = new Set<string>();
+  for (const value of payload) {
+    if (!value || typeof value !== "object") continue;
+    const row = value as { original?: unknown; preview?: unknown };
+    const normalizeUrl = (input: unknown) => {
+      if (typeof input !== "string" || !input.trim()) return undefined;
+      const raw = input.trim();
+      return safeImageUrl(raw.startsWith("//") ? "https:" + raw : raw);
+    };
+    const original = normalizeUrl(row.original);
+    const preview = normalizeUrl(row.preview);
+    const primary = original ?? preview;
+    if (!primary || seen.has(primary)) continue;
+    seen.add(primary);
+    result.push({ originalUrl: primary, previewUrl: preview ?? primary });
+    if (result.length >= 24) break;
+  }
+  return result;
 }
 
 function cleanName(value: string | null | undefined): string {
@@ -562,4 +590,42 @@ export const getShikimoriAnimeDetails = createServerFn({ method: "GET" })
         .filter((anime): anime is Anime => Boolean(anime)),
       apiError: null,
     };
+  });
+
+/**
+ * Loads screenshots only when a detail page is opened.
+ * Screenshot URLs are not added to the permanent catalogue; successful responses are cached in the Worker isolate.
+ */
+export const getShikimoriAnimeScreenshots = createServerFn({ method: "GET" })
+  .validator((input: { animeId?: unknown }) => ({
+    animeId: typeof input?.animeId === "string" && /^\d{1,12}$/.test(input.animeId)
+      ? input.animeId
+      : "",
+  }))
+  .handler(async ({ data }) => {
+    if (!data.animeId) return { items: [] as ShikimoriScreenshot[] };
+    const now = Date.now();
+    const cached = screenshotCache.get(data.animeId);
+    if (cached && cached.expiresAt > now) return { items: cached.items };
+    screenshotCache.delete(data.animeId);
+
+    try {
+      const response = await fetch(SCREENSHOT_API_URL + encodeURIComponent(data.animeId) + "/screenshots", {
+        headers: { Accept: "application/json", "User-Agent": "YUME/0.2.0" },
+        signal: AbortSignal.timeout(8000),
+      });
+      if (!response.ok) return { items: [] as ShikimoriScreenshot[] };
+      const items = normalizeShikimoriScreenshots(await response.json());
+      screenshotCache.set(data.animeId, { expiresAt: now + SCREENSHOT_CACHE_TTL_MS, items });
+      if (screenshotCache.size > 300) {
+        for (const [key, entry] of screenshotCache) {
+          if (entry.expiresAt <= now || screenshotCache.size > 300) screenshotCache.delete(key);
+          if (screenshotCache.size <= 250) break;
+        }
+      }
+      return { items };
+    } catch {
+      // Screenshots are optional; source failures must not break the anime page.
+      return { items: [] as ShikimoriScreenshot[] };
+    }
   });
