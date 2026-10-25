@@ -373,6 +373,42 @@ async function screenshotProgress(db: Database): Promise<{ processed: number; fa
   return { processed: done + failed + retry, failed, retry, done };
 }
 
+async function catalogRefreshStats(db: Database) {
+  const row = await db.prepare(`
+    SELECT COUNT(*) AS total,
+      SUM(CASE WHEN
+        TRIM(COALESCE(title,'')) = '' OR title = 'Без названия' OR
+        TRIM(COALESCE(english_title,'')) = '' OR
+        TRIM(COALESCE(original_title,'')) = '' OR original_title = 'Без названия' OR
+        (COALESCE(status,'') <> 'Анонс' AND COALESCE(year,0) <= 0) OR
+        (COALESCE(status,'') <> 'Анонс' AND COALESCE(episodes,0) <= 0) OR rating IS NULL OR
+        TRIM(COALESCE(genres_json,'')) = '' OR genres_json = '[]' OR
+        TRIM(COALESCE(status,'')) = '' OR status = 'Неизвестно' OR
+        TRIM(COALESCE(description,'')) = '' OR TRIM(COALESCE(poster_url,'')) = '' OR
+        TRIM(COALESCE(banner_url,'')) = '' OR TRIM(COALESCE(kind,'')) = '' OR
+        TRIM(COALESCE(age_rating,'')) = '' OR
+        (COALESCE(status,'') <> 'Анонс' AND TRIM(COALESCE(aired_on,'')) = '') OR
+        TRIM(COALESCE(studios_json,'')) = '' OR studios_json = '[]' OR
+        TRIM(COALESCE(youtube_trailer_id,'')) = ''
+      THEN 1 ELSE 0 END) AS incomplete,
+      SUM(CASE WHEN status = 'Анонс' THEN 1 ELSE 0 END) AS announced,
+      SUM(CASE WHEN youtube_trailer_id IS NULL OR TRIM(youtube_trailer_id) = '' THEN 1 ELSE 0 END) AS missingTrailer,
+      SUM(CASE WHEN youtube_trailer_id IS NOT NULL AND TRIM(youtube_trailer_id) <> '' THEN 1 ELSE 0 END) AS hasTrailer
+    FROM anime_catalog
+  `).first<{total:number;incomplete:number|null;announced:number|null;missingTrailer:number|null;hasTrailer:number|null}>();
+  const shots = await db.prepare(`
+    SELECT (SELECT COUNT(*) FROM anime_catalog_screenshots s JOIN anime_catalog a ON a.id=s.anime_id) AS savedScreenshotUrls,
+      SUM(CASE WHEN ss.status='done' THEN 1 ELSE 0 END) AS screenshotDone,
+      SUM(CASE WHEN ss.status='retry' THEN 1 ELSE 0 END) AS screenshotRetry,
+      SUM(CASE WHEN ss.status='failed' THEN 1 ELSE 0 END) AS screenshotFailed
+    FROM anime_catalog_screenshot_status ss JOIN anime_catalog a ON a.id=ss.anime_id
+  `).first<{savedScreenshotUrls:number|null;screenshotDone:number|null;screenshotRetry:number|null;screenshotFailed:number|null}>();
+  const total = Number(row?.total ?? 0), incomplete = Number(row?.incomplete ?? 0);
+  return { total, incomplete, complete: Math.max(0,total-incomplete), announced:Number(row?.announced??0),
+    missingTrailer:Number(row?.missingTrailer??0), hasTrailer:Number(row?.hasTrailer??0),
+    savedScreenshotUrls:Number(shots?.savedScreenshotUrls??0), screenshotDone:Number(shots?.screenshotDone??0),
+    screenshotRetry:Number(shots?.screenshotRetry??0), screenshotFailed:Number(shots?.screenshotFailed??0) };
+}
 async function catalogQuality(db: Database, requestedOffset = 0) {
   const offset = Number.isFinite(requestedOffset) ? Math.max(0,Math.min(100000,Math.floor(requestedOffset))) : 0;
   const [rows, aggregate] = await Promise.all([
@@ -726,7 +762,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
   try {
     if (!await authorize(request,env,db)) return json({isAdmin:false,error:"admin_required"},403);
     await ensureSchema(db);
-    if (request.method === "GET") { const url = new URL(request.url); const qualityOffset = Number(url.searchParams.get("qualityOffset") ?? "0"); const quality = await catalogQuality(db,qualityOffset); const [refreshState, metadataCursor, screenshotCursor, totalRow, shots, autoEnabled] = await Promise.all([getMeta(db,"metadata_refresh_state"),getMeta(db,"metadata_refresh_cursor"),getMeta(db,"metadata_refresh_screenshot_cursor"),db.prepare("SELECT COUNT(*) AS total FROM anime_catalog").first<{total:number}>(),screenshotProgress(db),getMeta(db,"metadata_refresh_auto_enabled")]); const refreshTotal = Number(totalRow?.total ?? 0); const phase = refreshState ?? "idle"; const metadataOffset = phase === "done" || phase.startsWith("screenshots") ? refreshTotal : Math.max(0,Number(metadataCursor ?? "0") || 0); const screenshotOffset = phase === "metadata" ? 0 : Math.max(0,Number(screenshotCursor ?? "0") || 0); return json({isAdmin:true,...await snapshot(db),metadataRefresh:{autoEnabled:autoEnabled === "1",phase,metadataOffset,screenshotOffset,total:refreshTotal,screenshotFailures:shots.failed,screenshotRetries:shots.retry,done:phase === "done",lastTickAt:await getMeta(db,"metadata_refresh_last_tick_at"),lastSuccessAt:await getMeta(db,"metadata_refresh_last_success_at"),lastError:await getMeta(db,"metadata_refresh_last_error"),lastPhase:await getMeta(db,"metadata_refresh_last_phase"),lastSteps:Number(await getMeta(db,"metadata_refresh_last_steps") ?? "0"),lastDurationMs:Number(await getMeta(db,"metadata_refresh_last_duration_ms") ?? "0")},quality:quality.items,qualitySummary:quality.summary,qualityLimit:quality.limit,qualityOffset:quality.offset,qualityHasMore:quality.hasMore,auditLog:await recentAudit(db)}); }
+    if (request.method === "GET") { const url = new URL(request.url); const qualityOffset = Number(url.searchParams.get("qualityOffset") ?? "0"); const quality = await catalogQuality(db,qualityOffset); const [refreshState, metadataCursor, screenshotCursor, totalRow, shots, autoEnabled, refreshStats] = await Promise.all([getMeta(db,"metadata_refresh_state"),getMeta(db,"metadata_refresh_cursor"),getMeta(db,"metadata_refresh_screenshot_cursor"),db.prepare("SELECT COUNT(*) AS total FROM anime_catalog").first<{total:number}>(),screenshotProgress(db),getMeta(db,"metadata_refresh_auto_enabled"),catalogRefreshStats(db)]); const refreshTotal = Number(totalRow?.total ?? 0); const phase = refreshState ?? "idle"; const metadataOffset = phase === "done" || phase.startsWith("screenshots") ? refreshTotal : Math.max(0,Number(metadataCursor ?? "0") || 0); const screenshotOffset = phase === "metadata" ? 0 : Math.max(0,Number(screenshotCursor ?? "0") || 0); return json({isAdmin:true,...await snapshot(db),metadataRefresh:{autoEnabled:autoEnabled === "1",phase,metadataOffset,screenshotOffset,total:refreshTotal,stats:refreshStats,screenshotFailures:shots.failed,screenshotRetries:shots.retry,done:phase === "done",lastTickAt:await getMeta(db,"metadata_refresh_last_tick_at"),lastSuccessAt:await getMeta(db,"metadata_refresh_last_success_at"),lastError:await getMeta(db,"metadata_refresh_last_error"),lastPhase:await getMeta(db,"metadata_refresh_last_phase"),lastSteps:Number(await getMeta(db,"metadata_refresh_last_steps") ?? "0"),lastDurationMs:Number(await getMeta(db,"metadata_refresh_last_duration_ms") ?? "0")},quality:quality.items,qualitySummary:quality.summary,qualityLimit:quality.limit,qualityOffset:quality.offset,qualityHasMore:quality.hasMore,auditLog:await recentAudit(db)}); }
     let body: {action?:unknown; target?:unknown};
     try { body = await request.json() as {action?:unknown;target?:unknown}; } catch { return json({error:"invalid_request"},400); }
     requestedAction = body.action;
@@ -742,6 +778,19 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
         const quality = await catalogQuality(db);
         await audit(db,"catalog.delete","success",{requested:safeIds.length,deleted});
         return json({isAdmin:true,deleted,quality:quality.items,qualitySummary:quality.summary});
+      }
+      if (body.action === "reset_metadata_refresh") {
+        const totalRow = await db.prepare("SELECT COUNT(*) AS total FROM anime_catalog").first<{total:number}>();
+        await db.batch([
+          setMeta(db, "metadata_refresh_state", "metadata"),
+          setMeta(db, "metadata_refresh_cursor", "0"),
+          setMeta(db, "metadata_refresh_screenshot_cursor", "0"),
+          setMeta(db, "metadata_refresh_auto_enabled", "0"),
+          setMeta(db, "metadata_refresh_last_error", ""),
+          db.prepare("UPDATE anime_catalog_screenshot_status SET status='retry',attempts=0,last_error=NULL,updated_at=CURRENT_TIMESTAMP WHERE status='failed'"),
+        ]);
+        await audit(db, "catalog.metadata.reset", "success", { total: Number(totalRow?.total ?? 0) });
+        return json({ isAdmin: true, autoEnabled: false, phase: "metadata", offset: 0, total: Number(totalRow?.total ?? 0), stats: await catalogRefreshStats(db), message: "Прогресс обновления сброшен. Следующий запуск начнётся с начала каталога." });
       }
       if (body.action === "auto_start") {
         const current = await getMeta(db, "metadata_refresh_state") ?? "idle";
