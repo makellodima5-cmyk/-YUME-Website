@@ -480,7 +480,7 @@ async function runCatalogMetadataRefreshStep(db: Database): Promise<Response> {
       let saved = 0;
       let screenshotWarning: string | null = null;
       const statements: Statement[] = [db.prepare("DELETE FROM anime_catalog_screenshots WHERE anime_id = ? AND (original_url LIKE '%example.com%' OR preview_url LIKE '%example.com%')").bind(animeId)];
-      const unreleased = row.status === "Анонс" || Boolean(row.aired_on && /^\\d{4}-\\d{2}-\\d{2}/.test(row.aired_on) && row.aired_on.slice(0, 10) > new Date().toISOString().slice(0, 10));
+      const unreleased = row.status === "Анонс" || Boolean(row.aired_on && /^\d{4}-\d{2}-\d{2}/.test(row.aired_on) && row.aired_on.slice(0, 10) > new Date().toISOString().slice(0, 10));
       const recentlyResolvedEmpty = statusRow?.status === "done"
         && statusRow.last_error === "Источник не вернул кадров"
         && Number.isFinite(Date.parse(statusRow.updated_at))

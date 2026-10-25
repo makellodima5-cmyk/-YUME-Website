@@ -1,7 +1,7 @@
 import { definePlugin } from "nitro";
 import { runScheduledCatalogMetadataRefresh } from "../src/data/admin-catalog-import.server";
-import { runScheduledTrailerUpdate } from "../../src/data/admin-trailers.server";
-import { setCatalogRuntimeEnvironment } from "../../src/data/catalog-d1.server";
+import { runScheduledTrailerUpdate } from "../src/data/admin-trailers.server";
+import { setCatalogRuntimeEnvironment } from "../src/data/catalog-d1.server";
 
 function hasDatabaseBinding(value: unknown): boolean {
   return Boolean(value && typeof value === "object" && "YUME_DB" in value
