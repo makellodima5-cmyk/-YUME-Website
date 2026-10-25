@@ -821,79 +821,18 @@ function Index() {
   const runMetadataRefresh = async () => {
     if (!isAdmin || metadataRefreshRunning || adminImportRunning || adminRunning) return;
     const confirmed = window.confirm(language === "ru"
-      ? "Дозаполнить отсутствующие метаданные и кадры из Shikimori для существующих тайтлов? Уже заполненные поля не перезаписываются; новые записи не добавляются. Процесс может занять много времени. При временной ошибке запуск можно повторить."
-      : "Fill missing metadata and screenshot URLs from Shikimori for existing titles? Populated fields will be preserved and no records added. This may take a long time. You can resume after a temporary error.");
+      ? "Запустить фоновое автоматическое заполнение метаданных и кадров? Задача продолжится на сервере, даже если закрыть страницу."
+      : "Start background metadata and screenshot enrichment? The server continues after you close this page.");
     if (!confirmed) return;
     setMetadataRefreshRunning(true);
-    setMetadataRefreshMessage("");
-    setMetadataRefreshProgress({ offset: 0, total: 0, updated: 0, screenshotsSaved: 0, phase: "metadata", metadataOffset: 0, screenshotOffset: 0, screenshotFailures: 0, screenshotRetries: 0 });
-    let total = 0;
-    let updated = 0;
-    let screenshotsSaved = 0;
-    let screenshotFailures = 0;
-    let screenshotRetries = 0;
-    let currentPhase = "metadata";
-    let metadataOffset = 0;
-    let screenshotOffset = 0;
+    setMetadataRefreshMessage(language === "ru" ? "Запускаю фоновую задачу…" : "Starting background job…");
     try {
-      while (true) {
-        const response = await fetch("/api/admin/catalog-import", {
-          method: "POST", credentials: "same-origin", cache: "no-store",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "refresh_metadata" }),
-        });
-        const payload = await response.json().catch(() => ({})) as {
-          isAdmin?: boolean; error?: string; message?: string; offset?: number; nextOffset?: number;
-          metadataOffset?: number; screenshotOffset?: number; phase?: string; phaseChanged?: boolean;
-          processed?: number; updated?: number; screenshotsSaved?: number; screenshotFailures?: number;
-          screenshotRetries?: number; screenshotWarning?: string | null; total?: number; done?: boolean;
-        };
-        if (typeof payload.total === "number") total = payload.total;
-        if (typeof payload.updated === "number") updated += payload.updated;
-        if (typeof payload.screenshotsSaved === "number") screenshotsSaved += payload.screenshotsSaved;
-        if (typeof payload.screenshotFailures === "number") screenshotFailures = payload.screenshotFailures;
-        if (typeof payload.screenshotRetries === "number") screenshotRetries = payload.screenshotRetries;
-        if (typeof payload.phase === "string") currentPhase = payload.phase;
-        if (typeof payload.metadataOffset === "number") metadataOffset = payload.metadataOffset;
-        if (typeof payload.screenshotOffset === "number") screenshotOffset = payload.screenshotOffset;
-        const displayOffset = currentPhase === "metadata"
-          ? metadataOffset
-          : currentPhase === "screenshots_retry"
-            ? Math.max(0, total - screenshotRetries)
-            : screenshotOffset;
-        setMetadataRefreshProgress({
-          offset: displayOffset, total, updated, screenshotsSaved, phase: currentPhase,
-          metadataOffset, screenshotOffset, screenshotFailures, screenshotRetries,
-        });
-        if (!response.ok || payload.isAdmin !== true) {
-          throw new Error(payload.message ?? payload.error ?? (language === "ru" ? "Не удалось обновить метаданные." : "Metadata refresh failed."));
-        }
-        const phaseLabel = currentPhase === "metadata"
-          ? (language === "ru" ? "Метаданные" : "Metadata")
-          : currentPhase === "screenshots"
-            ? (language === "ru" ? "Кадры" : "Screenshots")
-            : currentPhase === "screenshots_retry"
-              ? (language === "ru" ? "Повтор кадров" : "Screenshot retries")
-              : (language === "ru" ? "Завершено" : "Completed");
-        const statusMessage = (language === "ru"
-          ? phaseLabel + ": " + displayOffset + " / " + total + "; заполнено полей: " + updated + "; добавлено URL кадров: " + screenshotsSaved + "; неудачных кадров: " + screenshotFailures + "; повторов в очереди: " + screenshotRetries + "."
-          : phaseLabel + ": " + displayOffset + " / " + total + "; fields filled: " + updated + "; screenshot URLs added: " + screenshotsSaved + "; failed screenshots: " + screenshotFailures + "; retries queued: " + screenshotRetries + ".");
-        setMetadataRefreshMessage(payload.screenshotWarning
-          ? statusMessage + " " + (language === "ru" ? "Последняя ошибка кадров: " : "Latest screenshot error: ") + payload.screenshotWarning
-          : statusMessage);
-        if (payload.done) break;
-        if (!(payload.processed && payload.processed > 0) && !payload.phaseChanged) {
-          throw new Error(language === "ru" ? "Сервер не продвинул курсор. Повтори запуск — сохранённая позиция останется прежней." : "The server did not advance the cursor. Retry; the saved position will be preserved.");
-        }
-        await new Promise(resolve => setTimeout(resolve, currentPhase === "metadata" ? 500 : 800));
-      }
-      setMetadataRefreshProgress(current => ({ ...current, phase: "done", offset: total }));
-      setMetadataRefreshMessage(language === "ru"
-        ? "Готово: обработано тайтлов: " + total + "; заполнено отсутствующих полей: " + updated + "; добавлено URL кадров: " + screenshotsSaved + "; тайтлов с кадрами, не полученными после 3 попыток: " + screenshotFailures + "."
-        : "Completed: titles processed: " + total + "; missing fields filled: " + updated + "; screenshot URLs added: " + screenshotsSaved + "; titles with screenshots still unavailable after 3 attempts: " + screenshotFailures + ".");
-      await refreshCatalogQuality();
+      const response = await fetch("/api/admin/catalog-import", { method: "POST", credentials: "same-origin", cache: "no-store", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "auto_start" }) });
+      const payload = await response.json().catch(() => ({})) as { isAdmin?: boolean; error?: string; message?: string };
+      if (!response.ok || payload.isAdmin !== true) throw new Error(payload.message ?? payload.error ?? "Could not start auto-refresh.");
+      setMetadataRefreshMessage(payload.message ?? (language === "ru" ? "Фоновое обновление запущено. Страницу можно закрыть; прогресс сохранится." : "Background refresh started. You can close this page; progress is saved."));
     } catch (error) {
-      setMetadataRefreshMessage(error instanceof Error ? error.message : (language === "ru" ? "Обновление остановлено." : "Refresh stopped."));
+      setMetadataRefreshMessage(error instanceof Error ? error.message : "Could not start auto-refresh.");
     } finally {
       setMetadataRefreshRunning(false);
     }
