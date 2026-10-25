@@ -357,6 +357,7 @@ function Index() {
   const [adminImport, setAdminImport] = useState<{target:number;cursor:number;added:number;skipped:number;incomplete:number;errors:number;state:string;delayMs?:number}>({target:0,cursor:1,added:0,skipped:0,incomplete:0,errors:0,state:"idle"});
   const [adminImportMessage, setAdminImportMessage] = useState("");
   const [metadataRefreshRunning, setMetadataRefreshRunning] = useState(false);
+  const manualMetadataStopRef = useRef(false);
   const [metadataRefreshProgress, setMetadataRefreshProgress] = useState({ offset: 0, total: 0, updated: 0, screenshotsSaved: 0, phase: "metadata", metadataOffset: 0, screenshotOffset: 0, screenshotFailures: 0, screenshotRetries: 0 });
   const [metadataRefreshMessage, setMetadataRefreshMessage] = useState("");
   const [catalogQuality, setCatalogQuality] = useState<{id:string;title:string;year:number;missingYear:boolean;missingPoster:boolean;missingDescription:boolean}[]>([]);
@@ -841,21 +842,48 @@ function Index() {
   const runMetadataRefresh = async () => {
     if (!isAdmin || metadataRefreshRunning || adminImportRunning || adminRunning) return;
     const confirmed = window.confirm(language === "ru"
-      ? "Запустить фоновое автоматическое заполнение метаданных и кадров? Задача продолжится на сервере, даже если закрыть страницу."
-      : "Start background metadata and screenshot enrichment? The server continues after you close this page.");
+      ? "Запустить ручное обновление каталога? Оно будет выполняться, пока эта страница открыта. Можно остановить в любой момент; прогресс сохранится."
+      : "Start manual catalog refresh? It runs while this page stays open. You can stop it at any time; progress is saved.");
     if (!confirmed) return;
+    manualMetadataStopRef.current = false;
     setMetadataRefreshRunning(true);
-    setMetadataRefreshMessage(language === "ru" ? "Запускаю фоновую задачу…" : "Starting background job…");
+    setMetadataRefreshMessage(language === "ru" ? "Подготавливаю ручной запуск…" : "Preparing manual run…");
     try {
-      const response = await fetch("/api/admin/catalog-import", { method: "POST", credentials: "same-origin", cache: "no-store", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "auto_start" }) });
-      const payload = await response.json().catch(() => ({})) as { isAdmin?: boolean; error?: string; message?: string };
-      if (!response.ok || payload.isAdmin !== true) throw new Error(payload.message ?? payload.error ?? "Could not start auto-refresh.");
-      setMetadataRefreshMessage(payload.message ?? (language === "ru" ? "Фоновое обновление запущено. Страницу можно закрыть; прогресс сохранится." : "Background refresh started. You can close this page; progress is saved."));
+      const stopAuto = await fetch("/api/admin/catalog-import", { method: "POST", credentials: "same-origin", cache: "no-store", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "auto_stop" }) });
+      const stopPayload = await stopAuto.json().catch(() => ({})) as { isAdmin?: boolean; error?: string };
+      if (!stopAuto.ok || stopPayload.isAdmin !== true) throw new Error(stopPayload.error ?? "Could not disable automatic mode.");
+      let finished = false;
+      let requests = 0;
+      while (!manualMetadataStopRef.current && !finished && requests < 1500) {
+        requests++;
+        const response = await fetch("/api/admin/catalog-import", { method: "POST", credentials: "same-origin", cache: "no-store", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "refresh_metadata" }) });
+        const payload = await response.json().catch(() => ({})) as { isAdmin?: boolean; error?: string; message?: string; phase?: string; offset?: number; total?: number; metadataOffset?: number; screenshotOffset?: number; updated?: number; screenshotsSaved?: number; screenshotFailures?: number; screenshotRetries?: number; done?: boolean };
+        if (response.status === 409) {
+          await new Promise(resolve => window.setTimeout(resolve, 1500));
+          continue;
+        }
+        if (payload.isAdmin !== true || !response.ok) throw new Error(payload.message ?? payload.error ?? (language === "ru" ? "Ручной шаг не выполнен." : "Manual step failed."));
+        const phase = payload.phase ?? "metadata";
+        const total = payload.total ?? 0;
+        const offset = phase === "metadata" ? (payload.metadataOffset ?? payload.offset ?? 0) : (payload.screenshotOffset ?? payload.offset ?? 0);
+        setMetadataRefreshProgress(current => ({ ...current, phase, total, offset, metadataOffset: payload.metadataOffset ?? current.metadataOffset, screenshotOffset: payload.screenshotOffset ?? current.screenshotOffset, updated: current.updated + (payload.updated ?? 0), screenshotsSaved: current.screenshotsSaved + (payload.screenshotsSaved ?? 0), screenshotFailures: payload.screenshotFailures ?? current.screenshotFailures, screenshotRetries: payload.screenshotRetries ?? current.screenshotRetries }));
+        finished = payload.done === true || phase === "done";
+        setMetadataRefreshMessage(language === "ru"
+          ? (finished ? "Ручное обновление завершено." : manualMetadataStopRef.current ? "Ручной запуск остановлен. Прогресс сохранён." : "Ручное обновление: " + phase + ", " + offset + " / " + total + ".")
+          : (finished ? "Manual refresh completed." : manualMetadataStopRef.current ? "Manual run stopped. Progress saved." : "Manual refresh: " + phase + ", " + offset + " / " + total + "."));
+        if (!finished && !manualMetadataStopRef.current) await new Promise(resolve => window.setTimeout(resolve, 1250));
+      }
+      if (requests >= 1500 && !finished) setMetadataRefreshMessage(language === "ru" ? "Лимит шагов за запуск достигнут. Прогресс сохранён; нажми «Запустить вручную» для продолжения." : "Per-run step limit reached. Progress is saved; start manually again to continue.");
     } catch (error) {
-      setMetadataRefreshMessage(error instanceof Error ? error.message : "Could not start auto-refresh.");
+      setMetadataRefreshMessage((error instanceof Error ? error.message : "Manual refresh failed") + (language === "ru" ? " Прогресс сохранён; можно запустить вручную ещё раз." : " Progress is saved; you can start manually again."));
     } finally {
       setMetadataRefreshRunning(false);
     }
+  };
+
+  const stopManualMetadataRefresh = () => {
+    manualMetadataStopRef.current = true;
+    setMetadataRefreshMessage(language === "ru" ? "Останавливаю после текущего шага…" : "Stopping after the current step…");
   };
 
   const runMaintenanceCheck = async () => {
@@ -1705,7 +1733,7 @@ function Index() {
                 <div className="border-t border-border/70 p-3 sm:p-4">
                 <div className="flex flex-col gap-3">
                   <p className="text-xs leading-relaxed text-muted-foreground">{language === "ru" ? "Дозаполняет отсутствующие метаданные и кадры из Shikimori для существующих тайтлов. Уже заполненные поля не перезаписываются; новые записи не добавляются." : "Fills missing metadata and screenshot URLs from Shikimori for existing titles. Existing populated fields are preserved; no records are added."}</p>
-                  <div className="grid gap-2 sm:grid-cols-2"><button type="button" onClick={runMetadataRefresh} disabled={metadataRefreshRunning || adminImportRunning || adminRunning} className="w-full rounded-xl bg-gradient-to-r from-[#AC4EFC] to-[#8736FA] px-4 py-2.5 text-sm font-semibold text-white shadow-[0_0_16px_rgba(155,65,245,0.18)] transition hover:brightness-110 disabled:cursor-wait disabled:opacity-50">{metadataRefreshRunning ? (language === "ru" ? "Запуск…" : "Starting…") : (language === "ru" ? "Запустить автообновление" : "Start auto-refresh")}</button><button type="button" onClick={async () => { try { const response = await fetch("/api/admin/catalog-import", { method: "POST", credentials: "same-origin", cache: "no-store", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "auto_stop" }) }); const payload = await response.json().catch(() => ({})) as { isAdmin?: boolean; error?: string; message?: string }; if (!response.ok || payload.isAdmin !== true) throw new Error(payload.error ?? "Could not stop auto-refresh."); setMetadataRefreshMessage(payload.message ?? (language === "ru" ? "Автообновление остановлено. Прогресс сохранён." : "Auto-refresh stopped. Progress saved.")); } catch (error) { setMetadataRefreshMessage(error instanceof Error ? error.message : "Could not stop auto-refresh."); } }} className="w-full rounded-xl border border-border px-4 py-2.5 text-sm font-semibold">{language === "ru" ? "Остановить автообновление" : "Stop auto-refresh"}</button></div>
+                  <div className="grid gap-2 sm:grid-cols-2"><button type="button" onClick={runMetadataRefresh} disabled={metadataRefreshRunning || adminImportRunning || adminRunning} className="w-full rounded-xl bg-gradient-to-r from-[#AC4EFC] to-[#8736FA] px-4 py-2.5 text-sm font-semibold text-white shadow-[0_0_16px_rgba(155,65,245,0.18)] transition hover:brightness-110 disabled:cursor-wait disabled:opacity-50">{metadataRefreshRunning ? (language === "ru" ? "Выполняется…" : "Running…") : (language === "ru" ? "Запустить вручную" : "Run manually")}</button><button type="button" onClick={stopManualMetadataRefresh} disabled={!metadataRefreshRunning} className="w-full rounded-xl border border-border px-4 py-2.5 text-sm font-semibold disabled:opacity-50">{language === "ru" ? "Остановить ручной запуск" : "Stop manual run"}</button><button type="button" onClick={async () => { try { const response = await fetch("/api/admin/catalog-import", { method: "POST", credentials: "same-origin", cache: "no-store", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "auto_stop" }) }); const payload = await response.json().catch(() => ({})) as { isAdmin?: boolean; error?: string; message?: string }; if (!response.ok || payload.isAdmin !== true) throw new Error(payload.error ?? "Could not stop auto-refresh."); setMetadataRefreshMessage(payload.message ?? (language === "ru" ? "Автообновление остановлено. Прогресс сохранён." : "Auto-refresh stopped. Progress saved.")); } catch (error) { setMetadataRefreshMessage(error instanceof Error ? error.message : "Could not stop auto-refresh."); } }} className="w-full rounded-xl border border-border px-4 py-2.5 text-sm font-semibold">{language === "ru" ? "Остановить автообновление" : "Stop auto-refresh"}</button></div>
                 </div>
                 {(metadataRefreshRunning || metadataRefreshProgress.total > 0) && (
                   <div className="mt-3">
