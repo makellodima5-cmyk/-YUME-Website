@@ -27,7 +27,7 @@ import type { Anime } from "@/data/anime";
 import { getShikimoriAnimes } from "@/data/shikimori";
 import { displayAnimeTitle, useYumePreferences } from "@/data/preferences";
 import { PosterArt } from "./Poster";
-import { getTelegramWebApp } from "@/lib/telegram-mini-app";
+import { getTelegramWebApp, telegramHapticImpact } from "@/lib/telegram-mini-app";
 import { Grid } from "./Sections";
 import { SITE_RULES, SITE_RULES_LAST_UPDATED } from "@/data/site-rules";
 import {
