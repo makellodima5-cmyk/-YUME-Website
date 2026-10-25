@@ -150,7 +150,12 @@ export function normalizeShikimoriScreenshots(payload: unknown): ShikimoriScreen
     const normalizeUrl = (input: unknown) => {
       if (typeof input !== "string" || !input.trim()) return undefined;
       const raw = input.trim();
-      return safeImageUrl(raw.startsWith("//") ? "https:" + raw : raw);
+      const normalized = safeImageUrl(raw.startsWith("//") ? "https:" + raw : raw);
+      if (!normalized) return undefined;
+      try {
+        const hostname = new URL(normalized).hostname.toLowerCase();
+        return hostname === "example.com" || hostname.endsWith(".example.com") ? undefined : normalized;
+      } catch { return undefined; }
     };
     const original = normalizeUrl(row.original);
     const preview = normalizeUrl(row.preview);
