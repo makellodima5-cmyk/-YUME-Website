@@ -662,17 +662,26 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
     }
   } catch (error) {
     console.error("[YUME][ADMIN_CATALOG_IMPORT] Operation failed.",error);
-    let progress: { offset?: number; total?: number } = {};
+    let progress: Record<string, unknown> = {};
     if (requestedAction === "refresh_metadata") {
       try {
-        const [cursorValue, stateValue, totalRow] = await Promise.all([
+        const [metadataCursor, screenshotCursor, stateValue, totalRow, screenshots] = await Promise.all([
           getMeta(db, "metadata_refresh_cursor"),
+          getMeta(db, "metadata_refresh_screenshot_cursor"),
           getMeta(db, "metadata_refresh_state"),
           db.prepare("SELECT COUNT(*) AS total FROM anime_catalog").first<{ total: number }>(),
+          screenshotProgress(db),
         ]);
+        const total = Number(totalRow?.total ?? 0);
+        const phase = stateValue ?? "metadata";
         progress = {
-          offset: stateValue === "done" ? 0 : Math.max(0, Number(cursorValue ?? "0") || 0),
-          total: Number(totalRow?.total ?? 0),
+          phase,
+          metadataOffset: phase === "done" || phase.startsWith("screenshots") ? total : Math.max(0, Number(metadataCursor ?? "0") || 0),
+          screenshotOffset: phase === "metadata" ? 0 : Math.max(0, Number(screenshotCursor ?? "0") || 0),
+          offset: phase === "metadata" ? Math.max(0, Number(metadataCursor ?? "0") || 0) : Math.max(0, Number(screenshotCursor ?? "0") || 0),
+          total,
+          screenshotFailures: screenshots.failed,
+          screenshotRetries: screenshots.retry,
         };
       } catch (progressError) {
         console.warn("[YUME][ADMIN_CATALOG_IMPORT] Could not read refresh progress.", progressError);
