@@ -369,7 +369,7 @@ function Index() {
   const [adminAuditLog, setAdminAuditLog] = useState<{id:number;action:string;status:string;details:Record<string,unknown>;created_at:string}[]>([]);
   const [maintenanceBusy, setMaintenanceBusy] = useState(false);
   const [maintenanceMessage, setMaintenanceMessage] = useState("");
-  const [expandedAdminSections, setExpandedAdminSections] = useState({import:true,quality:false,maintenance:false,audit:false,trailers:false});
+  const [expandedAdminSections, setExpandedAdminSections] = useState({import:false,metadata:false,quality:false,maintenance:false,audit:false,trailers:false});
   const [analyticsData, setAnalyticsData] = useState<{periods:{hours:{visits:number;visitors:number};week:{visits:number;visitors:number};month:{visits:number;visitors:number};all:{visits:number;visitors:number}};daily:{date:string;visits:number;pageViews:number;visitors:number}[];updatedAt:string}|null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [analyticsError, setAnalyticsError] = useState("");
@@ -839,7 +839,7 @@ function Index() {
           body: JSON.stringify({ action: "refresh_metadata", offset }),
         });
         const payload = await response.json().catch(() => ({})) as {
-          isAdmin?: boolean; error?: string; message?: string; nextOffset?: number;
+          isAdmin?: boolean; error?: string; message?: string; offset?: number; nextOffset?: number;
           processed?: number; updated?: number; total?: number; done?: boolean;
         };
         if (!response.ok || payload.isAdmin !== true) {
@@ -847,9 +847,9 @@ function Index() {
         }
         total = payload.total ?? total;
         updated += payload.updated ?? 0;
-        processed += payload.processed ?? 0;
         offset = payload.nextOffset ?? offset;
-        setMetadataRefreshProgress({ offset: processed, total, updated });
+        processed = offset;
+        setMetadataRefreshProgress({ offset, total, updated });
         if (payload.done || payload.processed === 0) break;
         setMetadataRefreshMessage(language === "ru"
           ? "Обработано " + processed + " из " + total + "; обновлено записей: " + updated + "."
@@ -857,8 +857,8 @@ function Index() {
         await new Promise(resolve => setTimeout(resolve, 1500));
       }
       setMetadataRefreshMessage(language === "ru"
-        ? "Готово: обработано " + processed + " из " + total + "; обновлено записей: " + updated + ". ID трейлеров обслуживаются отдельно."
-        : "Completed: processed " + processed + " of " + total + "; updated records: " + updated + ". Trailer IDs are handled separately.");
+        ? "Готово: обработано " + processed + " из " + total + "; обновлено записей: " + updated + ". Кадры заполняются при открытии страниц аниме."
+        : "Completed: processed " + processed + " of " + total + "; updated records: " + updated + ". Screenshots populate when anime pages are opened.");
       await refreshCatalogQuality();
     } catch (error) {
       setMetadataRefreshMessage(error instanceof Error ? error.message : (language === "ru" ? "Обновление остановлено." : "Refresh stopped."));
@@ -1706,7 +1706,12 @@ function Index() {
                   {adminImportMessage && <p className="mt-2 rounded-lg border border-border bg-background/60 p-2.5 text-xs" role="status">{adminImportMessage}</p>}
                 </div>
               </details>
-              <section className="mb-3 overflow-hidden rounded-2xl border border-[#6C3E91] bg-[#0D0A13] p-4" aria-label={language === "ru" ? "Обновление метаданных каталога" : "Refresh catalogue metadata"}>
+              <details open={expandedAdminSections.metadata} onToggle={event => { const isOpen = event.currentTarget.open; setExpandedAdminSections(current => current.metadata === isOpen ? current : {...current, metadata: isOpen}); }} className="group mb-3 overflow-hidden rounded-2xl border border-[#6C3E91] bg-[#0D0A13]" aria-label={language === "ru" ? "Обновление метаданных каталога" : "Refresh catalogue metadata"}>
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 hover:bg-card/80 [&::-webkit-details-marker]:hidden">
+                  <span className="flex min-w-0 items-center gap-2.5"><Database className="h-5 w-5 shrink-0 text-[#BE65FF]" /><span className="min-w-0"><span className="block font-semibold text-[#F8F4FF]">{language === "ru" ? "Обновление метаданных каталога" : "Refresh catalogue metadata"}</span><span className="mt-0.5 block text-xs text-muted-foreground">{language === "ru" ? "Продолжает с сохранённого места при ошибке" : "Resumes from the saved cursor after errors"}</span></span></span>
+                  <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+                </summary>
+                <div className="border-t border-border/70 p-3 sm:p-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex min-w-0 items-start gap-3">
                     <Database className="mt-0.5 h-5 w-5 shrink-0 text-[#BE65FF]" />
@@ -1731,7 +1736,8 @@ function Index() {
                   </div>
                 )}
                 {metadataRefreshMessage && <p className="mt-3 rounded-lg border border-border bg-background/60 p-2.5 text-xs" role="status">{metadataRefreshMessage}</p>}
-              </section>
+                </div>
+              </details>
               <details open={expandedAdminSections.quality} onToggle={event => { const isOpen = event.currentTarget.open; setExpandedAdminSections(current => current.quality === isOpen ? current : {...current, quality: isOpen}); }} className="group mb-3 overflow-hidden rounded-2xl border border-[#382846] bg-[#0C0A12]" aria-label={language === "ru" ? "Качество каталога" : "Catalog quality"}>
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 hover:bg-card/80 [&::-webkit-details-marker]:hidden">
                   <span className="flex min-w-0 items-center gap-3"><Database className="h-6 w-6 shrink-0 text-[#BE65FF]"/><span className="min-w-0"><span className="block font-semibold text-[#F8F4FF]">{language === "ru" ? "Качество каталога" : "Catalog quality"}</span><span className="mt-0.5 block text-xs text-[#A89CB8]">{language === "ru" ? "Неполных записей: " : "Incomplete records: "}{catalogQualitySummary.incomplete}</span></span></span><span className="rounded-full bg-[#1D1729] px-3 py-1 text-xs text-[#DCC8F8]">{language === "ru" ? "Всего: " : "Total: "}{catalogQualitySummary.total}</span>
@@ -1790,39 +1796,7 @@ function Index() {
                   {adminAuditLog.length===0 ? <p className="text-sm text-muted-foreground">{language==="ru"?"Событий пока нет.":"No events yet."}</p> : <div className="max-h-64 space-y-2 overflow-y-auto">{adminAuditLog.map(entry=><div key={entry.id} className="flex flex-wrap items-start justify-between gap-2 rounded-lg border border-border bg-background/50 p-2.5 text-xs"><div className="min-w-0 flex-1"><strong className="break-words">{entry.action}</strong><p className="mt-1 break-words text-muted-foreground">{JSON.stringify(entry.details)}</p></div><div className="shrink-0 text-right"><span className={entry.status==="success"?"text-emerald-500":"text-amber-500"}>{entry.status}</span><p className="mt-1 text-muted-foreground">{new Date(entry.created_at.replace(" ","T")+"Z").toLocaleString(language==="ru"?"ru-RU":"en-US")}</p></div></div>)}</div>}
                 </div>
               </details>
-              <details open={expandedAdminSections.trailers} onToggle={event => { const isOpen = event.currentTarget.open; setExpandedAdminSections(current => current.trailers === isOpen ? current : {...current, trailers: isOpen}); }} className="group mb-3 overflow-hidden rounded-2xl border border-[#8D3DD6] bg-[#0D0A13] shadow-[0_0_18px_rgba(157,64,245,0.08)]" aria-label={language==="ru"?"Обновление трейлеров":"Trailer updates"}>
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 hover:bg-[#171020] [&::-webkit-details-marker]:hidden">
-                  <span className="flex min-w-0 items-center gap-2.5"><ShieldCheck className="h-5 w-5 shrink-0 text-[#BE65FF]"/><span className="min-w-0"><span className="block font-semibold text-[#F8F4FF]">{language==="ru"?"Обновление трейлеров":"Trailer updates"}</span><span className="mt-0.5 block text-xs text-muted-foreground">{language==="ru"?"Без трейлера: ":"Missing trailers: "}{adminStats?.missing ?? "—"} · {language==="ru"?"в очереди: ":"queued: "}{adminStats?.pending ?? 0}</span></span></span>
-                  <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
-                </summary>
-                <div className="border-t border-border/70 p-3 sm:p-4">
-                  <p className="mb-3 text-xs text-muted-foreground">{language==="ru"?"Обновляются только трейлеры уже сохранённых аниме; остальные поля не изменяются.":"Only trailer fields are updated; other catalog fields remain unchanged."}</p>
-                  <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
-                    <div className="rounded-lg border border-[#493044] bg-[#08070D] p-2.5"><span className="block text-xs text-[#A89CB8]">{language === "ru" ? "Без трейлера" : "Missing trailers"}</span><strong className="tabular-nums text-[#FF3D91]">{adminStats?.missing ?? "—"}</strong></div>
-                    <div className="rounded-lg border border-[#263C50] bg-[#08070D] p-2.5"><span className="block text-xs text-[#A89CB8]">{language === "ru" ? "Проверено" : "Checked"}</span><strong className="tabular-nums text-[#B8D7FF]">{adminStats?.checked ?? 0}</strong></div>
-                    <div className="rounded-lg border border-[#21483B] bg-[#08070D] p-2.5"><span className="block text-xs text-[#A89CB8]">{language === "ru" ? "Найдено" : "Found"}</span><strong className="tabular-nums text-[#36EBA6]">{adminStats?.found ?? 0}</strong></div>
-                    <div className="rounded-lg border border-[#493A27] bg-[#08070D] p-2.5"><span className="block text-xs text-[#A89CB8]">{language === "ru" ? "Очередь" : "Queue"}</span><strong className="tabular-nums text-[#FFAA43]">{adminStats?.pending ?? 0}</strong></div>
-                  </div>
-                  <div className="mt-3 rounded-xl border border-[#382D46] bg-[#08070D] p-3">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div><p className="text-sm font-semibold text-[#F8F4FF]">{language==="ru"?"Автообновление раз в 24 часа":"Automatic update every 24 hours"}</p>
-                      <p className="mt-1 text-xs text-muted-foreground">{trailerAuto.enabled ? (trailerAuto.running ? (language==="ru"?"Идёт автоматическая проверка":"Automatic scan in progress") : (language==="ru"?"Режим включён":"Enabled")) : (language==="ru"?"Режим выключен":"Disabled")}</p></div>
-                      <button type="button" onClick={toggleTrailerAuto} disabled={trailerAutoBusy} className={`min-h-9 rounded-lg border px-3 py-2 text-xs font-semibold transition disabled:opacity-50 ${trailerAuto.enabled ? "border-[#FFAA43]/40 bg-[#2A1B0A] text-[#FFCA7D]" : "border-[#36EBA6]/40 bg-[#0D2621] text-[#70F0BC]"}`}>{trailerAutoBusy ? "…" : trailerAuto.enabled ? (language==="ru"?"Выключить":"Disable") : (language==="ru"?"Включить авто":"Enable auto")}</button>
-                    </div>
-                    <div className="mt-2 space-y-1 text-xs text-muted-foreground">
-                      <p>{language==="ru"?"Следующий запуск: ":"Next run: "}{trailerAuto.nextRunAt ? new Date(trailerAuto.nextRunAt).toLocaleString(language==="ru"?"ru-RU":"en-US") : (trailerAuto.enabled ? (language==="ru"?"в ближайшую минуту":"within a minute") : "—")}</p>
-                      <p>{language==="ru"?"Последний запуск: ":"Last run: "}{trailerAuto.lastRunAt ? new Date(trailerAuto.lastRunAt).toLocaleString(language==="ru"?"ru-RU":"en-US") : "—"}</p>
-                      {trailerAuto.retryAt && <p className="text-[#FFAA43]">{language==="ru"?"Повтор после ошибки: ":"Retry after error: "}{new Date(trailerAuto.retryAt).toLocaleString(language==="ru"?"ru-RU":"en-US")}</p>}
-                      {trailerAuto.lastError && <p className="break-words text-[#FFAA43]">{language==="ru"?"Последняя ошибка: ":"Last error: "}{trailerAuto.lastError}</p>}
-                    </div>
-                  </div>
-                  <button type="button" onClick={runTrailerUpdate} disabled={adminRunning || adminStats?.missing === 0} className="mt-3 flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#AC4EFC] to-[#8736FA] px-4 py-2.5 text-sm font-semibold text-white shadow-[0_0_16px_rgba(155,65,245,0.18)] transition hover:brightness-110 disabled:cursor-wait disabled:opacity-50">
-                    <ShieldCheck className="h-4 w-4" />
-                    {adminRunning ? (language === "ru" ? "Обновление…" : "Updating…") : (language === "ru" ? "Обновить трейлеры" : "Update trailers")}
-                  </button>
-                  {adminMessage && <p className="mt-2 text-xs text-muted-foreground" role="status">{adminMessage}</p>}
-                </div>
-              </details>
+
               </>
             ) : (
               <p role="alert" className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm">{telegramAuthError || (language === "ru" ? "Доступ запрещён. Войди через Telegram под аккаунтом администратора." : "Access denied. Sign in with the administrator Telegram account.")}</p>
