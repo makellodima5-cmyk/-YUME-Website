@@ -468,7 +468,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
             ...(nextState === "screenshots" ? [setMeta(db, "metadata_refresh_screenshot_cursor", "0")] : []),
           ]);
           if (updated > 0) await invalidatePersistentCatalogCache();
-          await audit(db, "catalog.metadata.backfill", "success", { phase: "metadata", offset: cursor, processed: ids.length, fieldsFilled: updated, total });
+          await audit(db, "catalog.metadata.backfill", "success", { phase: "metadata", offset: cursor, processed: ids.length, titlesChanged: updated, total });
           const shots = await screenshotProgress(db);
           return json({ isAdmin: true, phase: nextState, phaseChanged: nextState !== "metadata", processed: ids.length, offset: nextOffset, nextOffset, metadataOffset: nextOffset, screenshotOffset: 0, total, updated, screenshotsSaved: 0, screenshotFailures: shots.failed, screenshotRetries: shots.retry, done: false });
         }
