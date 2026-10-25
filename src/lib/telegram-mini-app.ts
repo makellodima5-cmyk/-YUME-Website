@@ -26,6 +26,11 @@ export interface TelegramWebApp {
   expand(): void;
   openTelegramLink?(url: string): void;
   disableVerticalSwipes?(): void;
+  HapticFeedback?: {
+    impactOccurred(style: "light" | "medium" | "heavy" | "rigid" | "soft"): void;
+    notificationOccurred(type: "error" | "success" | "warning"): void;
+    selectionChanged(): void;
+  };
   onEvent?(eventType: string, eventHandler: () => void): void;
   offEvent?(eventType: string, eventHandler: () => void): void;
 }
@@ -51,6 +56,34 @@ function setInsetVariables(webApp: TelegramWebApp): void {
   const height = webApp.viewportStableHeight ?? webApp.viewportHeight;
   if (typeof height === "number" && Number.isFinite(height) && height > 0) {
     root.style.setProperty("--yume-tg-viewport-height", `${height}px`);
+  }
+}
+
+/**
+ * Trigger tactile feedback only when the Telegram client exposes the official
+ * HapticFeedback bridge. Web browsers and unsupported clients safely do nothing.
+ */
+export function telegramHapticImpact(style: "light" | "medium" | "heavy" | "rigid" | "soft" = "light"): void {
+  try {
+    getTelegramWebApp()?.HapticFeedback?.impactOccurred(style);
+  } catch {
+    // Haptic feedback is a progressive enhancement; never interrupt an action.
+  }
+}
+
+export function telegramHapticSelection(): void {
+  try {
+    getTelegramWebApp()?.HapticFeedback?.selectionChanged();
+  } catch {
+    // Ignore unsupported or unavailable haptics.
+  }
+}
+
+export function telegramHapticNotification(type: "error" | "success" | "warning"): void {
+  try {
+    getTelegramWebApp()?.HapticFeedback?.notificationOccurred(type);
+  } catch {
+    // Ignore unsupported or unavailable haptics.
   }
 }
 
