@@ -611,6 +611,11 @@ export const getShikimoriAnimeScreenshots = createServerFn({ method: "GET" })
       if (persisted?.length) return { items: persisted };
       const cached = screenshotCache.get(data.animeId);
       if (cached && cached.expiresAt > Date.now() && cached.items.length) return { items: cached.items };
+      const details = await getPersistentAnimeDetails(data.animeId);
+      const airedOn = details?.anime?.airedOn;
+      const futureRelease = typeof airedOn === "string" && /^\\d{4}-\\d{2}-\\d{2}/.test(airedOn)
+        && airedOn.slice(0, 10) > new Date().toISOString().slice(0, 10);
+      if (details?.anime?.status === "Анонс" || futureRelease) return { items: [] as ShikimoriScreenshot[] };
       const response = await fetch(SCREENSHOT_API_URL + encodeURIComponent(data.animeId) + "/screenshots", {
         headers: { Accept: "application/json", "User-Agent": "YUME/0.2.0" },
         signal: AbortSignal.timeout(8000),
