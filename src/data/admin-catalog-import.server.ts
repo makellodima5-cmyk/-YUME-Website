@@ -351,6 +351,21 @@ async function fetchAndStoreScreenshots(db: Database, animeId: string, previousA
   }
 }
 
+async function startPostImportEnrichment(db: Database): Promise<void> {
+  const current = await getMeta(db, "metadata_refresh_state");
+  // A completed/idle refresh has no cursor to preserve. Start a durable enrichment
+  // pass so new released titles receive screenshots as part of the import workflow.
+  if (!current || current === "idle" || current === "done") {
+    await db.batch([
+      setMeta(db, "metadata_refresh_state", "metadata"),
+      setMeta(db, "metadata_refresh_cursor", "0"),
+      setMeta(db, "metadata_refresh_screenshot_cursor", "0"),
+      setMeta(db, "metadata_refresh_auto_enabled", "1"),
+      db.prepare("UPDATE anime_catalog_screenshot_status SET status='retry',attempts=0,last_error=NULL,updated_at=CURRENT_TIMESTAMP WHERE status='failed'"),
+    ]);
+  }
+}
+
 async function screenshotProgress(db: Database): Promise<{ processed: number; failed: number; retry: number; done: number }> {
   const row = await db.prepare("SELECT SUM(CASE WHEN ss.status='done' THEN 1 ELSE 0 END) AS done, SUM(CASE WHEN ss.status='failed' THEN 1 ELSE 0 END) AS failed, SUM(CASE WHEN ss.status='retry' THEN 1 ELSE 0 END) AS retry FROM anime_catalog_screenshot_status ss INNER JOIN anime_catalog a ON a.id = ss.anime_id")
     .first<{ done: number | null; failed: number | null; retry: number | null }>();
@@ -795,6 +810,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
         if (before.added >= before.target || before.cursor > 500) {
           const finalState = before.added >= before.target ? "completed" : "partial";
           await db.batch([setMeta(db,"admin_import_state",finalState)]);
+          await startPostImportEnrichment(db);
           await audit(db,"catalog.import.finish",finalState,{added:before.added,target:before.target,skipped:before.skipped,errors:before.errors});
           return json({isAdmin:true,...await snapshot(db)});
         }
@@ -861,7 +877,10 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
         }
         const after = await snapshot(db);
         await audit(db,"catalog.import.page","success",{page:before.cursor,added:after.added-before.added,skipped:after.skipped-before.skipped,incomplete:after.incomplete-before.incomplete,state:after.state});
-        if (after.state !== "running") await audit(db,"catalog.import.finish",after.state,{added:after.added,target:after.target,skipped:after.skipped,errors:after.errors});
+        if (after.state !== "running") {
+          await startPostImportEnrichment(db);
+          await audit(db,"catalog.import.finish",after.state,{added:after.added,target:after.target,skipped:after.skipped,errors:after.errors});
+        }
         return json({isAdmin:true,...after});
       }
       if (body.action === "stop") {
