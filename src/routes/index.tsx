@@ -783,6 +783,26 @@ function Index() {
     return () => { cancelled = true; };
   }, [isAdmin]);
 
+  useEffect(() => {
+    if (!isAdmin) return;
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const response = await fetch("/api/admin/catalog-import", { credentials: "same-origin", cache: "no-store" });
+        const payload = await response.json().catch(() => ({})) as { isAdmin?: boolean; metadataRefresh?: { autoEnabled?: boolean; phase?: string; metadataOffset?: number; screenshotOffset?: number; total?: number; screenshotFailures?: number; screenshotRetries?: number; done?: boolean } };
+        if (cancelled || !response.ok || payload.isAdmin !== true || !payload.metadataRefresh) return;
+        const status = payload.metadataRefresh;
+        const phase = status.phase ?? "idle";
+        const total = status.total ?? 0;
+        const offset = phase === "metadata" ? (status.metadataOffset ?? 0) : (status.screenshotOffset ?? 0);
+        setMetadataRefreshProgress(current => ({ ...current, phase, total, offset, metadataOffset: status.metadataOffset ?? 0, screenshotOffset: status.screenshotOffset ?? 0, screenshotFailures: status.screenshotFailures ?? 0, screenshotRetries: status.screenshotRetries ?? 0 }));
+        if (status.autoEnabled) setMetadataRefreshMessage(language === "ru" ? "Фоновое автообновление активно. Этап: " + phase + "; прогресс: " + offset + " / " + total + "; ошибок кадров: " + (status.screenshotFailures ?? 0) + "; ожидают повтора: " + (status.screenshotRetries ?? 0) + "." : "Background auto-refresh active. Phase: " + phase + "; progress: " + offset + " / " + total + "; failed screenshots: " + (status.screenshotFailures ?? 0) + "; waiting to retry: " + (status.screenshotRetries ?? 0) + ".");
+      } catch { /* Status polling must not interrupt the server-side job. */ }
+    };
+    void poll();
+    const timer = window.setInterval(() => void poll(), 5000);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, [isAdmin, language]);
   const refreshCatalogQuality = async (offset = catalogQualityOffset) => {
     const response = await fetch("/api/admin/catalog-import?qualityOffset=" + Math.max(0,offset), {credentials:"same-origin",cache:"no-store"});
     const payload = await response.json().catch(() => ({})) as {isAdmin?:boolean;error?:string;quality?:typeof catalogQuality;qualitySummary?:typeof catalogQualitySummary;qualityOffset?:number;qualityHasMore?:boolean;auditLog?:typeof adminAuditLog};
