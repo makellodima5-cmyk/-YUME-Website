@@ -67,6 +67,8 @@ function saveLocalNotificationIds(ids: string[]): boolean {
   }
 }
 
+type MetadataCatalogStats = { total:number; incomplete:number; complete:number; announced:number; missingTrailer:number; hasTrailer:number; savedScreenshotUrls:number; screenshotDone:number; screenshotRetry:number; screenshotFailed:number };
+
 export const Route = createFileRoute("/")({
   head: () => {
     const image = absoluteImageUrl(homeSocialImage);
@@ -362,6 +364,7 @@ function Index() {
   const manualMetadataStopRef = useRef(false);
   const [metadataRefreshProgress, setMetadataRefreshProgress] = useState({ offset: 0, total: 0, updated: 0, screenshotsSaved: 0, phase: "metadata", metadataOffset: 0, screenshotOffset: 0, screenshotFailures: 0, screenshotRetries: 0 });
   const [metadataRefreshMessage, setMetadataRefreshMessage] = useState("");
+  const [metadataCatalogStats, setMetadataCatalogStats] = useState<MetadataCatalogStats | null>(null);
   const [catalogQuality, setCatalogQuality] = useState<{id:string;title:string;year:number;missingYear:boolean;missingPoster:boolean;missingDescription:boolean}[]>([]);
   const [catalogQualityOffset, setCatalogQualityOffset] = useState(0);
   const [catalogQualityHasMore, setCatalogQualityHasMore] = useState(false);
@@ -841,6 +844,31 @@ function Index() {
   };
 
 
+
+  const resetMetadataRefresh = async () => {
+    if (!isAdmin || metadataRefreshRunning || metadataAutoBusy || adminImportRunning || adminRunning) return;
+    const confirmed = window.confirm(language === "ru"
+      ? "Сбросить прогресс обновления метаданных и начать проверку с самого начала? Автообновление будет выключено. Существующие метаданные и скриншоты останутся без изменений."
+      : "Reset metadata refresh progress and restart from the beginning? Automatic refresh will be disabled. Existing metadata and screenshots will be preserved.");
+    if (!confirmed) return;
+    setMetadataAutoBusy(true);
+    setMetadataRefreshMessage(language === "ru" ? "Сбрасываю прогресс…" : "Resetting progress…");
+    try {
+      const response = await fetch("/api/admin/catalog-import", { method:"POST", credentials:"same-origin", cache:"no-store", headers:{"Content-Type":"application/json"}, body:JSON.stringify({action:"reset_metadata_refresh"}) });
+      const payload = await response.json().catch(() => ({})) as {isAdmin?:boolean;error?:string;message?:string;total?:number;stats?:MetadataCatalogStats};
+      if (!response.ok || payload.isAdmin !== true) throw new Error(payload.message ?? payload.error ?? "Could not reset metadata refresh.");
+      setMetadataAutoEnabled(false);
+      setMetadataRefreshProgress({offset:0,total:payload.total??0,updated:0,screenshotsSaved:0,phase:"metadata",metadataOffset:0,screenshotOffset:0,screenshotFailures:payload.stats?.screenshotFailed??0,screenshotRetries:payload.stats?.screenshotRetry??0});
+      setMetadataCatalogStats(payload.stats ?? null);
+      setMetadataRefreshMessage(payload.message ?? (language === "ru" ? "Прогресс сброшен." : "Progress reset."));
+      await refreshCatalogQuality(0);
+      const trailerResponse = await fetch("/api/admin/trailers", {credentials:"same-origin",cache:"no-store"});
+      const trailerStats = await trailerResponse.json().catch(() => ({})) as {isAdmin?:boolean;total?:number;pending?:number;checked?:number;found?:number;missing?:number};
+      if (trailerResponse.ok && trailerStats.isAdmin) setAdminStats({total:trailerStats.total??0,pending:trailerStats.pending??0,checked:trailerStats.checked??0,found:trailerStats.found??0,missing:trailerStats.missing??0});
+    } catch (error) {
+      setMetadataRefreshMessage(error instanceof Error ? error.message : (language === "ru" ? "Не удалось сбросить прогресс." : "Could not reset progress."));
+    } finally { setMetadataAutoBusy(false); }
+  };
 
   const runMetadataRefresh = async () => {
     if (!isAdmin || metadataRefreshRunning || adminImportRunning || adminRunning) return;
@@ -1766,13 +1794,14 @@ function Index() {
               </details>
               <details open={expandedAdminSections.metadata} onToggle={event => { const isOpen = event.currentTarget.open; setExpandedAdminSections(current => current.metadata === isOpen ? current : {...current, metadata: isOpen}); }} className="group mb-3 overflow-hidden rounded-2xl border border-[#6C3E91] bg-[#0D0A13]" aria-label={language === "ru" ? "Обновление метаданных каталога" : "Refresh catalogue metadata"}>
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 hover:bg-card/80 [&::-webkit-details-marker]:hidden">
-                  <span className="flex min-w-0 items-center gap-2.5"><Database className="h-5 w-5 shrink-0 text-[#BE65FF]" /><span className="min-w-0"><span className="block font-semibold text-[#F8F4FF]">{language === "ru" ? "Обновление метаданных каталога" : "Refresh catalogue metadata"}</span><span className="mt-0.5 block text-xs text-muted-foreground">{language === "ru" ? "Продолжает с сохранённого места при ошибке" : "Resumes from the saved cursor after errors"}</span></span></span>
+                  <span className="flex min-w-0 items-center gap-2.5"><Database className="h-5 w-5 shrink-0 text-[#BE65FF]" /><span className="min-w-0"><span className="block font-semibold text-[#F8F4FF]">{language === "ru" ? "Обновление метаданных каталога" : "Refresh catalogue metadata"}</span><span className="mt-0.5 block text-xs text-muted-foreground">{language === "ru" ? "Прогресс сохраняется; можно сбросить и начать проверку заново" : "Progress is saved; reset it to start a fresh scan"}</span></span></span>
                   <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
                 </summary>
                 <div className="border-t border-border/70 p-3 sm:p-4">
                 <div className="flex flex-col gap-3">
                   <p className="text-xs leading-relaxed text-muted-foreground">{language === "ru" ? "Дозаполняет отсутствующие метаданные и кадры из Shikimori для существующих тайтлов. Уже заполненные поля не перезаписываются; новые записи не добавляются." : "Fills missing metadata and screenshot URLs from Shikimori for existing titles. Existing populated fields are preserved; no records are added."}</p>
                   <div className="grid grid-cols-2 gap-1.5">
+                    <button type="button" onClick={resetMetadataRefresh} disabled={metadataRefreshRunning || metadataAutoBusy || adminImportRunning || adminRunning} className="col-span-2 w-full rounded-lg border border-amber-500/40 bg-amber-500/10 px-2.5 py-2 text-xs font-semibold text-amber-200 disabled:cursor-not-allowed disabled:opacity-45">{language === "ru" ? "Сбросить прогресс и начать сначала" : "Reset progress and start over"}</button>
                     <button type="button" onClick={runMetadataRefresh} disabled={metadataRefreshRunning || metadataAutoBusy || adminImportRunning || adminRunning} className="w-full rounded-lg bg-gradient-to-r from-[#AC4EFC] to-[#8736FA] px-2.5 py-2 text-xs font-semibold text-white shadow-[0_0_12px_rgba(155,65,245,0.15)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-45">{metadataRefreshRunning ? (language === "ru" ? "Выполняется вручную…" : "Manual run active…") : (language === "ru" ? "Запустить вручную" : "Run manually")}</button>
                     <button type="button" onClick={stopManualMetadataRefresh} disabled={!metadataRefreshRunning || metadataAutoBusy} className="w-full rounded-lg border border-border px-2.5 py-2 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-40">{language === "ru" ? "Стоп ручного запуска" : "Stop manual run"}</button>
                     <button type="button" onClick={() => void setAutomaticMetadataRefresh(true)} disabled={metadataAutoEnabled || metadataAutoBusy || metadataRefreshRunning || adminImportRunning || adminRunning} className="w-full rounded-lg border border-[#8D3DD6] bg-[#271534] px-2.5 py-2 text-xs font-semibold text-[#F1DFFF] transition hover:bg-[#38204A] disabled:cursor-not-allowed disabled:opacity-45">{metadataAutoEnabled ? (language === "ru" ? "Авто включено" : "Auto enabled") : (language === "ru" ? "Запустить авто" : "Start auto")}</button>
@@ -1791,6 +1820,22 @@ function Index() {
                   </div>
                 )}
                 {metadataRefreshMessage && <p className="mt-3 rounded-lg border border-border bg-background/60 p-2.5 text-xs" role="status">{metadataRefreshMessage}</p>}
+                  {metadataCatalogStats && (
+                    <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                      {[
+                        [language === "ru" ? "Всего в каталоге" : "Catalog total", metadataCatalogStats.total],
+                        [language === "ru" ? "Неполные метаданные" : "Incomplete metadata", metadataCatalogStats.incomplete],
+                        [language === "ru" ? "Полные записи" : "Complete records", metadataCatalogStats.complete],
+                        [language === "ru" ? "Анонсы" : "Announced", metadataCatalogStats.announced],
+                        [language === "ru" ? "Без трейлера" : "Missing trailer", metadataCatalogStats.missingTrailer],
+                        [language === "ru" ? "С трейлером" : "Has trailer", metadataCatalogStats.hasTrailer],
+                        [language === "ru" ? "URL кадров" : "Screenshot URLs", metadataCatalogStats.savedScreenshotUrls],
+                        [language === "ru" ? "Кадры проверены" : "Screenshots checked", metadataCatalogStats.screenshotDone],
+                        [language === "ru" ? "Кадры: повторы" : "Screenshot retries", metadataCatalogStats.screenshotRetry],
+                        [language === "ru" ? "Кадры: ошибки" : "Screenshot failures", metadataCatalogStats.screenshotFailed],
+                      ].map(([label, value]) => <div key={String(label)} className="rounded-lg border border-border bg-background/50 p-2"><span className="block text-[11px] text-muted-foreground">{label}</span><strong className="mt-1 block text-base tabular-nums">{Number(value).toLocaleString()}</strong></div>)}
+                    </div>
+                  )}
                 </div>
               </details>
               <details open={expandedAdminSections.quality} onToggle={event => { const isOpen = event.currentTarget.open; setExpandedAdminSections(current => current.quality === isOpen ? current : {...current, quality: isOpen}); }} className="group mb-3 overflow-hidden rounded-2xl border border-[#382846] bg-[#0C0A12]" aria-label={language === "ru" ? "Качество каталога" : "Catalog quality"}>
