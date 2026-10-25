@@ -469,7 +469,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
           if (updated > 0) await invalidatePersistentCatalogCache();
           await audit(db, "catalog.metadata.backfill", "success", { phase: "metadata", offset: cursor, processed: ids.length, fieldsFilled: updated, total });
           const shots = await screenshotProgress(db);
-          return json({ isAdmin: true, phase: nextState, phaseChanged: nextState !== "metadata", processed: ids.length, offset: nextOffset, nextOffset, metadataOffset: nextOffset, screenshotOffset: shots.processed, total, updated, screenshotsSaved: 0, screenshotFailures: shots.failed, screenshotRetries: shots.retry, done: false });
+          return json({ isAdmin: true, phase: nextState, phaseChanged: nextState !== "metadata", processed: ids.length, offset: nextOffset, nextOffset, metadataOffset: nextOffset, screenshotOffset: 0, total, updated, screenshotsSaved: 0, screenshotFailures: shots.failed, screenshotRetries: shots.retry, done: false });
         }
 
         if (state === "screenshots") {
@@ -486,7 +486,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
             .bind(cursor).first<{ id: string }>();
           if (!row) {
             await setMeta(db, "metadata_refresh_screenshot_cursor", String(total));
-            return json({ isAdmin: true, phase: "screenshots", phaseChanged: true, processed: 0, offset: cursor, nextOffset: cursor, metadataOffset: total, screenshotOffset: cursor, total, updated: 0, screenshotsSaved: 0, done: false });
+            return json({ isAdmin: true, phase: "screenshots", phaseChanged: true, processed: 0, offset: total, nextOffset: total, metadataOffset: total, screenshotOffset: total, total, updated: 0, screenshotsSaved: 0, done: false });
           }
           const animeId = row.id;
           const statusRow = await db.prepare("SELECT status,attempts FROM anime_catalog_screenshot_status WHERE anime_id = ?")
