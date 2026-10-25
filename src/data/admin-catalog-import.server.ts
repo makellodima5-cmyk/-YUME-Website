@@ -423,10 +423,16 @@ async function runCatalogMetadataRefreshStep(db: Database): Promise<Response> {
         const shots = await screenshotProgress(db);
         return json({ isAdmin: true, phase: nextState, phaseChanged: true, processed: 0, offset: total, nextOffset: total, metadataOffset: total, screenshotOffset: 0, total, updated: 0, screenshotsSaved: 0, screenshotFailures: shots.failed, screenshotRetries: shots.retry, done: nextState === "done" });
       }
-      const catalogPage = await db.prepare("SELECT id FROM anime_catalog ORDER BY position ASC,id ASC LIMIT ? OFFSET ?")
-        .bind(METADATA_REFRESH_BATCH_SIZE, cursor).all<{ id: string }>();
-      const ids = normalizeAdminCatalogIds(catalogPage.results.map(row => row.id)).slice(0, METADATA_REFRESH_BATCH_SIZE);
-      if (!ids.length) {
+      const catalogPage = await db.prepare("SELECT id,title,english_title,original_title,year,episodes,rating,genres_json,status,description,poster_url,banner_url,kind,age_rating,next_episode_at,episodes_aired,aired_on,studios_json,youtube_trailer_id FROM anime_catalog ORDER BY position ASC,id ASC LIMIT ? OFFSET ?")
+        .bind(METADATA_REFRESH_BATCH_SIZE, cursor).all<{
+          id: string; title: string; english_title: string | null; original_title: string; year: number; episodes: number;
+          rating: number | null; genres_json: string | null; status: string | null; description: string | null;
+          poster_url: string | null; banner_url: string | null; kind: string | null; age_rating: string | null;
+          next_episode_at: string | null; episodes_aired: number; aired_on: string | null; studios_json: string | null;
+          youtube_trailer_id: string | null;
+        }>();
+      const pageIds = normalizeAdminCatalogIds(catalogPage.results.map(row => row.id)).slice(0, METADATA_REFRESH_BATCH_SIZE);
+      if (!pageIds.length) {
         await db.batch([
           setMeta(db, "metadata_refresh_state", "screenshots"),
           setMeta(db, "metadata_refresh_screenshot_cursor", "0"),
@@ -434,16 +440,34 @@ async function runCatalogMetadataRefreshStep(db: Database): Promise<Response> {
         const shots = await screenshotProgress(db);
         return json({ isAdmin: true, phase: "screenshots", phaseChanged: true, processed: 0, offset: total, nextOffset: total, metadataOffset: total, screenshotOffset: 0, total, updated: 0, screenshotsSaved: 0, screenshotFailures: shots.failed, screenshotRetries: shots.retry, done: false });
       }
-      const source = await fetchByIds(ids);
-      const sourceById = new Map(source.map(item => [String(item.id), item]));
-      const missingIds = ids.filter(id => !sourceById.has(id));
-      if (missingIds.length) throw new Error("Shikimori не вернул метаданные для ID: " + missingIds.join(", ") + ". Курсор сохранён; повторите запуск позже.");
+
+      // Only query Shikimori for rows that are missing a field YUME already supports.
+      // Fully populated rows are deliberately skipped, including their existing posters,
+      // episode counts, ratings, descriptions, and other user-visible metadata.
+      const needsEnrichment = (row: typeof catalogPage.results[number]) =>
+        !row.title?.trim() || row.title === "Без названия" ||
+        !row.english_title?.trim() ||
+        !row.original_title?.trim() || row.original_title === "Без названия" ||
+        Number(row.year) <= 0 || Number(row.episodes) <= 0 || row.rating == null ||
+        !row.genres_json?.trim() || row.genres_json === "[]" ||
+        !row.status?.trim() || row.status === "Неизвестно" ||
+        !row.description?.trim() || !row.poster_url?.trim() || !row.banner_url?.trim() ||
+        !row.kind?.trim() || !row.age_rating?.trim() ||
+        !row.aired_on?.trim() || !row.studios_json?.trim() || row.studios_json === "[]" ||
+        !row.youtube_trailer_id?.trim();
+      const ids = catalogPage.results.filter(needsEnrichment).map(row => row.id);
       let updated = 0;
-      for (const id of ids) {
-        const sourceItem = sourceById.get(id);
-        if (sourceItem) updated += await updateCatalogMetadata(db, mapItem(sourceItem));
+      if (ids.length) {
+        const source = await fetchByIds(ids);
+        const sourceById = new Map(source.map(item => [String(item.id), item]));
+        const missingIds = ids.filter(id => !sourceById.has(id));
+        if (missingIds.length) throw new Error("Shikimori не вернул метаданные для ID: " + missingIds.join(", ") + ". Курсор сохранён; повторите запуск позже.");
+        for (const id of ids) {
+          const sourceItem = sourceById.get(id);
+          if (sourceItem) updated += await updateCatalogMetadata(db, mapItem(sourceItem));
+        }
       }
-      const nextOffset = cursor + ids.length;
+      const nextOffset = cursor + pageIds.length;
       const nextState = nextOffset >= total ? "screenshots" : "metadata";
       await db.batch([
         setMeta(db, "metadata_refresh_cursor", String(nextOffset)),
@@ -453,7 +477,7 @@ async function runCatalogMetadataRefreshStep(db: Database): Promise<Response> {
       if (updated > 0) await invalidatePersistentCatalogCache();
       await audit(db, "catalog.metadata.backfill", "success", { phase: "metadata", offset: cursor, processed: ids.length, titlesChanged: updated, total });
       const shots = await screenshotProgress(db);
-      return json({ isAdmin: true, phase: nextState, phaseChanged: nextState !== "metadata", processed: ids.length, offset: nextOffset, nextOffset, metadataOffset: nextOffset, screenshotOffset: 0, total, updated, screenshotsSaved: 0, screenshotFailures: shots.failed, screenshotRetries: shots.retry, done: false });
+      return json({ isAdmin: true, phase: nextState, phaseChanged: nextState !== "metadata", processed: pageIds.length, offset: nextOffset, nextOffset, metadataOffset: nextOffset, screenshotOffset: 0, total, updated, screenshotsSaved: 0, screenshotFailures: shots.failed, screenshotRetries: shots.retry, done: false });
     }
 
     if (state === "screenshots") {
