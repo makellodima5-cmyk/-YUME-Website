@@ -2,12 +2,12 @@
 
 ## What the background mode does
 
-The admin action `auto_start` sets a durable flag in D1. The Cloudflare Worker Cron Trigger calls `runScheduledCatalogMetadataRefresh`; each invocation reads the saved phase and cursor from D1 and continues from that point. Closing the admin page does not stop the job. The `auto_stop` action disables future ticks without deleting progress.
+The admin action `auto_start` sets a durable flag in D1. The Cloudflare Worker Cron Trigger is routed through Nitro's native `cloudflare:scheduled` runtime hook, which calls `runScheduledCatalogMetadataRefresh`; each invocation reads the saved phase and cursor from D1 and continues from that point. Closing the admin page does not stop the job. The `auto_stop` action disables future ticks without deleting progress.
 
 The refresh runs these phases:
 
 1. Fill missing metadata for existing catalog rows using Shikimori GraphQL in batches of up to 100 IDs.
-2. Fill screenshot URLs from Shikimori one title at a time, processing up to 8 titles per scheduled invocation with a 1.2-second delay between upstream requests.
+2. Fill screenshot URLs from Shikimori one title at a time. Each Cron invocation processes a bounded slice of up to 35 steps and stops after 28 seconds, with a 1.5-second delay between upstream requests. Metadata batches contain up to 100 IDs.
 3. Retry temporary screenshot failures in later scheduled invocations, up to the existing three-attempt limit.
 4. Mark the job done and turn off automatic mode when the retry queue is exhausted.
 
@@ -20,7 +20,7 @@ Existing populated metadata fields are preserved. Image bytes are not copied int
 - No new API key or external service binding is required for this first background implementation.
 - In the admin area, use the compact **Run manually / Stop manual** controls to drive one saved step at a time while the page stays open. Manual mode disables automatic mode first. D1 retains the cursor and status, so a later manual run resumes.
 - Alternatively, use **Start auto / Stop auto** to begin or pause the job in the background. The controls reflect the server-side D1 flag and cannot start auto mode while a manual run is active.
-- The scheduled handler awaits both scheduled jobs before completing, so Cron invocation duration and completion logs cover the actual work rather than returning immediately after registering background work.
+- The Nitro scheduled hook awaits both scheduled jobs before completing. The catalog job logs the start/end of each slice, step count, phase, duration, and last error; its last tick, last successful tick, and error are also persisted in D1 for diagnosis.
 - The existing screenshot-status migration `0003_create_anime_catalog_screenshot_status.sql` must be applied to production D1. The application also creates missing tables defensively, but applying tracked migrations remains the recommended deployment practice.
 
 ## Source-provider findings
