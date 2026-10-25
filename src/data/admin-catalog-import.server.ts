@@ -29,6 +29,7 @@ const MAX_TARGET = 500;
 const PAGE_SIZE = 50;
 const REQUEST_DELAY_MS = 1500;
 const METADATA_REFRESH_BATCH_SIZE = 100;
+const METADATA_LOOKUP_BATCH_SIZE = 40;
 const SCREENSHOT_RETRY_LIMIT = 3;
 const FIELDS = "id name english russian kind score status episodes episodesAired airedOn { date year } releasedOn { date year } description poster { mainUrl previewUrl originalUrl } opengraphImageUrl genres { id name russian kind } nextEpisodeAt rating studios { name } videos { url playerUrl name kind }";
 
@@ -248,12 +249,29 @@ async function fetchPage(page: number): Promise<ShikimoriAnime[]> {
 async function fetchByIds(ids: string[]): Promise<ShikimoriAnime[]> {
   const safeIds = normalizeAdminCatalogIds(ids);
   if (!safeIds.length) return [];
-  const query = "query { animes(ids: " + JSON.stringify(safeIds.join(",")) + ", limit: 100) { " + FIELDS + " } }";
-  const response = await fetch(API_URL, { method:"POST", headers:{"Content-Type":"application/json",Accept:"application/json","User-Agent":"YUME/1.0"}, body:JSON.stringify({query}), signal:AbortSignal.timeout(12000) });
-  if (!response.ok) throw new Error("Shikimori вернул HTTP " + response.status);
-  const payload = await response.json() as Payload;
-  if (payload.errors?.length) throw new Error(payload.errors.map(e=>e.message).filter(Boolean).join("; ") || "GraphQL error");
-  return (payload.data?.animes ?? []).filter(item => !(item.genres ?? []).some(g => [g.name,g.russian].some(n => clean(n).normalize("NFKC").toLowerCase() === "hentai" || clean(n).normalize("NFKC").toLowerCase() === "хентай")));
+
+  // Shikimori may silently return only part of a large ID query (and large
+  // requests have timed out in production). Keep each query below its practical
+  // result cap, while respecting the upstream request rate limit.
+  const resultById = new Map<string, ShikimoriAnime>();
+  for (let offset = 0; offset < safeIds.length; offset += METADATA_LOOKUP_BATCH_SIZE) {
+    if (offset > 0) await new Promise(resolve => setTimeout(resolve, REQUEST_DELAY_MS));
+    const batchIds = safeIds.slice(offset, offset + METADATA_LOOKUP_BATCH_SIZE);
+    const query = "query { animes(ids: " + JSON.stringify(batchIds.join(",")) + ", limit: 50) { " + FIELDS + " } }";
+    const response = await fetch(API_URL, { method:"POST", headers:{"Content-Type":"application/json",Accept:"application/json","User-Agent":"YUME/1.0"}, body:JSON.stringify({query}), signal:AbortSignal.timeout(12000) });
+    if (response.status === 429) {
+      const retryAfterMs = retryAfterMilliseconds(response.headers.get("Retry-After")) ?? 60000;
+      const error = new Error("Shikimori ограничил частоту запросов.");
+      (error as Error & {retryAfterMs?:number}).retryAfterMs = retryAfterMs;
+      throw error;
+    }
+    if (!response.ok) throw new Error("Shikimori вернул HTTP " + response.status);
+    const payload = await response.json() as Payload;
+    if (payload.errors?.length) throw new Error(payload.errors.map(e=>e.message).filter(Boolean).join("; ") || "GraphQL error");
+    for (const item of payload.data?.animes ?? []) resultById.set(String(item.id), item);
+  }
+
+  return Array.from(resultById.values()).filter(item => !(item.genres ?? []).some(g => [g.name,g.russian].some(n => clean(n).normalize("NFKC").toLowerCase() === "hentai" || clean(n).normalize("NFKC").toLowerCase() === "хентай")));
 }
 
 async function updateCatalogMetadata(db: Database, item: ReturnType<typeof mapItem>): Promise<number> {
@@ -534,14 +552,26 @@ async function runCatalogMetadataRefreshStep(db: Database): Promise<Response> {
       // episode counts, ratings, descriptions, and other user-visible metadata.
       const ids = catalogPage.results.filter(isCatalogMetadataIncomplete).map(row => row.id);
       let updated = 0;
+      let missingSourceIds: string[] = [];
       if (ids.length) {
+        // Network/HTTP/GraphQL failures still abort this step before cursor
+        // persistence, so a manual restart resumes the same page. IDs that
+        // Shikimori no longer returns (including excluded content) are different:
+        // record them and advance, otherwise one stale ID can block the entire
+        // catalog forever.
         const source = await fetchByIds(ids);
         const sourceById = new Map(source.map(item => [String(item.id), item]));
-        const missingIds = ids.filter(id => !sourceById.has(id));
-        if (missingIds.length) throw new Error("Shikimori не вернул метаданные для ID: " + missingIds.join(", ") + ". Курсор сохранён; повторите запуск позже.");
+        missingSourceIds = ids.filter(id => !sourceById.has(id));
         for (const id of ids) {
           const sourceItem = sourceById.get(id);
           if (sourceItem) updated += await updateCatalogMetadata(db, mapItem(sourceItem));
+        }
+        if (missingSourceIds.length) {
+          console.warn("[YUME][CATALOG_METADATA_REFRESH] Shikimori omitted catalog IDs; continuing past this page.", {
+            offset: cursor,
+            missingCount: missingSourceIds.length,
+            missingIds: missingSourceIds.slice(0, 100),
+          });
         }
       }
       const nextOffset = cursor + pageIds.length;
@@ -552,7 +582,10 @@ async function runCatalogMetadataRefreshStep(db: Database): Promise<Response> {
         ...(nextState === "screenshots" ? [setMeta(db, "metadata_refresh_screenshot_cursor", "0")] : []),
       ]);
       if (updated > 0) await invalidatePersistentCatalogCache();
-      await audit(db, "catalog.metadata.backfill", "success", { phase: "metadata", offset: cursor, processed: ids.length, titlesChanged: updated, total });
+      await audit(db, "catalog.metadata.backfill", missingSourceIds.length ? "partial" : "success", {
+        phase: "metadata", offset: cursor, processed: ids.length, titlesChanged: updated, total,
+        missingSourceIds: missingSourceIds.slice(0, 100),
+      });
       const shots = await screenshotProgress(db);
       return json({ isAdmin: true, phase: nextState, phaseChanged: nextState !== "metadata", processed: pageIds.length, offset: nextOffset, nextOffset, metadataOffset: nextOffset, screenshotOffset: 0, total, updated, screenshotsSaved: 0, screenshotFailures: shots.failed, screenshotRetries: shots.retry, done: false });
     }
