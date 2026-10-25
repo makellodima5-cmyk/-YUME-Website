@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isCatalogMetadataIncomplete, normalizeAdminCatalogIds } from "@/data/admin-catalog-import.server";
+import { chunkAdminCatalogIds, isCatalogMetadataIncomplete, normalizeAdminCatalogIds } from "@/data/admin-catalog-import.server";
 
 describe("admin catalog ID normalization", () => {
   it("accepts numeric IDs, removes duplicates, and ignores malformed IDs", () => {
@@ -11,6 +11,21 @@ describe("admin catalog ID normalization", () => {
     const input = Array.from({ length: 110 }, (_, index) => String(index + 1));
     expect(normalizeAdminCatalogIds(input)).toHaveLength(100);
     expect(normalizeAdminCatalogIds(input)[99]).toBe("100");
+  });
+});
+
+describe("bounded Shikimori metadata lookup batches", () => {
+  it("splits a 100-ID refresh page into requests below the upstream result cap", () => {
+    const ids = Array.from({ length: 100 }, (_, index) => String(index + 1));
+    const chunks = chunkAdminCatalogIds(ids);
+
+    expect(chunks.map(chunk => chunk.length)).toEqual([40, 40, 20]);
+    expect(chunks.flat()).toEqual(ids);
+    expect(chunks.every(chunk => chunk.length <= 40)).toBe(true);
+  });
+
+  it("deduplicates and validates IDs before chunking", () => {
+    expect(chunkAdminCatalogIds(["1", "1", "bad", "2"], 1)).toEqual([["1"], ["2"]]);
   });
 });
 
