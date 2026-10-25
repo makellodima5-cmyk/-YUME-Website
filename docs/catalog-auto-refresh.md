@@ -7,7 +7,7 @@ The admin action `auto_start` sets a durable flag in D1. The Cloudflare Worker C
 The refresh runs these phases:
 
 1. Fill missing metadata for existing catalog rows using Shikimori GraphQL in batches of up to 100 IDs.
-2. Fill screenshot URLs from Shikimori one title at a time, processing up to 35 titles per scheduled invocation with a 1.2-second delay between upstream requests.
+2. Fill screenshot URLs from Shikimori one title at a time, processing up to 8 titles per scheduled invocation with a 1.2-second delay between upstream requests.
 3. Retry temporary screenshot failures in later scheduled invocations, up to the existing three-attempt limit.
 4. Mark the job done and turn off automatic mode when the retry queue is exhausted.
 
@@ -18,7 +18,8 @@ Existing populated metadata fields are preserved. Image bytes are not copied int
 - The Worker must be deployed with the existing `YUME_DB` D1 binding.
 - The existing Cron Trigger in `wrangler.jsonc` must remain enabled (currently every minute). The scheduled handler runs the trailer updater and catalog refresh in parallel.
 - No new API key or external service binding is required for this first background implementation.
-- In the admin area, use **Start auto-refresh** to begin or resume the job. Use **Stop auto-refresh** to pause it. D1 retains the cursor and status between invocations.
+- In the admin area, use **Run manually** to drive one saved step at a time from the open admin page; it disables automatic mode first, and **Stop manual run** pauses after the current request. D1 retains the cursor and status, so a later manual run resumes.
+- Alternatively, use **Start auto-refresh** to begin or resume the job in the background. Use **Stop auto-refresh** to pause it. D1 retains the cursor and status between invocations.
 - The existing screenshot-status migration `0003_create_anime_catalog_screenshot_status.sql` must be applied to production D1. The application also creates missing tables defensively, but applying tracked migrations remains the recommended deployment practice.
 
 ## Source-provider findings
