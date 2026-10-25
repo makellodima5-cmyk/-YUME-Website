@@ -357,6 +357,8 @@ function Index() {
   const [adminImport, setAdminImport] = useState<{target:number;cursor:number;added:number;skipped:number;incomplete:number;errors:number;state:string;delayMs?:number}>({target:0,cursor:1,added:0,skipped:0,incomplete:0,errors:0,state:"idle"});
   const [adminImportMessage, setAdminImportMessage] = useState("");
   const [metadataRefreshRunning, setMetadataRefreshRunning] = useState(false);
+  const [metadataAutoEnabled, setMetadataAutoEnabled] = useState(false);
+  const [metadataAutoBusy, setMetadataAutoBusy] = useState(false);
   const manualMetadataStopRef = useRef(false);
   const [metadataRefreshProgress, setMetadataRefreshProgress] = useState({ offset: 0, total: 0, updated: 0, screenshotsSaved: 0, phase: "metadata", metadataOffset: 0, screenshotOffset: 0, screenshotFailures: 0, screenshotRetries: 0 });
   const [metadataRefreshMessage, setMetadataRefreshMessage] = useState("");
@@ -793,6 +795,7 @@ function Index() {
         const payload = await response.json().catch(() => ({})) as { isAdmin?: boolean; metadataRefresh?: { autoEnabled?: boolean; phase?: string; metadataOffset?: number; screenshotOffset?: number; total?: number; screenshotFailures?: number; screenshotRetries?: number; done?: boolean } };
         if (cancelled || !response.ok || payload.isAdmin !== true || !payload.metadataRefresh) return;
         const status = payload.metadataRefresh;
+        setMetadataAutoEnabled(status.autoEnabled === true);
         const phase = status.phase ?? "idle";
         const total = status.total ?? 0;
         const offset = phase === "metadata" ? (status.metadataOffset ?? 0) : (status.screenshotOffset ?? 0);
@@ -852,6 +855,7 @@ function Index() {
       const stopAuto = await fetch("/api/admin/catalog-import", { method: "POST", credentials: "same-origin", cache: "no-store", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "auto_stop" }) });
       const stopPayload = await stopAuto.json().catch(() => ({})) as { isAdmin?: boolean; error?: string };
       if (!stopAuto.ok || stopPayload.isAdmin !== true) throw new Error(stopPayload.error ?? "Could not disable automatic mode.");
+      setMetadataAutoEnabled(false);
       let finished = false;
       let requests = 0;
       while (!manualMetadataStopRef.current && !finished && requests < 1500) {
@@ -884,6 +888,41 @@ function Index() {
   const stopManualMetadataRefresh = () => {
     manualMetadataStopRef.current = true;
     setMetadataRefreshMessage(language === "ru" ? "Останавливаю после текущего шага…" : "Stopping after the current step…");
+  };
+
+  const setAutomaticMetadataRefresh = async (enabled: boolean) => {
+    if (!isAdmin || metadataAutoBusy || metadataRefreshRunning || adminImportRunning || adminRunning) return;
+    if (enabled && !window.confirm(language === "ru"
+      ? "Включить фоновое автообновление каталога? Оно продолжится, даже если закрыть страницу."
+      : "Enable background catalog auto-refresh? It continues even after you close the page.")) return;
+
+    setMetadataAutoBusy(true);
+    setMetadataRefreshMessage(enabled
+      ? (language === "ru" ? "Включаю автообновление…" : "Enabling auto-refresh…")
+      : (language === "ru" ? "Останавливаю автообновление…" : "Stopping auto-refresh…"));
+    try {
+      const response = await fetch("/api/admin/catalog-import", {
+        method: "POST",
+        credentials: "same-origin",
+        cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: enabled ? "auto_start" : "auto_stop" }),
+      });
+      const payload = await response.json().catch(() => ({})) as {
+        isAdmin?: boolean; autoEnabled?: boolean; phase?: string; error?: string; message?: string;
+      };
+      if (!response.ok || payload.isAdmin !== true) {
+        throw new Error(payload.message ?? payload.error ?? (language === "ru" ? "Не удалось изменить режим автообновления." : "Could not change automatic mode."));
+      }
+      setMetadataAutoEnabled(payload.autoEnabled === true);
+      setMetadataRefreshMessage(payload.message ?? (enabled
+        ? (language === "ru" ? "Автообновление включено. Прогресс сохраняется на сервере." : "Auto-refresh enabled. Progress is saved on the server.")
+        : (language === "ru" ? "Автообновление остановлено. Прогресс сохранён." : "Auto-refresh stopped. Progress saved.")));
+    } catch (error) {
+      setMetadataRefreshMessage(error instanceof Error ? error.message : (language === "ru" ? "Не удалось изменить режим автообновления." : "Could not change automatic mode."));
+    } finally {
+      setMetadataAutoBusy(false);
+    }
   };
 
   const runMaintenanceCheck = async () => {
@@ -1733,7 +1772,12 @@ function Index() {
                 <div className="border-t border-border/70 p-3 sm:p-4">
                 <div className="flex flex-col gap-3">
                   <p className="text-xs leading-relaxed text-muted-foreground">{language === "ru" ? "Дозаполняет отсутствующие метаданные и кадры из Shikimori для существующих тайтлов. Уже заполненные поля не перезаписываются; новые записи не добавляются." : "Fills missing metadata and screenshot URLs from Shikimori for existing titles. Existing populated fields are preserved; no records are added."}</p>
-                  <div className="grid gap-2 sm:grid-cols-2"><button type="button" onClick={runMetadataRefresh} disabled={metadataRefreshRunning || adminImportRunning || adminRunning} className="w-full rounded-xl bg-gradient-to-r from-[#AC4EFC] to-[#8736FA] px-4 py-2.5 text-sm font-semibold text-white shadow-[0_0_16px_rgba(155,65,245,0.18)] transition hover:brightness-110 disabled:cursor-wait disabled:opacity-50">{metadataRefreshRunning ? (language === "ru" ? "Выполняется…" : "Running…") : (language === "ru" ? "Запустить вручную" : "Run manually")}</button><button type="button" onClick={stopManualMetadataRefresh} disabled={!metadataRefreshRunning} className="w-full rounded-xl border border-border px-4 py-2.5 text-sm font-semibold disabled:opacity-50">{language === "ru" ? "Остановить ручной запуск" : "Stop manual run"}</button><button type="button" onClick={async () => { try { const response = await fetch("/api/admin/catalog-import", { method: "POST", credentials: "same-origin", cache: "no-store", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "auto_stop" }) }); const payload = await response.json().catch(() => ({})) as { isAdmin?: boolean; error?: string; message?: string }; if (!response.ok || payload.isAdmin !== true) throw new Error(payload.error ?? "Could not stop auto-refresh."); setMetadataRefreshMessage(payload.message ?? (language === "ru" ? "Автообновление остановлено. Прогресс сохранён." : "Auto-refresh stopped. Progress saved.")); } catch (error) { setMetadataRefreshMessage(error instanceof Error ? error.message : "Could not stop auto-refresh."); } }} className="w-full rounded-xl border border-border px-4 py-2.5 text-sm font-semibold">{language === "ru" ? "Остановить автообновление" : "Stop auto-refresh"}</button></div>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <button type="button" onClick={runMetadataRefresh} disabled={metadataRefreshRunning || metadataAutoBusy || adminImportRunning || adminRunning} className="w-full rounded-lg bg-gradient-to-r from-[#AC4EFC] to-[#8736FA] px-2.5 py-2 text-xs font-semibold text-white shadow-[0_0_12px_rgba(155,65,245,0.15)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-45">{metadataRefreshRunning ? (language === "ru" ? "Выполняется вручную…" : "Manual run active…") : (language === "ru" ? "Запустить вручную" : "Run manually")}</button>
+                    <button type="button" onClick={stopManualMetadataRefresh} disabled={!metadataRefreshRunning || metadataAutoBusy} className="w-full rounded-lg border border-border px-2.5 py-2 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-40">{language === "ru" ? "Остановить ручной" : "Stop manual"}</button>
+                    <button type="button" onClick={() => void setAutomaticMetadataRefresh(true)} disabled={metadataAutoEnabled || metadataAutoBusy || metadataRefreshRunning || adminImportRunning || adminRunning} className="w-full rounded-lg border border-[#8D3DD6] bg-[#271534] px-2.5 py-2 text-xs font-semibold text-[#F1DFFF] transition hover:bg-[#38204A] disabled:cursor-not-allowed disabled:opacity-45">{metadataAutoEnabled ? (language === "ru" ? "Авто включено" : "Auto enabled") : (language === "ru" ? "Запустить авто" : "Start auto")}</button>
+                    <button type="button" onClick={() => void setAutomaticMetadataRefresh(false)} disabled={!metadataAutoEnabled || metadataAutoBusy || metadataRefreshRunning} className="w-full rounded-lg border border-border px-2.5 py-2 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-40">{language === "ru" ? "Остановить авто" : "Stop auto"}</button>
+                  </div>
                 </div>
                 {(metadataRefreshRunning || metadataRefreshProgress.total > 0) && (
                   <div className="mt-3">

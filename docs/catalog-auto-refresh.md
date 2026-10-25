@@ -18,8 +18,9 @@ Existing populated metadata fields are preserved. Image bytes are not copied int
 - The Worker must be deployed with the existing `YUME_DB` D1 binding.
 - The existing Cron Trigger in `wrangler.jsonc` must remain enabled (currently every minute). The scheduled handler runs the trailer updater and catalog refresh in parallel.
 - No new API key or external service binding is required for this first background implementation.
-- In the admin area, use **Run manually** to drive one saved step at a time from the open admin page; it disables automatic mode first, and **Stop manual run** pauses after the current request. D1 retains the cursor and status, so a later manual run resumes.
-- Alternatively, use **Start auto-refresh** to begin or resume the job in the background. Use **Stop auto-refresh** to pause it. D1 retains the cursor and status between invocations.
+- In the admin area, use the compact **Run manually / Stop manual** controls to drive one saved step at a time while the page stays open. Manual mode disables automatic mode first. D1 retains the cursor and status, so a later manual run resumes.
+- Alternatively, use **Start auto / Stop auto** to begin or pause the job in the background. The controls reflect the server-side D1 flag and cannot start auto mode while a manual run is active.
+- The scheduled handler awaits both scheduled jobs before completing, so Cron invocation duration and completion logs cover the actual work rather than returning immediately after registering background work.
 - The existing screenshot-status migration `0003_create_anime_catalog_screenshot_status.sql` must be applied to production D1. The application also creates missing tables defensively, but applying tracked migrations remains the recommended deployment practice.
 
 ## Source-provider findings

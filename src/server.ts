@@ -183,15 +183,20 @@ function isH3SwallowedErrorBody(body: string): boolean {
 }
 
 export default {
-  async scheduled(controller: { scheduledTime: number; cron: string }, env: unknown, ctx: { waitUntil(promise: Promise<unknown>): void }) {
+  async scheduled(controller: { scheduledTime: number; cron: string }, env: unknown) {
     const runtimeEnv = resolveScheduledEnvironment(env);
     const databaseAvailable = hasDatabaseBinding(runtimeEnv);
     console.info("[YUME][CRON] Scheduled tick received.", { cron: controller.cron, databaseAvailable });
     setCatalogRuntimeEnvironment(runtimeEnv);
-    ctx.waitUntil(Promise.allSettled([
+    const [trailersResult, catalogRefreshResult] = await Promise.allSettled([
       runScheduledTrailerUpdate(runtimeEnv),
       runScheduledCatalogMetadataRefresh(runtimeEnv),
-    ]));
+    ]);
+    console.info("[YUME][CRON] Scheduled jobs finished.", {
+      cron: controller.cron,
+      trailerJob: trailersResult.status,
+      catalogRefreshJob: catalogRefreshResult.status,
+    });
   },
   async fetch(request: Request, env: unknown, ctx: unknown) {
     setCatalogRuntimeEnvironment(env);
