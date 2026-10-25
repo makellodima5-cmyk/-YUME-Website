@@ -299,7 +299,8 @@ async function fetchAndStoreScreenshots(db: Database, animeId: string, previousA
     const statements: Statement[] = shots.map((shot, index) =>
       db.prepare("INSERT OR IGNORE INTO anime_catalog_screenshots (anime_id,original_url,preview_url,position,updated_at) VALUES (?,?,?,?,CURRENT_TIMESTAMP)")
         .bind(animeId, shot.original, shot.preview, index));
-    statements.push(screenshotStatusStatement(db, animeId, "done", 0, null));
+    const emptyResult = shots.length === 0;
+    statements.push(screenshotStatusStatement(db, animeId, "done", 0, emptyResult ? "Источник не вернул кадров" : null));
     return { status: "done", attempts: 0, saved: shots.length, error: null, statements };
   } catch (error) {
     const attempts = previousAttempts + 1;
@@ -465,22 +466,29 @@ async function runCatalogMetadataRefreshStep(db: Database): Promise<Response> {
         const shots = await screenshotProgress(db);
         return json({ isAdmin: true, phase: nextState, phaseChanged: true, processed: 0, offset: total, nextOffset: total, metadataOffset: total, screenshotOffset: total, total, updated: 0, screenshotsSaved: 0, screenshotFailures: shots.failed, screenshotRetries: shots.retry, done: nextState === "done" });
       }
-      const row = await db.prepare("SELECT id FROM anime_catalog ORDER BY position ASC,id ASC LIMIT 1 OFFSET ?")
-        .bind(cursor).first<{ id: string }>();
+      const row = await db.prepare("SELECT id,status,aired_on FROM anime_catalog ORDER BY position ASC,id ASC LIMIT 1 OFFSET ?")
+        .bind(cursor).first<{ id: string; status: string | null; aired_on: string | null }>();
       if (!row) {
         await setMeta(db, "metadata_refresh_screenshot_cursor", String(total));
         return json({ isAdmin: true, phase: "screenshots", phaseChanged: true, processed: 0, offset: total, nextOffset: total, metadataOffset: total, screenshotOffset: total, total, updated: 0, screenshotsSaved: 0, done: false });
       }
       const animeId = row.id;
-      const statusRow = await db.prepare("SELECT status,attempts FROM anime_catalog_screenshot_status WHERE anime_id = ?")
-        .bind(animeId).first<{ status: ScreenshotStatus; attempts: number }>();
-      const existing = await db.prepare("SELECT COUNT(*) AS count FROM anime_catalog_screenshots WHERE anime_id = ?")
+      const statusRow = await db.prepare("SELECT status,attempts,last_error,updated_at FROM anime_catalog_screenshot_status WHERE anime_id = ?")
+        .bind(animeId).first<{ status: ScreenshotStatus; attempts: number; last_error: string | null; updated_at: string }>();
+      const existing = await db.prepare("SELECT COUNT(*) AS count FROM anime_catalog_screenshots WHERE anime_id = ? AND original_url NOT LIKE '%example.com%' AND preview_url NOT LIKE '%example.com%'")
         .bind(animeId).first<{ count: number }>();
       let saved = 0;
       let screenshotWarning: string | null = null;
-      const statements: Statement[] = [];
-      if (statusRow?.status === "done" || Number(existing?.count ?? 0) > 0) {
-        statements.push(screenshotStatusStatement(db, animeId, "done", 0, null));
+      const statements: Statement[] = [db.prepare("DELETE FROM anime_catalog_screenshots WHERE anime_id = ? AND (original_url LIKE '%example.com%' OR preview_url LIKE '%example.com%')").bind(animeId)];
+      const unreleased = row.status === "Анонс" || Boolean(row.aired_on && /^\\d{4}-\\d{2}-\\d{2}/.test(row.aired_on) && row.aired_on.slice(0, 10) > new Date().toISOString().slice(0, 10));
+      const recentlyResolvedEmpty = statusRow?.status === "done"
+        && statusRow.last_error === "Источник не вернул кадров"
+        && Number.isFinite(Date.parse(statusRow.updated_at))
+        && Date.parse(statusRow.updated_at) > Date.now() - 30 * 24 * 60 * 60 * 1000;
+      if (unreleased) {
+        statements.push(screenshotStatusStatement(db, animeId, "done", 0, "Пропущено: аниме ещё не вышло; запрос кадров не выполнялся"));
+      } else if (Number(existing?.count ?? 0) > 0 || recentlyResolvedEmpty) {
+        statements.push(screenshotStatusStatement(db, animeId, "done", 0, recentlyResolvedEmpty ? "Источник не вернул кадров" : null));
       } else {
         const attempt = await fetchAndStoreScreenshots(db, animeId, Number(statusRow?.attempts ?? 0));
         saved = attempt.saved;

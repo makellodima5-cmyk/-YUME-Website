@@ -589,7 +589,7 @@ export async function getPersistentAnimeScreenshots(animeId: string): Promise<Pe
   const db = database();
   if (!db) return null;
   await ensureSchema(db);
-  const result = await db.prepare("SELECT original_url, preview_url FROM anime_catalog_screenshots WHERE anime_id = ? ORDER BY position ASC, original_url ASC LIMIT 24").bind(animeId).all<{ original_url: string; preview_url: string }>();
+  const result = await db.prepare("SELECT original_url, preview_url FROM anime_catalog_screenshots WHERE anime_id = ? AND original_url NOT LIKE '%example.com%' AND preview_url NOT LIKE '%example.com%' ORDER BY position ASC, original_url ASC LIMIT 24").bind(animeId).all<{ original_url: string; preview_url: string }>();
   return result.results.map((row) => ({ originalUrl: row.original_url, previewUrl: row.preview_url }));
 }
 
@@ -597,6 +597,13 @@ export async function savePersistentAnimeScreenshots(animeId: string, items: Per
   const db = database();
   if (!db || !items.length) return;
   await ensureSchema(db);
-  const statements: D1Statement[] = [db.prepare("DELETE FROM anime_catalog_screenshots WHERE anime_id = ?").bind(animeId), ...items.slice(0, 24).map((item, index) => db.prepare("INSERT OR IGNORE INTO anime_catalog_screenshots (anime_id, original_url, preview_url, position, updated_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)").bind(animeId, item.originalUrl, item.previewUrl, index))];
+  const validItems = items.filter((item) => {
+    try {
+      const original = new URL(item.originalUrl), preview = new URL(item.previewUrl);
+      return [original, preview].every((url) => (url.protocol === "https:" || url.protocol === "http:") && url.hostname !== "example.com" && !url.hostname.endsWith(".example.com"));
+    } catch { return false; }
+  }).slice(0, 24);
+  if (!validItems.length) return;
+  const statements: D1Statement[] = [db.prepare("DELETE FROM anime_catalog_screenshots WHERE anime_id = ?").bind(animeId), ...validItems.map((item, index) => db.prepare("INSERT OR IGNORE INTO anime_catalog_screenshots (anime_id, original_url, preview_url, position, updated_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)").bind(animeId, item.originalUrl, item.previewUrl, index))];
   await db.batch(statements);
 }
