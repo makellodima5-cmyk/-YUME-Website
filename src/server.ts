@@ -9,6 +9,15 @@ type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
 };
 
+type ScheduledController = {
+  cron: string;
+  scheduledTime: number;
+};
+
+type WorkerExecutionContext = {
+  waitUntil(promise: Promise<unknown>): void;
+};
+
 let serverEntryPromise: Promise<ServerEntry> | undefined;
 
 type SupportBindings = {
@@ -161,6 +170,42 @@ function isH3SwallowedErrorBody(body: string): boolean {
 }
 
 export default {
+  async scheduled(controller: ScheduledController, env: unknown, _ctx: WorkerExecutionContext) {
+    setCatalogRuntimeEnvironment(env);
+    console.info("[YUME][CATALOG_AUTO_REFRESH] Worker scheduled handler received.", {
+      cron: controller.cron,
+      scheduledTime: new Date(controller.scheduledTime).toISOString(),
+      databaseAvailable: Boolean(env && typeof env === "object" && "YUME_DB" in env
+        && Boolean((env as Record<string, unknown>).YUME_DB)),
+    });
+
+    const [{ runScheduledCatalogMetadataRefresh }, { runScheduledTrailerUpdate }] = await Promise.all([
+      import("./data/admin-catalog-import.server"),
+      import("./data/admin-trailers.server"),
+    ]);
+
+    const [trailersResult, catalogRefreshResult] = await Promise.allSettled([
+      runScheduledTrailerUpdate(env),
+      runScheduledCatalogMetadataRefresh(env),
+    ]);
+    console.info("[YUME][CATALOG_AUTO_REFRESH] Worker scheduled handler completed.", {
+      cron: controller.cron,
+      trailerJob: trailersResult.status,
+      catalogRefreshJob: catalogRefreshResult.status,
+    });
+
+    const failures = [trailersResult, catalogRefreshResult].filter(
+      (result): result is PromiseRejectedResult => result.status === "rejected",
+    );
+    if (failures.length > 0) {
+      console.error("[YUME][CATALOG_AUTO_REFRESH] One or more scheduled jobs rejected.", {
+        cron: controller.cron,
+        errors: failures.map(result => result.reason instanceof Error ? result.reason.message : String(result.reason)),
+      });
+      throw new Error("One or more YUME scheduled jobs failed.");
+    }
+  },
+
   async fetch(request: Request, env: unknown, ctx: unknown) {
     setCatalogRuntimeEnvironment(env);
     const supportRedirect = getSupportRedirect(request, env);
