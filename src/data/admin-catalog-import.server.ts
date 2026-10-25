@@ -286,11 +286,15 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
         return json({isAdmin:true,deleted,quality:quality.items,qualitySummary:quality.summary});
       }
       if (body.action === "refresh_metadata") {
-        const requestedOffset = Number(body.offset ?? 0);
-        if (!Number.isInteger(requestedOffset) || requestedOffset < 0 || requestedOffset > 1000) {
-          return json({ error: "invalid_offset", max: 1000 }, 400);
+        // Persist the cursor in D1. A retry resumes the failed batch; after a
+        // completed run, the next click starts a fresh full pass from the beginning.
+        const storedState = await getMeta(db, "metadata_refresh_state") ?? "idle";
+        const storedCursor = Math.max(0, Number(await getMeta(db, "metadata_refresh_cursor") ?? "0") || 0);
+        const offset = storedState === "done" ? 0 : storedCursor;
+        const requestedOffset = body.offset == null ? offset : Number(body.offset);
+        if (!Number.isInteger(requestedOffset) || requestedOffset < 0 || requestedOffset > 100000) {
+          return json({ error: "invalid_offset", max: 100000 }, 400);
         }
-        const offset = requestedOffset;
         const [catalogPage, totalRow] = await Promise.all([
           db.prepare("SELECT id FROM anime_catalog ORDER BY position ASC,id ASC LIMIT ? OFFSET ?")
             .bind(METADATA_REFRESH_BATCH_SIZE, offset).all<{ id: string }>(),
@@ -299,6 +303,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
         const ids = normalizeAdminCatalogIds(catalogPage.results.map(row => row.id)).slice(0, METADATA_REFRESH_BATCH_SIZE);
         const total = Number(totalRow?.total ?? 0);
         if (!ids.length) {
+          await db.batch([setMeta(db, "metadata_refresh_state", "done"), setMeta(db, "metadata_refresh_cursor", "0")]);
           return json({ isAdmin: true, offset, nextOffset: offset, processed: 0, updated: 0, total, done: true });
         }
         const source = await fetchByIds(ids);
@@ -311,12 +316,14 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
         }
         if (updated > 0) await invalidatePersistentCatalogCache();
         const nextOffset = offset + ids.length;
+        const done = nextOffset >= total;
+        await db.batch([setMeta(db, "metadata_refresh_cursor", String(done ? 0 : nextOffset)), setMeta(db, "metadata_refresh_state", done ? "done" : "running")]);
         await audit(db, "catalog.metadata.refresh", "success", {
           offset, processed: ids.length, updated, missingFromSource: ids.length - source.length, total,
         });
         return json({
           isAdmin: true, offset, nextOffset, processed: ids.length, updated, total,
-          missingFromSource: ids.length - source.length, done: nextOffset >= total,
+          missingFromSource: ids.length - source.length, done,
         });
       }
       if (body.action === "repair") {
