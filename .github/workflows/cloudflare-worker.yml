@@ -40,7 +40,7 @@ jobs:
       - name: Build Cloudflare Worker
         run: bun run build
 
-      - name: Verify generated Worker configuration, entry and D1 binding
+      - name: Verify generated Worker configuration, entry, Cron hook and D1 binding
         run: |
           node --input-type=module <<'NODE'
           import fs from "node:fs";
@@ -69,7 +69,29 @@ jobs:
           if (rootConfig.assets?.directory !== ".output/public" || !fs.existsSync(rootConfig.assets.directory)) {
             throw new Error("Root Wrangler config must target the generated public assets.");
           }
-          console.log("Verified generated Worker config, root entry, assets, and YUME_DB binding.");
+          if (!Array.isArray(rootConfig.triggers?.crons) || !rootConfig.triggers.crons.includes("* * * * *")) {
+            throw new Error("Root Wrangler config does not include the expected per-minute Cron trigger.");
+          }
+          if (!Array.isArray(config.triggers?.crons) || !config.triggers.crons.includes("* * * * *")) {
+            throw new Error("Generated Nitro Wrangler config does not preserve the expected Cron trigger.");
+          }
+
+          // Verify the deployable Worker artifact itself. Source-only tests can pass
+          // while the actual Nitro entry has no registered scheduled callback.
+          const workerEntry = fs.readFileSync(rootConfig.main, "utf8");
+          if (!/callHook\(["']cloudflare:scheduled["']/.test(workerEntry)) {
+            throw new Error("Generated Worker entry has no Cloudflare scheduled-hook dispatch.");
+          }
+          if (!workerEntry.includes("[YUME][CATALOG_AUTO_REFRESH] Nitro scheduled hook received.")) {
+            throw new Error("Generated Worker entry has no registered YUME Cloudflare scheduled-hook subscriber.");
+          }
+          if (!workerEntry.includes("runScheduledCatalogMetadataRefresh")
+              || !workerEntry.includes("runScheduledTrailerUpdate")) {
+            throw new Error("Generated Worker entry does not include both scheduled background jobs.");
+          }
+          console.log("Verified generated Worker entry dispatches Cloudflare Cron to both YUME background jobs.");
+
+          console.log("Verified generated Worker config, root entry, assets, Cron trigger, and YUME_DB binding.");
           NODE
 
       - name: Validate Wrangler deploy artifact
