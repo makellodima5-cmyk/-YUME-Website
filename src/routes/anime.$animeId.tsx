@@ -6,12 +6,14 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronUp,
+  ChevronRight,
   CirclePlay,
   Heart,
   Play,
   Star,
+  X,
 } from "lucide-react";
-import { getShikimoriAnimeDetails } from "@/data/shikimori";
+import { getShikimoriAnimeDetails, getShikimoriAnimeScreenshots, type ShikimoriScreenshot } from "@/data/shikimori";
 import { Header, type View } from "@/components/yume/Header";
 import { Footer } from "@/components/yume/Footer";
 import { AnimeCard, PosterArt } from "@/components/yume/Poster";
@@ -92,10 +94,53 @@ function AnimeDetailPage() {
   const [saveSyncError, setSaveSyncError] = useState(false);
   const [authRequired, setAuthRequired] = useState(false);
   const [watchMode, setWatchMode] = useState<"trailer" | "episodes">("trailer");
+  const [screenshots, setScreenshots] = useState<ShikimoriScreenshot[]>([]);
+  const [activeScreenshotIndex, setActiveScreenshotIndex] = useState<number | null>(null);
+  const screenshotTriggerRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
     if (anime) document.title = displayAnimeTitle(anime, language) + (language === "en" ? " — watch anime | YUME" : " — смотреть аниме | YUME");
   }, [anime, language]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setScreenshots([]);
+    setActiveScreenshotIndex(null);
+    if (!/^\d{1,12}$/.test(animeId)) return;
+    getShikimoriAnimeScreenshots({ data: { animeId } })
+      .then((result) => {
+        if (!cancelled) setScreenshots(result.items ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setScreenshots([]);
+      });
+    return () => { cancelled = true; };
+  }, [animeId]);
+
+  useEffect(() => {
+    if (activeScreenshotIndex === null) {
+      screenshotTriggerRef.current?.focus();
+      return;
+    }
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setActiveScreenshotIndex(null);
+      } else if (event.key === "ArrowLeft" && screenshots.length > 1) {
+        event.preventDefault();
+        setActiveScreenshotIndex((current) => current === null ? current : (current - 1 + screenshots.length) % screenshots.length);
+      } else if (event.key === "ArrowRight" && screenshots.length > 1) {
+        event.preventDefault();
+        setActiveScreenshotIndex((current) => current === null ? current : (current + 1) % screenshots.length);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [activeScreenshotIndex, screenshots.length]);
 
   useEffect(() => {
     setDescriptionExpanded(false);
@@ -308,8 +353,15 @@ function AnimeDetailPage() {
             {t("anime.backCatalog")}
           </button>
 
-          <section aria-label={displayAnimeTitle(anime, language) + " — " + t("anime.sectionLabel")}>
-            <div className="hidden items-start gap-6 rounded-3xl border border-border bg-card/70 p-5 shadow-[0_18px_70px_rgba(0,0,0,0.25)] md:grid md:grid-cols-[minmax(220px,280px)_minmax(0,1fr)] lg:gap-8 lg:p-8">
+          <section className="relative isolate" aria-label={displayAnimeTitle(anime, language) + " — " + t("anime.sectionLabel")}>
+            {(anime.bannerUrl || anime.posterUrl) && (
+              <div className="pointer-events-none absolute inset-x-0 -top-3 z-0 h-[500px] overflow-hidden rounded-3xl md:h-[420px]" aria-hidden="true">
+                <img src={anime.bannerUrl ?? anime.posterUrl} alt="" loading="lazy" decoding="async" className="h-full w-full scale-105 object-cover object-[center_35%] opacity-50 blur-[1px]" />
+                <div className="absolute inset-0 bg-gradient-to-b from-background/10 via-background/70 to-background" />
+                <div className="absolute inset-0 bg-gradient-to-r from-background/10 via-background/20 to-background/70" />
+              </div>
+            )}
+            <div className="relative z-10 hidden items-start gap-6 rounded-3xl border border-border bg-card/70 p-5 shadow-[0_18px_70px_rgba(0,0,0,0.25)] md:grid md:grid-cols-[minmax(220px,280px)_minmax(0,1fr)] lg:gap-8 lg:p-8">
               <div className="mx-auto w-full max-w-[280px]">
                 <PosterArt
                   anime={anime}
@@ -366,6 +418,12 @@ function AnimeDetailPage() {
                   </div>
                 )}
 
+                {(anime.studios?.length || anime.episodesAired > 0) && (
+                  <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                    {anime.studios?.length ? <span>{language === "en" ? "Studio" : "Студия"}: {anime.studios.join(", ")}</span> : null}
+                    {anime.episodesAired > 0 ? <span>{language === "en" ? "Episodes aired" : "Серии"}: {anime.episodesAired}{anime.episodes > 0 ? (language === "en" ? " of " : " из ") + anime.episodes : ""}</span> : null}
+                  </div>
+                )}
                 <div className="mt-5 max-w-3xl">
                   {descriptionText("anime-description-desktop")}
                 </div>
@@ -396,7 +454,7 @@ function AnimeDetailPage() {
               </div>
             </div>
 
-            <div className="md:hidden">
+            <div className="relative z-10 md:hidden">
               <div className="flex items-start gap-4">
                 <div className="w-[38%] max-w-[190px] shrink-0">
                   <PosterArt anime={anime} className="aspect-[2/3] w-full rounded-2xl ring-1 ring-white/10 shadow-[0_12px_36px_rgba(0,0,0,0.3)]" />
@@ -427,6 +485,12 @@ function AnimeDetailPage() {
                     {anime.kind && <span className="rounded-full border border-border px-2 py-1 text-[11px] text-muted-foreground">{anime.kind}</span>}
                     {anime.ageRating && <span className="rounded-full border border-border px-2 py-1 text-[11px] text-muted-foreground">{anime.ageRating}</span>}
                   </div>
+                  {(anime.studios?.length || anime.episodesAired > 0) && (
+                    <div className="mt-2 space-y-1 text-[11px] leading-relaxed text-muted-foreground">
+                      {anime.studios?.length ? <p>{language === "en" ? "Studio" : "Студия"}: {anime.studios.join(", ")}</p> : null}
+                      {anime.episodesAired > 0 ? <p>{language === "en" ? "Episodes aired" : "Серии"}: {anime.episodesAired}{anime.episodes > 0 ? (language === "en" ? " of " : " из ") + anime.episodes : ""}</p> : null}
+                    </div>
+                  )}
                   {(formatAnimeDate(anime.airedOn, language) || formatAnimeDate(anime.nextEpisodeAt, language, true)) && (
                     <div className="mt-3 space-y-1 text-xs text-muted-foreground">
                       {formatAnimeDate(anime.airedOn, language) && (
@@ -460,24 +524,46 @@ function AnimeDetailPage() {
             </div>
           </section>
 
+          {screenshots.length > 0 && (
+            <section aria-labelledby="anime-screenshots-title" className="relative z-10 mt-5 md:mt-6">
+              <h2 id="anime-screenshots-title" className="mb-3 text-xl font-bold md:text-2xl">
+                {language === "en" ? "Screenshots" : "Кадры из аниме"}
+              </h2>
+              <div className="scrollbar-none flex snap-x snap-mandatory gap-2 overflow-x-auto overscroll-x-contain px-0.5 pb-2">
+                {screenshots.map((screenshot, index) => (
+                  <button
+                    key={screenshot.originalUrl}
+                    type="button"
+                    onClick={(event) => {
+                      screenshotTriggerRef.current = event.currentTarget;
+                      setActiveScreenshotIndex(index);
+                    }}
+                    aria-label={language === "en" ? "Open screenshot " + (index + 1) : "Открыть кадр " + (index + 1)}
+                    className="group relative aspect-video w-[68vw] max-w-[280px] shrink-0 snap-start overflow-hidden rounded-xl border border-white/10 bg-card shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  >
+                    <img
+                      src={screenshot.previewUrl}
+                      alt={language === "en" ? "Anime screenshot " + (index + 1) : "Кадр из аниме " + (index + 1)}
+                      loading="lazy"
+                      decoding="async"
+                      className="h-full w-full object-cover transition duration-200 group-hover:scale-[1.03]"
+                    />
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
+
           <section
             ref={playerSectionRef}
             id="watch"
             aria-labelledby="watch-title"
             className="mt-10 scroll-mt-24 md:mt-12"
           >
-            <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
-              <div>
-                <h2 id="watch-title" className="text-2xl font-bold md:text-3xl">
-                  {t("anime.watchSection")}
-                </h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {t("anime.chooseSource")}
-                </p>
-              </div>
-              <span className="max-w-full rounded-full border border-border bg-card px-3 py-1 text-center text-[10px] font-semibold text-muted-foreground">
-                {anime.youtubeTrailerId ? t("anime.videoPartial") : t("anime.videoUnavailable")}
-              </span>
+            <div className="mb-4">
+              <h2 id="watch-title" className="text-2xl font-bold md:text-3xl">
+                {t("anime.watchSection")}
+              </h2>
             </div>
 
             <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label={language === "en" ? "Viewing mode" : "Режим просмотра"}>
@@ -557,6 +643,37 @@ function AnimeDetailPage() {
           </section>
         </div>
       </main>
+
+      {activeScreenshotIndex !== null && screenshots[activeScreenshotIndex] && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/90 p-3 backdrop-blur-sm sm:p-6"
+          role="presentation"
+          onClick={() => setActiveScreenshotIndex(null)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={language === "en" ? "Anime screenshot viewer" : "Просмотр кадра из аниме"}
+            className="relative flex max-h-[94dvh] max-w-[96vw] items-center justify-center"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button type="button" onClick={() => setActiveScreenshotIndex(null)} aria-label={language === "en" ? "Close screenshot" : "Закрыть кадр"} className="absolute -right-1 -top-1 z-10 rounded-full border border-white/20 bg-black/70 p-2 text-white shadow-lg sm:right-2 sm:top-2">
+              <X className="h-5 w-5" />
+            </button>
+            {screenshots.length > 1 && (
+              <button type="button" onClick={() => setActiveScreenshotIndex((current) => current === null ? current : (current - 1 + screenshots.length) % screenshots.length)} aria-label={language === "en" ? "Previous screenshot" : "Предыдущий кадр"} className="absolute left-1 top-1/2 z-10 -translate-y-1/2 rounded-full border border-white/20 bg-black/70 p-2 text-white shadow-lg sm:left-3">
+                <ChevronLeft className="h-5 w-5" />
+              </button>
+            )}
+            <img src={screenshots[activeScreenshotIndex].originalUrl} alt={language === "en" ? "Anime screenshot " + (activeScreenshotIndex + 1) : "Кадр из аниме " + (activeScreenshotIndex + 1)} className="max-h-[86dvh] max-w-[94vw] select-none object-contain" decoding="async" />
+            {screenshots.length > 1 && (
+              <button type="button" onClick={() => setActiveScreenshotIndex((current) => current === null ? current : (current + 1) % screenshots.length)} aria-label={language === "en" ? "Next screenshot" : "Следующий кадр"} className="absolute right-1 top-1/2 z-10 -translate-y-1/2 rounded-full border border-white/20 bg-black/70 p-2 text-white shadow-lg sm:right-3">
+                <ChevronRight className="h-5 w-5" />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       <Footer onNavigate={navigateToSection} />
 

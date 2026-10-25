@@ -356,6 +356,9 @@ function Index() {
   const [adminImportRunning, setAdminImportRunning] = useState(false);
   const [adminImport, setAdminImport] = useState<{target:number;cursor:number;added:number;skipped:number;incomplete:number;errors:number;state:string;delayMs?:number}>({target:0,cursor:1,added:0,skipped:0,incomplete:0,errors:0,state:"idle"});
   const [adminImportMessage, setAdminImportMessage] = useState("");
+  const [metadataRefreshRunning, setMetadataRefreshRunning] = useState(false);
+  const [metadataRefreshProgress, setMetadataRefreshProgress] = useState({ offset: 0, total: 0, updated: 0 });
+  const [metadataRefreshMessage, setMetadataRefreshMessage] = useState("");
   const [catalogQuality, setCatalogQuality] = useState<{id:string;title:string;year:number;missingYear:boolean;missingPoster:boolean;missingDescription:boolean}[]>([]);
   const [catalogQualityOffset, setCatalogQualityOffset] = useState(0);
   const [catalogQualityHasMore, setCatalogQualityHasMore] = useState(false);
@@ -813,6 +816,57 @@ function Index() {
     }
   };
 
+
+
+  const runMetadataRefresh = async () => {
+    if (!isAdmin || metadataRefreshRunning || adminImportRunning || adminRunning) return;
+    const confirmed = window.confirm(language === "ru"
+      ? "Обновить сохранённые метаданные всех записей каталога из Shikimori? Новые записи не добавляются, записи не удаляются. Скриншоты загружаются отдельно при открытии страницы."
+      : "Refresh metadata for all saved catalogue records from Shikimori? No records will be added or deleted. Screenshots load on demand when an anime page is opened.");
+    if (!confirmed) return;
+    setMetadataRefreshRunning(true);
+    setMetadataRefreshMessage("");
+    setMetadataRefreshProgress({ offset: 0, total: 0, updated: 0 });
+    let offset = 0;
+    let total = 0;
+    let updated = 0;
+    let processed = 0;
+    try {
+      while (true) {
+        const response = await fetch("/api/admin/catalog-import", {
+          method: "POST", credentials: "same-origin", cache: "no-store",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "refresh_metadata", offset }),
+        });
+        const payload = await response.json().catch(() => ({})) as {
+          isAdmin?: boolean; error?: string; message?: string; nextOffset?: number;
+          processed?: number; updated?: number; total?: number; done?: boolean;
+        };
+        if (!response.ok || payload.isAdmin !== true) {
+          throw new Error(payload.message ?? payload.error ?? (language === "ru" ? "Не удалось обновить метаданные." : "Metadata refresh failed."));
+        }
+        total = payload.total ?? total;
+        updated += payload.updated ?? 0;
+        processed += payload.processed ?? 0;
+        offset = payload.nextOffset ?? offset;
+        setMetadataRefreshProgress({ offset: processed, total, updated });
+        if (payload.done || payload.processed === 0) break;
+        setMetadataRefreshMessage(language === "ru"
+          ? "Обработано " + processed + " из " + total + "; обновлено записей: " + updated + "."
+          : "Processed " + processed + " of " + total + "; updated records: " + updated + ".");
+        await new Promise(resolve => setTimeout(resolve, 1500));
+      }
+      setMetadataRefreshMessage(language === "ru"
+        ? "Готово: обработано " + processed + " из " + total + "; обновлено записей: " + updated + ". ID трейлеров обслуживаются отдельно."
+        : "Completed: processed " + processed + " of " + total + "; updated records: " + updated + ". Trailer IDs are handled separately.");
+      await refreshCatalogQuality();
+    } catch (error) {
+      setMetadataRefreshMessage(error instanceof Error ? error.message : (language === "ru" ? "Обновление остановлено." : "Refresh stopped."));
+    } finally {
+      setMetadataRefreshRunning(false);
+    }
+  };
+
   const runMaintenanceCheck = async () => {
     if (!isAdmin || maintenanceBusy) return;
     setMaintenanceBusy(true);
@@ -838,7 +892,7 @@ function Index() {
   );
 
   const runCatalogImport = async () => {
-    if (!isAdmin || adminImportRunning) return;
+    if (!isAdmin || adminImportRunning || metadataRefreshRunning) return;
     const target = Number(adminImportTarget);
     if (adminImport.state !== "running" && (!Number.isInteger(target) || target < 1 || target > 500)) {
       setAdminImportMessage(language === "ru" ? "Укажи целое число от 1 до 500." : "Enter a whole number from 1 to 500.");
@@ -1619,11 +1673,11 @@ function Index() {
               </details>
               <section className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-card/50 px-3 py-2.5" aria-label={language === "ru" ? "Состояние операций" : "Operations status"}>
                 <span className="text-sm font-medium">{language === "ru" ? "Состояние операций" : "Operations status"}</span>
-                <span className={`inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-xs font-medium ${(adminRunning || adminImportRunning) ? "border-primary/40 bg-primary/10 text-primary" : (adminMessage || adminImportMessage) ? "border-amber-500/40 bg-amber-500/10 text-amber-600" : "border-border bg-background/60 text-muted-foreground"}`}>
-                  <span className={`h-1.5 w-1.5 rounded-full ${(adminRunning || adminImportRunning) ? "animate-pulse bg-primary" : (adminMessage || adminImportMessage) ? "bg-amber-500" : "bg-muted-foreground/60"}`} />
-                  {(adminRunning || adminImportRunning) ? (language === "ru" ? "Выполняется" : "Running") : (adminMessage || adminImportMessage) ? (language === "ru" ? "Есть сообщение" : "Has message") : (language === "ru" ? "Ожидание запуска" : "Idle")}
+                <span className={`inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-xs font-medium ${(adminRunning || adminImportRunning || metadataRefreshRunning) ? "border-primary/40 bg-primary/10 text-primary" : (adminMessage || adminImportMessage || metadataRefreshMessage) ? "border-amber-500/40 bg-amber-500/10 text-amber-600" : "border-border bg-background/60 text-muted-foreground"}`}>
+                  <span className={`h-1.5 w-1.5 rounded-full ${(adminRunning || adminImportRunning || metadataRefreshRunning) ? "animate-pulse bg-primary" : (adminMessage || adminImportMessage || metadataRefreshMessage) ? "bg-amber-500" : "bg-muted-foreground/60"}`} />
+                  {(adminRunning || adminImportRunning || metadataRefreshRunning) ? (language === "ru" ? "Выполняется" : "Running") : (adminMessage || adminImportMessage || metadataRefreshMessage) ? (language === "ru" ? "Есть сообщение" : "Has message") : (language === "ru" ? "Ожидание запуска" : "Idle")}
                 </span>
-                {(adminMessage || adminImportMessage) && <p className="w-full border-t border-border/70 pt-2 text-xs text-muted-foreground" role="status">{adminMessage || adminImportMessage}</p>}
+                {(adminMessage || adminImportMessage || metadataRefreshMessage) && <p className="w-full border-t border-border/70 pt-2 text-xs text-muted-foreground" role="status">{adminMessage || adminImportMessage || metadataRefreshMessage}</p>}
               </section>
               <details open={expandedAdminSections.import} onToggle={event => { const isOpen = event.currentTarget.open; setExpandedAdminSections(current => current.import === isOpen ? current : {...current, import: isOpen}); }} className="group mb-3 overflow-hidden rounded-2xl border border-[#8D3DD6] bg-[#0D0A13] shadow-[0_0_18px_rgba(157,64,245,0.10)]" aria-label={language === "ru" ? "Пополнение каталога" : "Catalog import"}>
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 hover:bg-card/80 [&::-webkit-details-marker]:hidden">
@@ -1637,7 +1691,7 @@ function Index() {
                       <span className="mb-1 block text-xs text-muted-foreground">{language === "ru" ? "Количество новых записей (1–500)" : "Number of new records (1–500)"}</span>
                       <input type="number" min={1} max={500} step={1} value={adminImportTarget} onChange={event => setAdminImportTarget(event.target.value)} disabled={adminImportRunning || adminImport.state === "running"} className="h-10 w-full rounded-xl border border-[#453452] bg-[#050408] px-3 text-[#FFFFFF] focus:border-[#BE65FF] focus:outline-none focus:ring-1 focus:ring-[#BE65FF]" />
                     </label>
-                    <button type="button" onClick={runCatalogImport} disabled={adminImportRunning || (adminImport.state !== "running" && (!Number.isInteger(Number(adminImportTarget)) || Number(adminImportTarget)<1 || Number(adminImportTarget)>500))} className="self-end rounded-xl bg-gradient-to-r from-[#AC4EFC] to-[#8736FA] px-4 py-2.5 text-sm font-semibold text-white shadow-[0_0_16px_rgba(155,65,245,0.18)] transition hover:brightness-110 disabled:cursor-wait disabled:opacity-50">
+                    <button type="button" onClick={runCatalogImport} disabled={adminImportRunning || metadataRefreshRunning || (adminImport.state !== "running" && (!Number.isInteger(Number(adminImportTarget)) || Number(adminImportTarget)<1 || Number(adminImportTarget)>500))} className="self-end rounded-xl bg-gradient-to-r from-[#AC4EFC] to-[#8736FA] px-4 py-2.5 text-sm font-semibold text-white shadow-[0_0_16px_rgba(155,65,245,0.18)] transition hover:brightness-110 disabled:cursor-wait disabled:opacity-50">
                       {adminImportRunning ? (language === "ru" ? "Импорт…" : "Importing…") : adminImport.state === "running" ? (language === "ru" ? "Продолжить импорт" : "Resume import") : (language === "ru" ? "Начать импорт" : "Start import")}
                     </button>
                   </div>
@@ -1652,6 +1706,32 @@ function Index() {
                   {adminImportMessage && <p className="mt-2 rounded-lg border border-border bg-background/60 p-2.5 text-xs" role="status">{adminImportMessage}</p>}
                 </div>
               </details>
+              <section className="mb-3 overflow-hidden rounded-2xl border border-[#6C3E91] bg-[#0D0A13] p-4" aria-label={language === "ru" ? "Обновление метаданных каталога" : "Refresh catalogue metadata"}>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <Database className="mt-0.5 h-5 w-5 shrink-0 text-[#BE65FF]" />
+                    <div className="min-w-0">
+                      <h3 className="font-semibold text-[#F8F4FF]">{language === "ru" ? "Обновление метаданных каталога" : "Refresh catalogue metadata"}</h3>
+                      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{language === "ru" ? "Обновляет существующие названия, описания, постеры, баннеры, жанры, возрастные категории, студии и сведения о сериях. Не добавляет и не удаляет записи. ID трейлеров обновляются отдельным инструментом; скриншоты загружаются по запросу." : "Refreshes saved titles, descriptions, posters, banners, genres, age ratings, studios, and episode counts. It does not add or delete records. Trailer IDs use the separate tool; screenshots load on demand."}</p>
+                    </div>
+                  </div>
+                  <button type="button" onClick={runMetadataRefresh} disabled={metadataRefreshRunning || adminImportRunning || adminRunning} className="shrink-0 rounded-xl bg-gradient-to-r from-[#AC4EFC] to-[#8736FA] px-4 py-2.5 text-sm font-semibold text-white shadow-[0_0_16px_rgba(155,65,245,0.18)] transition hover:brightness-110 disabled:cursor-wait disabled:opacity-50">
+                    {metadataRefreshRunning ? (language === "ru" ? "Обновление…" : "Refreshing…") : (language === "ru" ? "Обновить данные" : "Refresh data")}
+                  </button>
+                </div>
+                {metadataRefreshProgress.total > 0 && (
+                  <div className="mt-3">
+                    <div className="mb-1 flex flex-wrap justify-between gap-2 text-xs text-muted-foreground">
+                      <span>{language === "ru" ? "Обработано" : "Processed"}: {metadataRefreshProgress.offset} / {metadataRefreshProgress.total}</span>
+                      <span>{language === "ru" ? "Обновлено" : "Updated"}: {metadataRefreshProgress.updated}</span>
+                    </div>
+                    <div role="progressbar" aria-valuemin={0} aria-valuemax={metadataRefreshProgress.total} aria-valuenow={metadataRefreshProgress.offset} className="h-1.5 overflow-hidden rounded-full bg-muted">
+                      <div className="h-full rounded-full bg-gradient-to-r from-[#A83BFA] to-[#D08AFF] transition-all" style={{ width: (metadataRefreshProgress.total ? Math.min(100, metadataRefreshProgress.offset / metadataRefreshProgress.total * 100) : 0) + "%" }} />
+                    </div>
+                  </div>
+                )}
+                {metadataRefreshMessage && <p className="mt-3 rounded-lg border border-border bg-background/60 p-2.5 text-xs" role="status">{metadataRefreshMessage}</p>}
+              </section>
               <details open={expandedAdminSections.quality} onToggle={event => { const isOpen = event.currentTarget.open; setExpandedAdminSections(current => current.quality === isOpen ? current : {...current, quality: isOpen}); }} className="group mb-3 overflow-hidden rounded-2xl border border-[#382846] bg-[#0C0A12]" aria-label={language === "ru" ? "Качество каталога" : "Catalog quality"}>
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 hover:bg-card/80 [&::-webkit-details-marker]:hidden">
                   <span className="flex min-w-0 items-center gap-3"><Database className="h-6 w-6 shrink-0 text-[#BE65FF]"/><span className="min-w-0"><span className="block font-semibold text-[#F8F4FF]">{language === "ru" ? "Качество каталога" : "Catalog quality"}</span><span className="mt-0.5 block text-xs text-[#A89CB8]">{language === "ru" ? "Неполных записей: " : "Incomplete records: "}{catalogQualitySummary.incomplete}</span></span></span><span className="rounded-full bg-[#1D1729] px-3 py-1 text-xs text-[#DCC8F8]">{language === "ru" ? "Всего: " : "Total: "}{catalogQualitySummary.total}</span>

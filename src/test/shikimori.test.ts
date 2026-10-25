@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   mapAnime,
+  normalizeShikimoriScreenshots,
   parseShikimoriResponse,
   retryAfterMilliseconds,
   validateRequest,
@@ -83,6 +84,27 @@ describe("Shikimori video URL validation", () => {
     expect(youtubeVideoId("https://example.com/watch?v=dQw4w9WgXcQ")).toBeUndefined();
     expect(youtubeVideoId("javascript:alert(1)")).toBeUndefined();
     expect(youtubeVideoId("https://youtu.be/short")).toBeUndefined();
+  });
+});
+
+describe("Shikimori screenshot normalization", () => {
+  it("normalizes image URLs, uses previews as a fallback, and removes duplicate frames", () => {
+    expect(normalizeShikimoriScreenshots([
+      { original: "http://images.example/frame-1.jpg", preview: "https://images.example/preview-1.jpg" },
+      { original: "http://images.example/frame-1.jpg", preview: "https://images.example/preview-duplicate.jpg" },
+      { preview: "//images.example/frame-2.jpg" },
+      { original: "javascript:alert(1)", preview: "data:image/png;base64,AAAA" },
+    ])).toEqual([
+      { originalUrl: "https://images.example/frame-1.jpg", previewUrl: "https://images.example/preview-1.jpg" },
+      { originalUrl: "https://images.example/frame-2.jpg", previewUrl: "https://images.example/frame-2.jpg" },
+    ]);
+  });
+
+  it("returns no screenshots for malformed payloads and caps large galleries", () => {
+    expect(normalizeShikimoriScreenshots({ screenshots: [] })).toEqual([]);
+    expect(normalizeShikimoriScreenshots(Array.from({ length: 30 }, (_, i) => ({
+      original: "https://images.example/" + i + ".jpg",
+    })))).toHaveLength(24);
   });
 });
 

@@ -27,6 +27,7 @@ const SESSION_COOKIE = "__Host-yume-session";
 const MAX_TARGET = 500;
 const PAGE_SIZE = 50;
 const REQUEST_DELAY_MS = 1500;
+const METADATA_REFRESH_BATCH_SIZE = 50;
 const FIELDS = "id name english russian kind score status episodes episodesAired airedOn { date year } releasedOn { date year } description poster { mainUrl previewUrl originalUrl } opengraphImageUrl genres { id name russian kind } nextEpisodeAt rating studios { name }";
 
 export function normalizeAdminCatalogIds(value: unknown): string[] {
@@ -186,6 +187,14 @@ async function fetchByIds(ids: string[]): Promise<ShikimoriAnime[]> {
   if (payload.errors?.length) throw new Error(payload.errors.map(e=>e.message).filter(Boolean).join("; ") || "GraphQL error");
   return (payload.data?.animes ?? []).filter(item => !(item.genres ?? []).some(g => [g.name,g.russian].some(n => clean(n).normalize("NFKC").toLowerCase() === "hentai" || clean(n).normalize("NFKC").toLowerCase() === "хентай")));
 }
+
+async function updateCatalogMetadata(db: Database, item: ReturnType<typeof mapItem>): Promise<number> {
+  const result = await db.prepare("UPDATE anime_catalog SET title=COALESCE(NULLIF(?,'Без названия'),title),english_title=COALESCE(NULLIF(?,'Без названия'),english_title),original_title=COALESCE(NULLIF(?,'Без названия'),original_title),year=CASE WHEN ?>0 THEN ? ELSE year END,episodes=CASE WHEN ?>0 THEN ? ELSE episodes END,rating=COALESCE(?,rating),genres_json=CASE WHEN ?<>'[]' THEN ? ELSE genres_json END,status=CASE WHEN ?<>'Неизвестно' THEN ? ELSE status END,description=COALESCE(NULLIF(? ,''),description),hue=?,glyph=?,is_new=?,popular=?,poster_url=COALESCE(?,poster_url),banner_url=COALESCE(?,banner_url),kind=COALESCE(?,kind),age_rating=COALESCE(?,age_rating),next_episode_at=COALESCE(?,next_episode_at),episodes_aired=CASE WHEN ?>0 THEN ? ELSE episodes_aired END,aired_on=COALESCE(?,aired_on),studios_json=CASE WHEN ?<>'[]' THEN ? ELSE studios_json END,updated_at=CURRENT_TIMESTAMP WHERE id=?")
+    .bind(item.title,item.english_title,item.original_title,item.year,item.year,item.episodes,item.episodes,item.rating,item.genres_json,item.genres_json,item.status,item.status,item.description,item.hue,item.glyph,item.is_new,item.popular,item.poster_url,item.banner_url,item.kind,item.age_rating,item.next_episode_at,item.episodes_aired,item.episodes_aired,item.aired_on,item.studios_json,item.studios_json,item.id)
+    .run();
+  return Number(result.meta?.changes ?? 0);
+}
+
 async function catalogQuality(db: Database, requestedOffset = 0) {
   const offset = Number.isFinite(requestedOffset) ? Math.max(0,Math.min(100000,Math.floor(requestedOffset))) : 0;
   const [rows, aggregate] = await Promise.all([
@@ -275,6 +284,40 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
         const quality = await catalogQuality(db);
         await audit(db,"catalog.delete","success",{requested:safeIds.length,deleted});
         return json({isAdmin:true,deleted,quality:quality.items,qualitySummary:quality.summary});
+      }
+      if (body.action === "refresh_metadata") {
+        const requestedOffset = Number(body.offset ?? 0);
+        if (!Number.isInteger(requestedOffset) || requestedOffset < 0 || requestedOffset > 1000) {
+          return json({ error: "invalid_offset", max: 1000 }, 400);
+        }
+        const offset = requestedOffset;
+        const [catalogPage, totalRow] = await Promise.all([
+          db.prepare("SELECT id FROM anime_catalog ORDER BY position ASC,id ASC LIMIT ? OFFSET ?")
+            .bind(METADATA_REFRESH_BATCH_SIZE, offset).all<{ id: string }>(),
+          db.prepare("SELECT COUNT(*) AS total FROM anime_catalog").first<{ total: number }>(),
+        ]);
+        const ids = normalizeAdminCatalogIds(catalogPage.results.map(row => row.id)).slice(0, METADATA_REFRESH_BATCH_SIZE);
+        const total = Number(totalRow?.total ?? 0);
+        if (!ids.length) {
+          return json({ isAdmin: true, offset, nextOffset: offset, processed: 0, updated: 0, total, done: true });
+        }
+        const source = await fetchByIds(ids);
+        const sourceById = new Map(source.map(item => [String(item.id), item]));
+        let updated = 0;
+        for (const id of ids) {
+          const sourceItem = sourceById.get(id);
+          if (!sourceItem) continue;
+          updated += await updateCatalogMetadata(db, mapItem(sourceItem));
+        }
+        if (updated > 0) await invalidatePersistentCatalogCache();
+        const nextOffset = offset + ids.length;
+        await audit(db, "catalog.metadata.refresh", "success", {
+          offset, processed: ids.length, updated, missingFromSource: ids.length - source.length, total,
+        });
+        return json({
+          isAdmin: true, offset, nextOffset, processed: ids.length, updated, total,
+          missingFromSource: ids.length - source.length, done: nextOffset >= total,
+        });
       }
       if (body.action === "repair") {
         const safeIds = normalizeAdminCatalogIds((body as { ids?: unknown }).ids);
