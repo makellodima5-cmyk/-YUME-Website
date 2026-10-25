@@ -313,7 +313,7 @@ async function fetchAndStoreScreenshots(db: Database, animeId: string, previousA
 }
 
 async function screenshotProgress(db: Database): Promise<{ processed: number; failed: number; retry: number; done: number }> {
-  const row = await db.prepare("SELECT SUM(CASE WHEN status='done' THEN 1 ELSE 0 END) AS done, SUM(CASE WHEN status='failed' THEN 1 ELSE 0 END) AS failed, SUM(CASE WHEN status='retry' THEN 1 ELSE 0 END) AS retry FROM anime_catalog_screenshot_status")
+  const row = await db.prepare("SELECT SUM(CASE WHEN ss.status='done' THEN 1 ELSE 0 END) AS done, SUM(CASE WHEN ss.status='failed' THEN 1 ELSE 0 END) AS failed, SUM(CASE WHEN ss.status='retry' THEN 1 ELSE 0 END) AS retry FROM anime_catalog_screenshot_status ss INNER JOIN anime_catalog a ON a.id = ss.anime_id")
     .first<{ done: number | null; failed: number | null; retry: number | null }>();
   const done = Number(row?.done ?? 0), failed = Number(row?.failed ?? 0), retry = Number(row?.retry ?? 0);
   return { processed: done + failed + retry, failed, retry, done };
@@ -476,7 +476,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
         if (state === "screenshots") {
           const cursor = Math.max(0, Number(await getMeta(db, "metadata_refresh_screenshot_cursor") ?? "0") || 0);
           if (cursor >= total) {
-            const retryRow = await db.prepare("SELECT COUNT(*) AS count FROM anime_catalog_screenshot_status WHERE status='retry' AND attempts < ?")
+            const retryRow = await db.prepare("SELECT COUNT(*) AS count FROM anime_catalog_screenshot_status ss WHERE status='retry' AND attempts < ? AND EXISTS (SELECT 1 FROM anime_catalog a WHERE a.id = ss.anime_id)")
               .bind(SCREENSHOT_RETRY_LIMIT).first<{ count: number }>();
             const nextState = Number(retryRow?.count ?? 0) > 0 ? "screenshots_retry" : "done";
             await setMeta(db, "metadata_refresh_state", nextState);
@@ -513,7 +513,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
         }
 
         if (state === "screenshots_retry") {
-          const retryItem = await db.prepare("SELECT anime_id,attempts FROM anime_catalog_screenshot_status WHERE status='retry' AND attempts < ? ORDER BY attempts ASC,updated_at ASC,anime_id ASC LIMIT 1")
+          const retryItem = await db.prepare("SELECT ss.anime_id,ss.attempts FROM anime_catalog_screenshot_status ss WHERE ss.status='retry' AND ss.attempts < ? AND EXISTS (SELECT 1 FROM anime_catalog a WHERE a.id = ss.anime_id) ORDER BY ss.attempts ASC,ss.updated_at ASC,ss.anime_id ASC LIMIT 1")
             .bind(SCREENSHOT_RETRY_LIMIT).first<{ anime_id: string; attempts: number }>();
           if (!retryItem) {
             await setMeta(db, "metadata_refresh_state", "done");
