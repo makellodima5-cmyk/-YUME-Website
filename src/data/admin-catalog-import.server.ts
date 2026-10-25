@@ -304,6 +304,7 @@ async function fetchAndStoreScreenshots(db: Database, animeId: string, previousA
     const attempts = previousAttempts + 1;
     const message = error instanceof Error ? error.message : "Неизвестная ошибка получения кадров";
     const status: ScreenshotStatus = attempts >= SCREENSHOT_RETRY_LIMIT ? "failed" : "retry";
+    console.warn("[YUME][SCREENSHOT_BACKFILL] Screenshot fetch failed.", { animeId, attempts, status, error: message });
     return {
       status, attempts, saved: 0, error: message,
       statements: [screenshotStatusStatement(db, animeId, status, attempts, message)],
