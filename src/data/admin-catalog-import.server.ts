@@ -294,12 +294,14 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
   if (request.method === "POST" && !sameOrigin(request)) return json({error:"cross_origin_request"},403);
   const env = environment(), db = database(env);
   if (!db) return json({error:"database_unavailable"},503);
+  let requestedAction: unknown = null;
   try {
     if (!await authorize(request,env,db)) return json({isAdmin:false,error:"admin_required"},403);
     await ensureSchema(db);
     if (request.method === "GET") { const url = new URL(request.url); const qualityOffset = Number(url.searchParams.get("qualityOffset") ?? "0"); const quality = await catalogQuality(db,qualityOffset); return json({isAdmin:true,...await snapshot(db),quality:quality.items,qualitySummary:quality.summary,qualityLimit:quality.limit,qualityOffset:quality.offset,qualityHasMore:quality.hasMore,auditLog:await recentAudit(db)}); }
     let body: {action?:unknown; target?:unknown};
     try { body = await request.json() as {action?:unknown;target?:unknown}; } catch { return json({error:"invalid_request"},400); }
+    requestedAction = body.action;
     const lockToken = await acquireLock(db);
     if (!lockToken) return json({isAdmin:true,error:"operation_in_progress",message:"Другая административная операция ещё выполняется."},409);
     try {
@@ -514,6 +516,22 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
     }
   } catch (error) {
     console.error("[YUME][ADMIN_CATALOG_IMPORT] Operation failed.",error);
-    return json({error:"admin_operation_failed",message:error instanceof Error ? error.message : "Unknown administrative operation error."},503);
+    let progress: { offset?: number; total?: number } = {};
+    if (requestedAction === "refresh_metadata") {
+      try {
+        const [cursorValue, stateValue, totalRow] = await Promise.all([
+          getMeta(db, "metadata_refresh_cursor"),
+          getMeta(db, "metadata_refresh_state"),
+          db.prepare("SELECT COUNT(*) AS total FROM anime_catalog").first<{ total: number }>(),
+        ]);
+        progress = {
+          offset: stateValue === "done" ? 0 : Math.max(0, Number(cursorValue ?? "0") || 0),
+          total: Number(totalRow?.total ?? 0),
+        };
+      } catch (progressError) {
+        console.warn("[YUME][ADMIN_CATALOG_IMPORT] Could not read refresh progress.", progressError);
+      }
+    }
+    return json({error:"admin_operation_failed",message:error instanceof Error ? error.message : "Unknown administrative operation error.", ...progress},503);
   }
 }
