@@ -105,7 +105,6 @@ export function AnimeModal({ anime, note, onClose }: { anime: Anime | null; note
             </div>
           </section>
         )}
-        </div>
       </div>
     </div>
   );
