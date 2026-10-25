@@ -269,9 +269,9 @@ function screenshotStatusStatement(db: Database, animeId: string, status: Screen
 
 async function fetchAndStoreScreenshots(db: Database, animeId: string, previousAttempts: number): Promise<ScreenshotFetchResult> {
   try {
-    const response = await fetch("https://shikimori.one/api/animes/" + encodeURIComponent(animeId) + "/screenshots", {
+    const response = await fetch("https://shikimori.io/api/animes/" + encodeURIComponent(animeId) + "/screenshots", {
       headers: { Accept: "application/json", "User-Agent": "YUME/1.0" },
-      signal: AbortSignal.timeout(12000),
+      signal: AbortSignal.timeout(8000),
     });
     if (!response.ok) {
       const retryAfter = response.headers.get("Retry-After");
