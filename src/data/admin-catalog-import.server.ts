@@ -514,6 +514,22 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
     }
   } catch (error) {
     console.error("[YUME][ADMIN_CATALOG_IMPORT] Operation failed.",error);
-    return json({error:"admin_operation_failed",message:error instanceof Error ? error.message : "Unknown administrative operation error."},503);
+    let progress: { offset?: number; total?: number } = {};
+    if (body.action === "refresh_metadata") {
+      try {
+        const [cursorValue, stateValue, totalRow] = await Promise.all([
+          getMeta(db, "metadata_refresh_cursor"),
+          getMeta(db, "metadata_refresh_state"),
+          db.prepare("SELECT COUNT(*) AS total FROM anime_catalog").first<{ total: number }>(),
+        ]);
+        progress = {
+          offset: stateValue === "done" ? 0 : Math.max(0, Number(cursorValue ?? "0") || 0),
+          total: Number(totalRow?.total ?? 0),
+        };
+      } catch (progressError) {
+        console.warn("[YUME][ADMIN_CATALOG_IMPORT] Could not read refresh progress.", progressError);
+      }
+    }
+    return json({error:"admin_operation_failed",message:error instanceof Error ? error.message : "Unknown administrative operation error.", ...progress},503);
   }
 }
