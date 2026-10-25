@@ -105,7 +105,6 @@ export function AnimeModal({ anime, note, onClose }: { anime: Anime | null; note
             </div>
           </section>
         )}
-        <div className="hidden" aria-hidden="true">{anime.youtubeTrailerId ?? ""}</div>
         </div>
       </div>
     </div>
