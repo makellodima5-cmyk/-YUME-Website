@@ -795,15 +795,30 @@ function Index() {
     const poll = async () => {
       try {
         const response = await fetch("/api/admin/catalog-import", { credentials: "same-origin", cache: "no-store" });
-        const payload = await response.json().catch(() => ({})) as { isAdmin?: boolean; metadataRefresh?: { autoEnabled?: boolean; phase?: string; metadataOffset?: number; screenshotOffset?: number; total?: number; screenshotFailures?: number; screenshotRetries?: number; done?: boolean } };
+        const payload = await response.json().catch(() => ({})) as {
+          isAdmin?: boolean; target?:number; cursor?:number; added?:number; skipped?:number; incomplete?:number; errors?:number; state?:string; delayMs?:number;
+          qualitySummary?:typeof catalogQualitySummary; quality?:typeof catalogQuality; qualityOffset?:number; qualityHasMore?:boolean;
+          metadataRefresh?: { autoEnabled?: boolean; phase?: string; metadataOffset?: number; screenshotOffset?: number; total?: number; screenshotFailures?: number; screenshotRetries?: number; done?: boolean; stats?: MetadataCatalogStats };
+        };
         if (cancelled || !response.ok || payload.isAdmin !== true || !payload.metadataRefresh) return;
         const status = payload.metadataRefresh;
+        if (status.stats) setMetadataCatalogStats(status.stats);
+        if (payload.qualitySummary) setCatalogQualitySummary(payload.qualitySummary);
+        if (payload.quality) {
+          setCatalogQuality(payload.quality);
+          setCatalogQualityOffset(payload.qualityOffset ?? 0);
+          setCatalogQualityHasMore(payload.qualityHasMore ?? false);
+        }
+        if (typeof payload.target === "number") setAdminImport({target:payload.target,cursor:payload.cursor??1,added:payload.added??0,skipped:payload.skipped??0,incomplete:payload.incomplete??0,errors:payload.errors??0,state:payload.state??"idle",delayMs:payload.delayMs});
         setMetadataAutoEnabled(status.autoEnabled === true);
         const phase = status.phase ?? "idle";
         const total = status.total ?? 0;
         const offset = phase === "metadata" ? (status.metadataOffset ?? 0) : (status.screenshotOffset ?? 0);
         setMetadataRefreshProgress(current => ({ ...current, phase, total, offset, metadataOffset: status.metadataOffset ?? 0, screenshotOffset: status.screenshotOffset ?? 0, screenshotFailures: status.screenshotFailures ?? 0, screenshotRetries: status.screenshotRetries ?? 0 }));
         if (status.autoEnabled) setMetadataRefreshMessage(language === "ru" ? "Фоновое автообновление активно. Этап: " + phase + "; прогресс: " + offset + " / " + total + "; ошибок кадров: " + (status.screenshotFailures ?? 0) + "; ожидают повтора: " + (status.screenshotRetries ?? 0) + "." : "Background auto-refresh active. Phase: " + phase + "; progress: " + offset + " / " + total + "; failed screenshots: " + (status.screenshotFailures ?? 0) + "; waiting to retry: " + (status.screenshotRetries ?? 0) + ".");
+        const trailerResponse = await fetch("/api/admin/trailers", {credentials:"same-origin",cache:"no-store"});
+        const trailerStats = await trailerResponse.json().catch(() => ({})) as {isAdmin?:boolean;total?:number;pending?:number;checked?:number;found?:number;missing?:number};
+        if (!cancelled && trailerResponse.ok && trailerStats.isAdmin) setAdminStats({total:trailerStats.total??0,pending:trailerStats.pending??0,checked:trailerStats.checked??0,found:trailerStats.found??0,missing:trailerStats.missing??0});
       } catch { /* Status polling must not interrupt the server-side job. */ }
     };
     void poll();
