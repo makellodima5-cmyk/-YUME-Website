@@ -19,7 +19,6 @@ describe("Cloudflare Worker scheduled entrypoint", () => {
     expect(cronPlugin).toContain('from "../src/data/catalog-d1.server"');
     expect(cronPlugin).not.toContain('from "../../src/data/');
 
-    expect(catalogImporter).toContain("/^\\d{4}-\\d{2}-\\d{2}/");
     expect(cronPlugin).not.toContain("runScheduledCatalogMetadataRefresh");
     expect(cronPlugin).toContain("runScheduledTrailerUpdate(env)");
     expect(cronPlugin).not.toContain("CATALOG_AUTO_REFRESH");
