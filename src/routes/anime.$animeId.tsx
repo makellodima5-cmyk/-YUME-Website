@@ -344,24 +344,23 @@ function AnimeDetailPage() {
 
       <main id="main-content" className="px-4 pt-24 md:px-10 md:pt-28">
         <div className="mx-auto max-w-screen-2xl">
-          <button
-            type="button"
-            onClick={() => navigateToSection("catalog")}
-            className="mb-4 inline-flex items-center gap-1 text-sm text-muted-foreground transition hover:text-foreground"
-          >
-            <ChevronLeft className="h-4 w-4" />
-            {t("anime.backCatalog")}
-          </button>
-
           <section className="relative isolate" aria-label={displayAnimeTitle(anime, language) + " — " + t("anime.sectionLabel")}>
-            {(anime.bannerUrl || anime.posterUrl) && (
-              <div className="pointer-events-none absolute inset-x-0 -top-3 z-0 h-[500px] overflow-hidden rounded-3xl md:h-[420px]" aria-hidden="true">
-                <img src={anime.bannerUrl ?? anime.posterUrl} alt="" loading="lazy" decoding="async" className="h-full w-full scale-105 object-cover object-[center_35%] opacity-50 blur-[1px]" />
-                <div className="absolute inset-0 bg-gradient-to-b from-background/10 via-background/70 to-background" />
-                <div className="absolute inset-0 bg-gradient-to-r from-background/10 via-background/20 to-background/70" />
+            {anime.bannerUrl?.startsWith("https://s4.anilist.co/") && (
+              <div className="pointer-events-none absolute inset-x-[-1rem] top-0 z-0 h-[680px] overflow-hidden md:inset-x-[-2.5rem] md:h-[620px]" aria-hidden="true">
+                <img src={anime.bannerUrl} alt="" loading="eager" decoding="async" className="h-full w-full scale-105 object-cover object-[center_30%] opacity-65 blur-[0.5px]" />
+                <div className="absolute inset-0 bg-gradient-to-b from-background/15 via-background/45 to-background" />
+                <div className="absolute inset-0 bg-gradient-to-r from-background/20 via-transparent to-background/35" />
               </div>
             )}
-            <div className="relative z-10 hidden items-start gap-6 rounded-3xl border border-border bg-card/70 p-5 shadow-[0_18px_70px_rgba(0,0,0,0.25)] md:grid md:grid-cols-[minmax(220px,280px)_minmax(0,1fr)] lg:gap-8 lg:p-8">
+            <button
+              type="button"
+              onClick={() => navigateToSection("catalog")}
+              className="relative z-10 mb-4 inline-flex items-center gap-1 text-sm text-muted-foreground transition hover:text-foreground"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              {t("anime.backCatalog")}
+            </button>
+            <div className="relative z-10 hidden items-start gap-6 p-5 md:grid md:grid-cols-[minmax(220px,280px)_minmax(0,1fr)] lg:gap-8 lg:p-8">
               <div className="mx-auto w-full max-w-[280px]">
                 <PosterArt
                   anime={anime}
