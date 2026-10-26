@@ -588,8 +588,18 @@ export const getShikimoriAnimeDetails = createServerFn({ method: "GET" })
       items: [...(details.anime ? [details.anime] : []), ...details.relatedAnime],
     }).items;
     const visibleById = new Map(allItems.map((anime) => [anime.id, anime]));
+    const anime = details.anime ? visibleById.get(details.anime.id) ?? null : null;
+    if (anime) {
+      try {
+        const { getAniListBannerByMalId } = await import("@/data/anilist-banner.server");
+        const aniListBanner = await getAniListBannerByMalId(anime.id);
+        if (aniListBanner) anime.bannerUrl = aniListBanner;
+      } catch {
+        // Keep the existing Shikimori image when AniList enrichment is unavailable.
+      }
+    }
     return {
-      anime: details.anime ? visibleById.get(details.anime.id) ?? null : null,
+      anime,
       relatedAnime: details.relatedAnime
         .map((anime) => visibleById.get(anime.id))
         .filter((anime): anime is Anime => Boolean(anime)),
