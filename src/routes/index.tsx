@@ -904,7 +904,6 @@ function Index() {
       const stopAuto = await fetch("/api/admin/catalog-import", { method: "POST", credentials: "same-origin", cache: "no-store", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "auto_stop" }) });
       const stopPayload = await stopAuto.json().catch(() => ({})) as { isAdmin?: boolean; error?: string };
       if (!stopAuto.ok || stopPayload.isAdmin !== true) throw new Error(stopPayload.error ?? "Could not disable automatic mode.");
-      setMetadataAutoEnabled(false);
       let finished = false;
       let requests = 0;
       while (!manualMetadataStopRef.current && !finished && requests < 1500) {
