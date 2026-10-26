@@ -12,9 +12,10 @@ type Statement = {
   bind(...values: unknown[]): Statement;
   first<T = Record<string, unknown>>(): Promise<T | null>;
   run(): Promise<{ meta?: { changes?: number } }>;
+  all<T = Record<string, unknown>>(): Promise<{ results: T[] }>;
 };
 type Database = { prepare(sql: string): Statement; batch(statements: Statement[]): Promise<unknown[]> };
-type StateRow = { state_hash: string; nonce: string; verifier: string; flow: "login" | "register"; privacy_consent: number; expires_at: number };
+type StateRow = { state_hash: string; nonce: string; verifier: string; flow: "login" | "register"; privacy_consent: number; terms_consent: number; expires_at: number };
 type Claims = { iss?: unknown; aud?: unknown; azp?: unknown; exp?: unknown; iat?: unknown; nonce?: unknown; sub?: unknown; id?: unknown; name?: unknown; given_name?: unknown; family_name?: unknown; preferred_username?: unknown; picture?: unknown };
 type Jwk = JsonWebKey & { kid?: string; alg?: string; use?: string };
 const COOKIE = "__Host-yume-session";
@@ -68,7 +69,11 @@ async function createSession(db: Database, userId: string, secret: string): Prom
   return sessionCookie(token);
 }
 async function ensureOidcStateTable(db: Database): Promise<void> {
-  await db.prepare("CREATE TABLE IF NOT EXISTS yume_telegram_oidc_states (state_hash TEXT PRIMARY KEY NOT NULL, nonce TEXT NOT NULL, verifier TEXT NOT NULL, flow TEXT NOT NULL CHECK (flow IN ('login','register')), privacy_consent INTEGER NOT NULL CHECK (privacy_consent IN (0,1)), expires_at INTEGER NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)").run();
+  await db.prepare("CREATE TABLE IF NOT EXISTS yume_telegram_oidc_states (state_hash TEXT PRIMARY KEY NOT NULL, nonce TEXT NOT NULL, verifier TEXT NOT NULL, flow TEXT NOT NULL CHECK (flow IN ('login','register')), privacy_consent INTEGER NOT NULL CHECK (privacy_consent IN (0,1)), terms_consent INTEGER NOT NULL DEFAULT 0 CHECK (terms_consent IN (0,1)), expires_at INTEGER NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)").run();
+  const result = await db.prepare("PRAGMA table_info(yume_telegram_oidc_states)").all<{ name: string }>();
+  if (!result.results.some((column) => column.name === "terms_consent")) {
+    await db.prepare("ALTER TABLE yume_telegram_oidc_states ADD COLUMN terms_consent INTEGER NOT NULL DEFAULT 0 CHECK (terms_consent IN (0,1))").run();
+  }
   await db.prepare("CREATE INDEX IF NOT EXISTS idx_yume_telegram_oidc_states_expiry ON yume_telegram_oidc_states(expires_at)").run();
 }
 function redirect(url: URL, cookies: string[] = []): Response {
@@ -127,12 +132,13 @@ export async function handleTelegramOidc(request: Request): Promise<Response> {
     if (!callback) {
       const flow = url.searchParams.get("flow");
       const consent = url.searchParams.get("consent") === "1";
-      if ((flow !== "login" && flow !== "register") || (flow === "register" && !consent)) return response({ error: flow === "register" ? "consent_required" : "invalid_request" }, 400);
+      const termsConsent = url.searchParams.get("terms") === "1";
+      if ((flow !== "login" && flow !== "register") || (flow === "register" && (!consent || !termsConsent))) return response({ error: flow === "register" ? "consent_required" : "invalid_request" }, 400);
       await db.prepare("DELETE FROM yume_telegram_oidc_states WHERE expires_at <= ?").bind(Date.now()).run();
       const state = randomToken(); const nonce = randomToken(); const verifier = randomToken(48);
       const stateHash = await keyedHash(state, secret);
-      await db.prepare("INSERT INTO yume_telegram_oidc_states (state_hash, nonce, verifier, flow, privacy_consent, expires_at) VALUES (?, ?, ?, ?, ?, ?)")
-        .bind(stateHash, nonce, verifier, flow, consent ? 1 : 0, Date.now() + 10 * 60 * 1000).run();
+      await db.prepare("INSERT INTO yume_telegram_oidc_states (state_hash, nonce, verifier, flow, privacy_consent, terms_consent, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
+        .bind(stateHash, nonce, verifier, flow, consent ? 1 : 0, termsConsent ? 1 : 0, Date.now() + 10 * 60 * 1000).run();
       const challenge = b64url(await digest(verifier));
       const auth = new URL("https://oauth.telegram.org/auth");
       auth.searchParams.set("client_id", clientId);
@@ -150,7 +156,7 @@ export async function handleTelegramOidc(request: Request): Promise<Response> {
     if (!code || !state || code.length > 4096 || state.length > 256) return errorRedirect(origin, "telegram_login_cancelled");
     if (readCookie(request, OIDC_STATE_COOKIE) !== state) return errorRedirect(origin, "telegram_login_state_mismatch");
     const stateHash = await keyedHash(state, secret);
-    const pending = await db.prepare("SELECT state_hash, nonce, verifier, flow, privacy_consent, expires_at FROM yume_telegram_oidc_states WHERE state_hash = ?")
+    const pending = await db.prepare("SELECT state_hash, nonce, verifier, flow, privacy_consent, terms_consent, expires_at FROM yume_telegram_oidc_states WHERE state_hash = ?")
       .bind(stateHash).first<StateRow>();
     if (!pending || pending.expires_at <= Date.now()) return errorRedirect(origin, "telegram_login_expired");
     await db.prepare("DELETE FROM yume_telegram_oidc_states WHERE state_hash = ?").bind(stateHash).run();
@@ -171,7 +177,7 @@ export async function handleTelegramOidc(request: Request): Promise<Response> {
     const existing = await db.prepare("SELECT id FROM yume_users WHERE telegram_user_id = ?").bind(telegramId).first<{ id: string }>();
     if (pending.flow === "login" && !existing) return errorRedirect(origin, "account_not_found");
     if (pending.flow === "register" && existing) return errorRedirect(origin, "already_registered");
-    if (pending.flow === "register" && pending.privacy_consent !== 1) return errorRedirect(origin, "consent_required");
+    if (pending.flow === "register" && (pending.privacy_consent !== 1 || pending.terms_consent !== 1)) return errorRedirect(origin, "consent_required");
     const fullName = typeof claims.name === "string" ? claims.name.trim() : "";
     const firstName = typeof claims.given_name === "string" ? claims.given_name.trim() : fullName.split(/\s+/)[0] || "Telegram user";
     const lastName = typeof claims.family_name === "string" ? claims.family_name.trim() : fullName.split(/\s+/).slice(1).join(" ") || null;
