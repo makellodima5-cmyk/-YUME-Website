@@ -35,7 +35,7 @@ const KODIK_PLAYER_HOSTS = [
 ] as const;
 
 function isTrustedKodikHost(hostname: string): boolean {
-  const normalized = hostname.toLowerCase().replace(/\\.$/, "");
+  const normalized = hostname.toLowerCase().replace(/\.$/, "");
   return KODIK_PLAYER_HOSTS.some((domain) => normalized === domain || normalized.endsWith("." + domain));
 }
 
