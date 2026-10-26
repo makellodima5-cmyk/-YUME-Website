@@ -32,6 +32,7 @@ const REQUEST_DELAY_MS = 1500;
 const METADATA_REFRESH_BATCH_SIZE = 100;
 const METADATA_LOOKUP_BATCH_SIZE = 40;
 const SCREENSHOT_RETRY_LIMIT = 3;
+const SCREENSHOT_REFRESH_BATCH_SIZE = 40;
 const FIELDS = "id name english russian kind score status episodes episodesAired airedOn { date year } releasedOn { date year } description poster { mainUrl previewUrl originalUrl } opengraphImageUrl genres { id name russian kind } nextEpisodeAt rating studios { name } videos { url playerUrl name kind }";
 const IMPORT_FIELDS = FIELDS + " screenshots { originalUrl x332Url x166Url }";
 
