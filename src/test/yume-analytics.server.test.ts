@@ -150,6 +150,27 @@ describe("YUME server analytics", () => {
     expect(db.rows).toHaveLength(0);
   });
 
+  it("honors Global Privacy Control even if the analytics consent cookie is present", async () => {
+    const request = new Request("https://yume.test/api/analytics", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Origin: "https://yume.test",
+        "Sec-GPC": "1",
+        Cookie: "yume-analytics-consent=all",
+      },
+      body: JSON.stringify({
+        path: "/#home",
+        sessionId: "00000000-0000-4000-8000-000000000001",
+        visitorId: "00000000-0000-4000-8000-000000000099",
+      }),
+    });
+    const response = await handleYumeAnalytics(request);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ ok: true, ignored: true, reason: "global_privacy_control" });
+    expect(db.rows).toHaveLength(0);
+  });
+
   it("stores only hashed visitor and session identifiers", async () => {
     const sessionId = "00000000-0000-4000-8000-000000000001";
     const response = await handleYumeAnalytics(visit("/#home", sessionId));
