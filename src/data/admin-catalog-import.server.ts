@@ -987,7 +987,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
         const remainingTarget = Math.max(0, before.target - before.added);
         const candidateBannerIds = Array.from(new Set(source
           .map(item => String(item.id))
-          .filter(id => /^\\d{1,10}$/.test(id) && Number(id) <= 2147483647 && !existingIds.has(id))))
+          .filter(id => /^\d{1,10}$/.test(id) && Number(id) <= 2147483647 && !existingIds.has(id))))
           .slice(0, remainingTarget);
         const importedBanners = await getAniListBannersByMalIds(candidateBannerIds);
         const seen = new Set<string>();
