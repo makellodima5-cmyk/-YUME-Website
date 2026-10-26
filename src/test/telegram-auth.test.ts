@@ -237,3 +237,15 @@ describe("Telegram browser-auth polling CSRF protection", () => {
     expect(await response.json()).toEqual({ error: "cross_origin_request" });
   });
 });
+
+describe("Telegram session logout CSRF protection", () => {
+  it("rejects cross-origin logout requests", async () => {
+    const response = await handleTelegramSession(new Request("https://yume.test/api/telegram/init-data", {
+      method: "DELETE",
+      headers: { Origin: "https://attacker.test" },
+    }));
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: "cross_origin_request" });
+  });
+});
