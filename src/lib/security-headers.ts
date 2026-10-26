@@ -28,3 +28,27 @@ export function applySecurityHeaders(response: Response, requestUrl: string): Re
     headers,
   });
 }
+
+
+/** Redirect all public HTTP requests to HTTPS before application code runs. */
+export function redirectHttpToHttps(request: Request): Response | null {
+  let url: URL;
+  try {
+    url = new URL(request.url);
+  } catch {
+    return null;
+  }
+  if (url.protocol !== "http:") return null;
+  const host = url.hostname.toLowerCase();
+  if (host === "localhost" || host === "127.0.0.1" || host === "[::1]" || host === "::1") return null;
+  url.protocol = "https:";
+  return new Response(null, {
+    status: 308,
+    headers: {
+      Location: url.toString(),
+      "Cache-Control": "no-store",
+      "X-Content-Type-Options": "nosniff",
+      "Referrer-Policy": "no-referrer",
+    },
+  });
+}
