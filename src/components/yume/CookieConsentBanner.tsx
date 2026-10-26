@@ -26,7 +26,7 @@ function hasConsent(): boolean {
   }
 }
 
-export function CookieConsentBanner({ isHome }: { isHome: boolean }) {
+export function CookieConsentBanner() {
   const { language } = useYumePreferences();
   const [visible, setVisible] = useState(false);
   const isRu = language === "ru";
@@ -41,8 +41,14 @@ export function CookieConsentBanner({ isHome }: { isHome: boolean }) {
         // Analytics itself remains blocked unless a valid opt-in is stored.
       }
     }
-    setVisible((current) => accepted ? false : current || isHome);
-  }, [isHome]);
+    setVisible(!accepted);
+  }, []);
+
+  useEffect(() => {
+    const showCookieSettings = () => setVisible(true);
+    window.addEventListener("yume-open-cookie-settings", showCookieSettings);
+    return () => window.removeEventListener("yume-open-cookie-settings", showCookieSettings);
+  }, []);
 
   const saveChoice = (analytics: boolean) => {
     const choice: ConsentChoice = {
