@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { handleShikimoriImageProxy, toSameOriginShikimoriImage } from "@/lib/shikimori-image-proxy";
+import { handleShikimoriImageProxy, toSameOriginShikimoriImage, toSameOriginShikimoriScreenshot } from "@/lib/shikimori-image-proxy";
 
 describe("Shikimori image proxy", () => {
   afterEach(() => vi.restoreAllMocks());
@@ -14,6 +14,20 @@ describe("Shikimori image proxy", () => {
     expect(toSameOriginShikimoriImage("https://shikimori.one/api/animes/123")).toBeUndefined();
     expect(toSameOriginShikimoriImage("https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/1.jpg"))
       .toBe("https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/1.jpg");
+  });
+
+  it("rewrites screenshot preview and original URLs together so browser requests stay same-origin", () => {
+    expect(toSameOriginShikimoriScreenshot({
+      previewUrl: "https://shikimori.one/uploads/screenshots/preview.jpg",
+      originalUrl: "https://shikimori.one/uploads/screenshots/original.jpg",
+    })).toEqual({
+      previewUrl: "/api/media/shikimori?src=https%3A%2F%2Fshikimori.one%2Fuploads%2Fscreenshots%2Fpreview.jpg",
+      originalUrl: "/api/media/shikimori?src=https%3A%2F%2Fshikimori.one%2Fuploads%2Fscreenshots%2Foriginal.jpg",
+    });
+    expect(toSameOriginShikimoriScreenshot({
+      previewUrl: "https://shikimori.one/api/animes/1",
+      originalUrl: "https://shikimori.one/uploads/screenshots/original.jpg",
+    })).toBeNull();
   });
 
   it("rejects unsafe hosts, non-HTTPS sources, queries, and non-image paths", async () => {
