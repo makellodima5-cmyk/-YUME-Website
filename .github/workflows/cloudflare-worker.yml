@@ -82,8 +82,8 @@ jobs:
           if (!/callHook\(["']cloudflare:scheduled["']/.test(workerEntry)) {
             throw new Error("Generated Worker entry has no Cloudflare scheduled-hook dispatch.");
           }
-          if (!workerEntry.includes("[YUME][CATALOG_AUTO_REFRESH] Nitro scheduled hook received.")) {
-            throw new Error("Generated Worker entry has no registered YUME Cloudflare scheduled-hook subscriber.");
+          if (!workerEntry.includes("[YUME][TRAILER_AUTO] Nitro scheduled hook received.")) {
+            throw new Error("Generated Worker entry has no registered trailer update scheduled-hook subscriber.");
           }
           if (workerEntry.includes("runScheduledCatalogMetadataRefresh")) {
             throw new Error("Catalog metadata refresh must not be scheduled; it is manual-only.");
