@@ -869,14 +869,18 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
                       title: language === "ru" ? "Cookie-файлы и аналогичные технологии" : "Cookies and similar technologies",
                       clauses: language === "ru" ? [
                         "Сайт может использовать cookie-файлы, локальное хранилище браузера и аналогичные технологии для поддержки основных функций, сохранения настроек и обеспечения безопасности.",
-                        "Строго необходимые технологии могут использоваться для работы запрошенных пользователем функций. Аналитические, рекламные и иные необязательные технологии применяются только при наличии соответствующих инструментов и с учётом выбора пользователя и применимых требований.",
-                        "Пользователь может ограничить или удалить cookie-файлы в настройках браузера. Это может повлиять на доступность отдельных функций или сохранение настроек.",
-                        "Если на сайте доступен интерфейс управления согласием на cookie, пользователь может изменить свой выбор через этот интерфейс. Закрытие уведомления или продолжение просмотра само по себе не рассматривается как согласие на необязательные технологии."
+                        "Строго необходимые технологии используются для входа и работы запрошенных функций. Cookie __Host-yume-session поддерживает авторизованную сессию и имеет атрибуты HttpOnly, Secure и SameSite=Lax; при входе через Telegram cookie __Host-yume-oidc-state может использоваться временно для защиты процесса авторизации.",
+                        "Выбор в уведомлении сохраняется в локальном хранилище yume-cookie-consent-v1, а cookie yume-analytics-consent хранит только значение выбора — all или necessary — без идентификатора пользователя.",
+                        "Необязательная внутренняя аналитика создаёт ключи yume-analytics-visitor-id и yume-analytics-session только после явного выбора «Принять все». При выборе «Только необходимые» аналитические ключи удаляются, а сервер не записывает аналитические события.",
+                        "Пользователь может ограничить или удалить cookie-файлы и данные сайта в настройках браузера. Это может повлиять на доступность отдельных функций или сохранение настроек.",
+                        "Изменить выбор можно через пункт «Настройки cookies» внизу сайта или в этом разделе Политики. Закрытие уведомления или продолжение просмотра само по себе не рассматривается как согласие на необязательные технологии."
                       ] : [
                         "The site may use cookies, browser local storage, and similar technologies to support core features, save preferences, and maintain security.",
-                        "Strictly necessary technologies may be used to provide features requested by the user. Analytics, advertising, and other optional technologies are used only if actually implemented and in line with user choices and applicable requirements.",
-                        "Users can restrict or delete cookies in browser settings. This may affect some features or saved preferences.",
-                        "If a cookie-consent interface is available, users can change their choices there. Closing a notice or continuing to browse is not by itself treated as consent to optional technologies."
+                        "Strictly necessary technologies support sign-in and requested site features. The __Host-yume-session cookie supports an authenticated session and uses HttpOnly, Secure, and SameSite=Lax attributes; the __Host-yume-oidc-state cookie may be used temporarily to protect Telegram sign-in.",
+                        "The consent choice is stored in localStorage under yume-cookie-consent-v1, while the yume-analytics-consent cookie stores only the choice — all or necessary — and no user identifier.",
+                        "Optional first-party analytics creates yume-analytics-visitor-id and yume-analytics-session identifiers only after the explicit “Accept all” choice. Choosing “Essential only” removes analytics identifiers and the server does not record analytics events.",
+                        "Users can restrict or delete cookies and site data in browser settings. This may affect some features or saved preferences.",
+                        "Users can change their choice through Cookie settings in the site footer or on this Policy page. Closing a notice or continuing to browse is not by itself treated as consent to optional technologies."
                       ]
                     },
                     {
@@ -949,6 +953,15 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
                             </li>
                           ))}
                         </ol>
+                        {section.title === (language === "ru" ? "Cookie-файлы и аналогичные технологии" : "Cookies and similar technologies") && (
+                          <button
+                            type="button"
+                            onClick={() => window.dispatchEvent(new CustomEvent("yume-open-cookie-settings"))}
+                            className="mt-4 text-sm font-semibold text-primary underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          >
+                            {language === "ru" ? "Настройки cookies" : "Cookie settings"}
+                          </button>
+                        )}
                       </div>
                     </details>
                   ))}
