@@ -857,11 +857,13 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
                         "Информация может обрабатываться для обеспечения работы сайта и учётной записи, предоставления доступных функций, сохранения пользовательских настроек, обеспечения безопасности, предотвращения злоупотреблений, диагностики ошибок и ответа на обращения пользователей.",
                         "В зависимости от используемых функций могут обрабатываться сведения, переданные при авторизации через Telegram, данные профиля, настройки и действия внутри сервиса, а также технические сведения о запросах и сбоях.",
                         "Обработка осуществляется в объёме, необходимом для указанных целей, на соответствующем основании, включая предоставление запрошенной функции, выполнение применимых требований и согласие пользователя в тех случаях, когда оно необходимо.",
+                        "Для оформления интерфейса браузер загружает шрифты Manrope и Unbounded через Google Fonts; для интеграции с Telegram загружается официальный скрипт Telegram Web Apps с telegram.org. При загрузке этих ресурсов соответствующие поставщики получают сетевые данные запроса, например IP-адрес и сведения о браузере, согласно собственным условиям и политикам.",
                         "Администрация не должна использовать данные для несовместимых с указанными целями задач без надлежащего основания и информирования пользователя, когда это требуется."
                       ] : [
                         "Information may be processed to operate the site and account, provide available features, save preferences, maintain security, prevent abuse, diagnose errors, and respond to user requests.",
                         "Depending on the features used, this may include information provided through Telegram authentication, profile details, settings and activity within the service, and technical request or error information.",
                         "Processing is limited to what is necessary for these purposes and relies on an appropriate basis, including providing a requested feature, meeting applicable requirements, or user consent where required.",
+                        "For interface styling, the browser loads the Manrope and Unbounded fonts through Google Fonts; Telegram integration loads the official Telegram Web Apps script from telegram.org. When these resources are requested, the respective providers receive request-level network data such as the IP address and browser information under their own terms and policies.",
                         "Information should not be used for purposes incompatible with those described without an appropriate basis and user notice where required."
                       ]
                     },
