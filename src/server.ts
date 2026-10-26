@@ -136,6 +136,23 @@ function getSupportRedirect(request: Request, env: unknown): Response | null {
   });
 }
 
+function redirectHttpToHttps(request: Request): Response | null {
+  const url = new URL(request.url);
+  if (url.protocol !== "http:") return null;
+
+  url.protocol = "https:";
+  if (url.port === "80") url.port = "";
+
+  return new Response(null, {
+    status: 308,
+    headers: {
+      Location: url.toString(),
+      "Cache-Control": "no-store",
+      "X-Content-Type-Options": "nosniff",
+    },
+  });
+}
+
 async function getServerEntry(): Promise<ServerEntry> {
   if (!serverEntryPromise) {
     serverEntryPromise = import("@tanstack/react-start/server-entry").then(
