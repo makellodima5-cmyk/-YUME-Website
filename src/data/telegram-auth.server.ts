@@ -515,6 +515,14 @@ export async function handleTelegramBrowserAuth(request: Request): Promise<Respo
     return jsonResponse({ error: "method_not_allowed" }, 405);
   }
 
+  // The polling token is a bearer credential. Without same-origin validation,
+  // an attacker could finish their own login flow and link a victim to this GET
+  // URL, forcing the victim's browser to receive a session for the attacker's
+  // account (login CSRF). Browser polling is same-origin; fail closed otherwise.
+  if (!isSameOriginRequest(request)) {
+    return jsonResponse({ error: "cross_origin_request" }, 403);
+  }
+
   const env = environment();
   const db = database(env);
   const secret = sessionSecret(env);
