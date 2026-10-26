@@ -153,6 +153,41 @@ function AnimeDetailPage() {
   }, [watchMode, kodikEmbedUrl, anime, language]);
 
   useEffect(() => {
+    if (watchMode !== "episodes" || !kodikEmbedUrl) return;
+    let historySaved = false;
+    const onKodikMessage = (event: MessageEvent) => {
+      if (historySaved || !event.origin) return;
+      try {
+        if (!new URL(event.origin).hostname.toLowerCase().includes("kodik")) return;
+      } catch {
+        return;
+      }
+      let payload: unknown = event.data;
+      if (typeof payload === "string") {
+        try { payload = JSON.parse(payload); } catch { return; }
+      }
+      if (!payload || typeof payload !== "object") return;
+      const message = payload as Record<string, unknown>;
+      const messageType = String(message.type ?? message.event ?? message.name ?? "");
+      if (!messageType.includes("time_update")) return;
+      const rawTime = message.time ?? message.currentTime ?? message.seconds ?? message.current_time;
+      const watchedSeconds = typeof rawTime === "number" ? rawTime : Number(rawTime);
+      // Ignore page opens and player initialization. Require an actual playback time update.
+      if (!Number.isFinite(watchedSeconds) || watchedSeconds < 30) return;
+      historySaved = true;
+      void fetch("/api/telegram/history", {
+        method: "POST",
+        credentials: "same-origin",
+        cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ animeId, watchedSeconds }),
+      }).catch(() => undefined);
+    };
+    window.addEventListener("message", onKodikMessage);
+    return () => window.removeEventListener("message", onKodikMessage);
+  }, [watchMode, kodikEmbedUrl, animeId]);
+
+  useEffect(() => {
     let cancelled = false;
     setScreenshots([]);
     setActiveScreenshotIndex(null);
