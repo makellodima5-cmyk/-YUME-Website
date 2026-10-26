@@ -115,6 +115,20 @@ function AnimeDetailPage() {
       types: "anime,anime-serial",
     };
 
+    // Keep Kodik's injected iframe fitted to the same responsive 16:9 frame as the trailer.
+    const fitPlayer = () => {
+      player.querySelectorAll("iframe").forEach((frame) => {
+        frame.style.position = "absolute";
+        frame.style.inset = "0";
+        frame.style.width = "100%";
+        frame.style.height = "100%";
+        frame.style.border = "0";
+      });
+    };
+    const observer = new MutationObserver(fitPlayer);
+    observer.observe(player, { childList: true, subtree: true });
+    fitPlayer();
+
     const script = document.createElement("script");
     script.src = "https://kodik-add.com/add-players.min.js";
     script.async = true;
@@ -122,6 +136,7 @@ function AnimeDetailPage() {
     player.insertAdjacentElement("afterend", script);
 
     return () => {
+      observer.disconnect();
       script.remove();
       player.replaceChildren();
       delete (window as Window & { kodikAddPlayers?: { types: string } }).kodikAddPlayers;
@@ -317,16 +332,16 @@ function AnimeDetailPage() {
     </>
   );
 
-  const watchButton = anime.youtubeTrailerId ? (
+  const watchButton = (
     <button
       type="button"
       onClick={scrollToPlayer}
       className="inline-flex items-center justify-center gap-2 rounded-full bg-neon px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-neon transition hover:brightness-110"
     >
       <Play className="h-4 w-4 fill-current" />
-      {t("anime.watchTrailer")}
+      {language === "en" ? "Watch" : "Смотреть"}
     </button>
-  ) : null;
+  );
 
   const favoriteButton = (
     <button
@@ -611,13 +626,8 @@ function AnimeDetailPage() {
             </div>
             <div className="mx-auto w-full max-w-6xl min-w-0">
               {watchMode === "episodes" ? (
-                <div className="mx-auto w-full min-w-0 overflow-hidden rounded-2xl border border-white/10 bg-[#080710] shadow-2xl">
-                  <div id="kodik-player" className="min-h-[240px] w-full sm:min-h-[360px] lg:min-h-[480px]" />
-                  <p className="px-4 py-3 text-xs leading-relaxed text-white/50">
-                    {language === "en"
-                      ? "Kodik automatically searches for a matching anime player. If nothing appears, a matching player may not be available for this title yet."
-                      : "Kodik автоматически ищет подходящий плеер для этого аниме. Если плеер не появился, возможно, для этого тайтла пока нет совпадения."}
-                  </p>
+                <div className="relative mx-auto aspect-video w-full min-w-0 overflow-hidden rounded-2xl border border-white/10 bg-[#080710] shadow-2xl">
+                  <div id="kodik-player" className="absolute inset-0 h-full w-full [&_iframe]:!absolute [&_iframe]:!inset-0 [&_iframe]:!h-full [&_iframe]:!w-full" />
                 </div>
               ) : anime.youtubeTrailerId ? (
                 <div className="relative mx-auto aspect-video w-full min-w-0 overflow-hidden rounded-2xl border border-white/10 bg-[#080710] shadow-2xl">
