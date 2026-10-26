@@ -21,6 +21,7 @@ type ShikimoriAnime = {
   opengraphImageUrl?: string | null; genres?: { name?: string; russian?: string; kind?: string }[] | null;
   rating?: string | null; studios?: { name?: string }[] | null; nextEpisodeAt?: string | null;
   videos?: { url?: string | null; playerUrl?: string | null; name?: string | null; kind?: string | null }[] | null;
+  screenshots?: { originalUrl?: string | null; x332Url?: string | null; x166Url?: string | null }[] | null;
 };
 type Payload = { data?: { animes?: ShikimoriAnime[] | null }; errors?: { message?: string }[] };
 const API_URL = "https://shikimori.io/api/graphql";
@@ -32,6 +33,7 @@ const METADATA_REFRESH_BATCH_SIZE = 100;
 const METADATA_LOOKUP_BATCH_SIZE = 40;
 const SCREENSHOT_RETRY_LIMIT = 3;
 const FIELDS = "id name english russian kind score status episodes episodesAired airedOn { date year } releasedOn { date year } description poster { mainUrl previewUrl originalUrl } opengraphImageUrl genres { id name russian kind } nextEpisodeAt rating studios { name } videos { url playerUrl name kind }";
+const IMPORT_FIELDS = FIELDS + " screenshots { originalUrl x332Url x166Url }";
 
 export function normalizeAdminCatalogIds(value: unknown): string[] {
   const rawIds = Array.isArray(value) ? value : [];
@@ -112,6 +114,7 @@ function ensureSchema(db: Database): Promise<void> {
     db.prepare("CREATE TABLE IF NOT EXISTS anime_catalog_screenshot_status (anime_id TEXT PRIMARY KEY NOT NULL, status TEXT NOT NULL CHECK (status IN ('done','retry','failed')), attempts INTEGER NOT NULL DEFAULT 0, last_error TEXT, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)"),
     db.prepare("CREATE INDEX IF NOT EXISTS idx_anime_catalog_screenshot_status_state ON anime_catalog_screenshot_status(status, attempts, updated_at)"),
     db.prepare("CREATE INDEX IF NOT EXISTS idx_anime_catalog_screenshots_position ON anime_catalog_screenshots(anime_id, position)"),
+    db.prepare("CREATE INDEX IF NOT EXISTS idx_anime_catalog_position_id ON anime_catalog(position,id)"),
     db.prepare("CREATE INDEX IF NOT EXISTS idx_anime_catalog_missing_trailer ON anime_catalog(id) WHERE youtube_trailer_id IS NULL OR youtube_trailer_id = ''"),
     db.prepare("CREATE TABLE IF NOT EXISTS yume_admin_audit_log (id INTEGER PRIMARY KEY AUTOINCREMENT, action TEXT NOT NULL, status TEXT NOT NULL, details TEXT NOT NULL DEFAULT '{}', actor_telegram_id TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)"),
     db.prepare("CREATE TABLE IF NOT EXISTS admin_catalog_import_lock (id INTEGER PRIMARY KEY CHECK (id = 1), token TEXT NOT NULL DEFAULT '', expires_at INTEGER NOT NULL DEFAULT 0)"),
@@ -241,7 +244,7 @@ export function isCatalogMetadataIncomplete(row: CatalogMetadataCompleteness): b
     blank(row.youtube_trailer_id);
 }
 async function fetchPage(page: number): Promise<ShikimoriAnime[]> {
-  const query = "query { animes(page: " + page + ", limit: " + PAGE_SIZE + ", order: popularity) { " + FIELDS + " } }";
+  const query = "query { animes(page: " + page + ", limit: " + PAGE_SIZE + ", order: popularity) { " + IMPORT_FIELDS + " } }";
   const response = await fetch(API_URL, { method:"POST", headers:{"Content-Type":"application/json",Accept:"application/json","User-Agent":"YUME/1.0"}, body:JSON.stringify({query}), signal:AbortSignal.timeout(12000) });
   if (response.status === 429) {
     const retryAfterMs = retryAfterMilliseconds(response.headers.get("Retry-After")) ?? 60000;
@@ -254,7 +257,7 @@ async function fetchPage(page: number): Promise<ShikimoriAnime[]> {
   if (payload.errors?.length) throw new Error(payload.errors.map(e=>e.message).filter(Boolean).join("; ") || "GraphQL error");
   return (payload.data?.animes ?? []).filter(item => !(item.genres ?? []).some(g => [g.name,g.russian].some(n => clean(n).normalize("NFKC").toLowerCase() === "hentai" || clean(n).normalize("NFKC").toLowerCase() === "хентай")));
 }
-async function fetchByIds(ids: string[]): Promise<ShikimoriAnime[]> {
+async function fetchByIds(ids: string[], includeScreenshots = false): Promise<ShikimoriAnime[]> {
   const safeIds = normalizeAdminCatalogIds(ids);
   if (!safeIds.length) return [];
 
@@ -266,7 +269,8 @@ async function fetchByIds(ids: string[]): Promise<ShikimoriAnime[]> {
   for (let index = 0; index < batches.length; index++) {
     if (index > 0) await new Promise(resolve => setTimeout(resolve, REQUEST_DELAY_MS));
     const batchIds = batches[index]!;
-    const query = "query { animes(ids: " + JSON.stringify(batchIds.join(",")) + ", limit: 50) { " + FIELDS + " } }";
+    const queryFields = includeScreenshots ? IMPORT_FIELDS : FIELDS;
+    const query = "query { animes(ids: " + JSON.stringify(batchIds.join(",")) + ", limit: 50) { " + queryFields + " } }";
     const response = await fetch(API_URL, { method:"POST", headers:{"Content-Type":"application/json",Accept:"application/json","User-Agent":"YUME/1.0"}, body:JSON.stringify({query}), signal:AbortSignal.timeout(12000) });
     if (response.status === 429) {
       const retryAfterMs = retryAfterMilliseconds(response.headers.get("Retry-After")) ?? 60000;
@@ -283,16 +287,7 @@ async function fetchByIds(ids: string[]): Promise<ShikimoriAnime[]> {
   return Array.from(resultById.values()).filter(item => !(item.genres ?? []).some(g => [g.name,g.russian].some(n => clean(n).normalize("NFKC").toLowerCase() === "hentai" || clean(n).normalize("NFKC").toLowerCase() === "хентай")));
 }
 
-async function updateCatalogMetadata(db: Database, item: ReturnType<typeof mapItem>): Promise<number> {
-  const row = await db.prepare("SELECT title,english_title,original_title,year,episodes,rating,genres_json,status,description,poster_url,banner_url,kind,age_rating,next_episode_at,episodes_aired,aired_on,studios_json,youtube_trailer_id FROM anime_catalog WHERE id = ?")
-    .bind(item.id).first<{
-      title: string; english_title: string | null; original_title: string; year: number; episodes: number;
-      rating: number | null; genres_json: string | null; status: string | null; description: string;
-      poster_url: string | null; banner_url: string | null; kind: string | null; age_rating: string | null;
-      next_episode_at: string | null; episodes_aired: number; aired_on: string | null; studios_json: string | null;
-      youtube_trailer_id: string | null;
-    }>();
-  if (!row) return 0;
+function catalogMetadataUpdateStatement(db: Database, item: ReturnType<typeof mapItem>, row: CatalogMetadataCompleteness & { next_episode_at: string | null; episodes_aired: number }): Statement | null {
   const changes: Array<[string, unknown]> = [];
   const blank = (value: string | null | undefined) => !value || !value.trim();
   const fill = (column: string, missing: boolean, value: unknown) => {
@@ -316,11 +311,24 @@ async function updateCatalogMetadata(db: Database, item: ReturnType<typeof mapIt
   fill("aired_on", blank(row.aired_on), item.aired_on);
   fill("studios_json", blank(row.studios_json) || row.studios_json === "[]", item.studios_json !== "[]" ? item.studios_json : null);
   fill("youtube_trailer_id", blank(row.youtube_trailer_id), item.youtube_trailer_id);
-  if (!changes.length) return 0;
+  if (!changes.length) return null;
   const assignments = changes.map(([column]) => column + " = ?").join(", ");
-  const result = await db.prepare("UPDATE anime_catalog SET " + assignments + ", updated_at = CURRENT_TIMESTAMP WHERE id = ?")
-    .bind(...changes.map(([, value]) => value), item.id).run();
-  return Number(result.meta?.changes ?? 0);
+  return db.prepare("UPDATE anime_catalog SET " + assignments + ", updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+    .bind(...changes.map(([, value]) => value), item.id);
+}
+
+export function mapAdminCatalogScreenshots(item: Pick<ShikimoriAnime, "screenshots">): Array<{ original: string; preview: string }> {
+  const seen = new Set<string>();
+  const screenshots: Array<{ original: string; preview: string }> = [];
+  for (const shot of item.screenshots ?? []) {
+    const original = safeImage(shot.originalUrl);
+    const preview = safeImage(shot.x332Url) ?? safeImage(shot.x166Url) ?? original;
+    if (!original || !preview || seen.has(original)) continue;
+    seen.add(original);
+    screenshots.push({ original, preview });
+    if (screenshots.length === 5) break;
+  }
+  return screenshots;
 }
 
 type ScreenshotStatus = "done" | "retry" | "failed";
@@ -359,7 +367,7 @@ async function fetchAndStoreScreenshots(db: Database, animeId: string, previousA
       return original && preview ? { original, preview } : null;
     }).filter((shot): shot is { original: string; preview: string } => shot !== null)
       .filter((shot, index, all) => all.findIndex(other => other.original === shot.original) === index)
-      .slice(0, 24);
+      .slice(0, 5);
     const statements: Statement[] = shots.map((shot, index) =>
       db.prepare("INSERT OR IGNORE INTO anime_catalog_screenshots (anime_id,original_url,preview_url,position,updated_at) VALUES (?,?,?,?,CURRENT_TIMESTAMP)")
         .bind(animeId, shot.original, shot.preview, index));
@@ -375,21 +383,6 @@ async function fetchAndStoreScreenshots(db: Database, animeId: string, previousA
       status, attempts, saved: 0, error: message,
       statements: [screenshotStatusStatement(db, animeId, status, attempts, message)],
     };
-  }
-}
-
-async function startPostImportEnrichment(db: Database): Promise<void> {
-  const current = await getMeta(db, "metadata_refresh_state");
-  // A completed/idle refresh has no cursor to preserve. Start a durable enrichment
-  // pass so new released titles receive screenshots as part of the import workflow.
-  if (!current || current === "idle" || current === "done") {
-    await db.batch([
-      setMeta(db, "metadata_refresh_state", "metadata"),
-      setMeta(db, "metadata_refresh_cursor", "0"),
-      setMeta(db, "metadata_refresh_screenshot_cursor", "0"),
-      setMeta(db, "metadata_refresh_auto_enabled", "1"),
-      db.prepare("UPDATE anime_catalog_screenshot_status SET status='retry',attempts=0,last_error=NULL,updated_at=CURRENT_TIMESTAMP WHERE status='failed'"),
-    ]);
   }
 }
 
@@ -571,10 +564,16 @@ async function runCatalogMetadataRefreshStep(db: Database): Promise<Response> {
         const source = await fetchByIds(ids);
         const sourceById = new Map(source.map(item => [String(item.id), item]));
         missingSourceIds = ids.filter(id => !sourceById.has(id));
+        const existingById = new Map(catalogPage.results.map(row => [row.id, row]));
+        const metadataUpdates: Statement[] = [];
         for (const id of ids) {
           const sourceItem = sourceById.get(id);
-          if (sourceItem) updated += await updateCatalogMetadata(db, mapItem(sourceItem));
+          const existingRow = existingById.get(id);
+          if (!sourceItem || !existingRow) continue;
+          const statement = catalogMetadataUpdateStatement(db, mapItem(sourceItem), existingRow);
+          if (statement) { metadataUpdates.push(statement); updated++; }
         }
+        if (metadataUpdates.length) await db.batch(metadataUpdates);
         if (missingSourceIds.length) {
           console.warn("[YUME][CATALOG_METADATA_REFRESH] Shikimori omitted catalog IDs; continuing past this page.", {
             offset: cursor,
@@ -835,19 +834,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
         return json({ isAdmin: true, autoEnabled: false, phase: "metadata", offset: 0, total: Number(totalRow?.total ?? 0), stats: await catalogRefreshStats(db), message: "Прогресс обновления сброшен. Следующий запуск начнётся с начала каталога." });
       }
       if (body.action === "auto_start") {
-        const current = await getMeta(db, "metadata_refresh_state") ?? "idle";
-        const nextState = current === "done" || current === "idle" ? "metadata" : current;
-        await db.batch([
-          setMeta(db, "metadata_refresh_state", nextState),
-          setMeta(db, "metadata_refresh_auto_enabled", "1"),
-          ...(nextState === "metadata" && (current === "done" || current === "idle") ? [
-            setMeta(db, "metadata_refresh_cursor", "0"),
-            setMeta(db, "metadata_refresh_screenshot_cursor", "0"),
-            db.prepare("UPDATE anime_catalog_screenshot_status SET status='retry',attempts=0,last_error=NULL,updated_at=CURRENT_TIMESTAMP WHERE status='failed'"),
-          ] : []),
-        ]);
-        await audit(db, "catalog.metadata.auto_start", "success", { phase: nextState });
-        return json({isAdmin:true,autoEnabled:true,phase:nextState,message:"Автоматическое обновление запущено. Оно продолжится в фоне."});
+        return json({ isAdmin: true, autoEnabled: false, error: "automatic_metadata_refresh_disabled", message: "Автоматическое обновление метаданных отключено. Используй ручной режим только при необходимости." }, 410);
       }
       if (body.action === "auto_stop") {
         await setMeta(db, "metadata_refresh_auto_enabled", "0").run();
@@ -901,7 +888,6 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
         if (before.added >= before.target || before.cursor > 500) {
           const finalState = before.added >= before.target ? "completed" : "partial";
           await db.batch([setMeta(db,"admin_import_state",finalState)]);
-          await startPostImportEnrichment(db);
           await audit(db,"catalog.import.finish",finalState,{added:before.added,target:before.target,skipped:before.skipped,errors:before.errors});
           return json({isAdmin:true,...await snapshot(db)});
         }
@@ -953,6 +939,12 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
             .bind(item.id,item.title,item.english_title,item.original_title,item.year,item.episodes,item.rating,item.genres_json,item.status,item.description,item.hue,item.glyph,item.is_new,item.popular,item.poster_url,item.banner_url,item.kind,item.age_rating,item.next_episode_at,item.episodes_aired,item.aired_on,item.studios_json,item.youtube_trailer_id,position++));
           statements.push(db.prepare("INSERT OR IGNORE INTO admin_catalog_import_items (run_id,anime_id,outcome,incomplete) VALUES (?,?,CASE WHEN changes() > 0 THEN 'added' ELSE 'skipped' END,?)")
             .bind(runId,item.id,incomplete(item)?1:0));
+          const screenshots = mapAdminCatalogScreenshots(sourceItem);
+          for (const [index, shot] of screenshots.entries()) {
+            statements.push(db.prepare("INSERT OR IGNORE INTO anime_catalog_screenshots (anime_id,original_url,preview_url,position,updated_at) VALUES (?,?,?,?,CURRENT_TIMESTAMP)")
+              .bind(item.id, shot.original, shot.preview, index));
+          }
+          statements.push(screenshotStatusStatement(db, item.id, "done", 0, screenshots.length ? null : "Источник не вернул кадров"));
           addedCandidates++;
         }
         const resumeAtValue = String(Date.now()+REQUEST_DELAY_MS);
@@ -969,7 +961,6 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
         const after = await snapshot(db);
         await audit(db,"catalog.import.page","success",{page:before.cursor,added:after.added-before.added,skipped:after.skipped-before.skipped,incomplete:after.incomplete-before.incomplete,state:after.state});
         if (after.state !== "running") {
-          await startPostImportEnrichment(db);
           await audit(db,"catalog.import.finish",after.state,{added:after.added,target:after.target,skipped:after.skipped,errors:after.errors});
         }
         return json({isAdmin:true,...after});
