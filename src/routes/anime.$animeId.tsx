@@ -527,7 +527,7 @@ function AnimeDetailPage() {
           {screenshots.length > 0 && (
             <section aria-labelledby="anime-screenshots-title" className="relative z-10 mt-5 md:mt-6">
               <h2 id="anime-screenshots-title" className="mb-3 text-xl font-bold md:text-2xl">
-                {language === "en" ? "Screenshots" : "Кадры из аниме"}
+                {language === "en" ? "Screenshots" : "Кадры"}
               </h2>
               <div className="scrollbar-none flex snap-x snap-mandatory gap-2 overflow-x-auto overscroll-x-contain px-0.5 pb-2">
                 {screenshots.map((screenshot, index) => (
