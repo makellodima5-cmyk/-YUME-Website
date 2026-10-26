@@ -639,7 +639,7 @@ function AnimeDetailPage() {
                   <div className="rounded-2xl border border-white/10 bg-card/70 p-4 sm:p-5">
                     <label htmlFor="kodik-translation" className="mb-2 block text-sm font-medium text-muted-foreground">{language === "en" ? "Voice-over" : "Озвучка"}</label>
                     <div className="relative">
-                      <select id="kodik-translation" value={kodikTranslationId} onChange={(event) => { const next = kodikSources.find((source) => source.id === event.target.value); setKodikTranslationId(event.target.value); setKodikEpisode(next?.episodes[0]?.number ?? 1); }} disabled={!kodikSources.length} className="w-full appearance-none rounded-xl border border-border bg-secondary px-4 py-3 pr-10 text-base text-foreground outline-none transition focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-60">
+                      <select id="kodik-translation" value={kodikTranslationId} onChange={(event) => { const next = kodikSources.find((source) => source.id === event.target.value); setKodikTranslationId(event.target.value); setKodikEpisode(next?.episodes.some((episode) => episode.number === kodikEpisode) ? kodikEpisode : (next?.episodes[0]?.number ?? 1)); }} disabled={!kodikSources.length} className="w-full appearance-none rounded-xl border border-border bg-secondary px-4 py-3 pr-10 text-base text-foreground outline-none transition focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-60">
                         {!kodikSources.length && <option value="">{language === "en" ? "Loading voice-overs…" : "Загрузка озвучек…"}</option>}
                         {kodikSources.map((source) => <option key={source.id} value={source.id}>{source.title}</option>)}
                       </select>
