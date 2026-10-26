@@ -596,6 +596,7 @@ async function runCatalogMetadataRefreshStep(db: Database): Promise<Response> {
       const anilistBanners = bannerLookup.banners;
       const anilistBannersByCatalogId = mapAniListBannersToCatalogIds(source, anilistBanners);
       // Bound title fallbacks to five requests per refresh slice. English is always tried first.
+      let titleFallbackRequests = 0;
       const titleFallbackCandidates = bannerRows
         .filter(row => !anilistBannersByCatalogId.has(row.id))
         .map(row => ({ row, source: sourceById.get(row.id) }))
@@ -609,6 +610,8 @@ async function runCatalogMetadataRefreshStep(db: Database): Promise<Response> {
           .map(value => value.trim())
           .filter((value, index, all) => all.findIndex(other => other.toLocaleLowerCase() === value.toLocaleLowerCase()) === index);
         for (const title of nonRussianTitles) {
+          if (titleFallbackRequests >= 5) break;
+          titleFallbackRequests++;
           const banner = await getAniListBannerByTitle(title);
           if (banner) { anilistBannersByCatalogId.set(entry.row.id, banner); break; }
         }
@@ -1139,6 +1142,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
         const importedTitleFallbacks = candidateSourceItems
           .filter(item => !importedBannersByCatalogId.has(String(item.id)))
           .slice(0, 5);
+        let importedTitleFallbackRequests = 0;
         for (const item of importedTitleFallbacks) {
           const titles = [item.english, item.name]
             .flatMap(value => Array.isArray(value) ? value : [value])
@@ -1146,6 +1150,8 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
             .map(value => value.trim())
             .filter((value, index, all) => all.findIndex(other => other.toLocaleLowerCase() === value.toLocaleLowerCase()) === index);
           for (const title of titles) {
+            if (importedTitleFallbackRequests >= 5) break;
+            importedTitleFallbackRequests++;
             const banner = await getAniListBannerByTitle(title);
             if (banner) { importedBannersByCatalogId.set(String(item.id), banner); break; }
           }
