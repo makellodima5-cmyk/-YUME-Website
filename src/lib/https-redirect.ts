@@ -4,7 +4,7 @@
  * Permanent 308 redirects preserve the HTTP method and request body. The original
  * path and query are retained, while the scheme is upgraded to HTTPS.
  */
-export function redirectHttpToHttps(request: Request): Response | null {
+export function redirectHttpToHttps(request: Pick<Request, "url">): Response | null {
   const url = new URL(request.url);
   if (url.protocol !== "http:") return null;
 
