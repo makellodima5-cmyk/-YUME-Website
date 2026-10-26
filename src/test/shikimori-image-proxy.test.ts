@@ -7,6 +7,10 @@ describe("Shikimori image proxy", () => {
   it("rewrites only HTTPS static image assets on the two approved hosts", () => {
     expect(toSameOriginShikimoriImage("https://shikimori.one/system/animes/original/123.jpg"))
       .toBe("/api/media/shikimori?src=https%3A%2F%2Fshikimori.one%2Fsystem%2Fanimes%2Foriginal%2F123.jpg");
+    expect(toSameOriginShikimoriImage("https://shikimori.io/system/animes/original/123.jpg?v=99"))
+      .toBe("/api/media/shikimori?src=https%3A%2F%2Fshikimori.io%2Fsystem%2Fanimes%2Foriginal%2F123.jpg");
+    expect(toSameOriginShikimoriImage("https://shikimori.one/api/animes/123"))
+      .toBeUndefined();
     expect(toSameOriginShikimoriImage("https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/1.jpg"))
       .toBe("https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/1.jpg");
   });
