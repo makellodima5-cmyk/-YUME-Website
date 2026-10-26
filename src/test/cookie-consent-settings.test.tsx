@@ -19,6 +19,25 @@ afterEach(() => {
 });
 
 describe("cookie consent settings", () => {
+  it("offers granular optional-analytics settings from the first consent layer", () => {
+    render(<CookieConsentBanner isHome />);
+
+    expect(screen.getByRole("button", { name: "Essential only" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Accept all" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+
+    const analytics = screen.getByRole("checkbox", { name: "Allow optional analytics" }) as HTMLInputElement;
+    expect(analytics.checked).toBe(false);
+
+    fireEvent.click(analytics);
+    fireEvent.click(screen.getByRole("button", { name: "Save preferences" }));
+
+    const choice = JSON.parse(window.localStorage.getItem("yume-cookie-consent-v1") ?? "null") as { necessary: boolean; analytics: boolean } | null;
+    expect(choice?.necessary).toBe(true);
+    expect(choice?.analytics).toBe(true);
+    expect(document.cookie).toContain("yume-analytics-consent=all");
+  });
+
   it("can be reopened after a choice and can revoke optional analytics", () => {
     render(<CookieConsentBanner isHome={false} />);
     const bannerName = "Cookie and analytics preferences";
