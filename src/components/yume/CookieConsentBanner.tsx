@@ -73,14 +73,15 @@ export function CookieConsentBanner({ isHome }: { isHome: boolean }) {
       className="fixed inset-x-3 bottom-3 z-[90] mx-auto flex max-w-5xl flex-col gap-3 rounded-2xl border border-primary/25 bg-background/95 p-4 shadow-2xl backdrop-blur-md sm:inset-x-5 sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:px-6 sm:py-4"
     >
       <p className="max-w-3xl text-center text-sm leading-relaxed text-foreground/90 sm:text-left">
-        {isRu ? "Продолжая пользоваться сайтом, вы соглашаетесь с " : "By continuing to use this website, you agree to the "}
-        <button
-          type="button"
-          onClick={() => window.open("/?section=privacy-policy", "_blank", "noopener,noreferrer")}
-          className="inline cursor-pointer text-primary underline decoration-primary/70 underline-offset-4 transition-colors hover:text-primary/80"
+        {isRu
+          ? "Выберите ниже, включать ли необязательную аналитику. Подробнее об обработке данных и cookie — в "
+          : "Choose below whether to enable optional analytics. Details about data processing and cookies are in the "}
+        <a
+          href="/?section=privacy-policy"
+          className="inline text-primary underline decoration-primary/70 underline-offset-4 transition-colors hover:text-primary/80"
         >
-          {isRu ? "политикой в отношении обработки персональных данных и использованием куки" : "the personal data processing policy and use of cookies"}
-        </button>.
+          {isRu ? "политике конфиденциальности" : "privacy policy"}
+        </a>.
       </p>
       <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
         <button
@@ -93,7 +94,7 @@ export function CookieConsentBanner({ isHome }: { isHome: boolean }) {
         <button
           type="button"
           onClick={() => saveChoice(true)}
-          className="inline-flex min-h-10 items-center justify-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="inline-flex min-h-10 items-center justify-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-[#14091f] transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           {isRu ? "Принять все" : "Accept all"}
         </button>
