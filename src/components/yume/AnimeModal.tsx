@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Bookmark, Play, Star, X } from "lucide-react";
 import type { Anime } from "@/data/anime";
 import { getShikimoriAnimeScreenshots, type ShikimoriScreenshot } from "@/data/shikimori";
+import { toSameOriginShikimoriImage } from "@/lib/shikimori-image-proxy";
 import { PosterArt } from "./Poster";
 
 export function AnimeModal({ anime, note, onClose }: { anime: Anime | null; note?: string | undefined; onClose: () => void }) {
@@ -98,8 +99,8 @@ export function AnimeModal({ anime, note, onClose }: { anime: Anime | null; note
             <h3 className="mb-3 text-sm font-semibold">Кадры из аниме</h3>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               {screenshots.map((shot) => (
-                <a key={shot.originalUrl} href={shot.originalUrl} target="_blank" rel="noreferrer" className="group block overflow-hidden rounded-xl ring-1 ring-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
-                  <img src={shot.previewUrl} alt={`Кадр из аниме ${anime.title}`} loading="lazy" className="aspect-video w-full object-cover transition-transform group-hover:scale-[1.03]" />
+                <a key={shot.originalUrl} href={toSameOriginShikimoriImage(shot.originalUrl) ?? shot.originalUrl} target="_blank" rel="noreferrer" className="group block overflow-hidden rounded-xl ring-1 ring-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                  <img src={toSameOriginShikimoriImage(shot.previewUrl) ?? shot.previewUrl} alt={`Кадр из аниме ${anime.title}`} loading="lazy" className="aspect-video w-full object-cover transition-transform group-hover:scale-[1.03]" />
                 </a>
               ))}
             </div>
