@@ -597,7 +597,7 @@ export async function handleTelegramBrowserAuth(request: Request): Promise<Respo
     const token = url.searchParams.get("id") ?? "";
     if (!/^[A-Za-z0-9_-]{30,60}$/.test(token)) return jsonResponse({ error: "invalid_request" }, 400);
     const tokenHash = await sessionTokenHash(token, secret);
-    const row = await db.prepare("SELECT token_hash, flow, privacy_consent, confirmation_code_hash, telegram_user_id, status, user_id, error_code, expires_at FROM yume_browser_auth WHERE token_hash = ?")
+    const row = await db.prepare("SELECT token_hash, flow, privacy_consent, terms_consent, confirmation_code_hash, telegram_user_id, status, user_id, error_code, expires_at FROM yume_browser_auth WHERE token_hash = ?")
       .bind(tokenHash).first<BrowserAuthRow>();
     if (!row || row.expires_at <= Date.now()) return jsonResponse({ status: "expired" });
     if (row.status === "error") return jsonResponse({ status: "error", error: row.error_code ?? "auth_failed" });
