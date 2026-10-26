@@ -222,6 +222,10 @@ export async function handleYumeAnalytics(request: Request): Promise<Response> {
     await ensureSchema(db);
     if (request.method === "POST") {
       if (!sameOrigin(request)) return json({ error: "Forbidden origin." }, 403);
+      // Global Privacy Control is an explicit opt-out and overrides a stored analytics opt-in.
+      if (request.headers.get("Sec-GPC") === "1") {
+        return json({ ok: true, ignored: true, reason: "global_privacy_control" });
+      }
       // Enforce the explicit optional-analytics choice on the server as well as in the client.
       // The preference cookie stores only the consent choice, not an analytics identifier.
       if (!hasAnalyticsConsent(request)) return json({ ok: true, ignored: true, reason: "analytics_consent_required" });
