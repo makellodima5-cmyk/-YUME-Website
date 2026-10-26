@@ -28,6 +28,10 @@ describe("Shikimori image proxy", () => {
       previewUrl: "https://shikimori.one/api/animes/1",
       originalUrl: "https://shikimori.one/uploads/screenshots/original.jpg",
     })).toBeNull();
+    expect(toSameOriginShikimoriScreenshot({
+      previewUrl: "https://attacker.example/uploads/screenshots/preview.jpg",
+      originalUrl: "https://shikimori.one/uploads/screenshots/original.jpg",
+    })).toBeNull();
   });
 
   it("rejects unsafe hosts, non-HTTPS sources, queries, and non-image paths", async () => {
