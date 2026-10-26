@@ -872,7 +872,8 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
           setMeta(db, "metadata_refresh_screenshot_cursor", "0"),
           setMeta(db, "metadata_refresh_auto_enabled", "0"),
           setMeta(db, "metadata_refresh_last_error", ""),
-          db.prepare("UPDATE anime_catalog_screenshot_status SET status='retry',attempts=0,last_error=NULL,updated_at=CURRENT_TIMESTAMP WHERE status='failed'"),
+          db.prepare("UPDATE anime_catalog_screenshot_status SET status='retry',attempts=0,last_error=NULL,updated_at=CURRENT_TIMESTAMP WHERE anime_id IN (SELECT a.id FROM anime_catalog a WHERE NOT EXISTS (SELECT 1 FROM anime_catalog_screenshots s WHERE s.anime_id=a.id AND s.original_url NOT LIKE '%example.com%' AND s.preview_url NOT LIKE '%example.com%'))"),
+          db.prepare("INSERT INTO anime_catalog_screenshot_status (anime_id,status,attempts,last_error,updated_at) SELECT a.id,'retry',0,NULL,CURRENT_TIMESTAMP FROM anime_catalog a WHERE NOT EXISTS (SELECT 1 FROM anime_catalog_screenshots s WHERE s.anime_id=a.id AND s.original_url NOT LIKE '%example.com%' AND s.preview_url NOT LIKE '%example.com%') ON CONFLICT(anime_id) DO UPDATE SET status='retry',attempts=0,last_error=NULL,updated_at=CURRENT_TIMESTAMP"),
         ]);
         await audit(db, "catalog.metadata.reset", "success", { total: Number(totalRow?.total ?? 0) });
         return json({ isAdmin: true, autoEnabled: false, phase: "metadata", offset: 0, total: Number(totalRow?.total ?? 0), stats: await catalogRefreshStats(db), message: "Прогресс обновления сброшен. Следующий запуск начнётся с начала каталога." });
