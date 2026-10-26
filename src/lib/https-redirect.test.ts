@@ -3,7 +3,7 @@ import { redirectHttpToHttps } from "./https-redirect";
 
 describe("redirectHttpToHttps", () => {
   it("permanently redirects HTTP while preserving path and query", () => {
-    const request = new Request("http://yume-website.yumesupport833.workers.dev/anime/123?tab=episodes");
+    const request = { url: "http://yume-website.yumesupport833.workers.dev/anime/123?tab=episodes" };
     const response = redirectHttpToHttps(request);
 
     expect(response).not.toBeNull();
@@ -15,7 +15,7 @@ describe("redirectHttpToHttps", () => {
   });
 
   it("does not redirect an HTTPS request", () => {
-    const request = new Request("https://yume-website.yumesupport833.workers.dev/anime/123?tab=episodes");
+    const request = { url: "https://yume-website.yumesupport833.workers.dev/anime/123?tab=episodes" };
 
     expect(redirectHttpToHttps(request)).toBeNull();
   });
