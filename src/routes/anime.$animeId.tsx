@@ -103,6 +103,32 @@ function AnimeDetailPage() {
   }, [anime, language]);
 
   useEffect(() => {
+    if (watchMode !== "episodes" || !anime) return;
+
+    const player = document.getElementById("kodik-player");
+    if (!player) return;
+
+    // Kodik's auto-embed script searches for a matching title on the current page.
+    // Load it only when the visitor opens the episode-player tab.
+    player.replaceChildren();
+    (window as Window & { kodikAddPlayers?: { types: string } }).kodikAddPlayers = {
+      types: "anime,anime-serial",
+    };
+
+    const script = document.createElement("script");
+    script.src = "https://kodik-add.com/add-players.min.js";
+    script.async = true;
+    script.dataset.kodikAutoPlayer = "true";
+    player.insertAdjacentElement("afterend", script);
+
+    return () => {
+      script.remove();
+      player.replaceChildren();
+      delete (window as Window & { kodikAddPlayers?: { types: string } }).kodikAddPlayers;
+    };
+  }, [watchMode, animeId, anime]);
+
+  useEffect(() => {
     let cancelled = false;
     setScreenshots([]);
     setActiveScreenshotIndex(null);
@@ -585,13 +611,13 @@ function AnimeDetailPage() {
             </div>
             <div className="mx-auto w-full max-w-6xl min-w-0">
               {watchMode === "episodes" ? (
-                <div className="relative mx-auto flex aspect-video w-full min-w-0 flex-col items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-[#080710] p-5 text-center sm:min-h-[300px] lg:min-h-[420px]" style={{ background: "radial-gradient(ellipse at 50% 40%, oklch(0.19 0.08 " + anime.hue + ") 0%, #080710 63%)" }}>
-                  <div aria-hidden="true" className="mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-primary/35 bg-primary/10 text-primary">
-                    <CirclePlay className="h-9 w-9" />
-                  </div>
-                  <h3 className="text-lg font-semibold text-white">{language === "en" ? "Episode player is not connected yet" : "Плеер для серий пока не подключён"}</h3>
-                  <p className="mt-2 max-w-md text-sm leading-relaxed text-white/60">{language === "en" ? "This viewing mode is prepared for the future player. No fake playback is started." : "Этот режим подготовлен для будущего плеера. Воспроизведение не имитируется."}</p>
-                  <button type="button" onClick={() => setWatchMode("trailer")} className="mt-5 rounded-full border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/10">{language === "en" ? "Back to trailer" : "Вернуться к трейлеру"}</button>
+                <div className="mx-auto w-full min-w-0 overflow-hidden rounded-2xl border border-white/10 bg-[#080710] shadow-2xl">
+                  <div id="kodik-player" className="min-h-[240px] w-full sm:min-h-[360px] lg:min-h-[480px]" />
+                  <p className="px-4 py-3 text-xs leading-relaxed text-white/50">
+                    {language === "en"
+                      ? "Kodik automatically searches for a matching anime player. If nothing appears, a matching player may not be available for this title yet."
+                      : "Kodik автоматически ищет подходящий плеер для этого аниме. Если плеер не появился, возможно, для этого тайтла пока нет совпадения."}
+                  </p>
                 </div>
               ) : anime.youtubeTrailerId ? (
                 <div className="relative mx-auto aspect-video w-full min-w-0 overflow-hidden rounded-2xl border border-white/10 bg-[#080710] shadow-2xl">
