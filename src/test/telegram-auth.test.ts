@@ -249,3 +249,36 @@ describe("Telegram session logout CSRF protection", () => {
     expect(await response.json()).toEqual({ error: "cross_origin_request" });
   });
 });
+
+describe("registration consent integrity", () => {
+  it("rejects browser registration unless both policy and user-agreement consent are explicit", async () => {
+    const db = new FakeTelegramDb();
+    const sessionSecret = "test-session-secret-with-at-least-32-characters";
+    Object.assign(cloudflareEnv, {
+      YUME_DB: db,
+      TELEGRAM_BOT_TOKEN: BOT_TOKEN,
+      YUME_AUTH_SESSION_SECRET: sessionSecret,
+    });
+
+    try {
+      const response = await handleTelegramBrowserAuth(new Request("https://yume.test/api/telegram/browser-auth", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Origin: "https://yume.test",
+          "Sec-Fetch-Site": "same-origin",
+        },
+        body: JSON.stringify({ flow: "register", privacyConsent: true }),
+      }));
+
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({ error: "consent_required" });
+      expect(db.executed.some((statement) => statement.sql.includes("INSERT INTO yume_browser_auth"))).toBe(false);
+    } finally {
+      delete cloudflareEnv.YUME_DB;
+      delete cloudflareEnv.TELEGRAM_BOT_TOKEN;
+      delete cloudflareEnv.YUME_AUTH_SESSION_SECRET;
+    }
+  });
+});
+
