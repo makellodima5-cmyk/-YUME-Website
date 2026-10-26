@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { env as cloudflareEnv } from "cloudflare:workers";
-import { handleTelegramSession } from "@/data/telegram-auth.server";
+import { handleTelegramBrowserAuth, handleTelegramSession } from "@/data/telegram-auth.server";
 import { validateTelegramInitData } from "@/data/telegram-init-data";
 
 const BOT_TOKEN = "test-bot-token-for-signature-tests";
@@ -206,5 +206,34 @@ describe("Telegram Mini App initData validation", () => {
     const result = await validateTelegramInitData(initData, BOT_TOKEN, now);
 
     expect(result).toEqual({ ok: false, error: "invalid_user" });
+  });
+});
+
+
+describe("Telegram browser-auth polling CSRF protection", () => {
+  it("rejects a cross-site polling URL before touching auth state", async () => {
+    const response = await handleTelegramBrowserAuth(new Request(
+      "https://yume.test/api/telegram/browser-auth?id=" + "A".repeat(40),
+      {
+        method: "GET",
+        headers: {
+          "Referer": "https://attacker.test/",
+          "Sec-Fetch-Site": "cross-site",
+        },
+      },
+    ));
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: "cross_origin_request" });
+  });
+
+  it("rejects browser-auth polling when browser origin signals are absent", async () => {
+    const response = await handleTelegramBrowserAuth(new Request(
+      "https://yume.test/api/telegram/browser-auth?id=" + "A".repeat(40),
+      { method: "GET" },
+    ));
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: "cross_origin_request" });
   });
 });
