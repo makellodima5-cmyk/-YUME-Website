@@ -641,6 +641,9 @@ async function runCatalogMetadataRefreshStep(db: Database): Promise<Response> {
       const shots = await screenshotProgress(db);
       return json({ isAdmin: true, phase: nextState, phaseChanged: nextState !== "metadata", processed: pageIds.length, offset: nextOffset, nextOffset, metadataOffset: nextOffset, screenshotOffset: 0, total, updated,
         bannersFound: anilistBanners.size, bannersMatched: bannerLookup.matched, bannersSaved, bannersAdded, bannerErrors: bannerLookup.failedBatches, ...bannerCounters,
+        bannersFoundTotal: bannerCounters.bannersFound, bannersMatchedTotal: bannerCounters.bannersMatched,
+        bannersSavedTotal: bannerCounters.bannersSaved, bannersAddedTotal: bannerCounters.bannersAdded,
+        bannerErrorsTotal: bannerCounters.bannerErrors, bannersStored: bannerCounters.bannersStored,
         screenshotsSaved: 0, screenshotFailures: shots.failed, screenshotRetries: shots.retry, done: false });
     }
 
