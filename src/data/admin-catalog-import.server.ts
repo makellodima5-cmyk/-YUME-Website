@@ -1,6 +1,6 @@
 import { env as cloudflareEnv } from "cloudflare:workers";
 import { invalidatePersistentCatalogCache } from "@/data/catalog-d1.server";
-import { getAniListBannersByMalIds } from "@/data/anilist-banner.server";
+import { getAniListBannersByMalIdsWithStats } from "@/data/anilist-banner.server";
 import { retryAfterMilliseconds } from "@/data/retry-after";
 
 type RuntimeGlobal = typeof globalThis & { __YUME_RUNTIME_ENV__?: unknown };
@@ -131,6 +131,12 @@ function ensureSchema(db: Database): Promise<void> {
     db.prepare("INSERT OR IGNORE INTO anime_catalog_meta (key,value) VALUES ('admin_import_errors','0')"),
     db.prepare("INSERT OR IGNORE INTO anime_catalog_meta (key,value) VALUES ('admin_import_resume_at','0')"),
     db.prepare("INSERT OR IGNORE INTO anime_catalog_meta (key,value) VALUES ('metadata_refresh_auto_enabled','0')"),
+    db.prepare("INSERT OR IGNORE INTO anime_catalog_meta (key,value) VALUES ('metadata_refresh_banners_found','0')"),
+    db.prepare("INSERT OR IGNORE INTO anime_catalog_meta (key,value) VALUES ('metadata_refresh_banners_matched','0')"),
+    db.prepare("INSERT OR IGNORE INTO anime_catalog_meta (key,value) VALUES ('metadata_refresh_banners_saved','0')"),
+    db.prepare("INSERT OR IGNORE INTO anime_catalog_meta (key,value) VALUES ('metadata_refresh_banners_added','0')"),
+    db.prepare("INSERT OR IGNORE INTO anime_catalog_meta (key,value) VALUES ('metadata_refresh_banner_errors','0')"),
+    db.prepare("INSERT OR IGNORE INTO anime_catalog_meta (key,value) VALUES ('metadata_refresh_banners_stored','0')"),
     ]);
   })().catch((error) => {
     adminImportSchemaPromises.delete(key);
@@ -369,19 +375,59 @@ async function catalogRefreshStats(db: Database) {
       SUM(CASE WHEN youtube_trailer_id IS NOT NULL AND TRIM(youtube_trailer_id) <> '' THEN 1 ELSE 0 END) AS hasTrailer
     FROM anime_catalog
   `).first<{total:number;incomplete:number|null;announced:number|null;missingTrailer:number|null;hasTrailer:number|null}>();
-  const shots = await db.prepare(`
-    SELECT (SELECT COUNT(*) FROM anime_catalog_screenshots s JOIN anime_catalog a ON a.id=s.anime_id) AS savedScreenshotUrls,
-      SUM(CASE WHEN ss.status='done' THEN 1 ELSE 0 END) AS screenshotDone,
-      SUM(CASE WHEN ss.status='retry' THEN 1 ELSE 0 END) AS screenshotRetry,
-      SUM(CASE WHEN ss.status='failed' THEN 1 ELSE 0 END) AS screenshotFailed
-    FROM anime_catalog_screenshot_status ss JOIN anime_catalog a ON a.id=ss.anime_id
-  `).first<{savedScreenshotUrls:number|null;screenshotDone:number|null;screenshotRetry:number|null;screenshotFailed:number|null}>();
+  const [shots, bannerRow] = await Promise.all([
+    db.prepare(`
+      SELECT (SELECT COUNT(*) FROM anime_catalog_screenshots s JOIN anime_catalog a ON a.id=s.anime_id) AS savedScreenshotUrls,
+        SUM(CASE WHEN ss.status='done' THEN 1 ELSE 0 END) AS screenshotDone,
+        SUM(CASE WHEN ss.status='retry' THEN 1 ELSE 0 END) AS screenshotRetry,
+        SUM(CASE WHEN ss.status='failed' THEN 1 ELSE 0 END) AS screenshotFailed
+      FROM anime_catalog_screenshot_status ss JOIN anime_catalog a ON a.id=ss.anime_id
+    `).first<{savedScreenshotUrls:number|null;screenshotDone:number|null;screenshotRetry:number|null;screenshotFailed:number|null}>(),
+    db.prepare(`
+      SELECT
+        SUM(CASE WHEN banner_url LIKE 'https://s4.anilist.co/%' THEN 1 ELSE 0 END) AS anilistBanners,
+        SUM(CASE WHEN banner_url IS NULL OR TRIM(COALESCE(banner_url,'')) = '' OR banner_url NOT LIKE 'https://s4.anilist.co/%' THEN 1 ELSE 0 END) AS missingAniListBanners
+      FROM anime_catalog
+    `).first<{anilistBanners:number|null;missingAniListBanners:number|null}>(),
+  ]);
   const total = Number(row?.total ?? 0), incomplete = Number(row?.incomplete ?? 0);
   return { total, incomplete, complete: Math.max(0,total-incomplete), announced:Number(row?.announced??0),
     missingTrailer:Number(row?.missingTrailer??0), hasTrailer:Number(row?.hasTrailer??0),
     savedScreenshotUrls:Number(shots?.savedScreenshotUrls??0), screenshotDone:Number(shots?.screenshotDone??0),
-    screenshotRetry:Number(shots?.screenshotRetry??0), screenshotFailed:Number(shots?.screenshotFailed??0) };
+    screenshotRetry:Number(shots?.screenshotRetry??0), screenshotFailed:Number(shots?.screenshotFailed??0),
+    anilistBanners:Number(bannerRow?.anilistBanners??0), missingAniListBanners:Number(bannerRow?.missingAniListBanners??0) };
 }
+type MetadataBannerCounters = {
+  bannersFound: number;
+  bannersMatched: number;
+  bannersSaved: number;
+  bannersAdded: number;
+  bannerErrors: number;
+  bannersStored: number;
+};
+
+async function metadataBannerCounters(db: Database): Promise<MetadataBannerCounters> {
+  const keys = [
+    "metadata_refresh_banners_found",
+    "metadata_refresh_banners_matched",
+    "metadata_refresh_banners_saved",
+    "metadata_refresh_banners_added",
+    "metadata_refresh_banner_errors",
+    "metadata_refresh_banners_stored",
+  ];
+  const rows = await db.prepare("SELECT key,value FROM anime_catalog_meta WHERE key IN (" + keys.map(() => "?").join(",") + ")")
+    .bind(...keys).all<{key:string;value:string}>();
+  const values = new Map(rows.results.map(row => [row.key, row.value]));
+  return {
+    bannersFound: Number(values.get(keys[0]) ?? 0),
+    bannersMatched: Number(values.get(keys[1]) ?? 0),
+    bannersSaved: Number(values.get(keys[2]) ?? 0),
+    bannersAdded: Number(values.get(keys[3]) ?? 0),
+    bannerErrors: Number(values.get(keys[4]) ?? 0),
+    bannersStored: Number(values.get(keys[5]) ?? 0),
+  };
+}
+
 async function catalogQuality(db: Database, requestedOffset = 0) {
   const offset = Number.isFinite(requestedOffset) ? Math.max(0,Math.min(100000,Math.floor(requestedOffset))) : 0;
   const [rows, aggregate] = await Promise.all([
@@ -458,10 +504,17 @@ async function snapshot(db: Database) {
 async function runCatalogMetadataRefreshStep(db: Database): Promise<Response> {
     let state = await getMeta(db, "metadata_refresh_state") ?? "metadata";
     if (state === "done") {
+      const bannerCountRow = await db.prepare("SELECT COUNT(*) AS count FROM anime_catalog WHERE banner_url LIKE 'https://s4.anilist.co/%'").first<{count:number}>();
       await db.batch([
         setMeta(db, "metadata_refresh_state", "metadata"),
         setMeta(db, "metadata_refresh_cursor", "0"),
         setMeta(db, "metadata_refresh_screenshot_cursor", "0"),
+        setMeta(db, "metadata_refresh_banners_found", "0"),
+        setMeta(db, "metadata_refresh_banners_matched", "0"),
+        setMeta(db, "metadata_refresh_banners_saved", "0"),
+        setMeta(db, "metadata_refresh_banners_added", "0"),
+        setMeta(db, "metadata_refresh_banner_errors", "0"),
+        setMeta(db, "metadata_refresh_banners_stored", String(Number(bannerCountRow?.count ?? 0))),
         db.prepare("UPDATE anime_catalog_screenshot_status SET status='retry',attempts=0,last_error=NULL,updated_at=CURRENT_TIMESTAMP WHERE status='failed'"),
       ]);
       state = "metadata";
@@ -504,12 +557,15 @@ async function runCatalogMetadataRefreshStep(db: Database): Promise<Response> {
 
       // Always enrich banners from AniList, even when the rest of a row is complete.
       // This keeps banners durable in D1 instead of depending on a per-page-view request.
-      const anilistBanners = await getAniListBannersByMalIds(pageIds);
+      const bannerLookup = await getAniListBannersByMalIdsWithStats(pageIds);
+      const anilistBanners = bannerLookup.banners;
       let bannersSaved = 0;
+      let bannersAdded = 0;
       const bannerUpdates: Statement[] = [];
       for (const row of catalogPage.results) {
         const bannerUrl = anilistBanners.get(row.id);
         if (!bannerUrl || bannerUrl === row.banner_url) continue;
+        if (!row.banner_url?.startsWith("https://s4.anilist.co/")) bannersAdded++;
         bannerUpdates.push(db.prepare("UPDATE anime_catalog SET banner_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(bannerUrl, row.id));
         // Keep the in-memory snapshot in sync so Shikimori's fallback image cannot
         // overwrite the AniList banner later in this same refresh step.
@@ -520,6 +576,15 @@ async function runCatalogMetadataRefreshStep(db: Database): Promise<Response> {
         await db.batch(bannerUpdates);
         await invalidatePersistentCatalogCache();
       }
+      const previousBannerCounters = await metadataBannerCounters(db);
+      const bannerCounters = {
+        bannersFound: previousBannerCounters.bannersFound + anilistBanners.size,
+        bannersMatched: previousBannerCounters.bannersMatched + bannerLookup.matched,
+        bannersSaved: previousBannerCounters.bannersSaved + bannersSaved,
+        bannersAdded: previousBannerCounters.bannersAdded + bannersAdded,
+        bannerErrors: previousBannerCounters.bannerErrors + bannerLookup.failedBatches,
+        bannersStored: previousBannerCounters.bannersStored + bannersAdded,
+      };
 
       // Shikimori metadata remains authoritative for all fields except banner_url.
       // Fully populated rows are deliberately skipped by the metadata backfill.
@@ -558,15 +623,28 @@ async function runCatalogMetadataRefreshStep(db: Database): Promise<Response> {
       await db.batch([
         setMeta(db, "metadata_refresh_cursor", String(nextOffset)),
         setMeta(db, "metadata_refresh_state", nextState),
+        setMeta(db, "metadata_refresh_banners_found", String(bannerCounters.bannersFound)),
+        setMeta(db, "metadata_refresh_banners_matched", String(bannerCounters.bannersMatched)),
+        setMeta(db, "metadata_refresh_banners_saved", String(bannerCounters.bannersSaved)),
+        setMeta(db, "metadata_refresh_banners_added", String(bannerCounters.bannersAdded)),
+        setMeta(db, "metadata_refresh_banner_errors", String(bannerCounters.bannerErrors)),
+        setMeta(db, "metadata_refresh_banners_stored", String(bannerCounters.bannersStored)),
         ...(nextState === "screenshots" ? [setMeta(db, "metadata_refresh_screenshot_cursor", "0")] : []),
       ]);
       if (updated > 0) await invalidatePersistentCatalogCache();
       await audit(db, "catalog.metadata.backfill", missingSourceIds.length ? "partial" : "success", {
-        phase: "metadata", offset: cursor, processed: ids.length, titlesChanged: updated, bannersSaved, total,
+        phase: "metadata", offset: cursor, processed: ids.length, titlesChanged: updated,
+        bannersFound: anilistBanners.size, bannersMatched: bannerLookup.matched, bannersSaved, bannersAdded,
+        bannerErrors: bannerLookup.failedBatches, ...bannerCounters, total,
         missingSourceIds: missingSourceIds.slice(0, 100),
       });
       const shots = await screenshotProgress(db);
-      return json({ isAdmin: true, phase: nextState, phaseChanged: nextState !== "metadata", processed: pageIds.length, offset: nextOffset, nextOffset, metadataOffset: nextOffset, screenshotOffset: 0, total, updated, bannersSaved, screenshotsSaved: 0, screenshotFailures: shots.failed, screenshotRetries: shots.retry, done: false });
+      return json({ isAdmin: true, phase: nextState, phaseChanged: nextState !== "metadata", processed: pageIds.length, offset: nextOffset, nextOffset, metadataOffset: nextOffset, screenshotOffset: 0, total, updated,
+        bannersFound: anilistBanners.size, bannersMatched: bannerLookup.matched, bannersSaved, bannersAdded, bannerErrors: bannerLookup.failedBatches, ...bannerCounters,
+        bannersFoundTotal: bannerCounters.bannersFound, bannersMatchedTotal: bannerCounters.bannersMatched,
+        bannersSavedTotal: bannerCounters.bannersSaved, bannersAddedTotal: bannerCounters.bannersAdded,
+        bannerErrorsTotal: bannerCounters.bannerErrors, bannersStored: bannerCounters.bannersStored,
+        screenshotsSaved: 0, screenshotFailures: shots.failed, screenshotRetries: shots.retry, done: false });
     }
 
     if (state === "screenshots") {
@@ -810,10 +888,11 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
       // The admin dashboard polls every five seconds. Status polling must not
       // rescan the entire catalogue or recompute aggregate quality counters.
       if (url.searchParams.get("status") === "1") {
-        const [refreshState, metadataCursor, screenshotCursor] = await Promise.all([
+        const [refreshState, metadataCursor, screenshotCursor, bannerCounters] = await Promise.all([
           getMeta(db, "metadata_refresh_state"),
           getMeta(db, "metadata_refresh_cursor"),
           getMeta(db, "metadata_refresh_screenshot_cursor"),
+          metadataBannerCounters(db),
         ]);
         const phase = refreshState ?? "idle";
         return json({
@@ -825,6 +904,12 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
             metadataOffset: Math.max(0, Number(metadataCursor ?? "0") || 0),
             screenshotOffset: Math.max(0, Number(screenshotCursor ?? "0") || 0),
             done: phase === "done",
+            bannersFoundTotal: bannerCounters.bannersFound,
+            bannersMatchedTotal: bannerCounters.bannersMatched,
+            bannersSavedTotal: bannerCounters.bannersSaved,
+            bannersAddedTotal: bannerCounters.bannersAdded,
+            bannerErrorsTotal: bannerCounters.bannerErrors,
+            bannersStored: bannerCounters.bannersStored,
             lastTickAt: await getMeta(db, "metadata_refresh_last_tick_at"),
             lastSuccessAt: await getMeta(db, "metadata_refresh_last_success_at"),
             lastError: await getMeta(db, "metadata_refresh_last_error"),
@@ -849,6 +934,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
       const metadataOffset = phase === "done" || phase.startsWith("screenshots")
         ? refreshTotal : Math.max(0, Number(metadataCursor ?? "0") || 0);
       const screenshotOffset = phase === "metadata" ? 0 : Math.max(0, Number(screenshotCursor ?? "0") || 0);
+      const bannerCounters = await metadataBannerCounters(db);
       return json({
         isAdmin: true,
         ...await snapshot(db),
@@ -856,6 +942,12 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
           autoEnabled: false, phase, metadataOffset, screenshotOffset, total: refreshTotal,
           stats: refreshStats, screenshotFailures: shots.failed, screenshotRetries: shots.retry,
           done: phase === "done",
+          bannersFoundTotal: bannerCounters.bannersFound,
+          bannersMatchedTotal: bannerCounters.bannersMatched,
+          bannersSavedTotal: bannerCounters.bannersSaved,
+          bannersAddedTotal: bannerCounters.bannersAdded,
+          bannerErrorsTotal: bannerCounters.bannerErrors,
+          bannersStored: refreshStats.anilistBanners,
           lastTickAt: await getMeta(db, "metadata_refresh_last_tick_at"),
           lastSuccessAt: await getMeta(db, "metadata_refresh_last_success_at"),
           lastError: await getMeta(db, "metadata_refresh_last_error"),
@@ -891,6 +983,12 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
           setMeta(db, "metadata_refresh_screenshot_cursor", "0"),
           setMeta(db, "metadata_refresh_auto_enabled", "0"),
           setMeta(db, "metadata_refresh_last_error", ""),
+          setMeta(db, "metadata_refresh_banners_found", "0"),
+          setMeta(db, "metadata_refresh_banners_matched", "0"),
+          setMeta(db, "metadata_refresh_banners_saved", "0"),
+          setMeta(db, "metadata_refresh_banners_added", "0"),
+          setMeta(db, "metadata_refresh_banner_errors", "0"),
+          setMeta(db, "metadata_refresh_banners_stored", String((await db.prepare("SELECT COUNT(*) AS count FROM anime_catalog WHERE banner_url LIKE 'https://s4.anilist.co/%'").first<{count:number}>())?.count ?? 0)),
           db.prepare("UPDATE anime_catalog_screenshot_status SET status='retry',attempts=0,last_error=NULL,updated_at=CURRENT_TIMESTAMP WHERE anime_id IN (SELECT a.id FROM anime_catalog a WHERE NOT EXISTS (SELECT 1 FROM anime_catalog_screenshots s WHERE s.anime_id=a.id AND s.original_url NOT LIKE '%example.com%' AND s.preview_url NOT LIKE '%example.com%'))"),
           db.prepare("INSERT INTO anime_catalog_screenshot_status (anime_id,status,attempts,last_error,updated_at) SELECT a.id,'retry',0,NULL,CURRENT_TIMESTAMP FROM anime_catalog a WHERE NOT EXISTS (SELECT 1 FROM anime_catalog_screenshots s WHERE s.anime_id=a.id AND s.original_url NOT LIKE '%example.com%' AND s.preview_url NOT LIKE '%example.com%') ON CONFLICT(anime_id) DO UPDATE SET status='retry',attempts=0,last_error=NULL,updated_at=CURRENT_TIMESTAMP"),
         ]);
