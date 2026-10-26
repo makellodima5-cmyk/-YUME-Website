@@ -33,6 +33,6 @@ jobs:
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add bun.lock bun.lockb package.json 2>/dev/null || true
+          git add bun.lock package.json
           git commit -m "security: update vulnerable dependency resolutions"
           git push origin HEAD:security/hardening-2026-10-26
