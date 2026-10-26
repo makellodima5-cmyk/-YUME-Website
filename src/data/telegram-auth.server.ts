@@ -726,6 +726,9 @@ export async function handleTelegramAccountDelete(request: Request): Promise<Res
 
 export async function handleTelegramSession(request: Request): Promise<Response> {
   if (request.method === "DELETE") {
+    if (!isSameOriginRequest(request)) {
+      return jsonResponse({ error: "cross_origin_request" }, 403);
+    }
     const env = environment();
     const db = database(env);
     const token = readCookie(request, SESSION_COOKIE);
