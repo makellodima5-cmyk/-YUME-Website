@@ -195,6 +195,29 @@ export async function getAniListBannersByMalIdsWithStats(shikimoriIds: string[])
   return { banners, requested: ids.length, matched, failedBatches };
 }
 
+/** Search AniList by one title only as a fallback after MAL-ID lookup fails. */
+export async function getAniListBannerByTitle(title: string): Promise<string | null> {
+  const normalizedTitle = typeof title === "string" ? title.trim().replace(/\\s+/g, " ") : "";
+  if (!normalizedTitle || normalizedTitle.length < 2 || normalizedTitle.length > 160) return null;
+  const cacheKey = "title:" + normalizedTitle.toLocaleLowerCase();
+  const cached = bannerCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now() && cached.matched) return cached.bannerUrl;
+  if (cached) bannerCache.delete(cacheKey);
+  const payload = await requestAniList(
+    "query ($search: String) { Media(search: $search, type: ANIME) { idMal title { romaji english native } bannerImage } }",
+    { search: normalizedTitle },
+  );
+  const media = payload?.data?.Media as (AniListMedia & { title?: { romaji?: string | null; english?: string | null; native?: string | null } }) | null | undefined;
+  if (!media) return null;
+  const candidates = [media.title?.english, media.title?.romaji, media.title?.native].filter((value): value is string => Boolean(value?.trim()));
+  const norm = (value: string) => value.normalize("NFKC").trim().replace(/\\s+/g, " ").toLocaleLowerCase();
+  if (!candidates.some(value => norm(value) === norm(normalizedTitle))) return null;
+  const bannerUrl = validBannerUrl(media.bannerImage);
+  bannerCache.set(cacheKey, { expiresAt: Date.now() + BANNER_CACHE_TTL_MS, bannerUrl, matched: true });
+  trimBannerCache();
+  return bannerUrl;
+}
+
 /** Backwards-compatible Map-only wrapper for existing callers. */
 export async function getAniListBannersByMalIds(shikimoriIds: string[]): Promise<Map<string, string>> {
   return (await getAniListBannersByMalIdsWithStats(shikimoriIds)).banners;
