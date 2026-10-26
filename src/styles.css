@@ -392,3 +392,12 @@ html.telegram-mini-app :where(button, a, [role="button"]) {
   }
 }
 
+
+
+/* Keep primary-action text above WCAG AA contrast for ordinary-sized text. */
+.bg-primary {
+  background-color: #8035b7 !important;
+}
+.bg-primary:hover {
+  background-color: #7130a4 !important;
+}
