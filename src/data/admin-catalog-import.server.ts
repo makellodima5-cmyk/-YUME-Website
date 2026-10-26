@@ -602,11 +602,6 @@ async function runCatalogMetadataRefreshStep(db: Database): Promise<Response> {
         .filter((entry): entry is { row: typeof bannerRows[number]; source: ShikimoriAnime } => Boolean(entry.source))
         .slice(0, 5);
       for (const entry of titleFallbackCandidates) {
-        const titleCandidates = [entry.source.english, entry.source.name, entry.source.russian]
-          .flatMap(value => Array.isArray(value) ? value : [value])
-          .filter((value): value is string => typeof value === "string" && value.trim().length > 1)
-          .map(value => value.trim())
-          .filter((value, index, all) => all.findIndex(other => other.toLocaleLowerCase() === value.toLocaleLowerCase()) === index);
         // Never search in Russian. The source title/name may be Japanese or romanized.
         const englishTitle = typeof entry.source.english === "string" ? entry.source.english.trim() : "";
         const nonRussianTitles = [englishTitle, entry.source.name, ...(Array.isArray(entry.source.english) ? entry.source.english : [])]
