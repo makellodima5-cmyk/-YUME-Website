@@ -831,8 +831,7 @@ export async function handleTelegramSession(request: Request): Promise<Response>
         privacyConsent: authMode === "register" && input.privacyConsent === true,
         termsAccepted: authMode === "register" && input.termsAccepted === true,
       });
-    }
-    else {
+    } else {
       const profileValues = [
         validated.user.firstName,
         validated.user.lastName ?? null,
