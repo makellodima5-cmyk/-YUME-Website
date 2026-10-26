@@ -1,6 +1,7 @@
 import "./lib/error-capture";
 import { applySecurityHeaders } from "./lib/security-headers";
 import { redirectHttpToHttps } from "./lib/https-redirect";
+import { handleShikimoriImageProxy } from "./lib/shikimori-image-proxy";
 import { env as cloudflareEnv } from "cloudflare:workers";
 
 import { consumeLastCapturedError } from "./lib/error-capture";
@@ -211,6 +212,17 @@ export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     const httpsRedirect = redirectHttpToHttps(request);
     if (httpsRedirect) return httpsRedirect;
+
+    const requestUrl = new URL(request.url);
+    if (requestUrl.pathname === "/api/media/shikimori") {
+      const response = request.method === "GET"
+        ? await handleShikimoriImageProxy(requestUrl.searchParams.get("src"))
+        : new Response("Method not allowed.", {
+            status: 405,
+            headers: { Allow: "GET", "Cache-Control": "no-store" },
+          });
+      return applySecurityHeaders(response, request.url);
+    }
 
     setCatalogRuntimeEnvironment(env);
     const supportRedirect = getSupportRedirect(request, env);
