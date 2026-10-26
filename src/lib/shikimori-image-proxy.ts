@@ -35,8 +35,20 @@ function parseAllowedSource(value: string | null | undefined): URL | null {
 /** Route approved Shikimori image assets through YUME so browsers do not contact the vendor directly. */
 export function toSameOriginShikimoriImage(value: string | null | undefined): string | undefined {
   if (!value) return undefined;
-  const url = parseAllowedSource(value);
-  if (!url) return value;
+  let source: URL;
+  try {
+    source = new URL(value);
+  } catch {
+    return value;
+  }
+  if (!SHIKIMORI_IMAGE_HOSTS.has(source.hostname.toLowerCase())) return value;
+
+  // Strip vendor query strings and fragments before creating the proxy URL.
+  // Invalid Shikimori URLs are omitted instead of falling back to direct requests.
+  source.search = "";
+  source.hash = "";
+  const url = parseAllowedSource(source.toString());
+  if (!url) return undefined;
   return `/api/media/shikimori?src=${encodeURIComponent(url.origin + url.pathname)}`;
 }
 
