@@ -25,7 +25,21 @@ function json(data: unknown, status = 200): Response {
   });
 }
 
-function episodeLink(value: EpisodeValue): { link: string; title: string } | null {
+const KODIK_PLAYER_HOSTS = [
+  "kodik.info",
+  "kodik.biz",
+  "kodik.cc",
+  "kodik.online",
+  "kodikplayer.com",
+  "kodikres.com",
+] as const;
+
+function isTrustedKodikHost(hostname: string): boolean {
+  const normalized = hostname.toLowerCase().replace(/\\.$/, "");
+  return KODIK_PLAYER_HOSTS.some((domain) => normalized === domain || normalized.endsWith("." + domain));
+}
+
+export function episodeLink(value: EpisodeValue): { link: string; title: string } | null {
   const raw = typeof value === "string" ? value : value?.link;
   if (typeof raw !== "string" || !raw.trim()) return null;
   let url: URL;
@@ -34,7 +48,7 @@ function episodeLink(value: EpisodeValue): { link: string; title: string } | nul
   } catch {
     return null;
   }
-  if (url.protocol !== "https:" || !url.hostname.toLowerCase().includes("kodik")) return null;
+  if (url.protocol !== "https:" || !isTrustedKodikHost(url.hostname)) return null;
   return { link: url.toString(), title: typeof value === "object" && typeof value.title === "string" ? value.title : "" };
 }
 
