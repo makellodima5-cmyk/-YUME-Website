@@ -42,6 +42,8 @@ export function redirectHttpToHttps(request: Request): Response | null {
   const host = url.hostname.toLowerCase();
   if (host === "localhost" || host.endsWith(".localhost") || /^127(?:\.\d{1,3}){3}$/.test(host) || host === "[::1]" || host === "::1") return null;
   url.protocol = "https:";
+  // The public service is served on standard TLS port 443, not an arbitrary HTTP port.
+  url.port = "";
   return new Response(null, {
     status: 308,
     headers: {
