@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chunkAdminCatalogIds, isCatalogMetadataIncomplete, normalizeAdminCatalogIds } from "@/data/admin-catalog-import.server";
+import { chunkAdminCatalogIds, isCatalogMetadataIncomplete, mapAdminCatalogScreenshots, normalizeAdminCatalogIds } from "@/data/admin-catalog-import.server";
 
 describe("admin catalog ID normalization", () => {
   it("accepts numeric IDs, removes duplicates, and ignores malformed IDs", () => {
@@ -58,5 +58,29 @@ describe("catalog metadata enrichment policy", () => {
     expect(isCatalogMetadataIncomplete({ ...completeRecord, poster_url: null })).toBe(true);
     expect(isCatalogMetadataIncomplete({ ...completeRecord, description: "" })).toBe(true);
     expect(isCatalogMetadataIncomplete({ ...completeRecord, rating: null })).toBe(true);
+  });
+});
+
+
+describe("catalog import screenshot policy", () => {
+  it("keeps at most five unique screenshots and prefers medium previews", () => {
+    const screenshots = Array.from({ length: 8 }, (_, index) => ({
+      originalUrl: `https://cdn.example.org/frame-${index + 1}.jpg`,
+      x332Url: `https://cdn.example.org/preview-${index + 1}.jpg`,
+      x166Url: `https://cdn.example.org/small-${index + 1}.jpg`,
+    }));
+    screenshots.splice(1, 0, { ...screenshots[0]! });
+    expect(mapAdminCatalogScreenshots({ screenshots })).toEqual([
+      { original: "https://cdn.example.org/frame-1.jpg", preview: "https://cdn.example.org/preview-1.jpg" },
+      { original: "https://cdn.example.org/frame-2.jpg", preview: "https://cdn.example.org/preview-2.jpg" },
+      { original: "https://cdn.example.org/frame-3.jpg", preview: "https://cdn.example.org/preview-3.jpg" },
+      { original: "https://cdn.example.org/frame-4.jpg", preview: "https://cdn.example.org/preview-4.jpg" },
+      { original: "https://cdn.example.org/frame-5.jpg", preview: "https://cdn.example.org/preview-5.jpg" },
+    ]);
+  });
+
+  it("falls back to the original image when no preview URL is available", () => {
+    expect(mapAdminCatalogScreenshots({ screenshots: [{ originalUrl: "https://cdn.example.org/frame.jpg" }] }))
+      .toEqual([{ original: "https://cdn.example.org/frame.jpg", preview: "https://cdn.example.org/frame.jpg" }]);
   });
 });

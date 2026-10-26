@@ -1,40 +1,43 @@
-# YUME automatic catalog enrichment
+# YUME catalog import and screenshot enrichment
 
-## What the background mode does
+## Current design
 
-The admin action `auto_start` sets a durable flag in D1. The Cloudflare Worker Cron Trigger is routed through Nitro's native `cloudflare:scheduled` runtime hook, which calls `runScheduledCatalogMetadataRefresh`; each invocation reads the saved phase and cursor from D1 and continues from that point. Closing the admin page does not stop the job. The `auto_stop` action disables future ticks without deleting progress.
+Catalog metadata enrichment is manual-only. The Cloudflare Cron Trigger no longer runs the catalog metadata refresh; the scheduled hook is retained only for the separately configured trailer updater. The admin interface no longer exposes start/stop controls for catalog auto-refresh.
 
-The refresh runs these phases:
+New catalog imports now request scene screenshot URLs in the same Shikimori GraphQL response as titles, descriptions, posters, trailers, genres, and other metadata. YUME stores at most five unique screenshots for newly imported anime. The screenshot URLs and per-title status are written in the same D1 batch as the catalog records. Previously saved screenshot rows are preserved rather than destructively trimmed by this change.
 
-1. Fill missing metadata for existing catalog rows using Shikimori GraphQL in batches of up to 100 IDs.
-2. Fill screenshot URLs from Shikimori one title at a time. Each Cron invocation processes a bounded slice of up to 35 steps and stops after 28 seconds, with a 1.5-second delay between upstream requests. Metadata batches contain up to 100 IDs.
-3. Retry temporary screenshot failures in later scheduled invocations, up to the existing three-attempt limit.
-4. Mark the job done and turn off automatic mode when the retry queue is exhausted.
+The import no longer launches a second full-catalog enrichment pass when it finishes. Existing populated metadata fields are preserved, and existing titles are skipped during import. This avoids automatically rescanning the catalog after every import.
 
-When the separate admin import reaches a terminal state, it starts this durable enrichment pass if no pass is already active. That ensures newly added titles also get trailer backfill and screenshot processing without making the import request issue dozens of upstream calls at once. Announced/future-release titles are marked as intentionally skipped for screenshots; trailers are still mapped from the metadata response.
+## Backfilling existing catalog entries
 
-Existing populated metadata fields are preserved. Image bytes are not copied into R2; only image URLs are stored in D1. A successful empty screenshot response is recorded as done so that titles with no available shots are not fetched repeatedly. Failed requests are tracked in `anime_catalog_screenshot_status`.
+For existing catalog rows, the manual metadata refresh remains available when an explicit repair is needed:
 
-## Deployment and use
+1. Missing metadata is identified from the fields already supported by YUME. Complete records are skipped.
+2. The screenshot phase reads an indexed page of up to 40 catalog rows and requests screenshots for eligible IDs together through Shikimori GraphQL.
+3. At most five unique screenshots are stored when frames are newly fetched. Existing screenshot rows, future/unreleased titles, and recently confirmed empty screenshot results are skipped. Older rows that already contain more than five screenshots are preserved.
+4. A provider/network failure leaves the current page cursor unchanged, so restarting manual mode retries the same batch.
+5. Temporary screenshot retries are also batched. The durable cursor and screenshot statuses are stored in D1.
 
-- The Worker must be deployed with the existing `YUME_DB` D1 binding.
-- The existing Cron Trigger in `wrangler.jsonc` must remain enabled (currently every minute). The scheduled handler runs the trailer updater and catalog refresh in parallel.
-- No new API key or external service binding is required for this first background implementation.
-- In the admin area, use the compact **Run manually / Stop manual** controls to drive one saved step at a time while the page stays open. Manual mode disables automatic mode first. D1 retains the cursor and status, so a later manual run resumes.
-- Alternatively, use **Start auto / Stop auto** to begin or pause the job in the background. The controls reflect the server-side D1 flag and cannot start auto mode while a manual run is active.
-- The Nitro scheduled hook awaits both scheduled jobs before completing. The catalog job logs the start/end of each slice, step count, phase, duration, and last error; its last tick, last successful tick, and error are also persisted in D1 for diagnosis.
-- The existing screenshot-status migration `0003_create_anime_catalog_screenshot_status.sql` must be applied to production D1. The application also creates missing tables defensively, but applying tracked migrations remains the recommended deployment practice.
+The metadata update step uses the existing catalog row already read for the current page. It no longer performs a second SELECT for every incomplete anime. Metadata updates are batched in D1, and an index on position and ID supports ordered catalog paging.
 
-## Source-provider findings
+## D1 usage
 
-- **Shikimori** remains the source for existing catalog enrichment and scene screenshot URLs. Its API documentation states a limit of 5 requests/second and 90 requests/minute and asks clients to send an identifying User-Agent. This job intentionally stays below that ceiling.
-- **AniList** is a candidate for metadata, poster, and banner enrichment, but should be added only with a reliable cross-catalog ID mapping and a measured pilot. Its public rate limit can be temporarily reduced.
-- **Jikan** is a possible experimental fallback for MyAnimeList images, but is unofficial, has a 3 requests/second and 60 requests/minute limit, and its picture gallery is not guaranteed to match Shikimori scene screenshots.
-- **Simkl is not enabled**: its published API terms restrict competing catalogue/tracker uses unless the application provides Simkl login and sync functionality. Do not add it as a YUME data source without resolving those terms first.
-- Kitsu and TMDB can provide additional artwork, but their cover/backdrop fields should not be treated as proof that episode scene screenshots are available. Confirm the specific API terms before production use.
+The admin status panel polls every five seconds. Polling uses a lightweight status=1 endpoint that reads saved progress without running full-catalog quality aggregates or counting every screenshot status. Full quality and completeness summaries are calculated on initial load or when the user explicitly opens/refreshes catalog quality.
 
-## Operational notes
+The intent is to reduce repeated D1 reads, not to claim a fixed consumption number before production measurements. Validate the change by comparing Cloudflare D1 rows_read and rows_written, the time to import a page, response size, and Worker errors before and after deployment.
 
-The schedule runs once per minute, so the task is durable rather than instantaneous. Actual completion time depends on catalogue size, upstream latency, API throttling, and retries. If the upstream returns a rate-limit response or a transient error, the current cursor remains saved and the next scheduled invocation continues the job. Check Worker logs and the admin audit log if the job repeatedly fails.
+## Deployment and operations
 
-This first iteration intentionally does not silently merge metadata from multiple providers. A later provider-adapter change should add explicit source IDs and provenance per field, pilot coverage on a representative sample, and only then enable fallback for missing fields.
+- Keep the YUME_DB D1 binding configured.
+- The existing Cron Trigger remains enabled for the separate trailer updater. It no longer calls catalog metadata refresh.
+- No new API key or external service binding is required.
+- Use the manual Run manually / Stop manual controls only when an existing catalog needs repair. The cursor is saved after each successful page; after a transient upstream failure, retrying resumes the same page.
+- Newly imported titles get their screenshot URLs as part of import, so there is no automatic full-catalog follow-up pass.
+- Image bytes are not copied to R2; only image URLs are stored in D1.
+- The screenshot status table is created defensively by the application. Applying tracked migrations remains the recommended production practice.
+
+## Source-provider notes
+
+Shikimori remains the source for metadata and scene screenshots. GraphQL's screenshots field provides original and preview URLs, so the import can avoid one REST request per title. The five-frame cap limits stored rows and display volume; it does not reduce the number of screenshot links returned by GraphQL if the source sends the full list.
+
+AniList, Jikan, Kitsu, and TMDB should not be added as silent fallbacks without a reliable ID mapping, measured coverage, and review of their API terms. Poster/backdrop fields from other providers are not equivalent to scene screenshots.
