@@ -67,7 +67,7 @@ function saveLocalNotificationIds(ids: string[]): boolean {
   }
 }
 
-type MetadataCatalogStats = { total:number; incomplete:number; complete:number; announced:number; missingTrailer:number; hasTrailer:number; savedScreenshotUrls:number; screenshotDone:number; screenshotRetry:number; screenshotFailed:number };
+type MetadataCatalogStats = { total:number; incomplete:number; complete:number; announced:number; missingTrailer:number; hasTrailer:number; savedScreenshotUrls:number; screenshotDone:number; screenshotRetry:number; screenshotFailed:number; anilistBanners:number; missingAniListBanners:number };
 
 export const Route = createFileRoute("/")({
   head: () => {
@@ -361,7 +361,7 @@ function Index() {
   const [metadataRefreshRunning, setMetadataRefreshRunning] = useState(false);
   const [metadataAutoBusy, setMetadataAutoBusy] = useState(false);
   const manualMetadataStopRef = useRef(false);
-  const [metadataRefreshProgress, setMetadataRefreshProgress] = useState({ offset: 0, total: 0, updated: 0, screenshotsSaved: 0, phase: "metadata", metadataOffset: 0, screenshotOffset: 0, screenshotFailures: 0, screenshotRetries: 0 });
+  const [metadataRefreshProgress, setMetadataRefreshProgress] = useState({ offset: 0, total: 0, updated: 0, screenshotsSaved: 0, bannersFound: 0, bannersMatched: 0, bannersSaved: 0, bannersAdded: 0, bannerErrors: 0, bannersStored: 0, phase: "metadata", metadataOffset: 0, screenshotOffset: 0, screenshotFailures: 0, screenshotRetries: 0 });
   const [metadataRefreshMessage, setMetadataRefreshMessage] = useState("");
   const [metadataCatalogStats, setMetadataCatalogStats] = useState<MetadataCatalogStats | null>(null);
   const [catalogQuality, setCatalogQuality] = useState<{id:string;title:string;year:number;missingYear:boolean;missingPoster:boolean;missingDescription:boolean}[]>([]);
@@ -797,7 +797,7 @@ function Index() {
         const payload = await response.json().catch(() => ({})) as {
           isAdmin?: boolean; target?:number; cursor?:number; added?:number; skipped?:number; incomplete?:number; errors?:number; state?:string; delayMs?:number;
           qualitySummary?:typeof catalogQualitySummary; quality?:typeof catalogQuality; qualityOffset?:number; qualityHasMore?:boolean;
-          metadataRefresh?: { autoEnabled?: boolean; phase?: string; metadataOffset?: number; screenshotOffset?: number; total?: number; screenshotFailures?: number; screenshotRetries?: number; done?: boolean; stats?: MetadataCatalogStats };
+          metadataRefresh?: { autoEnabled?: boolean; phase?: string; metadataOffset?: number; screenshotOffset?: number; total?: number; screenshotFailures?: number; screenshotRetries?: number; done?: boolean; stats?: MetadataCatalogStats; bannersFoundTotal?: number; bannersMatchedTotal?: number; bannersSavedTotal?: number; bannersAddedTotal?: number; bannerErrorsTotal?: number; bannersStored?: number };
         };
         if (cancelled || !response.ok || payload.isAdmin !== true || !payload.metadataRefresh) return;
         const status = payload.metadataRefresh;
@@ -821,6 +821,12 @@ function Index() {
             metadataOffset, screenshotOffset,
             screenshotFailures: status.screenshotFailures ?? current.screenshotFailures,
             screenshotRetries: status.screenshotRetries ?? current.screenshotRetries,
+            bannersFound: status.bannersFoundTotal ?? current.bannersFound,
+            bannersMatched: status.bannersMatchedTotal ?? current.bannersMatched,
+            bannersSaved: status.bannersSavedTotal ?? current.bannersSaved,
+            bannersAdded: status.bannersAddedTotal ?? current.bannersAdded,
+            bannerErrors: status.bannerErrorsTotal ?? current.bannerErrors,
+            bannersStored: status.bannersStored ?? current.bannersStored,
           };
         });
         const trailerResponse = await fetch("/api/admin/trailers", {credentials:"same-origin",cache:"no-store"});
@@ -879,7 +885,7 @@ function Index() {
       const response = await fetch("/api/admin/catalog-import", { method:"POST", credentials:"same-origin", cache:"no-store", headers:{"Content-Type":"application/json"}, body:JSON.stringify({action:"reset_metadata_refresh"}) });
       const payload = await response.json().catch(() => ({})) as {isAdmin?:boolean;error?:string;message?:string;total?:number;stats?:MetadataCatalogStats};
       if (!response.ok || payload.isAdmin !== true) throw new Error(payload.message ?? payload.error ?? "Could not reset metadata refresh.");
-      setMetadataRefreshProgress({offset:0,total:payload.total??0,updated:0,screenshotsSaved:0,phase:"metadata",metadataOffset:0,screenshotOffset:0,screenshotFailures:payload.stats?.screenshotFailed??0,screenshotRetries:payload.stats?.screenshotRetry??0});
+      setMetadataRefreshProgress({offset:0,total:payload.total??0,updated:0,screenshotsSaved:0,bannersFound:0,bannersMatched:0,bannersSaved:0,bannersAdded:0,bannerErrors:0,bannersStored:payload.stats?.anilistBanners??0,phase:"metadata",metadataOffset:0,screenshotOffset:0,screenshotFailures:payload.stats?.screenshotFailed??0,screenshotRetries:payload.stats?.screenshotRetry??0});
       setMetadataCatalogStats(payload.stats ?? null);
       setMetadataRefreshMessage(payload.message ?? (language === "ru" ? "Прогресс сброшен." : "Progress reset."));
       await refreshCatalogQuality(0);
@@ -909,7 +915,7 @@ function Index() {
       while (!manualMetadataStopRef.current && !finished && requests < 1500) {
         requests++;
         const response = await fetch("/api/admin/catalog-import", { method: "POST", credentials: "same-origin", cache: "no-store", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "refresh_metadata" }) });
-        const payload = await response.json().catch(() => ({})) as { isAdmin?: boolean; error?: string; message?: string; phase?: string; offset?: number; total?: number; metadataOffset?: number; screenshotOffset?: number; updated?: number; screenshotsSaved?: number; screenshotFailures?: number; screenshotRetries?: number; done?: boolean };
+        const payload = await response.json().catch(() => ({})) as { isAdmin?: boolean; error?: string; message?: string; phase?: string; offset?: number; total?: number; metadataOffset?: number; screenshotOffset?: number; updated?: number; screenshotsSaved?: number; screenshotFailures?: number; screenshotRetries?: number; bannersFoundTotal?: number; bannersMatchedTotal?: number; bannersSavedTotal?: number; bannersAddedTotal?: number; bannerErrorsTotal?: number; bannersStored?: number; done?: boolean };
         if (response.status === 409) {
           await new Promise(resolve => window.setTimeout(resolve, 1500));
           continue;
@@ -918,7 +924,7 @@ function Index() {
         const phase = payload.phase ?? "metadata";
         const total = payload.total ?? 0;
         const offset = phase === "metadata" ? (payload.metadataOffset ?? payload.offset ?? 0) : (payload.screenshotOffset ?? payload.offset ?? 0);
-        setMetadataRefreshProgress(current => ({ ...current, phase, total, offset, metadataOffset: payload.metadataOffset ?? current.metadataOffset, screenshotOffset: payload.screenshotOffset ?? current.screenshotOffset, updated: current.updated + (payload.updated ?? 0), screenshotsSaved: current.screenshotsSaved + (payload.screenshotsSaved ?? 0), screenshotFailures: payload.screenshotFailures ?? current.screenshotFailures, screenshotRetries: payload.screenshotRetries ?? current.screenshotRetries }));
+        setMetadataRefreshProgress(current => ({ ...current, phase, total, offset, metadataOffset: payload.metadataOffset ?? current.metadataOffset, screenshotOffset: payload.screenshotOffset ?? current.screenshotOffset, updated: current.updated + (payload.updated ?? 0), screenshotsSaved: current.screenshotsSaved + (payload.screenshotsSaved ?? 0), bannersFound: payload.bannersFoundTotal ?? current.bannersFound, bannersMatched: payload.bannersMatchedTotal ?? current.bannersMatched, bannersSaved: payload.bannersSavedTotal ?? current.bannersSaved, bannersAdded: payload.bannersAddedTotal ?? current.bannersAdded, bannerErrors: payload.bannerErrorsTotal ?? current.bannerErrors, bannersStored: payload.bannersStored ?? current.bannersStored, screenshotFailures: payload.screenshotFailures ?? current.screenshotFailures, screenshotRetries: payload.screenshotRetries ?? current.screenshotRetries }));
         finished = payload.done === true || phase === "done";
         setMetadataRefreshMessage(language === "ru"
           ? (finished ? "Ручное обновление завершено." : manualMetadataStopRef.current ? "Ручной запуск остановлен. Прогресс сохранён." : "Ручное обновление: " + phase + ", " + offset + " / " + total + ".")
@@ -1784,7 +1790,7 @@ function Index() {
                 </summary>
                 <div className="border-t border-border/70 p-3 sm:p-4">
                 <div className="flex flex-col gap-3">
-                  <p className="text-xs leading-relaxed text-muted-foreground">{language === "ru" ? "Дозаполняет отсутствующие метаданные и кадры из Shikimori для существующих тайтлов. Уже заполненные поля не перезаписываются; новые записи не добавляются." : "Fills missing metadata and screenshot URLs from Shikimori for existing titles. Existing populated fields are preserved; no records are added."}</p>
+                  <p className="text-xs leading-relaxed text-muted-foreground">{language === "ru" ? "Дозаполняет отсутствующие метаданные и кадры из Shikimori, а широкие баннеры получает из AniList и сохраняет в D1. Уже заполненные метаданные не перезаписываются; новые записи не добавляются." : "Fills missing metadata and screenshots from Shikimori, and fetches wide banners from AniList into D1. Existing metadata is preserved; no records are added."}</p>
                   <div className="grid grid-cols-2 gap-1.5">
                     <button type="button" onClick={resetMetadataRefresh} disabled={metadataRefreshRunning || metadataAutoBusy || adminImportRunning || adminRunning} className="col-span-2 w-full rounded-lg border border-amber-500/40 bg-amber-500/10 px-2.5 py-2 text-xs font-semibold text-amber-200 disabled:cursor-not-allowed disabled:opacity-45">{language === "ru" ? "Сбросить прогресс и начать сначала" : "Reset progress and start over"}</button>
                     <button type="button" onClick={runMetadataRefresh} disabled={metadataRefreshRunning || metadataAutoBusy || adminImportRunning || adminRunning} className="w-full rounded-lg bg-gradient-to-r from-[#AC4EFC] to-[#8736FA] px-2.5 py-2 text-xs font-semibold text-white shadow-[0_0_12px_rgba(155,65,245,0.15)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-45">{metadataRefreshRunning ? (language === "ru" ? "Выполняется вручную…" : "Manual run active…") : (language === "ru" ? "Запустить вручную" : "Run manually")}</button>
@@ -1795,7 +1801,7 @@ function Index() {
                   <div className="mt-3">
                     <div className="mb-1 flex flex-wrap justify-between gap-2 text-xs text-muted-foreground">
                       <span>{metadataRefreshProgress.phase === "metadata" ? (language === "ru" ? "Метаданные" : "Metadata") : metadataRefreshProgress.phase === "screenshots" ? (language === "ru" ? "Проверено тайтлов" : "Titles checked") : metadataRefreshProgress.phase === "screenshots_retry" ? (language === "ru" ? "Повтор кадров" : "Screenshot retries") : (language === "ru" ? "Завершено" : "Completed")}: {metadataRefreshProgress.offset} / {metadataRefreshProgress.total}</span>
-                      <span>{language === "ru" ? "Дополнено тайтлов" : "Titles enriched"}: {metadataRefreshProgress.updated} · {language === "ru" ? "URL кадров" : "Screenshot URLs"}: {metadataRefreshProgress.screenshotsSaved} · {language === "ru" ? "Ошибок кадров" : "Failed shots"}: {metadataRefreshProgress.screenshotFailures} · {language === "ru" ? "Ожидают повтора" : "Waiting to retry"}: {metadataRefreshProgress.screenshotRetries}</span>
+                      <span>{language === "ru" ? "Дополнено тайтлов" : "Titles enriched"}: {metadataRefreshProgress.updated} · {language === "ru" ? "Найдено баннеров" : "Banners found"}: {metadataRefreshProgress.bannersFound} · {language === "ru" ? "Добавлено в D1" : "New banners saved"}: {metadataRefreshProgress.bannersAdded} · {language === "ru" ? "В D1 сейчас" : "Stored in D1"}: {metadataRefreshProgress.bannersStored} · {language === "ru" ? "Ошибок AniList" : "AniList errors"}: {metadataRefreshProgress.bannerErrors} · {language === "ru" ? "URL кадров" : "Screenshot URLs"}: {metadataRefreshProgress.screenshotsSaved} · {language === "ru" ? "Ошибок кадров" : "Failed shots"}: {metadataRefreshProgress.screenshotFailures} · {language === "ru" ? "Ожидают повтора" : "Waiting to retry"}: {metadataRefreshProgress.screenshotRetries}</span>
                     </div>
                     <div role="progressbar" aria-valuemin={0} aria-valuemax={metadataRefreshProgress.total} aria-valuenow={metadataRefreshProgress.offset} className="h-1.5 overflow-hidden rounded-full bg-muted">
                       <div className="h-full rounded-full bg-gradient-to-r from-[#A83BFA] to-[#D08AFF] transition-all" style={{ width: (metadataRefreshProgress.total ? Math.min(100, metadataRefreshProgress.offset / metadataRefreshProgress.total * 100) : 0) + "%" }} />
@@ -1812,6 +1818,8 @@ function Index() {
                         [language === "ru" ? "Анонсы" : "Announced", metadataCatalogStats.announced],
                         [language === "ru" ? "Без трейлера" : "Missing trailer", metadataCatalogStats.missingTrailer],
                         [language === "ru" ? "С трейлером" : "Has trailer", metadataCatalogStats.hasTrailer],
+                        [language === "ru" ? "Баннеры AniList в D1" : "AniList banners in D1", metadataCatalogStats.anilistBanners],
+                        [language === "ru" ? "Без баннера AniList" : "Missing AniList banner", metadataCatalogStats.missingAniListBanners],
                         [language === "ru" ? "URL кадров" : "Screenshot URLs", metadataCatalogStats.savedScreenshotUrls],
                         [language === "ru" ? "Кадры проверены" : "Screenshots checked", metadataCatalogStats.screenshotDone],
                         [language === "ru" ? "Кадры: повторы" : "Screenshot retries", metadataCatalogStats.screenshotRetry],
