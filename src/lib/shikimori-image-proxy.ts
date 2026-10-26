@@ -32,7 +32,24 @@ function parseAllowedSource(value: string | null | undefined): URL | null {
   }
 }
 
-/** Route approved Shikimori image assets through YUME so browsers do not contact the vendor directly. */
+export type ShikimoriImagePair = { originalUrl: string; previewUrl: string };
+
+/** Rewrite Shikimori screenshot variants through the proxy; reject unexpected external hosts. */
+export function toSameOriginShikimoriScreenshot(value: ShikimoriImagePair): ShikimoriImagePair | null {
+  const rewrite = (input: string): string | undefined => {
+    try {
+      const source = new URL(input);
+      if (source.protocol !== "https:" || !SHIKIMORI_IMAGE_HOSTS.has(source.hostname.toLowerCase())) return undefined;
+      return toSameOriginShikimoriImage(source);
+    } catch {
+      return undefined;
+    }
+  };
+  const originalUrl = rewrite(value.originalUrl);
+  const previewUrl = rewrite(value.previewUrl);
+  return originalUrl && previewUrl ? { ...value, originalUrl, previewUrl } : null;
+}
+
 export function toSameOriginShikimoriImage(value: string | null | undefined): string | undefined {
   if (!value) return undefined;
   let source: URL;

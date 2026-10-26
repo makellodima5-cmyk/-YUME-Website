@@ -30,6 +30,7 @@ import {
   WATCHLIST_STORAGE_KEY,
 } from "@/data/profile-storage";
 import { absoluteImageUrl, canonicalUrl, sanitizeMetaDescription } from "@/data/seo";
+import { toSameOriginShikimoriScreenshot } from "@/lib/shikimori-image-proxy";
 
 function formatAnimeDate(value: string | undefined, language: "ru" | "en", includeTime = false): string | null {
   if (!value) return null;
@@ -106,6 +107,10 @@ function AnimeDetailPage() {
   const [kodikTranslationId, setKodikTranslationId] = useState("");
   const [kodikEpisode, setKodikEpisode] = useState(1);
   const [kodikError, setKodikError] = useState("");
+  const displayableScreenshots = screenshots.flatMap((screenshot) => {
+    const proxied = toSameOriginShikimoriScreenshot(screenshot);
+    return proxied ? [proxied] : [];
+  });
 
   useEffect(() => {
     if (watchMode !== "episodes" || !anime) return;
@@ -212,12 +217,12 @@ function AnimeDetailPage() {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setActiveScreenshotIndex(null);
-      } else if (event.key === "ArrowLeft" && screenshots.length > 1) {
+      } else if (event.key === "ArrowLeft" && displayableScreenshots.length > 1) {
         event.preventDefault();
-        setActiveScreenshotIndex((current) => current === null ? current : (current - 1 + screenshots.length) % screenshots.length);
-      } else if (event.key === "ArrowRight" && screenshots.length > 1) {
+        setActiveScreenshotIndex((current) => current === null ? current : (current - 1 + displayableScreenshots.length) % displayableScreenshots.length);
+      } else if (event.key === "ArrowRight" && displayableScreenshots.length > 1) {
         event.preventDefault();
-        setActiveScreenshotIndex((current) => current === null ? current : (current + 1) % screenshots.length);
+        setActiveScreenshotIndex((current) => current === null ? current : (current + 1) % displayableScreenshots.length);
       }
     };
     window.addEventListener("keydown", onKeyDown);
@@ -225,7 +230,7 @@ function AnimeDetailPage() {
       window.removeEventListener("keydown", onKeyDown);
       document.body.style.overflow = previousOverflow;
     };
-  }, [activeScreenshotIndex, screenshots.length]);
+  }, [activeScreenshotIndex, displayableScreenshots.length]);
 
   useEffect(() => {
     setDescriptionExpanded(false);
@@ -599,13 +604,13 @@ function AnimeDetailPage() {
             </div>
           </section>
 
-          {screenshots.length > 0 && (
+          {displayableScreenshots.length > 0 && (
             <section aria-labelledby="anime-screenshots-title" className="relative z-10 mt-5 md:mt-6">
               <h2 id="anime-screenshots-title" className="mb-3 text-xl font-bold md:text-2xl">
                 {language === "en" ? "Screenshots" : "Кадры"}
               </h2>
               <div className="scrollbar-none flex snap-x snap-mandatory gap-2 overflow-x-auto overscroll-x-contain px-0.5 pb-2">
-                {screenshots.map((screenshot, index) => (
+                {displayableScreenshots.map((screenshot, index) => (
                   <button
                     key={screenshot.originalUrl}
                     type="button"
@@ -736,7 +741,7 @@ function AnimeDetailPage() {
         </div>
       </main>
 
-      {activeScreenshotIndex !== null && screenshots[activeScreenshotIndex] && (
+      {activeScreenshotIndex !== null && displayableScreenshots[activeScreenshotIndex] && (
         <div
           className="fixed inset-0 z-[70] flex items-center justify-center bg-black/90 p-3 backdrop-blur-sm sm:p-6"
           role="presentation"
@@ -757,7 +762,7 @@ function AnimeDetailPage() {
                 <ChevronLeft className="h-5 w-5" />
               </button>
             )}
-            <img src={screenshots[activeScreenshotIndex].originalUrl} alt={language === "en" ? "Anime screenshot " + (activeScreenshotIndex + 1) : "Кадр из аниме " + (activeScreenshotIndex + 1)} className="max-h-[86dvh] max-w-[94vw] select-none object-contain" decoding="async" />
+            <img src={displayableScreenshots[activeScreenshotIndex].originalUrl} alt={language === "en" ? "Anime screenshot " + (activeScreenshotIndex + 1) : "Кадр из аниме " + (activeScreenshotIndex + 1)} className="max-h-[86dvh] max-w-[94vw] select-none object-contain" decoding="async" />
             {screenshots.length > 1 && (
               <button type="button" onClick={() => setActiveScreenshotIndex((current) => current === null ? current : (current + 1) % screenshots.length)} aria-label={language === "en" ? "Next screenshot" : "Следующий кадр"} className="absolute right-1 top-1/2 z-10 -translate-y-1/2 rounded-full border border-white/20 bg-black/70 p-2 text-white shadow-lg sm:right-3">
                 <ChevronRight className="h-5 w-5" />
