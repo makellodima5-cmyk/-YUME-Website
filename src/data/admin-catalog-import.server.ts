@@ -1,6 +1,6 @@
 import { env as cloudflareEnv } from "cloudflare:workers";
 import { invalidatePersistentCatalogCache } from "@/data/catalog-d1.server";
-import { getAniListBannersByMalIdsWithStats } from "@/data/anilist-banner.server";
+import { getAniListBannerByTitle, getAniListBannersByMalIdsWithStats } from "@/data/anilist-banner.server";
 import { retryAfterMilliseconds } from "@/data/retry-after";
 
 type RuntimeGlobal = typeof globalThis & { __YUME_RUNTIME_ENV__?: unknown };
@@ -595,13 +595,26 @@ async function runCatalogMetadataRefreshStep(db: Database): Promise<Response> {
       const bannerLookup = await getAniListBannersByMalIdsWithStats(malIds);
       const anilistBanners = bannerLookup.banners;
       const anilistBannersByCatalogId = mapAniListBannersToCatalogIds(source, anilistBanners);
-
-      const rowsWithoutMalId = bannerRows.filter(row => !normalizeAniListMalId(sourceById.get(row.id)?.malId));
-      if (rowsWithoutMalId.length) {
-        console.warn("[YUME][ANILIST_BANNER] Skipping catalogue rows without a valid Shikimori MAL ID.", {
-          count: rowsWithoutMalId.length,
-          ids: rowsWithoutMalId.slice(0, 20).map(row => row.id),
-        });
+      // Bound title fallbacks to five requests per refresh slice. English is always tried first.
+      let titleFallbackRequests = 0;
+      const titleFallbackCandidates = bannerRows
+        .filter(row => !anilistBannersByCatalogId.has(row.id))
+        .map(row => ({ row, source: sourceById.get(row.id) }))
+        .filter((entry): entry is { row: typeof bannerRows[number]; source: ShikimoriAnime } => Boolean(entry.source))
+        .slice(0, 5);
+      for (const entry of titleFallbackCandidates) {
+        // Never search in Russian. The source title/name may be Japanese or romanized.
+        const englishTitle = typeof entry.source.english === "string" ? entry.source.english.trim() : "";
+        const nonRussianTitles = [englishTitle, entry.source.name, ...(Array.isArray(entry.source.english) ? entry.source.english : [])]
+          .filter((value): value is string => typeof value === "string" && value.trim().length > 1)
+          .map(value => value.trim())
+          .filter((value, index, all) => all.findIndex(other => other.toLocaleLowerCase() === value.toLocaleLowerCase()) === index);
+        for (const title of nonRussianTitles) {
+          if (titleFallbackRequests >= 5) break;
+          titleFallbackRequests++;
+          const banner = await getAniListBannerByTitle(title);
+          if (banner) { anilistBannersByCatalogId.set(entry.row.id, banner); break; }
+        }
       }
 
       let bannersSaved = 0;
@@ -1125,6 +1138,24 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
           .filter((id): id is string => id !== null)));
         const importedBannerLookup = await getAniListBannersByMalIdsWithStats(candidateMalIds);
         const importedBannersByCatalogId = mapAniListBannersToCatalogIds(candidateSourceItems, importedBannerLookup.banners);
+        // Title fallback is deliberately small and only runs for records unmatched by MAL ID.
+        const importedTitleFallbacks = candidateSourceItems
+          .filter(item => !importedBannersByCatalogId.has(String(item.id)))
+          .slice(0, 5);
+        let importedTitleFallbackRequests = 0;
+        for (const item of importedTitleFallbacks) {
+          const titles = [item.english, item.name]
+            .flatMap(value => Array.isArray(value) ? value : [value])
+            .filter((value): value is string => typeof value === "string" && value.trim().length > 1)
+            .map(value => value.trim())
+            .filter((value, index, all) => all.findIndex(other => other.toLocaleLowerCase() === value.toLocaleLowerCase()) === index);
+          for (const title of titles) {
+            if (importedTitleFallbackRequests >= 5) break;
+            importedTitleFallbackRequests++;
+            const banner = await getAniListBannerByTitle(title);
+            if (banner) { importedBannersByCatalogId.set(String(item.id), banner); break; }
+          }
+        }
         const seen = new Set<string>();
         const currentCount = await db.prepare("SELECT COUNT(*) AS count FROM anime_catalog").first<{count:number}>();
         let position = Number(currentCount?.count ?? 0);
