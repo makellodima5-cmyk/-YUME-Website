@@ -1929,7 +1929,7 @@ function Index() {
         </main>
       ) : null}
       {!["profile", "favorites", "watchlist", "privacy", "privacy-policy", "rules", "rights", "login", "register"].includes(view) && (
-        <Footer onNavigate={setView} />
+        <Footer />
       )}
       </div>
     </div>
