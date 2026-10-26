@@ -1,14 +1,6 @@
 import { useYumePreferences } from "@/data/preferences";
 import { APP_VERSION } from "@/data/app-version";
-import type { View } from "./Header";
-
-type LegalFooterView = Extract<View, "privacy-policy" | "rights" | "rules">;
-
-type Props = {
-  onNavigate: (view: LegalFooterView) => void;
-};
-
-export function Footer({ onNavigate }: Props) {
+export function Footer() {
   const { t, language } = useYumePreferences();
 
   return (
@@ -17,12 +9,12 @@ export function Footer({ onNavigate }: Props) {
         <div className="min-w-0">
           <p className="font-display text-sm font-bold tracking-wide text-foreground">YUME</p>
           <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{t("footer.source")}</p>
-          <p className="mt-1 text-[10px] text-muted-foreground/70">{language === "en" ? "Version" : "Версия"} {APP_VERSION}</p>
+          <p className="mt-1 text-[10px] text-muted-foreground">{language === "en" ? "Version" : "Версия"} {APP_VERSION}</p>
         </div>
         <nav aria-label={language === "en" ? "Legal information" : "Правовая информация"} className="flex flex-wrap gap-x-5 gap-y-2 text-xs sm:justify-end sm:text-sm">
-          <button type="button" onClick={() => onNavigate("privacy-policy")} className="text-muted-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:ring-offset-background">{language === "en" ? "Privacy policy" : "Политика конфиденциальности"}</button>
-          <button type="button" onClick={() => onNavigate("rights")} className="text-muted-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:ring-offset-background">{language === "en" ? "For copyright holders" : "Для правообладателей"}</button>
-          <button type="button" onClick={() => onNavigate("rules")} className="text-muted-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:ring-offset-background">{language === "en" ? "Site rules" : "Правила сайта"}</button>
+          <a href="/?section=privacy-policy" className="text-muted-foreground underline-offset-4 transition-colors hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:ring-offset-background">{language === "en" ? "Privacy policy" : "Политика конфиденциальности"}</a>
+          <a href="/?section=rights" className="text-muted-foreground underline-offset-4 transition-colors hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:ring-offset-background">{language === "en" ? "For copyright holders" : "Для правообладателей"}</a>
+          <a href="/?section=rules" className="text-muted-foreground underline-offset-4 transition-colors hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:ring-offset-background">{language === "en" ? "Site rules" : "Правила сайта"}</a>
         </nav>
       </div>
     </footer>
