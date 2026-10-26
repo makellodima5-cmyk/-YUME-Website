@@ -137,10 +137,11 @@ function AnimeDetailPage() {
 
   useEffect(() => {
     if (watchMode !== "episodes" || !kodikEmbedUrl) return;
-    const player = document.getElementById("kodik-player");
+    const player = document.getElementById("kodik-player-container");
     if (!player) return;
     player.replaceChildren();
     const frame = document.createElement("iframe");
+    frame.id = "kodik-player";
     frame.src = kodikEmbedUrl;
     frame.title = (anime ? displayAnimeTitle(anime, language) : "Kodik") + " — " + (language === "en" ? "episode player" : "плеер серий");
     frame.className = "absolute inset-0 h-full w-full border-0";
@@ -655,7 +656,7 @@ function AnimeDetailPage() {
                     {kodikError && selectedKodikSource?.episodes.length ? <p role="status" className="mt-3 text-sm text-muted-foreground">{kodikError}</p> : null}
                   </div>
                   <div className="relative mx-auto aspect-video w-full min-w-0 overflow-hidden rounded-2xl border border-white/10 bg-[#080710] shadow-2xl">
-                    <div id="kodik-player" className="absolute inset-0 h-full w-full [&_iframe]:!absolute [&_iframe]:!inset-0 [&_iframe]:!h-full [&_iframe]:!w-full" />
+                    <div id="kodik-player-container" className="absolute inset-0 h-full w-full [&_iframe]:!absolute [&_iframe]:!inset-0 [&_iframe]:!h-full [&_iframe]:!w-full" />
                     {!kodikEmbedUrl && <div className="absolute inset-0 flex items-center justify-center p-5 text-center text-sm text-muted-foreground">{kodikError || (language === "en" ? "Loading Kodik player…" : "Загрузка плеера Kodik…")}</div>}
                   </div>
                 </div>
