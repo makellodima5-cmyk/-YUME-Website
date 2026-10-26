@@ -73,14 +73,17 @@ export function CookieConsentBanner({ isHome }: { isHome: boolean }) {
       className="fixed inset-x-3 bottom-3 z-[90] mx-auto flex max-w-5xl flex-col gap-3 rounded-2xl border border-primary/25 bg-background/95 p-4 shadow-2xl backdrop-blur-md sm:inset-x-5 sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:px-6 sm:py-4"
     >
       <p className="max-w-3xl text-center text-sm leading-relaxed text-foreground/90 sm:text-left">
-        {isRu ? "Продолжая пользоваться сайтом, вы соглашаетесь с " : "By continuing to use this website, you agree to the "}
-        <button
-          type="button"
-          onClick={() => window.open("/?section=privacy-policy", "_blank", "noopener,noreferrer")}
-          className="inline cursor-pointer text-primary underline decoration-primary/70 underline-offset-4 transition-colors hover:text-primary/80"
+        {isRu
+          ? "Необходимые технические данные используются для работы сайта. Необязательная аналитика включается только после выбора «Принять все». Подробнее о персональных данных и cookies — в "
+          : "Essential technical storage is used to operate the site. Optional analytics starts only after you choose “Accept all”. Details about personal data and cookies are in the "}
+        <a
+          href="/?section=privacy-policy"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline text-primary underline decoration-primary/70 underline-offset-4 transition-colors hover:text-primary/80"
         >
-          {isRu ? "политикой в отношении обработки персональных данных и использованием куки" : "the personal data processing policy and use of cookies"}
-        </button>.
+          {isRu ? "политике конфиденциальности и cookies" : "the privacy and cookie policy"}
+        </a>.
       </p>
       <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
         <button
