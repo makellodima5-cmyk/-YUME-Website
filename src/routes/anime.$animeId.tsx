@@ -14,6 +14,7 @@ import {
   X,
 } from "lucide-react";
 import { getShikimoriAnimeDetails, getShikimoriAnimeScreenshots, type ShikimoriScreenshot } from "@/data/shikimori";
+import { toSameOriginShikimoriImage } from "@/lib/shikimori-image-proxy";
 import { Header, type View } from "@/components/yume/Header";
 import { Footer } from "@/components/yume/Footer";
 import { AnimeCard, PosterArt } from "@/components/yume/Poster";
@@ -61,7 +62,7 @@ export const Route = createFileRoute("/anime/$animeId")({
       anime?.description,
       anime ? `Смотри ${anime.title} на YUME — информация, рейтинг, жанры и трейлер аниме.` : "Это аниме не найдено. Открой каталог YUME, чтобы найти другие тайтлы.",
     );
-    const image = absoluteImageUrl(anime?.bannerUrl ?? anime?.posterUrl);
+    const image = absoluteImageUrl(toSameOriginShikimoriImage(anime?.bannerUrl ?? anime?.posterUrl));
     const canonical = anime ? canonicalUrl(`/anime/${encodeURIComponent(anime.id)}`) : canonicalUrl("/");
     return {
       meta: [
@@ -617,7 +618,7 @@ function AnimeDetailPage() {
                     className="group relative aspect-video w-[68vw] max-w-[280px] shrink-0 snap-start overflow-hidden rounded-xl border border-white/10 bg-card shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                   >
                     <img
-                      src={screenshot.previewUrl}
+                      src={toSameOriginShikimoriImage(screenshot.previewUrl) ?? screenshot.previewUrl}
                       alt={language === "en" ? "Anime screenshot " + (index + 1) : "Кадр из аниме " + (index + 1)}
                       loading="lazy"
                       decoding="async"
@@ -757,7 +758,7 @@ function AnimeDetailPage() {
                 <ChevronLeft className="h-5 w-5" />
               </button>
             )}
-            <img src={screenshots[activeScreenshotIndex].originalUrl} alt={language === "en" ? "Anime screenshot " + (activeScreenshotIndex + 1) : "Кадр из аниме " + (activeScreenshotIndex + 1)} className="max-h-[86dvh] max-w-[94vw] select-none object-contain" decoding="async" />
+            <img src={toSameOriginShikimoriImage(screenshots[activeScreenshotIndex].originalUrl) ?? screenshots[activeScreenshotIndex].originalUrl} alt={language === "en" ? "Anime screenshot " + (activeScreenshotIndex + 1) : "Кадр из аниме " + (activeScreenshotIndex + 1)} className="max-h-[86dvh] max-w-[94vw] select-none object-contain" decoding="async" />
             {screenshots.length > 1 && (
               <button type="button" onClick={() => setActiveScreenshotIndex((current) => current === null ? current : (current + 1) % screenshots.length)} aria-label={language === "en" ? "Next screenshot" : "Следующий кадр"} className="absolute right-1 top-1/2 z-10 -translate-y-1/2 rounded-full border border-white/20 bg-black/70 p-2 text-white shadow-lg sm:right-3">
                 <ChevronRight className="h-5 w-5" />
