@@ -94,7 +94,7 @@ export function CookieConsentBanner({ isHome }: { isHome: boolean }) {
         <button
           type="button"
           onClick={() => saveChoice(true)}
-          className="inline-flex min-h-10 items-center justify-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="inline-flex min-h-10 items-center justify-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-[#14091f] transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           {isRu ? "Принять все" : "Accept all"}
         </button>
