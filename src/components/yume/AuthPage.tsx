@@ -29,13 +29,6 @@ export function AuthPage({ mode, language, onModeChange, onPrivacy, onRules, onC
   const isRegister = mode === "register";
 
   useEffect(() => {
-    if (mode !== "register") {
-      setConsentAccepted(false);
-      setTermsAccepted(false);
-    }
-  }, [mode]);
-
-  useEffect(() => {
     if (!pollingEnabled || !requestId) return;
     let cancelled = false;
     const startedAt = Date.now();
@@ -227,7 +220,7 @@ export function AuthPage({ mode, language, onModeChange, onPrivacy, onRules, onC
           </p>
           <div className="mt-6 border-t border-border pt-5 text-center text-sm text-muted-foreground">
             {isRegister ? (isRu ? "Уже есть аккаунт? " : "Already registered? ") : (isRu ? "Нет аккаунта? " : "Don't have an account? ")}
-            <button type="button" onClick={() => { setError(""); setMessage(""); setBotUrl(""); setRequestId(""); setConfirmationCode(""); setPollingEnabled(false); onModeChange(isRegister ? "login" : "register"); }} className="font-semibold text-primary hover:text-neon">
+            <button type="button" onClick={() => { setError(""); setMessage(""); setBotUrl(""); setRequestId(""); setConfirmationCode(""); setPollingEnabled(false); setConsentAccepted(false); setTermsAccepted(false); onModeChange(isRegister ? "login" : "register"); }} className="font-semibold text-primary hover:text-neon">
               {isRegister ? (isRu ? "Войти" : "Sign in") : (isRu ? "Зарегистрироваться" : "Create an account")}
             </button>
           </div>
