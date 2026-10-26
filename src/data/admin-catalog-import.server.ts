@@ -569,7 +569,7 @@ async function runCatalogMetadataRefreshStep(db: Database): Promise<Response> {
       const statements: Statement[] = [];
       const now = Date.now();
       for (const row of page.results) {
-        const unreleased = row.status === "Анонс" || Boolean(row.aired_on && /^\\d{4}-\\d{2}-\\d{2}/.test(row.aired_on) && row.aired_on.slice(0, 10) > new Date().toISOString().slice(0, 10));
+        const unreleased = row.status === "Анонс" || Boolean(row.aired_on && /^\d{4}-\d{2}-\d{2}/.test(row.aired_on) && row.aired_on.slice(0, 10) > new Date().toISOString().slice(0, 10));
         const recentEmpty = row.screenshot_status === "done" && row.last_error === "Источник не вернул кадров" && Number.isFinite(Date.parse(row.updated_at ?? "")) && Date.parse(row.updated_at ?? "") > now - 30 * 24 * 60 * 60 * 1000;
         if (unreleased) {
           if (row.screenshot_status !== "done") statements.push(screenshotStatusStatement(db, row.id, "done", 0, "Пропущено: аниме ещё не вышло; запрос кадров не выполнялся"));
