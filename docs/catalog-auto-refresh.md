@@ -4,7 +4,7 @@
 
 Catalog metadata enrichment is manual-only. The Cloudflare Cron Trigger no longer runs the catalog metadata refresh; the scheduled hook is retained only for the separately configured trailer updater. The admin interface no longer exposes start/stop controls for catalog auto-refresh.
 
-New catalog imports now request scene screenshot URLs in the same Shikimori GraphQL response as titles, descriptions, posters, trailers, genres, and other metadata. YUME stores at most five unique screenshots per newly imported anime. The screenshot URLs and per-title status are written in the same D1 batch as the catalog records.
+New catalog imports now request scene screenshot URLs in the same Shikimori GraphQL response as titles, descriptions, posters, trailers, genres, and other metadata. YUME stores at most five unique screenshots for newly imported anime. The screenshot URLs and per-title status are written in the same D1 batch as the catalog records. Previously saved screenshot rows are preserved rather than destructively trimmed by this change.
 
 The import no longer launches a second full-catalog enrichment pass when it finishes. Existing populated metadata fields are preserved, and existing titles are skipped during import. This avoids automatically rescanning the catalog after every import.
 
@@ -14,7 +14,7 @@ For existing catalog rows, the manual metadata refresh remains available when an
 
 1. Missing metadata is identified from the fields already supported by YUME. Complete records are skipped.
 2. The screenshot phase reads an indexed page of up to 40 catalog rows and requests screenshots for eligible IDs together through Shikimori GraphQL.
-3. At most five unique screenshots are stored per anime. Existing screenshots, future/unreleased titles, and recently confirmed empty screenshot results are skipped.
+3. At most five unique screenshots are stored when frames are newly fetched. Existing screenshot rows, future/unreleased titles, and recently confirmed empty screenshot results are skipped. Older rows that already contain more than five screenshots are preserved.
 4. A provider/network failure leaves the current page cursor unchanged, so restarting manual mode retries the same batch.
 5. Temporary screenshot retries are also batched. The durable cursor and screenshot statuses are stored in D1.
 
