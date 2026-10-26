@@ -62,7 +62,7 @@ export function AuthPage({ mode, language, onModeChange, onPrivacy, onRules, onC
           const errors: Record<string, [string, string]> = {
             account_not_found: ["Аккаунт не найден. Переключись на регистрацию.", "No account found. Switch to registration."],
             already_registered: ["Этот Telegram уже зарегистрирован. Переключись на вход.", "This Telegram account is already registered. Switch to sign in."],
-            consent_required: ["Для регистрации нужно принять Политику конфиденциальности.", "Accept the Privacy Policy to register."],
+            consent_required: ["Для регистрации нужно принять оба документа.", "Accept both documents to register."],
           };
           const pair = errors[result.error ?? (result.status === "expired" ? "expired" : "")];
           setError(pair ? (isRu ? pair[0] : pair[1]) : (isRu ? "Ссылка истекла или не удалось завершить вход." : "The link expired or sign-in could not be completed."));
