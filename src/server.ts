@@ -1,4 +1,5 @@
 import "./lib/error-capture";
+import { applySecurityHeaders } from "./lib/security-headers";
 import { env as cloudflareEnv } from "cloudflare:workers";
 
 import { consumeLastCapturedError } from "./lib/error-capture";
@@ -209,17 +210,17 @@ export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     setCatalogRuntimeEnvironment(env);
     const supportRedirect = getSupportRedirect(request, env);
-    if (supportRedirect) return supportRedirect;
+    if (supportRedirect) return applySecurityHeaders(supportRedirect, request.url);
     try {
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
-      return await normalizeCatastrophicSsrResponse(response);
+      return applySecurityHeaders(await normalizeCatastrophicSsrResponse(response), request.url);
     } catch (error) {
       console.error(error);
-      return new Response(renderErrorPage(), {
+      return applySecurityHeaders(new Response(renderErrorPage(), {
         status: 500,
         headers: { "content-type": "text/html; charset=utf-8" },
-      });
+      }), request.url);
     }
   },
 };
