@@ -23,7 +23,7 @@ jobs:
       - name: Update vulnerable dependency resolutions
         run: |
           bun install --frozen-lockfile
-          bun audit fix || true
+          bun audit fix --latest || true
           bun audit || true
       - name: Commit patched lockfile
         run: |
