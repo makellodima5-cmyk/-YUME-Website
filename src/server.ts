@@ -1,5 +1,6 @@
 import "./lib/error-capture";
 import { applySecurityHeaders } from "./lib/security-headers";
+import { redirectHttpToHttps } from "./lib/https-redirect";
 import { env as cloudflareEnv } from "cloudflare:workers";
 
 import { consumeLastCapturedError } from "./lib/error-capture";
@@ -208,6 +209,9 @@ export default {
   },
 
   async fetch(request: Request, env: unknown, ctx: unknown) {
+    const httpsRedirect = redirectHttpToHttps(request);
+    if (httpsRedirect) return httpsRedirect;
+
     setCatalogRuntimeEnvironment(env);
     const supportRedirect = getSupportRedirect(request, env);
     if (supportRedirect) return applySecurityHeaders(supportRedirect, request.url);
