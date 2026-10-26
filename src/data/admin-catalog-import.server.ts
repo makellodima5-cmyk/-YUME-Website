@@ -1,5 +1,6 @@
 import { env as cloudflareEnv } from "cloudflare:workers";
 import { invalidatePersistentCatalogCache } from "@/data/catalog-d1.server";
+import { getAniListBannersByMalIds } from "@/data/anilist-banner.server";
 import { retryAfterMilliseconds } from "@/data/retry-after";
 
 type RuntimeGlobal = typeof globalThis & { __YUME_RUNTIME_ENV__?: unknown };
@@ -501,9 +502,27 @@ async function runCatalogMetadataRefreshStep(db: Database): Promise<Response> {
         return json({ isAdmin: true, phase: "screenshots", phaseChanged: true, processed: 0, offset: total, nextOffset: total, metadataOffset: total, screenshotOffset: 0, total, updated: 0, screenshotsSaved: 0, screenshotFailures: shots.failed, screenshotRetries: shots.retry, done: false });
       }
 
-      // Only query Shikimori for rows that are missing a field YUME already supports.
-      // Fully populated rows are deliberately skipped, including their existing posters,
-      // episode counts, ratings, descriptions, and other user-visible metadata.
+      // Always enrich banners from AniList, even when the rest of a row is complete.
+      // This keeps banners durable in D1 instead of depending on a per-page-view request.
+      const anilistBanners = await getAniListBannersByMalIds(pageIds);
+      let bannersSaved = 0;
+      const bannerUpdates: Statement[] = [];
+      for (const row of catalogPage.results) {
+        const bannerUrl = anilistBanners.get(row.id);
+        if (!bannerUrl || bannerUrl === row.banner_url) continue;
+        bannerUpdates.push(db.prepare("UPDATE anime_catalog SET banner_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(bannerUrl, row.id));
+        // Keep the in-memory snapshot in sync so Shikimori's fallback image cannot
+        // overwrite the AniList banner later in this same refresh step.
+        row.banner_url = bannerUrl;
+        bannersSaved++;
+      }
+      if (bannerUpdates.length) {
+        await db.batch(bannerUpdates);
+        await invalidatePersistentCatalogCache();
+      }
+
+      // Shikimori metadata remains authoritative for all fields except banner_url.
+      // Fully populated rows are deliberately skipped by the metadata backfill.
       const ids = catalogPage.results.filter(isCatalogMetadataIncomplete).map(row => row.id);
       let updated = 0;
       let missingSourceIds: string[] = [];
@@ -543,11 +562,11 @@ async function runCatalogMetadataRefreshStep(db: Database): Promise<Response> {
       ]);
       if (updated > 0) await invalidatePersistentCatalogCache();
       await audit(db, "catalog.metadata.backfill", missingSourceIds.length ? "partial" : "success", {
-        phase: "metadata", offset: cursor, processed: ids.length, titlesChanged: updated, total,
+        phase: "metadata", offset: cursor, processed: ids.length, titlesChanged: updated, bannersSaved, total,
         missingSourceIds: missingSourceIds.slice(0, 100),
       });
       const shots = await screenshotProgress(db);
-      return json({ isAdmin: true, phase: nextState, phaseChanged: nextState !== "metadata", processed: pageIds.length, offset: nextOffset, nextOffset, metadataOffset: nextOffset, screenshotOffset: 0, total, updated, screenshotsSaved: 0, screenshotFailures: shots.failed, screenshotRetries: shots.retry, done: false });
+      return json({ isAdmin: true, phase: nextState, phaseChanged: nextState !== "metadata", processed: pageIds.length, offset: nextOffset, nextOffset, metadataOffset: nextOffset, screenshotOffset: 0, total, updated, bannersSaved, screenshotsSaved: 0, screenshotFailures: shots.failed, screenshotRetries: shots.retry, done: false });
     }
 
     if (state === "screenshots") {
@@ -965,6 +984,12 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
           ? await db.prepare("SELECT id FROM anime_catalog WHERE id IN (" + sourceIds.map(() => "?").join(",") + ")").bind(...sourceIds).all<{id:string}>()
           : {results:[] as {id:string}[]};
         const existingIds = new Set(existingRows.results.map(row => row.id));
+        const remainingTarget = Math.max(0, before.target - before.added);
+        const candidateBannerIds = Array.from(new Set(source
+          .map(item => String(item.id))
+          .filter(id => /^\\d{1,10}$/.test(id) && Number(id) <= 2147483647 && !existingIds.has(id))))
+          .slice(0, remainingTarget);
+        const importedBanners = await getAniListBannersByMalIds(candidateBannerIds);
         const seen = new Set<string>();
         const currentCount = await db.prepare("SELECT COUNT(*) AS count FROM anime_catalog").first<{count:number}>();
         let position = Number(currentCount?.count ?? 0);
@@ -980,6 +1005,8 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
             continue;
           }
           const item = mapItem(sourceItem);
+          const anilistBanner = importedBanners.get(item.id);
+          if (anilistBanner) item.banner_url = anilistBanner;
           statements.push(db.prepare("INSERT OR IGNORE INTO anime_catalog (id,title,english_title,original_title,year,episodes,rating,genres_json,status,description,hue,glyph,is_new,popular,poster_url,banner_url,kind,age_rating,next_episode_at,episodes_aired,aired_on,studios_json,youtube_trailer_id,position,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)")
             .bind(item.id,item.title,item.english_title,item.original_title,item.year,item.episodes,item.rating,item.genres_json,item.status,item.description,item.hue,item.glyph,item.is_new,item.popular,item.poster_url,item.banner_url,item.kind,item.age_rating,item.next_episode_at,item.episodes_aired,item.aired_on,item.studios_json,item.youtube_trailer_id,position++));
           statements.push(db.prepare("INSERT OR IGNORE INTO admin_catalog_import_items (run_id,anime_id,outcome,incomplete) VALUES (?,?,CASE WHEN changes() > 0 THEN 'added' ELSE 'skipped' END,?)")
@@ -1004,7 +1031,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
           await invalidatePersistentCatalogCache();
         }
         const after = await snapshot(db);
-        await audit(db,"catalog.import.page","success",{page:before.cursor,added:after.added-before.added,skipped:after.skipped-before.skipped,incomplete:after.incomplete-before.incomplete,state:after.state});
+        await audit(db,"catalog.import.page","success",{page:before.cursor,added:after.added-before.added,skipped:after.skipped-before.skipped,incomplete:after.incomplete-before.incomplete,bannersResolved:importedBanners.size,state:after.state});
         if (after.state !== "running") {
           await audit(db,"catalog.import.finish",after.state,{added:after.added,target:after.target,skipped:after.skipped,errors:after.errors});
         }
