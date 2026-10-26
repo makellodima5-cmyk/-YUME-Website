@@ -40,7 +40,7 @@ export function redirectHttpToHttps(request: Request): Response | null {
   }
   if (url.protocol !== "http:") return null;
   const host = url.hostname.toLowerCase();
-  if (host === "localhost" || host === "127.0.0.1" || host === "[::1]" || host === "::1") return null;
+  if (host === "localhost" || host.endsWith(".localhost") || /^127(?:\.\d{1,3}){3}$/.test(host) || host === "[::1]" || host === "::1") return null;
   url.protocol = "https:";
   return new Response(null, {
     status: 308,
