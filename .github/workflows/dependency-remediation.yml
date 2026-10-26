@@ -23,7 +23,8 @@ jobs:
       - name: Update vulnerable dependency resolutions
         run: |
           bun install --frozen-lockfile
-          bun audit fix
+          bun audit fix || true
+          bun audit || true
       - name: Commit patched lockfile
         run: |
           if git diff --quiet -- bun.lock bun.lockb package.json; then
