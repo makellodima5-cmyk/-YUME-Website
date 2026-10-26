@@ -17,8 +17,8 @@ const RU = {
   "nav.profile": "Профиль",
 
   "hero.artAlt": "Ночной японский город с сакурой, пагодами, фонарями и героиней YUME",
-  "hero.title": "Больше чем аниме",
-  "hero.description": "Открой для себя удивительные истории, новых героев и целые миры. Смотри, сохраняй любимое и создавай свою историю вместе с YUME.",
+  "hero.title": "Там, где заканчивается реальность, начинается YUME",
+  "hero.description": "Открой двери в новые миры, где каждая история скрывает настоящее чудо.",
   "hero.random": "Случайное аниме",
   "hero.catalog": "Каталог",
 
@@ -240,8 +240,8 @@ const EN: Record<TranslationKey, string> = {
   "nav.profile": "Profile",
 
   "hero.artAlt": "A Japanese city at night with cherry blossoms, pagodas, lanterns and the YUME heroine",
-  "hero.title": "More than anime",
-  "hero.description": "Discover amazing stories, new heroes and whole worlds. Watch, save your favorites and create your story with YUME.",
+  "hero.title": "Where Reality Ends, YUME Begins",
+  "hero.description": "Open the door to new worlds, where every story hides a real wonder.",
   "hero.random": "Random anime",
   "hero.catalog": "Catalog",
 
