@@ -218,15 +218,6 @@ function AnimeDetailPage() {
       })
       .catch(() => { if (!cancelled) setProfileStorageAuthenticated(false); });
 
-    // A visit is only persisted by the server after validating the account cookie.
-    void fetch("/api/telegram/history", {
-      method: "POST",
-      credentials: "same-origin",
-      cache: "no-store",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ animeId }),
-    }).catch(() => undefined);
-
     return () => { cancelled = true; };
   }, [animeId]);
 
