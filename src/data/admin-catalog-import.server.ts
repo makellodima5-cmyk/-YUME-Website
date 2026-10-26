@@ -13,7 +13,7 @@ type Statement = {
 };
 type Database = { prepare(sql: string): Statement; batch(statements: Statement[]): Promise<unknown[]> };
 type ShikimoriAnime = {
-  id: string; name?: string | null; russian?: string | null; english?: string | string[] | null;
+  id: string; malId?: string | number | null; name?: string | null; russian?: string | null; english?: string | string[] | null;
   kind?: string | null; score?: string | number | null; status?: string | null;
   episodes?: number | null; episodesAired?: number | null;
   airedOn?: { date?: string | null; year?: number | null } | null;
@@ -34,12 +34,38 @@ const METADATA_REFRESH_BATCH_SIZE = 100;
 const METADATA_LOOKUP_BATCH_SIZE = 40;
 const SCREENSHOT_RETRY_LIMIT = 3;
 const SCREENSHOT_REFRESH_BATCH_SIZE = 40;
-const FIELDS = "id name english russian kind score status episodes episodesAired airedOn { date year } releasedOn { date year } description poster { mainUrl previewUrl originalUrl } opengraphImageUrl genres { id name russian kind } nextEpisodeAt rating studios { name } videos { url playerUrl name kind }";
+const FIELDS = "id malId name english russian kind score status episodes episodesAired airedOn { date year } releasedOn { date year } description poster { mainUrl previewUrl originalUrl } opengraphImageUrl genres { id name russian kind } nextEpisodeAt rating studios { name } videos { url playerUrl name kind }";
 const IMPORT_FIELDS = FIELDS + " screenshots { originalUrl x332Url x166Url }";
 
 export function normalizeAdminCatalogIds(value: unknown): string[] {
   const rawIds = Array.isArray(value) ? value : [];
   return Array.from(new Set(rawIds.filter((id): id is string => typeof id === "string" && /^\d{1,20}$/.test(id)))).slice(0, 100);
+}
+
+/** Normalize Shikimori's malId independently from its own catalogue ID. */
+export function normalizeAniListMalId(value: unknown): string | null {
+  const raw = typeof value === "number" && Number.isSafeInteger(value)
+    ? String(value)
+    : typeof value === "string" ? value.trim() : "";
+  if (!/^\d{1,10}$/.test(raw)) return null;
+  const numeric = Number(raw);
+  return Number.isSafeInteger(numeric) && numeric > 0 && numeric <= 2147483647
+    ? String(numeric)
+    : null;
+}
+
+/** AniList results are keyed by MAL ID; persist each URL against its Shikimori catalogue ID. */
+export function mapAniListBannersToCatalogIds(
+  source: Array<{ id: string; malId?: string | number | null }>,
+  bannersByMalId: Map<string, string>,
+): Map<string, string> {
+  const result = new Map<string, string>();
+  for (const item of source) {
+    const malId = normalizeAniListMalId(item.malId);
+    const bannerUrl = malId ? bannersByMalId.get(malId) : undefined;
+    if (bannerUrl) result.set(String(item.id), bannerUrl);
+  }
+  return result;
 }
 
 export function chunkAdminCatalogIds(value: unknown, size = METADATA_LOOKUP_BATCH_SIZE): string[][] {
@@ -555,20 +581,37 @@ async function runCatalogMetadataRefreshStep(db: Database): Promise<Response> {
         return json({ isAdmin: true, phase: "screenshots", phaseChanged: true, processed: 0, offset: total, nextOffset: total, metadataOffset: total, screenshotOffset: 0, total, updated: 0, screenshotsSaved: 0, screenshotFailures: shots.failed, screenshotRetries: shots.retry, done: false });
       }
 
-      // Always enrich banners from AniList, even when the rest of a row is complete.
-      // This keeps banners durable in D1 instead of depending on a per-page-view request.
-      const bannerLookup = await getAniListBannersByMalIdsWithStats(pageIds);
+      // Refresh missing/non-AniList banners by resolving each Shikimori ID to its real MAL ID first.
+      // AniList's idMal is a MyAnimeList ID, not the Shikimori catalogue ID stored in D1.
+      const bannerRows = catalogPage.results.filter(row => !row.banner_url?.startsWith("https://s4.anilist.co/"));
+      const ids = catalogPage.results.filter(isCatalogMetadataIncomplete).map(row => row.id);
+      const sourceIdsToFetch = normalizeAdminCatalogIds([...bannerRows.map(row => row.id), ...ids]);
+      // Reuse this Shikimori lookup both for MAL-ID mapping and any metadata backfill in this step.
+      const source = sourceIdsToFetch.length ? await fetchByIds(sourceIdsToFetch) : [];
+      const sourceById = new Map(source.map(item => [String(item.id), item]));
+      const malIds = Array.from(new Set(bannerRows
+        .map(row => normalizeAniListMalId(sourceById.get(row.id)?.malId))
+        .filter((id): id is string => id !== null)));
+      const bannerLookup = await getAniListBannersByMalIdsWithStats(malIds);
       const anilistBanners = bannerLookup.banners;
+      const anilistBannersByCatalogId = mapAniListBannersToCatalogIds(source, anilistBanners);
+
+      const rowsWithoutMalId = bannerRows.filter(row => !normalizeAniListMalId(sourceById.get(row.id)?.malId));
+      if (rowsWithoutMalId.length) {
+        console.warn("[YUME][ANILIST_BANNER] Skipping catalogue rows without a valid Shikimori MAL ID.", {
+          count: rowsWithoutMalId.length,
+          ids: rowsWithoutMalId.slice(0, 20).map(row => row.id),
+        });
+      }
+
       let bannersSaved = 0;
       let bannersAdded = 0;
       const bannerUpdates: Statement[] = [];
-      for (const row of catalogPage.results) {
-        const bannerUrl = anilistBanners.get(row.id);
+      for (const row of bannerRows) {
+        const bannerUrl = anilistBannersByCatalogId.get(row.id);
         if (!bannerUrl || bannerUrl === row.banner_url) continue;
         if (!row.banner_url?.startsWith("https://s4.anilist.co/")) bannersAdded++;
         bannerUpdates.push(db.prepare("UPDATE anime_catalog SET banner_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(bannerUrl, row.id));
-        // Keep the in-memory snapshot in sync so Shikimori's fallback image cannot
-        // overwrite the AniList banner later in this same refresh step.
         row.banner_url = bannerUrl;
         bannersSaved++;
       }
@@ -586,20 +629,11 @@ async function runCatalogMetadataRefreshStep(db: Database): Promise<Response> {
         bannersStored: previousBannerCounters.bannersStored + bannersAdded,
       };
 
-      // Shikimori metadata remains authoritative for all fields except banner_url.
+      // Shikimori remains authoritative for metadata other than banner_url.
       // Fully populated rows are deliberately skipped by the metadata backfill.
-      const ids = catalogPage.results.filter(isCatalogMetadataIncomplete).map(row => row.id);
       let updated = 0;
-      let missingSourceIds: string[] = [];
+      const missingSourceIds: string[] = ids.filter(id => !sourceById.has(id));
       if (ids.length) {
-        // Network/HTTP/GraphQL failures still abort this step before cursor
-        // persistence, so a manual restart resumes the same page. IDs that
-        // Shikimori no longer returns (including excluded content) are different:
-        // record them and advance, otherwise one stale ID can block the entire
-        // catalog forever.
-        const source = await fetchByIds(ids);
-        const sourceById = new Map(source.map(item => [String(item.id), item]));
-        missingSourceIds = ids.filter(id => !sourceById.has(id));
         const existingById = new Map(catalogPage.results.map(row => [row.id, row]));
         const metadataUpdates: Statement[] = [];
         for (const id of ids) {
@@ -1083,11 +1117,14 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
           : {results:[] as {id:string}[]};
         const existingIds = new Set(existingRows.results.map(row => row.id));
         const remainingTarget = Math.max(0, before.target - before.added);
-        const candidateBannerIds = Array.from(new Set(source
-          .map(item => String(item.id))
-          .filter(id => /^\d{1,10}$/.test(id) && Number(id) <= 2147483647 && !existingIds.has(id))))
+        const candidateSourceItems = source
+          .filter(item => !existingIds.has(String(item.id)))
           .slice(0, remainingTarget);
-        const importedBanners = await getAniListBannersByMalIds(candidateBannerIds);
+        const candidateMalIds = Array.from(new Set(candidateSourceItems
+          .map(item => normalizeAniListMalId(item.malId))
+          .filter((id): id is string => id !== null)));
+        const importedBannerLookup = await getAniListBannersByMalIdsWithStats(candidateMalIds);
+        const importedBannersByCatalogId = mapAniListBannersToCatalogIds(candidateSourceItems, importedBannerLookup.banners);
         const seen = new Set<string>();
         const currentCount = await db.prepare("SELECT COUNT(*) AS count FROM anime_catalog").first<{count:number}>();
         let position = Number(currentCount?.count ?? 0);
@@ -1103,7 +1140,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
             continue;
           }
           const item = mapItem(sourceItem);
-          const anilistBanner = importedBanners.get(item.id);
+          const anilistBanner = importedBannersByCatalogId.get(item.id);
           if (anilistBanner) item.banner_url = anilistBanner;
           statements.push(db.prepare("INSERT OR IGNORE INTO anime_catalog (id,title,english_title,original_title,year,episodes,rating,genres_json,status,description,hue,glyph,is_new,popular,poster_url,banner_url,kind,age_rating,next_episode_at,episodes_aired,aired_on,studios_json,youtube_trailer_id,position,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)")
             .bind(item.id,item.title,item.english_title,item.original_title,item.year,item.episodes,item.rating,item.genres_json,item.status,item.description,item.hue,item.glyph,item.is_new,item.popular,item.poster_url,item.banner_url,item.kind,item.age_rating,item.next_episode_at,item.episodes_aired,item.aired_on,item.studios_json,item.youtube_trailer_id,position++));
@@ -1129,7 +1166,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
           await invalidatePersistentCatalogCache();
         }
         const after = await snapshot(db);
-        await audit(db,"catalog.import.page","success",{page:before.cursor,added:after.added-before.added,skipped:after.skipped-before.skipped,incomplete:after.incomplete-before.incomplete,bannersResolved:importedBanners.size,state:after.state});
+        await audit(db,"catalog.import.page","success",{page:before.cursor,added:after.added-before.added,skipped:after.skipped-before.skipped,incomplete:after.incomplete-before.incomplete,bannersResolved:importedBannersByCatalogId.size,bannersMatched:importedBannerLookup.matched,bannerErrors:importedBannerLookup.failedBatches,sourceRowsWithoutMalId:candidateSourceItems.filter(item => !normalizeAniListMalId(item.malId)).length,state:after.state});
         if (after.state !== "running") {
           await audit(db,"catalog.import.finish",after.state,{added:after.added,target:after.target,skipped:after.skipped,errors:after.errors});
         }

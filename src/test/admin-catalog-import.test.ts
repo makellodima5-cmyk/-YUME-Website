@@ -1,5 +1,22 @@
 import { describe, expect, it } from "vitest";
-import { chunkAdminCatalogIds, isCatalogMetadataIncomplete, mapAdminCatalogScreenshots, normalizeAdminCatalogIds } from "@/data/admin-catalog-import.server";
+import { chunkAdminCatalogIds, isCatalogMetadataIncomplete, mapAdminCatalogScreenshots, mapAniListBannersToCatalogIds, normalizeAdminCatalogIds, normalizeAniListMalId } from "@/data/admin-catalog-import.server";
+
+describe("AniList MAL ID mapping", () => {
+  it("normalizes a separate MAL ID and maps AniList banners back to Shikimori catalogue IDs", () => {
+    const banner = "https://s4.anilist.co/file/anilistcdn/media/anime/banner/901107.jpg";
+    expect(normalizeAniListMalId(901107)).toBe("901107");
+    expect(normalizeAniListMalId("901107")).toBe("901107");
+    expect(normalizeAniListMalId("0")).toBeNull();
+    expect(normalizeAniListMalId("not-an-id")).toBeNull();
+    expect(normalizeAniListMalId(2147483648)).toBeNull();
+
+    expect(mapAniListBannersToCatalogIds([
+      { id: "shikimori-42", malId: 901107 },
+      { id: "shikimori-43", malId: null },
+      { id: "shikimori-44", malId: 901108 },
+    ], new Map([["901107", banner]]))).toEqual(new Map([["shikimori-42", banner]]));
+  });
+});
 
 describe("admin catalog ID normalization", () => {
   it("accepts numeric IDs, removes duplicates, and ignores malformed IDs", () => {
