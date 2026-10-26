@@ -12,16 +12,31 @@ type AniListBannerResponse = {
     Page?: {
       media?: AniListMedia[] | null;
     } | null;
+    Media?: AniListMedia | null;
   };
   errors?: { message?: string }[];
 };
 
+export type AniListBannerLookup = {
+  banners: Map<string, string>;
+  requested: number;
+  matched: number;
+  failedBatches: number;
+};
+
+type BannerCacheEntry = {
+  expiresAt: number;
+  bannerUrl: string | null;
+  /** True only when AniList confirmed that the MAL ID resolves to an entry. */
+  matched: boolean;
+};
+
 const ANILIST_GRAPHQL_URL = "https://graphql.anilist.co";
 const BANNER_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
-const REQUEST_TIMEOUT_MS = 3500;
+const REQUEST_TIMEOUT_MS = 7000;
 const MAX_BATCH_SIZE = 50;
 const MAX_CACHE_SIZE = 1500;
-const bannerCache = new Map<string, { expiresAt: number; bannerUrl: string | null }>();
+const bannerCache = new Map<string, BannerCacheEntry>();
 
 function validMalId(value: unknown): string | null {
   if (typeof value !== "string" || !/^\d{1,10}$/.test(value)) return null;
@@ -52,20 +67,73 @@ function trimBannerCache(): void {
   }
 }
 
+async function requestAniList(query: string, variables: Record<string, unknown>): Promise<AniListBannerResponse | null> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const response = await fetch(ANILIST_GRAPHQL_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ query, variables }),
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      });
+
+      if (!response.ok) {
+        console.warn("[YUME][ANILIST_BANNER] AniList returned HTTP status.", {
+          status: response.status,
+          attempt: attempt + 1,
+        });
+        if (attempt === 0 && (response.status === 429 || response.status >= 500)) {
+          await new Promise(resolve => setTimeout(resolve, response.status === 429 ? 1000 : 250));
+          continue;
+        }
+        return null;
+      }
+
+      const payload = await response.json() as AniListBannerResponse;
+      if (payload.errors?.length) {
+        console.warn("[YUME][ANILIST_BANNER] AniList GraphQL error.", {
+          messages: payload.errors.map(error => error.message).filter(Boolean).slice(0, 3),
+          attempt: attempt + 1,
+        });
+        if (attempt === 0) {
+          await new Promise(resolve => setTimeout(resolve, 250));
+          continue;
+        }
+        return null;
+      }
+      return payload;
+    } catch (error) {
+      console.warn("[YUME][ANILIST_BANNER] AniList request failed.", {
+        reason: error instanceof Error ? error.message : "Unknown request error",
+        attempt: attempt + 1,
+      });
+      if (attempt === 0) {
+        await new Promise(resolve => setTimeout(resolve, 250));
+        continue;
+      }
+      return null;
+    }
+  }
+  return null;
+}
+
 /**
- * Resolve a batch of Shikimori/MAL IDs in one or more AniList requests.
- * Missing matches or missing banners are cached too, but transport/API errors
- * are not cached so a later admin refresh can retry them.
+ * Resolve Shikimori/MAL IDs in batches. A missing result is deliberately not
+ * negatively cached: some Shikimori IDs do not map to MAL IDs, and transient
+ * or incomplete upstream results must not hide a later successful lookup.
  */
-export async function getAniListBannersByMalIds(shikimoriIds: string[]): Promise<Map<string, string>> {
+export async function getAniListBannersByMalIdsWithStats(shikimoriIds: string[]): Promise<AniListBannerLookup> {
   const ids = Array.from(new Set(shikimoriIds.map(validMalId).filter((id): id is string => id !== null)));
   const banners = new Map<string, string>();
   const uncached: string[] = [];
+  let matched = 0;
+  let failedBatches = 0;
   const now = Date.now();
 
   for (const id of ids) {
     const cached = bannerCache.get(id);
-    if (cached && cached.expiresAt > now) {
+    if (cached && cached.expiresAt > now && cached.matched) {
+      matched++;
       if (cached.bannerUrl) banners.set(id, cached.bannerUrl);
       continue;
     }
@@ -75,46 +143,72 @@ export async function getAniListBannersByMalIds(shikimoriIds: string[]): Promise
 
   for (let offset = 0; offset < uncached.length; offset += MAX_BATCH_SIZE) {
     const batch = uncached.slice(offset, offset + MAX_BATCH_SIZE);
-    let payload: AniListBannerResponse;
-    try {
-      const response = await fetch(ANILIST_GRAPHQL_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({
-          query: "query ($malIds: [Int]) { Page(page: 1, perPage: 50) { media(idMal_in: $malIds, type: ANIME) { idMal bannerImage } } }",
-          variables: { malIds: batch.map(Number) },
-        }),
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-      });
-      if (!response.ok) continue;
-      payload = await response.json() as AniListBannerResponse;
-    } catch {
-      // AniList is optional enrichment. Its failure must not break catalog work.
+    const payload = await requestAniList(
+      "query ($malIds: [Int]) { Page(page: 1, perPage: 50) { media(idMal_in: $malIds, type: ANIME) { idMal bannerImage } } }",
+      { malIds: batch.map(Number) },
+    );
+    if (!payload) {
+      failedBatches++;
       continue;
     }
 
-    const media = payload.errors?.length ? null : payload.data?.Page?.media;
-    if (!Array.isArray(media)) continue;
+    const media = payload.data?.Page?.media;
+    if (!Array.isArray(media)) {
+      failedBatches++;
+      console.warn("[YUME][ANILIST_BANNER] AniList batch response did not include Page.media.");
+      continue;
+    }
 
     const batchSet = new Set(batch);
+    const matchedIds = new Set<string>();
     const expiresAt = Date.now() + BANNER_CACHE_TTL_MS;
-    for (const id of batch) bannerCache.set(id, { expiresAt, bannerUrl: null });
-
     for (const item of media) {
       const id = validMalId(item?.idMal == null ? null : String(item.idMal));
       if (!id || !batchSet.has(id)) continue;
+      matchedIds.add(id);
       const bannerUrl = validBannerUrl(item.bannerImage);
-      if (!bannerUrl) continue;
-      bannerCache.set(id, { expiresAt, bannerUrl });
-      banners.set(id, bannerUrl);
+      bannerCache.set(id, { expiresAt, bannerUrl, matched: true });
+      if (bannerUrl) banners.set(id, bannerUrl);
     }
+    // Only records explicitly returned by AniList are cached. IDs absent from
+    // Page.media stay retryable on the next admin refresh.
+    matched += matchedIds.size;
   }
 
   trimBannerCache();
-  return banners;
+  return { banners, requested: ids.length, matched, failedBatches };
 }
 
-/** Resolve one Shikimori/MAL ID to AniList's matching entry and return its banner. */
+/** Backwards-compatible Map-only wrapper for existing callers. */
+export async function getAniListBannersByMalIds(shikimoriIds: string[]): Promise<Map<string, string>> {
+  return (await getAniListBannersByMalIdsWithStats(shikimoriIds)).banners;
+}
+
+/**
+ * The detail page uses a direct Media(idMal) query. This is intentionally
+ * separate from Page.media batch queries and provides a second lookup path
+ * for a single title when an upstream batch omitted its ID.
+ */
 export async function getAniListBannerByMalId(shikimoriId: string): Promise<string | null> {
-  return (await getAniListBannersByMalIds([shikimoriId])).get(shikimoriId) ?? null;
+  const id = validMalId(shikimoriId);
+  if (!id) return null;
+
+  const cached = bannerCache.get(id);
+  if (cached && cached.expiresAt > Date.now() && cached.matched) return cached.bannerUrl;
+  if (cached) bannerCache.delete(id);
+
+  const payload = await requestAniList(
+    "query ($malId: Int!) { Media(idMal: $malId, type: ANIME) { idMal bannerImage } }",
+    { malId: Number(id) },
+  );
+  const media = payload?.data?.Media;
+  if (!media || String(media.idMal) !== id) {
+    // Do not cache misses; the next request can retry or use a corrected source ID.
+    return null;
+  }
+
+  const bannerUrl = validBannerUrl(media.bannerImage);
+  bannerCache.set(id, { expiresAt: Date.now() + BANNER_CACHE_TTL_MS, bannerUrl, matched: true });
+  trimBannerCache();
+  return bannerUrl;
 }
