@@ -786,7 +786,68 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
   try {
     if (!await authorize(request,env,db)) return json({isAdmin:false,error:"admin_required"},403);
     await ensureSchema(db);
-    if (request.method === "GET") { const url = new URL(request.url); const qualityOffset = Number(url.searchParams.get("qualityOffset") ?? "0"); const quality = await catalogQuality(db,qualityOffset); const [refreshState, metadataCursor, screenshotCursor, totalRow, shots, autoEnabled, refreshStats] = await Promise.all([getMeta(db,"metadata_refresh_state"),getMeta(db,"metadata_refresh_cursor"),getMeta(db,"metadata_refresh_screenshot_cursor"),db.prepare("SELECT COUNT(*) AS total FROM anime_catalog").first<{total:number}>(),screenshotProgress(db),getMeta(db,"metadata_refresh_auto_enabled"),catalogRefreshStats(db)]); const refreshTotal = Number(totalRow?.total ?? 0); const phase = refreshState ?? "idle"; const metadataOffset = phase === "done" || phase.startsWith("screenshots") ? refreshTotal : Math.max(0,Number(metadataCursor ?? "0") || 0); const screenshotOffset = phase === "metadata" ? 0 : Math.max(0,Number(screenshotCursor ?? "0") || 0); return json({isAdmin:true,...await snapshot(db),metadataRefresh:{autoEnabled:autoEnabled === "1",phase,metadataOffset,screenshotOffset,total:refreshTotal,stats:refreshStats,screenshotFailures:shots.failed,screenshotRetries:shots.retry,done:phase === "done",lastTickAt:await getMeta(db,"metadata_refresh_last_tick_at"),lastSuccessAt:await getMeta(db,"metadata_refresh_last_success_at"),lastError:await getMeta(db,"metadata_refresh_last_error"),lastPhase:await getMeta(db,"metadata_refresh_last_phase"),lastSteps:Number(await getMeta(db,"metadata_refresh_last_steps") ?? "0"),lastDurationMs:Number(await getMeta(db,"metadata_refresh_last_duration_ms") ?? "0")},quality:quality.items,qualitySummary:quality.summary,qualityLimit:quality.limit,qualityOffset:quality.offset,qualityHasMore:quality.hasMore,auditLog:await recentAudit(db)}); }
+    if (request.method === "GET") {
+      const url = new URL(request.url);
+      // The admin dashboard polls every five seconds. Status polling must not
+      // rescan the entire catalogue or recompute aggregate quality counters.
+      if (url.searchParams.get("status") === "1") {
+        const [refreshState, metadataCursor, screenshotCursor] = await Promise.all([
+          getMeta(db, "metadata_refresh_state"),
+          getMeta(db, "metadata_refresh_cursor"),
+          getMeta(db, "metadata_refresh_screenshot_cursor"),
+        ]);
+        const phase = refreshState ?? "idle";
+        return json({
+          isAdmin: true,
+          ...await snapshot(db),
+          metadataRefresh: {
+            autoEnabled: false,
+            phase,
+            metadataOffset: Math.max(0, Number(metadataCursor ?? "0") || 0),
+            screenshotOffset: Math.max(0, Number(screenshotCursor ?? "0") || 0),
+            done: phase === "done",
+            lastTickAt: await getMeta(db, "metadata_refresh_last_tick_at"),
+            lastSuccessAt: await getMeta(db, "metadata_refresh_last_success_at"),
+            lastError: await getMeta(db, "metadata_refresh_last_error"),
+            lastPhase: await getMeta(db, "metadata_refresh_last_phase"),
+            lastSteps: Number(await getMeta(db, "metadata_refresh_last_steps") ?? "0"),
+            lastDurationMs: Number(await getMeta(db, "metadata_refresh_last_duration_ms") ?? "0"),
+          },
+        });
+      }
+      const qualityOffset = Number(url.searchParams.get("qualityOffset") ?? "0");
+      const quality = await catalogQuality(db, qualityOffset);
+      const [refreshState, metadataCursor, screenshotCursor, totalRow, shots, refreshStats] = await Promise.all([
+        getMeta(db, "metadata_refresh_state"),
+        getMeta(db, "metadata_refresh_cursor"),
+        getMeta(db, "metadata_refresh_screenshot_cursor"),
+        db.prepare("SELECT COUNT(*) AS total FROM anime_catalog").first<{total:number}>(),
+        screenshotProgress(db),
+        catalogRefreshStats(db),
+      ]);
+      const refreshTotal = Number(totalRow?.total ?? 0);
+      const phase = refreshState ?? "idle";
+      const metadataOffset = phase === "done" || phase.startsWith("screenshots")
+        ? refreshTotal : Math.max(0, Number(metadataCursor ?? "0") || 0);
+      const screenshotOffset = phase === "metadata" ? 0 : Math.max(0, Number(screenshotCursor ?? "0") || 0);
+      return json({
+        isAdmin: true,
+        ...await snapshot(db),
+        metadataRefresh: {
+          autoEnabled: false, phase, metadataOffset, screenshotOffset, total: refreshTotal,
+          stats: refreshStats, screenshotFailures: shots.failed, screenshotRetries: shots.retry,
+          done: phase === "done",
+          lastTickAt: await getMeta(db, "metadata_refresh_last_tick_at"),
+          lastSuccessAt: await getMeta(db, "metadata_refresh_last_success_at"),
+          lastError: await getMeta(db, "metadata_refresh_last_error"),
+          lastPhase: await getMeta(db, "metadata_refresh_last_phase"),
+          lastSteps: Number(await getMeta(db, "metadata_refresh_last_steps") ?? "0"),
+          lastDurationMs: Number(await getMeta(db, "metadata_refresh_last_duration_ms") ?? "0"),
+        },
+        quality: quality.items, qualitySummary: quality.summary, qualityLimit: quality.limit,
+        qualityOffset: quality.offset, qualityHasMore: quality.hasMore, auditLog: await recentAudit(db),
+      });
+    }
     let body: {action?:unknown; target?:unknown};
     try { body = await request.json() as {action?:unknown;target?:unknown}; } catch { return json({error:"invalid_request"},400); }
     requestedAction = body.action;
