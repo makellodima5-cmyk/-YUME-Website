@@ -22,7 +22,8 @@ jobs:
           bun-version: 1.4.4
       - name: Update vulnerable dependency resolutions
         run: |
-          bun install --frozen-lockfile
+          bun install
+          bun update vitest
           bun audit fix --latest || true
           bun audit || true
       - name: Commit patched lockfile
