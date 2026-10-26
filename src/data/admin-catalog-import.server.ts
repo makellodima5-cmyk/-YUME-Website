@@ -659,21 +659,39 @@ async function runCatalogMetadataRefreshStep(db: Database): Promise<Response> {
     }
 
     if (state === "screenshots_retry") {
-      const retryItem = await db.prepare("SELECT ss.anime_id,ss.attempts FROM anime_catalog_screenshot_status ss WHERE ss.status='retry' AND ss.attempts < ? AND EXISTS (SELECT 1 FROM anime_catalog a WHERE a.id = ss.anime_id) ORDER BY ss.attempts ASC,ss.updated_at ASC,ss.anime_id ASC LIMIT 1")
-        .bind(SCREENSHOT_RETRY_LIMIT).first<{ anime_id: string; attempts: number }>();
-      if (!retryItem) {
+      const retryRows = await db.prepare("SELECT ss.anime_id,ss.attempts FROM anime_catalog_screenshot_status ss WHERE ss.status='retry' AND ss.attempts < ? AND EXISTS (SELECT 1 FROM anime_catalog a WHERE a.id=ss.anime_id) ORDER BY ss.attempts ASC,ss.updated_at ASC,ss.anime_id ASC LIMIT ?")
+        .bind(SCREENSHOT_RETRY_LIMIT, SCREENSHOT_REFRESH_BATCH_SIZE).all<{anime_id:string;attempts:number}>();
+      if (!retryRows.results.length) {
         await setMeta(db, "metadata_refresh_state", "done");
         const shots = await screenshotProgress(db);
         return json({ isAdmin: true, phase: "done", phaseChanged: true, processed: 0, offset: shots.processed, nextOffset: shots.processed, metadataOffset: total, screenshotOffset: shots.processed, total, updated: 0, screenshotsSaved: 0, screenshotFailures: shots.failed, screenshotRetries: 0, done: true });
       }
-      const attempt = await fetchAndStoreScreenshots(db, retryItem.anime_id, Number(retryItem.attempts ?? 0));
-      await db.batch(attempt.statements);
-      const remaining = await db.prepare("SELECT COUNT(*) AS count FROM anime_catalog_screenshot_status WHERE status='retry' AND attempts < ?")
-        .bind(SCREENSHOT_RETRY_LIMIT).first<{ count: number }>();
+      const ids = retryRows.results.map(row => row.anime_id);
+      const source = await fetchByIds(ids, true);
+      const sourceById = new Map(source.map(item => [String(item.id), item]));
+      const attemptsById = new Map(retryRows.results.map(row => [row.anime_id, Number(row.attempts ?? 0)]));
+      const statements: Statement[] = [];
+      let screenshotsSaved = 0;
+      for (const animeId of ids) {
+        const item = sourceById.get(animeId);
+        if (!item) {
+          statements.push(screenshotStatusStatement(db, animeId, "failed", (attemptsById.get(animeId) ?? 0) + 1, "Shikimori не вернул аниме для получения кадров"));
+          continue;
+        }
+        const screenshots = mapAdminCatalogScreenshots(item);
+        for (const [index, shot] of screenshots.entries()) {
+          statements.push(db.prepare("INSERT OR IGNORE INTO anime_catalog_screenshots (anime_id,original_url,preview_url,position,updated_at) VALUES (?,?,?,?,CURRENT_TIMESTAMP)").bind(animeId, shot.original, shot.preview, index));
+        }
+        screenshotsSaved += screenshots.length;
+        statements.push(screenshotStatusStatement(db, animeId, "done", 0, screenshots.length ? null : "Источник не вернул кадров"));
+      }
+      await db.batch(statements);
+      if (screenshotsSaved > 0) await invalidatePersistentCatalogCache();
+      const remaining = await db.prepare("SELECT COUNT(*) AS count FROM anime_catalog_screenshot_status WHERE status='retry' AND attempts < ?").bind(SCREENSHOT_RETRY_LIMIT).first<{count:number}>();
       const done = Number(remaining?.count ?? 0) === 0;
       if (done) await setMeta(db, "metadata_refresh_state", "done");
       const shots = await screenshotProgress(db);
-      return json({ isAdmin: true, phase: done ? "done" : "screenshots_retry", phaseChanged: done, processed: 1, offset: shots.processed, nextOffset: shots.processed, metadataOffset: total, screenshotOffset: shots.processed, total, updated: 0, screenshotsSaved: attempt.saved, screenshotFailures: shots.failed, screenshotRetries: Number(remaining?.count ?? 0), screenshotWarning: attempt.error, done });
+      return json({ isAdmin: true, phase: done ? "done" : "screenshots_retry", phaseChanged: done, processed: ids.length, offset: shots.processed, nextOffset: shots.processed, metadataOffset: total, screenshotOffset: shots.processed, total, updated: 0, screenshotsSaved, screenshotFailures: shots.failed, screenshotRetries: Number(remaining?.count ?? 0), done });
     }
 
     await setMeta(db, "metadata_refresh_state", "metadata");
