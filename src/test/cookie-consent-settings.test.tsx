@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 /** @vitest-environment-options {"url":"https://yume.test/"} */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { CookieConsentBanner } from "@/components/yume/CookieConsentBanner";
 
 vi.mock("@/data/preferences", () => ({ useYumePreferences: () => ({ language: "en" }) }));
@@ -22,7 +22,7 @@ describe("cookie consent settings", () => {
   it("can be reopened after a choice and can revoke optional analytics", () => {
     render(<CookieConsentBanner isHome={false} />);
     const bannerName = "Cookie and analytics preferences";
-    const openSettings = () => window.dispatchEvent(new Event("yume-open-cookie-settings"));
+    const openSettings = () => act(() => { window.dispatchEvent(new Event("yume-open-cookie-settings")); });
 
     expect(screen.queryByRole("complementary", { name: bannerName })).toBeNull();
 
