@@ -8,6 +8,7 @@ class FakeStatement {
   bind(..._values: unknown[]) { return this; }
   async run() { return { meta: { changes: 1 } }; }
   async first<T = Record<string, unknown>>(): Promise<T | null> { return null; }
+  async all<T = Record<string, unknown>>(): Promise<{ results: T[] }> { return { results: [] }; }
 }
 class FakeDb {
   prepare(_sql: string) { return new FakeStatement(); }
@@ -37,5 +38,21 @@ describe("Telegram OIDC browser binding", () => {
     expect(response.status).toBe(302);
     expect(response.headers.get("location")).toContain("telegram_login_state_mismatch");
     expect(response.headers.get("set-cookie")).toContain("__Host-yume-oidc-state=;");
+  });
+
+  it("requires an explicit user-agreement choice before starting registration", async () => {
+    Object.assign(runtimeEnv, {
+      YUME_DB: new FakeDb(),
+      YUME_AUTH_SESSION_SECRET: "test-session-secret-with-at-least-32-characters",
+      TELEGRAM_OIDC_CLIENT_ID: "test-client-id",
+      TELEGRAM_OIDC_CLIENT_SECRET: "test-client-secret",
+    });
+
+    const response = await handleTelegramOidc(new Request(
+      "https://yume.test/api/telegram/oidc?flow=register&consent=1",
+    ));
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: "consent_required" });
   });
 });

@@ -18,6 +18,7 @@ type PollResult = { status?: string; error?: string };
 export function AuthPage({ mode, language, onModeChange, onPrivacy, onRules, onComplete }: Props) {
   const isRu = language === "ru";
   const [consentAccepted, setConsentAccepted] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [busy, setBusy] = useState(false);
   const [botUrl, setBotUrl] = useState("");
   const [requestId, setRequestId] = useState("");
@@ -54,7 +55,7 @@ export function AuthPage({ mode, language, onModeChange, onPrivacy, onRules, onC
           const errors: Record<string, [string, string]> = {
             account_not_found: ["Аккаунт не найден. Переключись на регистрацию.", "No account found. Switch to registration."],
             already_registered: ["Этот Telegram уже зарегистрирован. Переключись на вход.", "This Telegram account is already registered. Switch to sign in."],
-            consent_required: ["Для регистрации нужно принять Политику конфиденциальности.", "Accept the Privacy Policy to register."],
+            consent_required: ["Для регистрации нужно принять оба документа.", "Accept both documents to register."],
           };
           const pair = errors[result.error ?? (result.status === "expired" ? "expired" : "")];
           setError(pair ? (isRu ? pair[0] : pair[1]) : (isRu ? "Ссылка истекла или не удалось завершить вход." : "The link expired or sign-in could not be completed."));
@@ -74,8 +75,8 @@ export function AuthPage({ mode, language, onModeChange, onPrivacy, onRules, onC
   const startAuth = async () => {
     setError("");
     setMessage("");
-    if (isRegister && !consentAccepted) {
-      setError(isRu ? "Прими Политику конфиденциальности и Пользовательское соглашение." : "Accept the Privacy Policy and User Agreement.");
+    if (isRegister && (!consentAccepted || !termsAccepted)) {
+      setError(isRu ? "Прими Политику обработки персональных данных и Пользовательское соглашение." : "Accept the Personal Data Processing Policy and User Agreement.");
       return;
     }
     if (busy) return;
@@ -92,7 +93,7 @@ export function AuthPage({ mode, language, onModeChange, onPrivacy, onRules, onC
           credentials: "same-origin",
           cache: "no-store",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ initData: webApp.initData, mode, privacyConsent: isRegister && consentAccepted }),
+          body: JSON.stringify({ initData: webApp.initData, mode, privacyConsent: isRegister && consentAccepted, termsAccepted: isRegister && termsAccepted }),
         });
         const result = await response.json().catch(() => ({})) as { authenticated?: boolean; error?: string };
         if (!response.ok || result.authenticated !== true) {
@@ -115,7 +116,7 @@ export function AuthPage({ mode, language, onModeChange, onPrivacy, onRules, onC
       }
 
       // Browser authentication uses Telegram's official OIDC Authorization Code + PKCE flow.
-      window.location.assign("/api/telegram/oidc?flow=" + encodeURIComponent(mode) + (isRegister ? "&consent=1" : ""));
+      window.location.assign("/api/telegram/oidc?flow=" + encodeURIComponent(mode) + (isRegister ? "&consent=1&terms=1" : ""));
       return;
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : (isRu ? "Ошибка авторизации." : "Authentication error."));
@@ -167,7 +168,7 @@ export function AuthPage({ mode, language, onModeChange, onPrivacy, onRules, onC
           ) : (
             <button
               type="button"
-              disabled={busy || (isRegister && !consentAccepted)}
+              disabled={busy || (isRegister && (!consentAccepted || !termsAccepted))}
               onClick={() => { void startAuth(); }}
               className="mt-5 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-sky-500 px-4 py-3 text-sm font-bold text-white transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-50"
             >
@@ -177,17 +178,39 @@ export function AuthPage({ mode, language, onModeChange, onPrivacy, onRules, onC
           )}
 
           {isRegister && (
-            <div className="mt-5 rounded-2xl border border-border bg-background/50 p-3.5">
-              <label className="flex cursor-pointer items-start gap-3 text-sm leading-relaxed">
-                <input type="checkbox" checked={consentAccepted} onChange={(event) => setConsentAccepted(event.target.checked)} className="mt-1 h-4 w-4 accent-primary" />
-                <span className="min-w-0 flex-1 text-left">
-                  {isRu ? "Я соглашусь с " : "I agree to the "}
+            <div className="mt-5 space-y-3 rounded-2xl border border-border bg-background/50 p-3.5">
+              <div className="flex items-start gap-3 text-sm leading-relaxed">
+                <input
+                  id="yume-privacy-consent"
+                  type="checkbox"
+                  aria-label={isRu ? "Согласие с Политикой обработки персональных данных" : "Accept the Personal Data Processing Policy"}
+                  checked={consentAccepted}
+                  onChange={(event) => setConsentAccepted(event.target.checked)}
+                  className="mt-1 h-4 w-4 shrink-0 accent-primary"
+                />
+                <div className="min-w-0 flex-1 text-left">
+                  <label htmlFor="yume-privacy-consent" className="cursor-pointer">{isRu ? "Я принимаю " : "I accept the "}</label>
                   <button type="button" onClick={onPrivacy} className="inline break-words text-left font-semibold text-primary underline underline-offset-4">
-                    {isRu ? "политикой в отношении обработки персональных данных" : "Personal Data Processing Policy"}
+                    {isRu ? "Политику обработки персональных данных" : "Personal Data Processing Policy"}
                   </button>
-                </span>
-              </label>
-
+                </div>
+              </div>
+              <div className="flex items-start gap-3 text-sm leading-relaxed">
+                <input
+                  id="yume-terms-consent"
+                  type="checkbox"
+                  aria-label={isRu ? "Согласие с Пользовательским соглашением" : "Accept the User Agreement"}
+                  checked={termsAccepted}
+                  onChange={(event) => setTermsAccepted(event.target.checked)}
+                  className="mt-1 h-4 w-4 shrink-0 accent-primary"
+                />
+                <div className="min-w-0 flex-1 text-left">
+                  <label htmlFor="yume-terms-consent" className="cursor-pointer">{isRu ? "Я принимаю " : "I accept the "}</label>
+                  <button type="button" onClick={onRules} className="inline break-words text-left font-semibold text-primary underline underline-offset-4">
+                    {isRu ? "Пользовательское соглашение" : "User Agreement"}
+                  </button>
+                </div>
+              </div>
             </div>
           )}
 
@@ -197,7 +220,7 @@ export function AuthPage({ mode, language, onModeChange, onPrivacy, onRules, onC
           </p>
           <div className="mt-6 border-t border-border pt-5 text-center text-sm text-muted-foreground">
             {isRegister ? (isRu ? "Уже есть аккаунт? " : "Already registered? ") : (isRu ? "Нет аккаунта? " : "Don't have an account? ")}
-            <button type="button" onClick={() => { setError(""); setMessage(""); setBotUrl(""); setRequestId(""); setConfirmationCode(""); setPollingEnabled(false); onModeChange(isRegister ? "login" : "register"); }} className="font-semibold text-primary hover:text-neon">
+            <button type="button" onClick={() => { setError(""); setMessage(""); setBotUrl(""); setRequestId(""); setConfirmationCode(""); setPollingEnabled(false); setConsentAccepted(false); setTermsAccepted(false); onModeChange(isRegister ? "login" : "register"); }} className="font-semibold text-primary hover:text-neon">
               {isRegister ? (isRu ? "Войти" : "Sign in") : (isRu ? "Зарегистрироваться" : "Create an account")}
             </button>
           </div>

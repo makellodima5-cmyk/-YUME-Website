@@ -44,6 +44,12 @@ export function CookieConsentBanner({ isHome }: { isHome: boolean }) {
     setVisible((current) => accepted ? false : current || isHome);
   }, [isHome]);
 
+  useEffect(() => {
+    const reopenSettings = () => setVisible(true);
+    window.addEventListener("yume-open-cookie-settings", reopenSettings);
+    return () => window.removeEventListener("yume-open-cookie-settings", reopenSettings);
+  }, []);
+
   const saveChoice = (analytics: boolean) => {
     const choice: ConsentChoice = {
       necessary: true,

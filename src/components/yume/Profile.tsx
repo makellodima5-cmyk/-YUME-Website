@@ -871,12 +871,12 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
                         "Сайт может использовать cookie-файлы, локальное хранилище браузера и аналогичные технологии для поддержки основных функций, сохранения настроек и обеспечения безопасности.",
                         "Строго необходимые технологии могут использоваться для работы запрошенных пользователем функций. Аналитические, рекламные и иные необязательные технологии применяются только при наличии соответствующих инструментов и с учётом выбора пользователя и применимых требований.",
                         "Пользователь может ограничить или удалить cookie-файлы в настройках браузера. Это может повлиять на доступность отдельных функций или сохранение настроек.",
-                        "Если на сайте доступен интерфейс управления согласием на cookie, пользователь может изменить свой выбор через этот интерфейс. Закрытие уведомления или продолжение просмотра само по себе не рассматривается как согласие на необязательные технологии."
+                        "Пользователь может в любой момент открыть «Настройки cookie» внизу сайта или на этой странице и изменить выбор. Аналитика YUME включается только после явного выбора «Принять все»; выбор «Только необходимые» отключает необязательную аналитику. Закрытие уведомления или продолжение просмотра само по себе не считается согласием."
                       ] : [
                         "The site may use cookies, browser local storage, and similar technologies to support core features, save preferences, and maintain security.",
                         "Strictly necessary technologies may be used to provide features requested by the user. Analytics, advertising, and other optional technologies are used only if actually implemented and in line with user choices and applicable requirements.",
                         "Users can restrict or delete cookies in browser settings. This may affect some features or saved preferences.",
-                        "If a cookie-consent interface is available, users can change their choices there. Closing a notice or continuing to browse is not by itself treated as consent to optional technologies."
+                        "Users can reopen Cookie settings at the bottom of the site or on this page and change their choice at any time. YUME analytics is enabled only after an explicit “Accept all” choice; “Essential only” keeps optional analytics disabled. Closing a notice or continuing to browse is not by itself treated as consent."
                       ]
                     },
                     {
@@ -957,6 +957,9 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
                   {language === "ru" ? "По вопросам конфиденциальности: " : "Privacy inquiries: "}
                   <a className="text-primary underline underline-offset-4" href="mailto:yumesupport833@gmail.com">yumesupport833@gmail.com</a>
                 </p>
+                <button type="button" onClick={() => window.dispatchEvent(new Event("yume-open-cookie-settings"))} className="inline-flex min-h-10 items-center justify-center rounded-xl border border-border px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                  {language === "ru" ? "Настройки cookie" : "Cookie settings"}
+                </button>
               </article>
             ) : null}
 
