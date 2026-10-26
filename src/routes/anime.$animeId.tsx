@@ -102,46 +102,55 @@ function AnimeDetailPage() {
     if (anime) document.title = displayAnimeTitle(anime, language) + (language === "en" ? " — watch anime | YUME" : " — смотреть аниме | YUME");
   }, [anime, language]);
 
+  const [kodikSources, setKodikSources] = useState<Array<{ id: string; title: string; episodes: Array<{ number: number; title: string; link: string }> }>>([]);
+  const [kodikTranslationId, setKodikTranslationId] = useState("");
+  const [kodikEpisode, setKodikEpisode] = useState(1);
+  const [kodikError, setKodikError] = useState("");
+
   useEffect(() => {
     if (watchMode !== "episodes" || !anime) return;
-
-    const player = document.getElementById("kodik-player");
-    if (!player) return;
-
-    // Kodik's auto-embed script searches for a matching title on the current page.
-    // Load it only when the visitor opens the episode-player tab.
-    player.replaceChildren();
-    (window as Window & { kodikAddPlayers?: { types: string } }).kodikAddPlayers = {
-      types: "anime,anime-serial",
-    };
-
-    // Keep Kodik's injected iframe fitted to the same responsive 16:9 frame as the trailer.
-    const fitPlayer = () => {
-      player.querySelectorAll("iframe").forEach((frame) => {
-        frame.style.position = "absolute";
-        frame.style.inset = "0";
-        frame.style.width = "100%";
-        frame.style.height = "100%";
-        frame.style.border = "0";
+    let cancelled = false;
+    setKodikSources([]);
+    setKodikTranslationId("");
+    setKodikEpisode(1);
+    setKodikError("");
+    fetch("/api/kodik?animeId=" + encodeURIComponent(animeId), { credentials: "same-origin", cache: "no-store", headers: { Accept: "application/json" } })
+      .then(async (response) => {
+        const result = await response.json().catch(() => ({})) as { sources?: Array<{ id: string; title: string; episodes: Array<{ number: number; title: string; link: string }> }>; error?: string };
+        if (!response.ok) throw new Error(result.error || "Kodik API request failed");
+        if (cancelled) return;
+        const sources = Array.isArray(result.sources) ? result.sources : [];
+        setKodikSources(sources);
+        setKodikTranslationId(sources[0]?.id ?? "");
+        setKodikEpisode(sources[0]?.episodes[0]?.number ?? 1);
+        if (!sources.length) setKodikError(language === "en" ? "No Kodik episodes were found for this title." : "В Kodik не найдены серии для этого аниме.");
+      })
+      .catch(() => {
+        if (!cancelled) setKodikError(language === "en" ? "Could not load episodes from Kodik. Please try again later." : "Не удалось загрузить серии из Kodik. Попробуйте позже.");
       });
-    };
-    const observer = new MutationObserver(fitPlayer);
-    observer.observe(player, { childList: true, subtree: true });
-    fitPlayer();
+    return () => { cancelled = true; };
+  }, [watchMode, animeId, anime, language]);
 
-    const script = document.createElement("script");
-    script.src = "https://kodik-add.com/add-players.min.js";
-    script.async = true;
-    script.dataset.kodikAutoPlayer = "true";
-    player.insertAdjacentElement("afterend", script);
+  const selectedKodikSource = kodikSources.find((source) => source.id === kodikTranslationId);
+  const selectedKodikEpisode = selectedKodikSource?.episodes.find((episode) => episode.number === kodikEpisode);
+  const kodikEmbedUrl = selectedKodikEpisode?.link ? (selectedKodikEpisode.link.startsWith("//") ? "https:" + selectedKodikEpisode.link : selectedKodikEpisode.link) : "";
 
-    return () => {
-      observer.disconnect();
-      script.remove();
-      player.replaceChildren();
-      delete (window as Window & { kodikAddPlayers?: { types: string } }).kodikAddPlayers;
-    };
-  }, [watchMode, animeId, anime]);
+  useEffect(() => {
+    if (watchMode !== "episodes" || !kodikEmbedUrl) return;
+    const player = document.getElementById("kodik-player-container");
+    if (!player) return;
+    player.replaceChildren();
+    const frame = document.createElement("iframe");
+    frame.id = "kodik-player";
+    frame.src = kodikEmbedUrl;
+    frame.title = (anime ? displayAnimeTitle(anime, language) : "Kodik") + " — " + (language === "en" ? "episode player" : "плеер серий");
+    frame.className = "absolute inset-0 h-full w-full border-0";
+    frame.allow = "autoplay; fullscreen; picture-in-picture; encrypted-media";
+    frame.allowFullscreen = true;
+    frame.referrerPolicy = "strict-origin-when-cross-origin";
+    player.appendChild(frame);
+    return () => { frame.remove(); };
+  }, [watchMode, kodikEmbedUrl, anime, language]);
 
   useEffect(() => {
     let cancelled = false;
@@ -626,8 +635,30 @@ function AnimeDetailPage() {
             </div>
             <div className="mx-auto w-full max-w-6xl min-w-0">
               {watchMode === "episodes" ? (
-                <div className="relative mx-auto aspect-video w-full min-w-0 overflow-hidden rounded-2xl border border-white/10 bg-[#080710] shadow-2xl">
-                  <div id="kodik-player" className="absolute inset-0 h-full w-full [&_iframe]:!absolute [&_iframe]:!inset-0 [&_iframe]:!h-full [&_iframe]:!w-full" />
+                <div className="space-y-4">
+                  <div className="rounded-2xl border border-white/10 bg-card/70 p-4 sm:p-5">
+                    <label htmlFor="kodik-translation" className="mb-2 block text-sm font-medium text-muted-foreground">{language === "en" ? "Voice-over" : "Озвучка"}</label>
+                    <div className="relative">
+                      <select id="kodik-translation" value={kodikTranslationId} onChange={(event) => { const next = kodikSources.find((source) => source.id === event.target.value); setKodikTranslationId(event.target.value); setKodikEpisode(next?.episodes.some((episode) => episode.number === kodikEpisode) ? kodikEpisode : (next?.episodes[0]?.number ?? 1)); }} disabled={!kodikSources.length} className="w-full appearance-none rounded-xl border border-border bg-secondary px-4 py-3 pr-10 text-base text-foreground outline-none transition focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-60">
+                        {!kodikSources.length && <option value="">{language === "en" ? "Loading voice-overs…" : "Загрузка озвучек…"}</option>}
+                        {kodikSources.map((source) => <option key={source.id} value={source.id}>{source.title}</option>)}
+                      </select>
+                      <ChevronDown aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+                    </div>
+                    <label className="mb-2 mt-4 block text-sm font-medium text-muted-foreground">{language === "en" ? "Episode" : "Серия"}</label>
+                    {selectedKodikSource?.episodes.length ? (
+                      <div className="scrollbar-none max-h-44 overflow-y-auto overscroll-contain rounded-xl border border-border/70 bg-background/40 p-2" aria-label={language === "en" ? "Episode list" : "Список серий"}>
+                        <div className="grid grid-cols-5 gap-2 sm:grid-cols-8 md:grid-cols-10">
+                          {selectedKodikSource.episodes.map((episode) => <button key={episode.number} type="button" onClick={() => setKodikEpisode(episode.number)} aria-pressed={kodikEpisode === episode.number} aria-label={(language === "en" ? "Episode " : "Серия ") + episode.number} title={episode.title || undefined} className={"min-h-11 rounded-lg px-2 py-2 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary " + (kodikEpisode === episode.number ? "bg-primary text-primary-foreground shadow-[0_0_18px_rgba(168,85,247,0.25)]" : "bg-secondary text-foreground hover:bg-accent")}>{episode.number}</button>)}
+                        </div>
+                      </div>
+                    ) : <p className="rounded-xl border border-border/70 bg-background/40 p-3 text-sm text-muted-foreground">{kodikError || (language === "en" ? "Episode list will appear here when available." : "Список серий появится здесь, когда будет доступен.")}</p>}
+                    {kodikError && selectedKodikSource?.episodes.length ? <p role="status" className="mt-3 text-sm text-muted-foreground">{kodikError}</p> : null}
+                  </div>
+                  <div className="relative mx-auto aspect-video w-full min-w-0 overflow-hidden rounded-2xl border border-white/10 bg-[#080710] shadow-2xl">
+                    <div id="kodik-player-container" className="absolute inset-0 h-full w-full [&_iframe]:!absolute [&_iframe]:!inset-0 [&_iframe]:!h-full [&_iframe]:!w-full" />
+                    {!kodikEmbedUrl && <div className="absolute inset-0 flex items-center justify-center p-5 text-center text-sm text-muted-foreground">{kodikError || (language === "en" ? "Loading Kodik player…" : "Загрузка плеера Kodik…")}</div>}
+                  </div>
                 </div>
               ) : anime.youtubeTrailerId ? (
                 <div className="relative mx-auto aspect-video w-full min-w-0 overflow-hidden rounded-2xl border border-white/10 bg-[#080710] shadow-2xl">
