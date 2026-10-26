@@ -34,8 +34,18 @@ type BannerCacheEntry = {
 const ANILIST_GRAPHQL_URL = "https://graphql.anilist.co";
 const BANNER_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const REQUEST_TIMEOUT_MS = 7000;
+// Stay comfortably below AniList's public GraphQL rate limit when enriching
+// a whole catalog over several manual refresh steps.
+const ANILIST_REQUEST_DELAY_MS = 1100;
 const MAX_BATCH_SIZE = 50;
 const MAX_CACHE_SIZE = 1500;
+let lastAniListRequestAt = 0;
+
+async function waitForAniListSlot(): Promise<void> {
+  const waitMs = Math.max(0, lastAniListRequestAt + ANILIST_REQUEST_DELAY_MS - Date.now());
+  if (waitMs > 0) await new Promise(resolve => setTimeout(resolve, waitMs));
+  lastAniListRequestAt = Date.now();
+}
 const bannerCache = new Map<string, BannerCacheEntry>();
 
 function validMalId(value: unknown): string | null {
@@ -70,6 +80,7 @@ function trimBannerCache(): void {
 async function requestAniList(query: string, variables: Record<string, unknown>): Promise<AniListBannerResponse | null> {
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
+      await waitForAniListSlot();
       const response = await fetch(ANILIST_GRAPHQL_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
@@ -78,12 +89,17 @@ async function requestAniList(query: string, variables: Record<string, unknown>)
       });
 
       if (!response.ok) {
+        const retryAfter = Number(response.headers.get("Retry-After"));
+        const retryDelayMs = Number.isFinite(retryAfter) && retryAfter > 0
+          ? Math.min(retryAfter * 1000, 10_000)
+          : response.status === 429 ? 3000 : 500;
         console.warn("[YUME][ANILIST_BANNER] AniList returned HTTP status.", {
           status: response.status,
+          retryAfter: response.headers.get("Retry-After"),
           attempt: attempt + 1,
         });
         if (attempt === 0 && (response.status === 429 || response.status >= 500)) {
-          await new Promise(resolve => setTimeout(resolve, response.status === 429 ? 1000 : 250));
+          await new Promise(resolve => setTimeout(resolve, retryDelayMs));
           continue;
         }
         return null;
