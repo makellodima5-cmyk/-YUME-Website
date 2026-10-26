@@ -17,6 +17,8 @@ type StoredSession = {
  */
 export function trackYumePage(path: string): void {
   if (typeof window === "undefined") return;
+  // Honor the browser's Global Privacy Control signal even when a prior opt-in exists.
+  if ((navigator as Navigator & { globalPrivacyControl?: boolean }).globalPrivacyControl === true) return;
   const safePath = path.startsWith("/") ? path.split("?")[0].slice(0, 180) : "/";
   const now = Date.now();
   try {

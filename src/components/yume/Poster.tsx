@@ -3,6 +3,7 @@ import type { Anime } from "@/data/anime";
 import { useYumePreferences, displayAnimeTitle, displayGenre, displayAnimeKind, displayAnimeStatus } from "@/data/preferences";
 import { isNewRelease } from "@/data/anime-sections";
 import { telegramHapticImpact } from "@/lib/telegram-mini-app";
+import { toSameOriginShikimoriImage } from "@/lib/shikimori-image-proxy";
 
 export function PosterArt({ anime, className = "" }: { anime: Anime; className?: string }) {
   const h = anime.hue;
@@ -27,7 +28,7 @@ export function PosterArt({ anime, className = "" }: { anime: Anime; className?:
       </span>
       {anime.posterUrl && (
         <img
-          src={anime.posterUrl}
+          src={toSameOriginShikimoriImage(anime.posterUrl)}
           alt=""
           aria-hidden="true"
           loading="lazy"

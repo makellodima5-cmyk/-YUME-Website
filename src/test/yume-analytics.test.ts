@@ -25,6 +25,7 @@ describe("YUME analytics pageview tracking", () => {
     window.sessionStorage.clear();
     if (randomUuidDescriptor) Object.defineProperty(window.crypto, "randomUUID", randomUuidDescriptor);
     else Reflect.deleteProperty(window.crypto, "randomUUID");
+    Reflect.deleteProperty(navigator, "globalPrivacyControl");
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
@@ -43,6 +44,13 @@ describe("YUME analytics pageview tracking", () => {
     trackYumePage("/#home");
     expect(fetch).not.toHaveBeenCalled();
     expect(window.localStorage.getItem("yume-analytics-visitor-id")).toBeNull();
+  });
+
+  it("does not collect analytics when Global Privacy Control is enabled", () => {
+    Object.defineProperty(navigator, "globalPrivacyControl", { configurable: true, value: true });
+    trackYumePage("/#home");
+    expect(fetch).not.toHaveBeenCalled();
+    expect(window.localStorage.getItem("yume-analytics-visitor-id")).toBe(visitorId);
   });
 
   it("sends a sanitized route and a pseudonymous session token", () => {
