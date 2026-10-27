@@ -26,6 +26,22 @@ The `anime_catalog` table is the authoritative persistent list. Records remain t
 
 The SQL schema is also tracked in `migrations/0001_create_anime_catalog.sql`. The application creates missing tables on first use, so a Wrangler migration is not required for initial table creation. Keep the migration file aligned with `CREATE_SCHEMA` in `src/data/catalog-d1.server.ts` when the schema changes.
 
+## Catalog identity vs. live details
+
+D1 remains the durable catalogue index: Shikimori ID, stored display title, poster URL, latest known score, ordering, and the summary fields used by catalogue search, filters, and home sections. When a user opens an anime detail page, YUME requests that title by Shikimori ID and uses the live response for its description, status, genres, episode counts, airing dates, studios, type, age rating, and trailer. The page keeps the D1 title and poster stable; a successful live score refresh is written back to D1. A short in-isolate cache limits repeated upstream requests, and the previous D1 record remains a fallback if Shikimori is unavailable.
+
+Past `next_episode_at` values are never shown as upcoming. The new `migrations/0006_clear_stale_episode_dates.sql` clears the legacy episode schedule snapshot once; it does not alter table structure or require changing any migration that has already been applied.
+
+For the production database, open the existing `yume_db` database in Cloudflare D1 Console and execute the contents of `migrations/0006_clear_stale_episode_dates.sql` once. Do not rerun older migrations or edit them retroactively. Verify with:
+
+```sql
+SELECT COUNT(*) AS stale_schedule_rows
+FROM anime_catalog
+WHERE next_episode_at IS NOT NULL;
+```
+
+The expected result after applying the cleanup is `0`. The field remains in the schema for compatibility with existing catalog import code, but it is no longer the source of truth for a selected title's episode schedule.
+
 ## Important constraints
 
 - The catalog is capped at 1,000 records.
