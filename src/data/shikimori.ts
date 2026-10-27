@@ -68,8 +68,15 @@ type ShikimoriGraphQLVideo = {
 };
 
 type GraphQLResponse = {
-  data?: { animes?: ShikimoriGraphQLAnime[] | null };
+  data?: { animes?: ShikimoriGraphQLAnime[] | null; [key: string]: ShikimoriGraphQLAnime[] | null | undefined };
   errors?: { message?: string }[];
+};
+
+export type ShikimoriSectionFeeds = {
+  popular: Anime[];
+  newReleases: Anime[];
+  announcements: Anime[];
+  airing: Anime[];
 };
 
 export function parseShikimoriResponse(payload: GraphQLResponse): { items: Anime[]; error: string | null } {
@@ -116,6 +123,25 @@ const ANIME_FIELDS = [
   "nextEpisodeAt",
   "rating",
   "studios { name }",
+].join(" ");
+
+const SECTION_ANIME_FIELDS = [
+  "id",
+  "name",
+  "english",
+  "russian",
+  "kind",
+  "score",
+  "status",
+  "episodes",
+  "episodesAired",
+  "airedOn { date year }",
+  "releasedOn { date year }",
+  "poster { originalUrl mainUrl previewUrl }",
+  "opengraphImageUrl",
+  "genres { id name russian kind }",
+  "nextEpisodeAt",
+  "rating",
 ].join(" ");
 
 function cleanDescription(value: string | null | undefined): string {
@@ -422,6 +448,105 @@ async function fetchShikimoriAnimes(data: ShikimoriRequest) {
 export const getShikimoriAnimes = createServerFn({ method: "GET" })
   .validator((input: ShikimoriRequest) => validateRequest(input))
   .handler(async ({ data }) => filterCatalogForCurrentRequest(await fetchShikimoriAnimes(data)));
+
+const SECTION_FEED_CACHE_TTL_MS = 2 * 60 * 1000;
+let sectionFeedCache: { expiresAt: number; feeds: ShikimoriSectionFeeds } | null = null;
+let sectionFeedRequest: Promise<ShikimoriSectionFeeds | null> | null = null;
+
+function dedupeSectionItems(items: Anime[]): Anime[] {
+  const unique = new Map<string, Anime>();
+  for (const item of items) unique.set(item.id, item);
+  return Array.from(unique.values());
+}
+
+/**
+ * Current data for existing homepage sections, fetched in one GraphQL round-trip.
+ * D1 remains the durable catalogue; these feeds refresh status/rating snapshots.
+ */
+export function parseShikimoriSectionFeeds(payload: GraphQLResponse): ShikimoriSectionFeeds | null {
+  if (payload.errors?.length || !payload.data) return null;
+  const names = [
+    "popularPage1", "popularPage2", "newReleasesPage1", "newReleasesPage2",
+    "announcementsPage1", "airingPage1", "airingPage2",
+  ];
+  if (!names.some((name) => Array.isArray(payload.data?.[name]))) return null;
+
+  const read = (...keys: string[]) => dedupeSectionItems(keys.flatMap((key) =>
+    (payload.data?.[key] ?? []).filter((item) => !hasExcludedGenre(item)).map(mapAnime),
+  ));
+
+  return {
+    popular: read("popularPage1", "popularPage2"),
+    newReleases: read("newReleasesPage1", "newReleasesPage2"),
+    announcements: read("announcementsPage1"),
+    airing: read("airingPage1", "airingPage2"),
+  };
+}
+
+async function fetchShikimoriSectionFeeds(): Promise<ShikimoriSectionFeeds | null> {
+  const now = Date.now();
+  if (sectionFeedCache && sectionFeedCache.expiresAt > now) return sectionFeedCache.feeds;
+  if (sectionFeedRequest) return sectionFeedRequest;
+  if (now < shikimoriCooldownUntil) return null;
+
+  sectionFeedRequest = (async () => {
+    const fields = SECTION_ANIME_FIELDS;
+    const query = [
+      "query {",
+      "  popularPage1: animes(page: 1, limit: 50, order: \"ranked\") { " + fields + " }",
+      "  popularPage2: animes(page: 2, limit: 50, order: \"ranked\") { " + fields + " }",
+      "  newReleasesPage1: animes(page: 1, limit: 50, order: \"aired_on\", status: \"released\") { " + fields + " }",
+      "  newReleasesPage2: animes(page: 2, limit: 50, order: \"aired_on\", status: \"released\") { " + fields + " }",
+      "  announcementsPage1: animes(page: 1, limit: 50, order: \"aired_on\", status: \"anons\") { " + fields + " }",
+      "  airingPage1: animes(page: 1, limit: 50, order: \"ranked\", status: \"ongoing\") { " + fields + " }",
+      "  airingPage2: animes(page: 2, limit: 50, order: \"ranked\", status: \"ongoing\") { " + fields + " }",
+      "}",
+    ].join("\n");
+
+    try {
+      const response = await fetch(API_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          "User-Agent": "YUME/1.0",
+        },
+        body: JSON.stringify({ query }),
+        signal: AbortSignal.timeout(12000),
+      });
+
+      if (response.status === 429) {
+        const retryAfterMs = retryAfterMilliseconds(response.headers.get("Retry-After"))
+          ?? SHIKIMORI_429_COOLDOWN_MS;
+        shikimoriCooldownUntil = Math.max(shikimoriCooldownUntil, Date.now() + retryAfterMs);
+        console.warn("[YUME] Shikimori section feed returned HTTP 429; pausing requests for", retryAfterMs, "ms.");
+        return null;
+      }
+      if (!response.ok) throw new Error("Shikimori section feed returned HTTP " + response.status);
+
+      const payload = await response.json() as GraphQLResponse;
+      const feeds = parseShikimoriSectionFeeds(payload);
+      if (!feeds) {
+        console.warn("[YUME] Shikimori section feed response was incomplete or returned GraphQL errors.");
+        return null;
+      }
+      sectionFeedCache = { expiresAt: Date.now() + SECTION_FEED_CACHE_TTL_MS, feeds };
+      return feeds;
+    } catch (error) {
+      console.error("[YUME] Failed to refresh live section feeds:", error instanceof Error ? error.message : "Unknown Shikimori error");
+      return null;
+    }
+  })();
+
+  try {
+    return await sectionFeedRequest;
+  } finally {
+    sectionFeedRequest = null;
+  }
+}
+
+export const getShikimoriSectionFeeds = createServerFn({ method: "GET" })
+  .handler(async () => fetchShikimoriSectionFeeds());
 
 const CATALOG_LIMIT = 1000;
 const CATALOG_CACHE_TTL_MS = 30 * 60 * 1000;

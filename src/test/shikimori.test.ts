@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   mapAnime,
   normalizeShikimoriScreenshots,
+  parseShikimoriSectionFeeds,
   parseShikimoriResponse,
   retryAfterMilliseconds,
   validateRequest,
@@ -57,6 +58,32 @@ describe("Shikimori GraphQL responses", () => {
     });
     expect(result.error).toBeNull();
     expect(result.items.map((anime) => anime.id)).toEqual(["1"]);
+  });
+});
+
+describe("live Shikimori section feeds", () => {
+  it("parses fresh status feeds, deduplicates aliases, and excludes hentai", () => {
+    const payload = {
+      data: {
+        airingPage1: [
+          { id: "10", name: "Still airing", status: "ongoing", score: "8.8" },
+          { id: "11", name: "Excluded", status: "ongoing", genres: [{ id: "1", name: "Hentai", russian: "Хентай", kind: "genre" }] },
+        ],
+        airingPage2: [{ id: "10", name: "Duplicate from another page", status: "ongoing", score: "8.8" }],
+        announcementsPage1: [{ id: "12", name: "Upcoming", status: "anons", airedOn: { date: "2027-01-01", year: 2027 } }],
+        newReleasesPage1: [{ id: "13", name: "Completed", status: "released", score: "9.1" }],
+        newReleasesPage2: [],
+        popularPage1: [{ id: "13", name: "Completed", status: "released", score: "9.1" }],
+        popularPage2: [],
+      },
+    };
+
+    const feeds = parseShikimoriSectionFeeds(payload as never);
+    expect(feeds?.airing.map((item) => item.id)).toEqual(["10"]);
+    expect(feeds?.announcements.map((item) => item.id)).toEqual(["12"]);
+    expect(feeds?.newReleases.map((item) => item.id)).toEqual(["13"]);
+    expect(feeds?.popular.map((item) => item.id)).toEqual(["13"]);
+    expect(parseShikimoriSectionFeeds({ data: { animes: [] }, errors: [{ message: "Partial failure" }] })).toBeNull();
   });
 });
 
