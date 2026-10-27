@@ -24,7 +24,6 @@ import { trackYumePage } from "@/lib/yume-analytics";
 import { setProfileStorageAuthenticated, syncTelegramLibrary } from "@/data/profile-storage";
 import { USER_NOTIFICATIONS } from "@/data/notifications.shared";
 import { runAdminTrailerUpdate, type AdminTrailerStats } from "@/data/admin-trailer-update";
-import { formatPlaybackTime, PLAYBACK_PROGRESS_UPDATED_EVENT, readPlaybackProgress, removePlaybackProgress, type PlaybackProgressEntry } from "@/data/playback-progress";
 
 function mergeLiveSectionAnime(stored: Anime, live: Anime): Anime {
   const merged = mergeLiveAnimeDetails(stored, live);
@@ -402,7 +401,6 @@ function Index() {
     catalogProgress: initialCatalogProgress,
   } = Route.useLoaderData();
   const [catalogAnime, setCatalogAnime] = useState<Anime[]>(loadedAnime.slice(0, 1000));
-  const [continueWatching, setContinueWatching] = useState<PlaybackProgressEntry[]>([]);
   const [popularAnime, setPopularAnime] = useState<Anime[]>(initialPopularAnime);
   const [catalogProgress, setCatalogProgress] = useState(initialCatalogProgress);
   const [sectionFeeds, setSectionFeeds] = useState(initialSectionFeeds);
@@ -413,17 +411,6 @@ function Index() {
   useEffect(() => {
     catalogAnimeRef.current = catalogAnime;
   }, [catalogAnime]);
-
-  useEffect(() => {
-    const syncPlaybackProgress = () => setContinueWatching(readPlaybackProgress());
-    syncPlaybackProgress();
-    window.addEventListener(PLAYBACK_PROGRESS_UPDATED_EVENT, syncPlaybackProgress);
-    window.addEventListener("storage", syncPlaybackProgress);
-    return () => {
-      window.removeEventListener(PLAYBACK_PROGRESS_UPDATED_EVENT, syncPlaybackProgress);
-      window.removeEventListener("storage", syncPlaybackProgress);
-    };
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -1568,54 +1555,6 @@ function Index() {
                 </section>
               ) : (
                 <>
-                  {continueWatching.length > 0 && <Row title={language === "en" ? "Continue watching" : "Продолжить просмотр"}>
-                    {continueWatching.map((entry) => {
-                      const progressPercent = entry.durationSeconds && entry.durationSeconds > 0
-                        ? Math.min(100, Math.max(0, (entry.positionSeconds / entry.durationSeconds) * 100))
-                        : 0;
-                      const remainingSeconds = entry.durationSeconds && entry.durationSeconds > entry.positionSeconds
-                        ? entry.durationSeconds - entry.positionSeconds
-                        : null;
-                      return (
-                        <article key={entry.animeId} className="group relative w-64 shrink-0 overflow-hidden rounded-xl bg-card ring-1 ring-border transition hover:ring-primary sm:w-72">
-                          <button
-                            type="button"
-                            onClick={() => window.location.assign("/anime/" + encodeURIComponent(entry.animeId) + "?watch=1&episode=" + entry.episode + "&resume=" + Math.floor(entry.positionSeconds))}
-                            className="yume-tactile-control block w-full text-left"
-                            aria-label={(language === "en" ? "Continue " : "Продолжить просмотр: ") + entry.title}
-                          >
-                            <div className="relative aspect-video overflow-hidden bg-muted">
-                              {entry.posterUrl ? (
-                                <img src={entry.posterUrl} alt="" loading="lazy" className="h-full w-full object-cover" />
-                              ) : (
-                                <div className="flex h-full items-center justify-center bg-gradient-to-br from-primary/30 via-card to-neon/20 px-4 text-center text-lg font-bold">{entry.title}</div>
-                              )}
-                              <div className="absolute inset-0 flex items-center justify-center bg-black/0 opacity-0 transition group-hover:bg-black/20 group-hover:opacity-100">
-                                <span className="rounded-full bg-neon p-3 text-primary-foreground"><Play className="h-5 w-5 fill-current" /></span>
-                              </div>
-                              <div className="absolute inset-x-0 bottom-0 h-1 bg-white/25">
-                                <div className="h-full bg-[#F05A28]" style={{ width: progressPercent + "%" }} />
-                              </div>
-                              {remainingSeconds !== null && <span className="absolute bottom-2 right-2 rounded bg-black/75 px-1.5 py-0.5 text-xs font-semibold text-white">{Math.ceil(remainingSeconds / 60)} {language === "en" ? "min left" : "мин. осталось"}</span>}
-                            </div>
-                            <div className="p-3 pr-10">
-                              <div className="line-clamp-1 text-sm font-semibold">{language === "en" ? (entry.englishTitle || entry.title) : entry.title}</div>
-                              <div className="mt-1 text-xs text-muted-foreground">{language === "en" ? "Episode " : "Серия "}{entry.episode} · {language === "en" ? "Continue from " : "Продолжить с "}{formatPlaybackTime(entry.positionSeconds)}</div>
-                            </div>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => removePlaybackProgress(entry.animeId)}
-                            aria-label={(language === "en" ? "Remove " : "Убрать из продолжения просмотра: ") + entry.title}
-                            title={language === "en" ? "Remove from Continue watching" : "Убрать из продолжения просмотра"}
-                            className="absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-black/75 text-white opacity-100 transition hover:bg-black hover:text-white sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                        </article>
-                      );
-                    })}
-                  </Row>}
                   {popularCards.length > 0 && <Row title={t("home.popular")} action={<SeeAll onClick={() => setView("popular")} />}>
                     {popularCards.map((a) => <AnimeCard key={a.id} anime={a} onSelect={select} />)}
                   </Row>}
