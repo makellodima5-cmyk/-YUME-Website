@@ -670,7 +670,8 @@ function AnimeDetailPage() {
                 <h2 className="mb-2 text-sm font-semibold">{t("anime.description")}</h2>
                 {descriptionText("anime-description-mobile")}
               </div>
-
+            </div>
+          </section>
 
           {displayableScreenshots.length > 0 && (
             <section aria-labelledby="anime-screenshots-title" className="relative z-10 mt-5 md:mt-6">
