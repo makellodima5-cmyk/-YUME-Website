@@ -8,6 +8,24 @@
   "triggers": {
     "crons": ["* * * * *"]
   },
+  "ratelimits": [
+    {
+      "name": "KODIK_RATE_LIMITER",
+      "namespace_id": "202610271",
+      "simple": {
+        "limit": 30,
+        "period": 60
+      }
+    },
+    {
+      "name": "MEDIA_RATE_LIMITER",
+      "namespace_id": "202610272",
+      "simple": {
+        "limit": 600,
+        "period": 60
+      }
+    }
+  ],
   "observability": {
     "enabled": true
   },
