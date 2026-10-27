@@ -93,6 +93,9 @@ function ensureSchema(db: Database): Promise<void> {
   const pending = db.batch([
     db.prepare("CREATE TABLE IF NOT EXISTS yume_notification_reads (user_id TEXT NOT NULL REFERENCES yume_users(id) ON DELETE CASCADE, notification_id TEXT NOT NULL, read_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (user_id, notification_id))"),
     db.prepare("CREATE TABLE IF NOT EXISTS yume_notification_dismissals (user_id TEXT NOT NULL REFERENCES yume_users(id) ON DELETE CASCADE, notification_id TEXT NOT NULL, dismissed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (user_id, notification_id))"),
+    db.prepare("CREATE TABLE IF NOT EXISTS yume_notifications (id TEXT PRIMARY KEY NOT NULL, title TEXT NOT NULL, body TEXT NOT NULL, type TEXT NOT NULL DEFAULT 'info', target_url TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, created_by TEXT, active INTEGER NOT NULL DEFAULT 1)"),
+    db.prepare("CREATE TABLE IF NOT EXISTS yume_notification_reads_v2 (user_id TEXT NOT NULL REFERENCES yume_users(id) ON DELETE CASCADE, notification_id TEXT NOT NULL REFERENCES yume_notifications(id) ON DELETE CASCADE, read_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, dismissed_at TEXT, PRIMARY KEY(user_id,notification_id))"),
+    db.prepare("CREATE TABLE IF NOT EXISTS yume_notification_targets (notification_id TEXT NOT NULL REFERENCES yume_notifications(id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES yume_users(id) ON DELETE CASCADE, PRIMARY KEY(notification_id,user_id))"),
     // Composite primary keys already index each table by user_id; the separate user-only indexes are redundant.
     db.prepare("DROP INDEX IF EXISTS idx_yume_notification_reads_user"),
     db.prepare("DROP INDEX IF EXISTS idx_yume_notification_dismissals_user"),
