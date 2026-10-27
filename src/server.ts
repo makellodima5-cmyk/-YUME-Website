@@ -223,8 +223,17 @@ export default {
           headers: { Allow: "GET", "Cache-Control": "no-store" },
         });
       } else {
-        const bindings = env && typeof env === "object" ? env as Record<string, unknown> : {};
-        const rateLimit = await enforceRateLimit(bindings.MEDIA_RATE_LIMITER, request, "media");
+        // Read this binding from Cloudflare's request-scoped env import. In the
+        // deployed TanStack/Nitro adapter, the generic handler env argument does
+        // not expose the RateLimit binding consistently.
+        let rateLimitBinding: unknown;
+        try {
+          const cloudflareBindings = cloudflareEnv as unknown as Record<string, unknown>;
+          rateLimitBinding = cloudflareBindings.MEDIA_RATE_LIMITER;
+        } catch {
+          rateLimitBinding = undefined;
+        }
+        const rateLimit = await enforceRateLimit(rateLimitBinding, request, "media");
         if (rateLimit === "limited") {
           response = new Response("Too many image requests. Please try again in a minute.", {
             status: 429,
