@@ -212,7 +212,7 @@ function AnimeDetailPage() {
     const onKodikMessage = (event: MessageEvent) => {
       if (!event.origin) return;
       try {
-        const hostname = new URL(event.origin).hostname.toLowerCase().replace(/\\.$/, "");
+        const hostname = new URL(event.origin).hostname.toLowerCase().replace(/\.$/, "");
         if (!trustedHosts.some((host) => hostname === host || hostname.endsWith("." + host))) return;
       } catch {
         return;
