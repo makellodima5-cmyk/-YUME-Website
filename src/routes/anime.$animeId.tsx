@@ -32,7 +32,7 @@ import {
 } from "@/data/profile-storage";
 import { absoluteImageUrl, canonicalUrl, sanitizeMetaDescription } from "@/data/seo";
 import { toSameOriginShikimoriScreenshot } from "@/lib/shikimori-image-proxy";
-import { removePlaybackProgress, savePlaybackProgress } from "@/data/playback-progress";
+import { PLAYBACK_PROGRESS_UPDATED_EVENT, readPlaybackProgress, savePlaybackProgress, markPlaybackEpisodeCompleted, type PlaybackProgressEntry } from "@/data/playback-progress";
 
 function formatAnimeDate(value: string | undefined, language: "ru" | "en", includeTime = false): string | null {
   if (!value) return null;
@@ -129,6 +129,20 @@ function AnimeDetailPage() {
   const [resumeTargetEpisode, setResumeTargetEpisode] = useState<number | null>(null);
   const [resumeTargetSeconds, setResumeTargetSeconds] = useState(0);
   const [kodikError, setKodikError] = useState("");
+  const [episodeProgress, setEpisodeProgress] = useState<PlaybackProgressEntry[]>([]);
+
+  useEffect(() => {
+    const syncEpisodeProgress = () => {
+      setEpisodeProgress(readPlaybackProgress().filter((entry) => entry.animeId === animeId));
+    };
+    syncEpisodeProgress();
+    window.addEventListener(PLAYBACK_PROGRESS_UPDATED_EVENT, syncEpisodeProgress);
+    window.addEventListener("storage", syncEpisodeProgress);
+    return () => {
+      window.removeEventListener(PLAYBACK_PROGRESS_UPDATED_EVENT, syncEpisodeProgress);
+      window.removeEventListener("storage", syncEpisodeProgress);
+    };
+  }, [animeId]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -226,8 +240,19 @@ function AnimeDetailPage() {
       if (!payload || typeof payload !== "object") return;
       const message = payload as Record<string, unknown>;
       const messageType = String(message.type ?? message.event ?? message.name ?? message.key ?? "").toLowerCase();
-      if (messageType.includes("ended") || messageType === "end" || messageType.includes("video_end")) {
-        removePlaybackProgress(animeId);
+      const progressEntry = {
+        animeId,
+        title: displayAnimeTitle(anime, language),
+        ...(anime.englishTitle ? { englishTitle: anime.englishTitle } : {}),
+        ...((anime.bannerUrl || anime.posterUrl) ? { posterUrl: anime.bannerUrl || anime.posterUrl } : {}),
+        episode: kodikEpisode,
+      };
+      if (messageType.includes("ended") || messageType === "end" || messageType.endsWith("_end") || messageType.includes("video_end")) {
+        markPlaybackEpisodeCompleted({
+          ...progressEntry,
+          positionSeconds: 0,
+          durationSeconds: null,
+        });
         return;
       }
       if (!messageType.includes("time_update")) return;
@@ -237,17 +262,16 @@ function AnimeDetailPage() {
       const durationValue = typeof rawDuration === "number" ? rawDuration : Number(rawDuration);
       const durationSeconds = Number.isFinite(durationValue) && durationValue > 0 ? durationValue : null;
       if (!Number.isFinite(watchedSeconds) || watchedSeconds < 0) return;
-      if (durationSeconds !== null && watchedSeconds / durationSeconds >= 0.95) {
-        removePlaybackProgress(animeId);
+      const completed = durationSeconds !== null && watchedSeconds / durationSeconds >= 0.95;
+      if (completed) {
+        markPlaybackEpisodeCompleted({ ...progressEntry, positionSeconds: watchedSeconds, durationSeconds });
+        lastSavedPosition = watchedSeconds;
       } else if (watchedSeconds >= 5 && (lastSavedPosition < 0 || watchedSeconds - lastSavedPosition >= 8 || watchedSeconds < lastSavedPosition)) {
         savePlaybackProgress({
-          animeId,
-          title: displayAnimeTitle(anime, language),
-          ...(anime.englishTitle ? { englishTitle: anime.englishTitle } : {}),
-          ...((anime.bannerUrl || anime.posterUrl) ? { posterUrl: anime.bannerUrl || anime.posterUrl } : {}),
-          episode: kodikEpisode,
+          ...progressEntry,
           positionSeconds: watchedSeconds,
           durationSeconds,
+          completed: false,
           updatedAt: new Date().toISOString(),
         });
         lastSavedPosition = watchedSeconds;
@@ -813,7 +837,44 @@ function AnimeDetailPage() {
                     {selectedKodikSource?.episodes.length ? (
                       <div className="scrollbar-none max-h-44 overflow-y-auto overscroll-contain rounded-xl border border-border/70 bg-background/40 p-2" aria-label={language === "en" ? "Episode list" : "Список серий"}>
                         <div className="grid grid-cols-5 gap-2 sm:grid-cols-8 md:grid-cols-10">
-                          {selectedKodikSource.episodes.map((episode) => <button key={episode.number} type="button" onClick={() => setKodikEpisode(episode.number)} aria-pressed={kodikEpisode === episode.number} aria-label={(language === "en" ? "Episode " : "Серия ") + episode.number} title={episode.title || undefined} className={"min-h-11 rounded-lg px-2 py-2 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary " + (kodikEpisode === episode.number ? "bg-primary text-primary-foreground shadow-[0_0_18px_rgba(168,85,247,0.25)]" : "bg-secondary text-foreground hover:bg-accent")}>{episode.number}</button>)}
+                          {selectedKodikSource.episodes.map((episode) => {
+                            const savedProgress = episodeProgress.find((entry) => entry.episode === episode.number);
+                            const isCompleted = savedProgress?.completed === true;
+                            const progressPercent = savedProgress?.durationSeconds && savedProgress.durationSeconds > 0
+                              ? Math.min(100, Math.max(0, (savedProgress.positionSeconds / savedProgress.durationSeconds) * 100))
+                              : 0;
+                            const isSelected = kodikEpisode === episode.number;
+                            return (
+                              <button
+                                key={episode.number}
+                                type="button"
+                                onClick={() => {
+                                  setKodikEpisode(episode.number);
+                                  setResumeTargetEpisode(savedProgress && !isCompleted ? episode.number : null);
+                                  setResumeTargetSeconds(savedProgress && !isCompleted ? savedProgress.positionSeconds : 0);
+                                }}
+                                aria-pressed={isSelected}
+                                aria-label={(language === "en" ? "Episode " : "Серия ") + episode.number + (isCompleted ? (language === "en" ? ", watched" : ", просмотрена") : progressPercent > 0 ? (language === "en" ? ", " + Math.round(progressPercent) + "% watched" : ", просмотрено " + Math.round(progressPercent) + "%") : "")}
+                                title={episode.title || undefined}
+                                className={"relative min-h-11 overflow-hidden rounded-lg px-2 py-2 pb-3 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary " + (
+                                  isCompleted
+                                    ? "bg-zinc-950/90 text-zinc-500 ring-1 ring-inset ring-white/5 " + (isSelected ? "ring-2 ring-primary/60" : "hover:bg-zinc-900")
+                                    : isSelected
+                                      ? "bg-primary text-primary-foreground shadow-[0_0_18px_rgba(168,85,247,0.25)]"
+                                      : "bg-secondary text-foreground hover:bg-accent"
+                                )}
+                              >
+                                <span>{episode.number}</span>
+                                {isCompleted ? <span aria-hidden="true" className="absolute right-1.5 top-1 text-[10px] leading-none opacity-70">✓</span> : null}
+                                {!isCompleted && progressPercent > 0 ? (
+                                  <span aria-hidden="true" className="absolute bottom-1 left-2 right-2 h-[3px] overflow-hidden rounded-full bg-foreground/15">
+                                    <span className="block h-full rounded-full bg-neon" style={{ width: progressPercent + "%" }} />
+                                  </span>
+                                ) : null}
+                                {isCompleted ? <span aria-hidden="true" className="absolute bottom-1 left-2 right-2 h-[3px] rounded-full bg-zinc-700/70" /> : null}
+                              </button>
+                            );
+                          })}
                         </div>
                       </div>
                     ) : <p className="rounded-xl border border-border/70 bg-background/40 p-3 text-sm text-muted-foreground">{kodikError || (language === "en" ? "Episode list will appear here when available." : "Список серий появится здесь, когда будет доступен.")}</p>}
