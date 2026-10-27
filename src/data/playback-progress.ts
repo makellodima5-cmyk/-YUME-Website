@@ -84,7 +84,7 @@ export function markPlaybackEpisodeCompleted(entry: Omit<PlaybackProgressEntry, 
   savePlaybackProgress({
     ...existing,
     ...entry,
-    positionSeconds: existing?.positionSeconds ?? entry.positionSeconds,
+    positionSeconds: Math.max(existing?.positionSeconds ?? 0, entry.positionSeconds),
     durationSeconds: entry.durationSeconds ?? existing?.durationSeconds ?? null,
     completed: true,
     updatedAt: new Date().toISOString(),
