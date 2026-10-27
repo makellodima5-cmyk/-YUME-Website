@@ -1,10 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import {
   getOpeningSkipTarget,
   getResumePosition,
   normalizePlaybackProgress,
   type PlaybackProgress,
 } from "@/data/profile-storage";
+import { markPlaybackEpisodeCompleted, PLAYBACK_PROGRESS_STORAGE_KEY, readPlaybackProgress, savePlaybackProgress } from "@/data/playback-progress";
 
 const validProgress: PlaybackProgress = {
   animeId: "123",
@@ -80,5 +81,60 @@ describe("opening skip target", () => {
     expect(getOpeningSkipTarget(-1)).toBeNull();
     expect(getOpeningSkipTarget(Number.POSITIVE_INFINITY)).toBeNull();
     expect(getOpeningSkipTarget(Number.NaN)).toBeNull();
+  });
+});
+
+
+describe("episode list playback progress", () => {
+  beforeEach(() => {
+    window.localStorage.removeItem(PLAYBACK_PROGRESS_STORAGE_KEY);
+  });
+
+  const entry = (episode: number, positionSeconds: number) => ({
+    animeId: "123",
+    title: "Test anime",
+    episode,
+    positionSeconds,
+    durationSeconds: null,
+    completed: false,
+    updatedAt: "2026-10-21T12:00:00.000Z",
+  });
+
+  it("stores progress independently for each episode", () => {
+    savePlaybackProgress(entry(1, 300));
+    savePlaybackProgress(entry(2, 420));
+
+    expect(readPlaybackProgress()).toEqual(expect.arrayContaining([
+      expect.objectContaining({ animeId: "123", episode: 1, positionSeconds: 300, completed: false }),
+      expect.objectContaining({ animeId: "123", episode: 2, positionSeconds: 420, completed: false }),
+    ]));
+  });
+
+  it("marks only the selected episode completed and preserves its last position", () => {
+    savePlaybackProgress(entry(1, 300));
+    savePlaybackProgress(entry(2, 420));
+
+    markPlaybackEpisodeCompleted(entry(1, 1380));
+
+    const progress = readPlaybackProgress();
+    expect(progress.find((item) => item.episode === 1)).toEqual(expect.objectContaining({
+      animeId: "123",
+      episode: 1,
+      positionSeconds: 1380,
+      completed: true,
+    }));
+    expect(progress.find((item) => item.episode === 2)).toEqual(expect.objectContaining({
+      episode: 2,
+      positionSeconds: 420,
+      completed: false,
+    }));
+  });
+
+  it("updates a saved episode instead of creating duplicate indicators", () => {
+    savePlaybackProgress(entry(1, 120));
+    savePlaybackProgress(entry(1, 240));
+
+    expect(readPlaybackProgress().filter((item) => item.animeId === "123" && item.episode === 1)).toHaveLength(1);
+    expect(readPlaybackProgress().find((item) => item.episode === 1)?.positionSeconds).toBe(240);
   });
 });
