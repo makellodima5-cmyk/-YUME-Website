@@ -32,6 +32,7 @@ import {
 } from "@/data/profile-storage";
 import { absoluteImageUrl, canonicalUrl, sanitizeMetaDescription } from "@/data/seo";
 import { toSameOriginShikimoriScreenshot } from "@/lib/shikimori-image-proxy";
+import { removePlaybackProgress, savePlaybackProgress } from "@/data/playback-progress";
 
 function formatAnimeDate(value: string | undefined, language: "ru" | "en", includeTime = false): string | null {
   if (!value) return null;
@@ -125,7 +126,14 @@ function AnimeDetailPage() {
   const [kodikSources, setKodikSources] = useState<Array<{ id: string; title: string; episodes: Array<{ number: number; title: string; link: string }> }>>([]);
   const [kodikTranslationId, setKodikTranslationId] = useState("");
   const [kodikEpisode, setKodikEpisode] = useState(1);
+  const [resumeTargetEpisode, setResumeTargetEpisode] = useState<number | null>(null);
+  const [resumeTargetSeconds, setResumeTargetSeconds] = useState(0);
   const [kodikError, setKodikError] = useState("");
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("watch") === "1") setWatchMode("episodes");
+  }, []);
   const displayableScreenshots = screenshots.flatMap((screenshot) => {
     const proxied = toSameOriginShikimoriScreenshot(screenshot);
     return proxied ? [proxied] : [];
@@ -145,8 +153,17 @@ function AnimeDetailPage() {
         if (cancelled) return;
         const sources = Array.isArray(result.sources) ? result.sources : [];
         setKodikSources(sources);
-        setKodikTranslationId(sources[0]?.id ?? "");
-        setKodikEpisode(sources[0]?.episodes[0]?.number ?? 1);
+        const params = new URLSearchParams(window.location.search);
+        const requestedEpisode = Number(params.get("episode"));
+        const requestedResume = Number(params.get("resume"));
+        const matchingSource = Number.isInteger(requestedEpisode) && requestedEpisode > 0
+          ? sources.find((source) => source.episodes.some((episode) => episode.number === requestedEpisode)) ?? sources[0]
+          : sources[0];
+        const matchingEpisode = matchingSource?.episodes.find((episode) => episode.number === requestedEpisode);
+        setKodikTranslationId(matchingSource?.id ?? "");
+        setKodikEpisode(matchingEpisode?.number ?? matchingSource?.episodes[0]?.number ?? 1);
+        setResumeTargetEpisode(matchingEpisode ? matchingEpisode.number : null);
+        setResumeTargetSeconds(Number.isFinite(requestedResume) && requestedResume > 0 ? Math.floor(requestedResume) : 0);
         if (!sources.length) setKodikError(language === "en" ? "No Kodik episodes were found for this title." : "В Kodik не найдены серии для этого аниме.");
       })
       .catch(() => {
@@ -166,7 +183,18 @@ function AnimeDetailPage() {
     player.replaceChildren();
     const frame = document.createElement("iframe");
     frame.id = "kodik-player";
-    frame.src = kodikEmbedUrl;
+    let playerUrl = kodikEmbedUrl;
+    // Kodik may ignore this parameter on some player versions; the saved position is still retained locally.
+    if (resumeTargetEpisode === kodikEpisode && resumeTargetSeconds > 0) {
+      try {
+        const resumeUrl = new URL(kodikEmbedUrl);
+        resumeUrl.searchParams.set("start", String(resumeTargetSeconds));
+        playerUrl = resumeUrl.toString();
+      } catch {
+        // The API already validates Kodik URLs; retain the original URL if parsing fails.
+      }
+    }
+    frame.src = playerUrl;
     frame.title = (anime ? displayAnimeTitle(anime, language) : "Kodik") + " — " + (language === "en" ? "episode player" : "плеер серий");
     frame.className = "absolute inset-0 h-full w-full border-0";
     frame.allow = "autoplay; fullscreen; picture-in-picture; encrypted-media";
@@ -174,15 +202,18 @@ function AnimeDetailPage() {
     frame.referrerPolicy = "strict-origin-when-cross-origin";
     player.appendChild(frame);
     return () => { frame.remove(); };
-  }, [watchMode, kodikEmbedUrl, anime, language]);
+  }, [watchMode, kodikEmbedUrl, anime, language, resumeTargetEpisode, resumeTargetSeconds, kodikEpisode]);
 
   useEffect(() => {
-    if (watchMode !== "episodes" || !kodikEmbedUrl) return;
+    if (watchMode !== "episodes" || !kodikEmbedUrl || !anime) return;
     let historySaved = false;
+    let lastSavedPosition = -1;
+    const trustedHosts = ["kodik.info", "kodik.biz", "kodik.cc", "kodik.online", "kodikplayer.com", "kodikres.com"];
     const onKodikMessage = (event: MessageEvent) => {
-      if (historySaved || !event.origin) return;
+      if (!event.origin) return;
       try {
-        if (!new URL(event.origin).hostname.toLowerCase().includes("kodik")) return;
+        const hostname = new URL(event.origin).hostname.toLowerCase().replace(/\\.$/, "");
+        if (!trustedHosts.some((host) => hostname === host || hostname.endsWith("." + host))) return;
       } catch {
         return;
       }
@@ -192,24 +223,48 @@ function AnimeDetailPage() {
       }
       if (!payload || typeof payload !== "object") return;
       const message = payload as Record<string, unknown>;
-      const messageType = String(message.type ?? message.event ?? message.name ?? "");
+      const messageType = String(message.type ?? message.event ?? message.name ?? "").toLowerCase();
+      if (messageType.includes("ended") || messageType === "end" || messageType.includes("video_end")) {
+        removePlaybackProgress(animeId);
+        return;
+      }
       if (!messageType.includes("time_update")) return;
       const rawTime = message.time ?? message.currentTime ?? message.seconds ?? message.current_time;
       const watchedSeconds = typeof rawTime === "number" ? rawTime : Number(rawTime);
-      // Ignore page opens and player initialization. Require an actual playback time update.
-      if (!Number.isFinite(watchedSeconds) || watchedSeconds < 30) return;
-      historySaved = true;
-      void fetch("/api/telegram/history", {
-        method: "POST",
-        credentials: "same-origin",
-        cache: "no-store",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ animeId, watchedSeconds }),
-      }).catch(() => undefined);
+      const rawDuration = message.duration ?? message.durationSeconds ?? message.duration_seconds ?? message.totalTime ?? message.total_time;
+      const durationValue = typeof rawDuration === "number" ? rawDuration : Number(rawDuration);
+      const durationSeconds = Number.isFinite(durationValue) && durationValue > 0 ? durationValue : null;
+      if (!Number.isFinite(watchedSeconds) || watchedSeconds < 0) return;
+      if (durationSeconds !== null && watchedSeconds / durationSeconds >= 0.95) {
+        removePlaybackProgress(animeId);
+      } else if (watchedSeconds >= 5 && (lastSavedPosition < 0 || watchedSeconds - lastSavedPosition >= 8 || watchedSeconds < lastSavedPosition)) {
+        savePlaybackProgress({
+          animeId,
+          title: displayAnimeTitle(anime, language),
+          ...(anime.englishTitle ? { englishTitle: anime.englishTitle } : {}),
+          ...((anime.posterUrl || anime.bannerUrl) ? { posterUrl: anime.posterUrl || anime.bannerUrl } : {}),
+          episode: kodikEpisode,
+          positionSeconds: watchedSeconds,
+          durationSeconds,
+          updatedAt: new Date().toISOString(),
+        });
+        lastSavedPosition = watchedSeconds;
+      }
+      // Preserve the existing Telegram history signal, but do not let it stop local progress updates.
+      if (!historySaved && watchedSeconds >= 30) {
+        historySaved = true;
+        void fetch("/api/telegram/history", {
+          method: "POST",
+          credentials: "same-origin",
+          cache: "no-store",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ animeId, watchedSeconds }),
+        }).catch(() => undefined);
+      }
     };
     window.addEventListener("message", onKodikMessage);
     return () => window.removeEventListener("message", onKodikMessage);
-  }, [watchMode, kodikEmbedUrl, animeId]);
+  }, [watchMode, kodikEmbedUrl, animeId, anime, language, kodikEpisode]);
 
   useEffect(() => {
     let cancelled = false;
