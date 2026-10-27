@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import {
   Bookmark,
+  Bell,
   Check,
   ChevronDown,
   ChevronLeft,
@@ -94,6 +95,8 @@ function AnimeDetailPage() {
   const [showListNote, setShowListNote] = useState(false);
   const [saveSyncError, setSaveSyncError] = useState(false);
   const [authRequired, setAuthRequired] = useState(false);
+  const [episodeSubscribed, setEpisodeSubscribed] = useState(false);
+  const [subscriptionBusy, setSubscriptionBusy] = useState(false);
   const [watchMode, setWatchMode] = useState<"trailer" | "episodes">("trailer");
   const [screenshots, setScreenshots] = useState<ShikimoriScreenshot[]>([]);
   const [activeScreenshotIndex, setActiveScreenshotIndex] = useState<number | null>(null);
@@ -102,6 +105,22 @@ function AnimeDetailPage() {
   useEffect(() => {
     if (anime) document.title = displayAnimeTitle(anime, language) + (language === "en" ? " — watch anime | YUME" : " — смотреть аниме | YUME");
   }, [anime, language]);
+
+  useEffect(() => {
+    if (!anime || anime.status !== "Онгоинг") {
+      setEpisodeSubscribed(false);
+      return;
+    }
+    let cancelled = false;
+    fetch("/api/anime-subscriptions", { credentials: "same-origin", cache: "no-store" })
+      .then(async response => {
+        const payload = await response.json().catch(() => ({})) as { subscriptions?: string[] };
+        if (!cancelled && response.ok) setEpisodeSubscribed(Array.isArray(payload.subscriptions) && payload.subscriptions.includes(anime.id));
+      })
+      .catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [anime?.id, anime?.status]);
+
 
   const [kodikSources, setKodikSources] = useState<Array<{ id: string; title: string; episodes: Array<{ number: number; title: string; link: string }> }>>([]);
   const [kodikTranslationId, setKodikTranslationId] = useState("");
@@ -399,6 +418,41 @@ function AnimeDetailPage() {
     </button>
   );
 
+  const episodeSubscriptionButton = anime.status === "Онгоинг" ? (
+    <button
+      type="button"
+      disabled={subscriptionBusy}
+      onClick={async () => {
+        setSubscriptionBusy(true);
+        try {
+          const response = await fetch("/api/anime-subscriptions", {
+            method: episodeSubscribed ? "DELETE" : "POST",
+            credentials: "same-origin",
+            cache: "no-store",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ animeId: anime.id }),
+          });
+          const payload = await response.json().catch(() => ({})) as { error?: string; subscribed?: boolean };
+          if (response.status === 401) {
+            navigateToSection("login");
+            return;
+          }
+          if (!response.ok) throw new Error(payload.error ?? "subscription_failed");
+          setEpisodeSubscribed(payload.subscribed === true);
+        } catch {
+          setSaveSyncError(true);
+        } finally {
+          setSubscriptionBusy(false);
+        }
+      }}
+      aria-pressed={episodeSubscribed}
+      className="inline-flex items-center justify-center gap-2 rounded-full bg-secondary px-4 py-2.5 text-sm font-semibold ring-1 ring-border transition hover:bg-accent disabled:opacity-50"
+    >
+      <Bell className={`h-4 w-4 ${episodeSubscribed ? "fill-current text-primary" : ""}`} />
+      {episodeSubscribed ? (language === "en" ? "Following new episodes" : "Следить за новыми сериями · Вкл.") : (language === "en" ? "Follow new episodes" : "Следить за новыми сериями")}
+    </button>
+  ) : null;
+
   const listButton = (
     <button
       type="button"
@@ -511,6 +565,7 @@ function AnimeDetailPage() {
                   {watchButton}
                   {favoriteButton}
                   {listButton}
+                  {episodeSubscriptionButton}
                 </div>
                 {showListNote && (
                   <p className="mt-3 text-xs text-muted-foreground" aria-live="polite">
