@@ -179,7 +179,9 @@ export async function handleNotifications(request: Request): Promise<Response> {
       const values = USER_NOTIFICATIONS.flatMap((notification) => [userId, notification.id]);
       await db.prepare("INSERT OR IGNORE INTO yume_notification_reads (user_id, notification_id) VALUES " + placeholders).bind(...values).run();
     }
-    return json({ ok: true, authenticated: true, readIds: USER_NOTIFICATIONS.map((notification) => notification.id) });
+    await db.prepare("INSERT OR IGNORE INTO yume_notification_reads_v2(user_id,notification_id) SELECT ?,n.id FROM yume_notifications n WHERE n.active=1 AND (NOT EXISTS (SELECT 1 FROM yume_notification_targets t WHERE t.notification_id=n.id) OR EXISTS (SELECT 1 FROM yume_notification_targets t WHERE t.notification_id=n.id AND t.user_id=?))").bind(userId,userId).run();
+    const dynamicIds = await db.prepare("SELECT n.id FROM yume_notifications n WHERE n.active=1 AND (NOT EXISTS (SELECT 1 FROM yume_notification_targets t WHERE t.notification_id=n.id) OR EXISTS (SELECT 1 FROM yume_notification_targets t WHERE t.notification_id=n.id AND t.user_id=?))").bind(userId).all<{id:string}>();
+    return json({ ok: true, authenticated: true, readIds: [...USER_NOTIFICATIONS.map((notification) => notification.id), ...dynamicIds.results.map(n=>n.id)] });
   } catch (error) {
     console.error("[YUME][NOTIFICATIONS] Request failed.", error);
     return json({ error: "notifications_unavailable" }, 503);
