@@ -1,6 +1,63 @@
 import { describe, expect, it } from "vitest";
 import { ANIME } from "@/data/anime";
-import { selectRelatedAnime } from "@/data/catalog-details";
+import { mergeLiveAnimeDetails, selectRelatedAnime } from "@/data/catalog-details";
+
+describe("live anime detail merge", () => {
+  it("keeps the stored identity and poster while using fresh Shikimori metadata", () => {
+    const stored = {
+      ...ANIME[0]!,
+      id: "42",
+      title: "Stored title",
+      englishTitle: "Stored English title",
+      original: "Stored original",
+      posterUrl: "https://cdn.example/stored-poster.jpg",
+      rating: 7.1,
+      description: "Stale description",
+      status: "Онгоинг" as const,
+      nextEpisodeAt: "2026-10-25T12:00:00Z",
+      genres: ["Старый жанр"],
+    };
+    const live = {
+      ...stored,
+      title: "Live title",
+      englishTitle: "Live English title",
+      original: "Live original",
+      posterUrl: "https://cdn.example/live-poster.jpg",
+      rating: 8.9,
+      description: "Fresh description",
+      status: "Вышел" as const,
+      nextEpisodeAt: undefined,
+      genres: ["Новый жанр"],
+      episodesAired: 12,
+      airedOn: "2026-10-01",
+    };
+
+    expect(mergeLiveAnimeDetails(stored, live)).toMatchObject({
+      id: "42",
+      title: "Stored title",
+      englishTitle: "Stored English title",
+      original: "Stored original",
+      posterUrl: "https://cdn.example/stored-poster.jpg",
+      rating: 8.9,
+      description: "Fresh description",
+      status: "Вышел",
+      nextEpisodeAt: undefined,
+      genres: ["Новый жанр"],
+      episodesAired: 12,
+      airedOn: "2026-10-01",
+    });
+  });
+
+  it("uses live artwork and rating only when the stored values are missing", () => {
+    const stored = { ...ANIME[0]!, posterUrl: undefined, rating: null };
+    const live = { ...ANIME[0]!, posterUrl: "https://cdn.example/live.jpg", rating: 8.2 };
+
+    expect(mergeLiveAnimeDetails(stored, live)).toMatchObject({
+      posterUrl: "https://cdn.example/live.jpg",
+      rating: 8.2,
+    });
+  });
+});
 
 describe("related anime selection", () => {
   it("prioritizes shared genres before rating and excludes the current title", () => {
