@@ -589,7 +589,7 @@ export const getShikimoriAnimeDetails = createServerFn({ method: "GET" })
     }
     if (!details.anime) return { anime: null, relatedAnime: [], apiError: null };
 
-    let anime = details.anime;
+    let anime: Anime | null = details.anime;
     let apiError: string | null = null;
     try {
       const liveResult = await fetchShikimoriAnimes(validateRequest({
@@ -599,11 +599,16 @@ export const getShikimoriAnimeDetails = createServerFn({ method: "GET" })
       const liveAnime = liveResult.items.find((item) => item.id === data.animeId);
       if (liveAnime && !liveResult.error) {
         anime = mergeLiveAnimeDetails(details.anime, liveAnime);
-        await refreshPersistentAnimeIdentity({
-          id: anime.id,
-          rating: liveAnime.rating,
-          posterUrl: liveAnime.posterUrl,
-        });
+        try {
+          await refreshPersistentAnimeIdentity({
+            id: anime.id,
+            rating: liveAnime.rating,
+            posterUrl: liveAnime.posterUrl,
+          });
+        } catch (error) {
+          // A transient D1 write failure must not discard the fresh provider response.
+          console.error("[YUME] Failed to persist refreshed anime identity:", error);
+        }
       } else {
         apiError = liveResult.error ?? "Не удалось обновить данные из Shikimori.";
         anime = {
@@ -628,7 +633,7 @@ export const getShikimoriAnimeDetails = createServerFn({ method: "GET" })
       items: [anime, ...details.relatedAnime],
     }).items;
     const visibleById = new Map(filtered.map((item) => [item.id, item]));
-    anime = visibleById.get(anime.id) ?? null as never;
+    anime = visibleById.get(details.anime.id) ?? null;
     if (anime) {
       try {
         const { getAniListBannerByMalId } = await import("@/data/anilist-banner.server");
