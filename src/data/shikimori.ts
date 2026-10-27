@@ -1,7 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import type { Anime } from "@/data/anime";
 import { isNewRelease } from "@/data/anime-sections";
-import { getPersistentAnimeDetails, getPersistentCatalog, getPersistentAnimeScreenshots, savePersistentAnimeScreenshots, type CatalogResult, type CatalogSeedPageResult } from "@/data/catalog-d1.server";
+import { getPersistentAnimeDetails, getPersistentCatalog, getPersistentAnimeScreenshots, savePersistentAnimeScreenshots, refreshPersistentAnimeIdentity, type CatalogResult, type CatalogSeedPageResult } from "@/data/catalog-d1.server";
+import { isUpcomingEpisodeDate, mergeLiveAnimeDetails } from "@/data/catalog-details";
 import { retryAfterMilliseconds } from "@/data/retry-after";
 export { retryAfterMilliseconds };
 import { filterCatalogForCurrentRequest } from "@/data/territorial-restrictions.server";
@@ -306,7 +307,7 @@ export function mapAnime(item: ShikimoriGraphQLAnime): Anime {
     bannerUrl,
     kind: mapKind(item.kind),
     ageRating: mapAgeRating(item.rating),
-    nextEpisodeAt: item.nextEpisodeAt || undefined,
+    nextEpisodeAt: isUpcomingEpisodeDate(item.nextEpisodeAt || undefined) ? item.nextEpisodeAt || undefined : undefined,
     episodesAired,
     airedOn,
     studios: Array.from(new Set((item.studios ?? []).map((studio) => cleanName(studio.name)).filter(Boolean))),
@@ -562,10 +563,13 @@ export const getShikimoriCatalog = createServerFn({ method: "GET" })
   });
 
 
-/** Loads one anime and a bounded set of related titles directly from D1. */
+/**
+ * Loads stable identity from D1, then resolves changing metadata from Shikimori
+ * for the selected title. D1 remains the fallback when the provider is unavailable.
+ */
 export const getShikimoriAnimeDetails = createServerFn({ method: "GET" })
   .validator((input: { animeId?: unknown }) => ({
-    animeId: typeof input?.animeId === "string" && /^\d{1,12}$/.test(input.animeId)
+    animeId: typeof input?.animeId === "string" && /^\\d{1,12}$/.test(input.animeId)
       ? input.animeId
       : "",
   }))
@@ -583,27 +587,63 @@ export const getShikimoriAnimeDetails = createServerFn({ method: "GET" })
     if (!details) {
       return { ...empty, apiError: "Каталог недоступен: база данных D1 не подключена." };
     }
+    if (!details.anime) return { anime: null, relatedAnime: [], apiError: null };
 
-    const allItems = filterCatalogForCurrentRequest({
-      items: [...(details.anime ? [details.anime] : []), ...details.relatedAnime],
+    let anime = details.anime;
+    let apiError: string | null = null;
+    try {
+      const liveResult = await fetchShikimoriAnimes(validateRequest({
+        ids: data.animeId,
+        includeVideos: true,
+      }));
+      const liveAnime = liveResult.items.find((item) => item.id === data.animeId);
+      if (liveAnime && !liveResult.error) {
+        anime = mergeLiveAnimeDetails(details.anime, liveAnime);
+        await refreshPersistentAnimeIdentity({
+          id: anime.id,
+          rating: liveAnime.rating,
+          posterUrl: liveAnime.posterUrl,
+        });
+      } else {
+        apiError = liveResult.error ?? "Не удалось обновить данные из Shikimori.";
+        anime = {
+          ...details.anime,
+          nextEpisodeAt: isUpcomingEpisodeDate(details.anime.nextEpisodeAt)
+            ? details.anime.nextEpisodeAt
+            : undefined,
+        };
+      }
+    } catch (error) {
+      console.error("[YUME] Failed to refresh selected anime from Shikimori:", error);
+      apiError = "Не удалось обновить данные из Shikimori.";
+      anime = {
+        ...details.anime,
+        nextEpisodeAt: isUpcomingEpisodeDate(details.anime.nextEpisodeAt)
+          ? details.anime.nextEpisodeAt
+          : undefined,
+      };
+    }
+
+    const filtered = filterCatalogForCurrentRequest({
+      items: [anime, ...details.relatedAnime],
     }).items;
-    const visibleById = new Map(allItems.map((anime) => [anime.id, anime]));
-    const anime = details.anime ? visibleById.get(details.anime.id) ?? null : null;
+    const visibleById = new Map(filtered.map((item) => [item.id, item]));
+    anime = visibleById.get(anime.id) ?? null as never;
     if (anime) {
       try {
         const { getAniListBannerByMalId } = await import("@/data/anilist-banner.server");
         const aniListBanner = await getAniListBannerByMalId(anime.id);
         if (aniListBanner) anime.bannerUrl = aniListBanner;
       } catch {
-        // Keep the existing Shikimori image when AniList enrichment is unavailable.
+        // Keep the stored artwork when AniList enrichment is unavailable.
       }
     }
     return {
       anime,
       relatedAnime: details.relatedAnime
-        .map((anime) => visibleById.get(anime.id))
-        .filter((anime): anime is Anime => Boolean(anime)),
-      apiError: null,
+        .map((item) => visibleById.get(item.id))
+        .filter((item): item is Anime => Boolean(item)),
+      apiError,
     };
   });
 
