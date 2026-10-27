@@ -392,3 +392,46 @@ html.telegram-mini-app :where(button, a, [role="button"]) {
   }
 }
 
+
+
+/* Consistent tactile feedback across every YUME route, not only the home page. */
+:where(button, [role="button"], input[type="button"], input[type="submit"], input[type="reset"]) {
+  -webkit-tap-highlight-color: transparent;
+  transform-origin: center;
+  transition:
+    transform 120ms ease,
+    filter 150ms ease,
+    box-shadow 180ms ease,
+    background-color 150ms ease,
+    border-color 150ms ease;
+}
+
+:where(button, [role="button"], input[type="button"], input[type="submit"], input[type="reset"]):active:not(:disabled) {
+  transform: scale(0.975);
+  filter: brightness(1.06);
+}
+
+:where(button, [role="button"], input[type="button"], input[type="submit"], input[type="reset"]):disabled {
+  cursor: not-allowed;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  :where(button, [role="button"], input[type="button"], input[type="submit"], input[type="reset"]):hover:not(:disabled) {
+    filter: brightness(1.035);
+  }
+}
+
+/* Anime posters get a slightly more noticeable press and a restrained hover lift. */
+button.yume-tactile-control:has(.aspect-\\[2\\/3\\]) {
+  transition: transform 150ms ease, filter 150ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :where(button, [role="button"], input[type="button"], input[type="submit"], input[type="reset"]) {
+    transition: none !important;
+  }
+  :where(button, [role="button"], input[type="button"], input[type="submit"], input[type="reset"]):active:not(:disabled) {
+    transform: none;
+    filter: none;
+  }
+}
