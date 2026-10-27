@@ -640,6 +640,7 @@ function AnimeDetailPage() {
                     {watchButton}
                     {favoriteButton}
                     {listButton}
+                    {episodeSubscriptionButton}
                   </div>
                 </div>
               </div>
