@@ -2,6 +2,7 @@ import "./lib/error-capture";
 import { applySecurityHeaders } from "./lib/security-headers";
 import { redirectHttpToHttps } from "./lib/https-redirect";
 import { handleShikimoriImageProxy } from "./lib/shikimori-image-proxy";
+import { enforceRateLimit } from "./lib/rate-limit";
 import { env as cloudflareEnv } from "cloudflare:workers";
 
 import { consumeLastCapturedError } from "./lib/error-capture";
@@ -215,12 +216,29 @@ export default {
 
     const requestUrl = new URL(request.url);
     if (requestUrl.pathname === "/api/media/shikimori") {
-      const response = request.method === "GET"
-        ? await handleShikimoriImageProxy(requestUrl.searchParams.get("src"))
-        : new Response("Method not allowed.", {
-            status: 405,
-            headers: { Allow: "GET", "Cache-Control": "no-store" },
+      let response: Response;
+      if (request.method !== "GET") {
+        response = new Response("Method not allowed.", {
+          status: 405,
+          headers: { Allow: "GET", "Cache-Control": "no-store" },
+        });
+      } else {
+        const bindings = env && typeof env === "object" ? env as Record<string, unknown> : {};
+        const rateLimit = await enforceRateLimit(bindings.MEDIA_RATE_LIMITER, request, "media");
+        if (rateLimit === "limited") {
+          response = new Response("Too many image requests. Please try again in a minute.", {
+            status: 429,
+            headers: { "Cache-Control": "private, no-store", "Retry-After": "60", "X-Content-Type-Options": "nosniff" },
           });
+        } else if (rateLimit !== "allowed") {
+          response = new Response("Rate limiting is temporarily unavailable.", {
+            status: 503,
+            headers: { "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" },
+          });
+        } else {
+          response = await handleShikimoriImageProxy(requestUrl.searchParams.get("src"));
+        }
+      }
       return applySecurityHeaders(response, request.url);
     }
 
