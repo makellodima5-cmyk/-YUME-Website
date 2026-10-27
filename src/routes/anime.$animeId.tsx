@@ -449,7 +449,7 @@ function AnimeDetailPage() {
       className="inline-flex items-center justify-center gap-2 rounded-full bg-secondary px-4 py-2.5 text-sm font-semibold ring-1 ring-border transition hover:bg-accent disabled:opacity-50"
     >
       <Bell className={`h-4 w-4 ${episodeSubscribed ? "fill-current text-primary" : ""}`} />
-      {episodeSubscribed ? (language === "en" ? "Following new episodes" : "Следить за новыми сериями · Вкл.") : (language === "en" ? "Follow new episodes" : "Следить за новыми сериями")}
+      {language === "en" ? "Follow new episodes" : "Следить за новыми сериями"}
     </button>
   ) : null;
 
