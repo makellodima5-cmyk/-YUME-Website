@@ -6,6 +6,7 @@ export type PlaybackProgressEntry = {
   episode: number;
   positionSeconds: number;
   durationSeconds: number | null;
+  completed: boolean;
   updatedAt: string;
 };
 
@@ -22,9 +23,10 @@ function normalizeEntry(value: unknown): PlaybackProgressEntry | null {
   if (item.durationSeconds !== null && item.durationSeconds !== undefined &&
       (!Number.isFinite(item.durationSeconds) || item.durationSeconds <= 0)) return null;
   if (typeof item.updatedAt !== "string" || !Number.isFinite(Date.parse(item.updatedAt))) return null;
+
   const duration = item.durationSeconds ?? null;
   const position = item.positionSeconds ?? 0;
-  if (duration !== null && position / duration >= 0.95) return null;
+  const inferredCompleted = duration !== null && position / duration >= 0.95;
   return {
     animeId: item.animeId,
     title: item.title.trim().slice(0, 240),
@@ -33,6 +35,7 @@ function normalizeEntry(value: unknown): PlaybackProgressEntry | null {
     episode: item.episode ?? 1,
     positionSeconds: duration === null ? position : Math.min(position, duration),
     durationSeconds: duration,
+    completed: item.completed === true || inferredCompleted,
     updatedAt: item.updatedAt,
   };
 }
@@ -56,33 +59,34 @@ function writeProgress(entries: PlaybackProgressEntry[]): void {
   try {
     window.localStorage.setItem(PLAYBACK_PROGRESS_STORAGE_KEY, JSON.stringify(entries));
   } catch {
-    // Continue watching is a convenience feature; storage can be unavailable or full.
+    // The episode indicators remain best-effort if browser storage is unavailable or full.
   }
   window.dispatchEvent(new Event(PLAYBACK_PROGRESS_UPDATED_EVENT));
 }
 
+/** Stores progress separately for each anime episode, retaining completion markers. */
 export function savePlaybackProgress(entry: PlaybackProgressEntry): void {
   if (typeof window === "undefined") return;
-  const duration = entry.durationSeconds;
-  const isCompleted = duration !== null && duration > 0 && entry.positionSeconds / duration >= 0.95;
-  const current = readPlaybackProgress().filter((item) => item.animeId !== entry.animeId);
-  if (!isCompleted) {
-    const normalized = normalizeEntry(entry);
-    if (normalized) current.unshift(normalized);
-  }
-  writeProgress(current.slice(0, 50));
+  const normalized = normalizeEntry(entry);
+  if (!normalized) return;
+  const current = readPlaybackProgress().filter(
+    (item) => item.animeId !== normalized.animeId || item.episode !== normalized.episode,
+  );
+  current.unshift(normalized);
+  writeProgress(current.slice(0, 500));
 }
 
-export function removePlaybackProgress(animeId: string): void {
-  if (typeof window === "undefined") return;
-  writeProgress(readPlaybackProgress().filter((item) => item.animeId !== animeId));
-}
-
-export function formatPlaybackTime(seconds: number): string {
-  const safeSeconds = Math.max(0, Math.floor(seconds));
-  const hours = Math.floor(safeSeconds / 3600);
-  const minutes = Math.floor((safeSeconds % 3600) / 60);
-  const remainingSeconds = safeSeconds % 60;
-  if (hours > 0) return hours + ":" + String(minutes).padStart(2, "0") + ":" + String(remainingSeconds).padStart(2, "0");
-  return minutes + ":" + String(remainingSeconds).padStart(2, "0");
+/** Marks an episode as completed without discarding its history. */
+export function markPlaybackEpisodeCompleted(entry: Omit<PlaybackProgressEntry, "completed" | "updatedAt">): void {
+  const existing = readPlaybackProgress().find(
+    (item) => item.animeId === entry.animeId && item.episode === entry.episode,
+  );
+  savePlaybackProgress({
+    ...existing,
+    ...entry,
+    positionSeconds: existing?.positionSeconds ?? entry.positionSeconds,
+    durationSeconds: entry.durationSeconds ?? existing?.durationSeconds ?? null,
+    completed: true,
+    updatedAt: new Date().toISOString(),
+  });
 }
