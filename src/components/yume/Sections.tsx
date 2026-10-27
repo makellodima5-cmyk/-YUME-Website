@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Play, Search, Shuffle, SlidersHorizontal, X } from "lucide-react";
-import heroArtwork from "@/assets/yume-hero-desktop-new.png.PNG";
-import mobileHeroArtwork from "@/assets/yume-hero-mobile-new.png.PNG";
+import heroArtwork from "@/assets/yume-desktop.webp";
+import mobileHeroArtwork from "@/assets/yume-mobile.webp";
 import { type Anime, CONTINUE, COLLECTIONS, byId } from "@/data/anime";
 import { AnimeCard, PosterArt } from "./Poster";
 import { CatalogFilters, type CatalogFiltersValue } from "./CatalogFilters";
@@ -67,8 +67,8 @@ export function Hero({
         <img
         src={heroArtwork}
         alt={t("hero.artAlt")}
-        width={2048}
-        height={1024}
+        width={1600}
+        height={640}
         fetchPriority="high"
         className="absolute inset-0 h-full w-full object-cover object-[58%_center] md:object-center"
         />
