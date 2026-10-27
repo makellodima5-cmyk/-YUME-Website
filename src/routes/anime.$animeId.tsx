@@ -239,7 +239,7 @@ function AnimeDetailPage() {
       }
       if (!payload || typeof payload !== "object") return;
       const message = payload as Record<string, unknown>;
-      const messageType = String(message.type ?? message.event ?? message.name ?? message.key ?? "").toLowerCase();
+      const messageType = [message.type, message.event, message.name, message.key].map((value) => String(value ?? "").toLowerCase()).join(" ");
       const progressEntry = {
         animeId,
         title: displayAnimeTitle(anime, language),
@@ -247,7 +247,7 @@ function AnimeDetailPage() {
         ...((anime.bannerUrl || anime.posterUrl) ? { posterUrl: anime.bannerUrl || anime.posterUrl } : {}),
         episode: kodikEpisode,
       };
-      if (messageType.includes("ended") || messageType === "end" || messageType.endsWith("_end") || messageType.includes("video_end")) {
+      if (messageType.includes("ended") || messageType.endsWith(" end") || messageType.endsWith("_end") || messageType.includes("video_end") || messageType.includes("complete")) {
         markPlaybackEpisodeCompleted({
           ...progressEntry,
           positionSeconds: 0,
