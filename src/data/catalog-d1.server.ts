@@ -298,6 +298,26 @@ export async function getPersistentAnimeDetails(id: string): Promise<{ anime: An
   };
 }
 
+/**
+ * Refresh only the durable identity fields that should remain in D1.
+ * The detail response itself is composed from the live Shikimori record.
+ */
+export async function refreshPersistentAnimeIdentity(anime: Pick<Anime, "id" | "rating" | "posterUrl">): Promise<void> {
+  const db = database();
+  if (!db) return;
+  await ensureSchema(db);
+  await db.prepare(`
+    UPDATE anime_catalog
+    SET
+      rating = COALESCE(?, rating),
+      popular = CASE WHEN ? IS NULL THEN popular WHEN ? >= 8.5 THEN 1 ELSE 0 END,
+      poster_url = CASE WHEN poster_url IS NULL OR TRIM(poster_url) = '' THEN COALESCE(?, poster_url) ELSE poster_url END,
+      updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `).bind(anime.rating ?? null, anime.rating ?? null, anime.rating ?? null, anime.posterUrl ?? null, anime.id).run();
+  await invalidatePersistentCatalogCache();
+}
+
 function rowValues(item: Anime, position: number): unknown[] {
   return [
     item.id,
