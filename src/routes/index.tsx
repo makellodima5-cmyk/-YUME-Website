@@ -1472,9 +1472,9 @@ function Index() {
 
             <div className="mb-4 flex items-center justify-between rounded-xl border border-border bg-card/50 px-3 py-2.5">
               <span className="text-sm text-muted-foreground">{language === "ru" ? "Всего уведомлений" : "Total notifications"}</span>
-              <span className="font-semibold tabular-nums">{USER_NOTIFICATIONS.filter((item) => !notificationDismissedIds.includes(item.id)).length}</span>
+              <span className="font-semibold tabular-nums">{notificationItems.filter((item) => !notificationDismissedIds.includes(item.id)).length}</span>
               <span className="text-sm text-muted-foreground">{language === "ru" ? "Непрочитано" : "Unread"}</span>
-              <span className={`font-semibold tabular-nums ${notificationItems.some((item) => !notificationReadIds.includes(item.id)) ? "text-red-400" : "text-emerald-400"}`}>{USER_NOTIFICATIONS.filter((item) => !notificationReadIds.includes(item.id)).length}</span>
+              <span className={`font-semibold tabular-nums ${notificationItems.some((item) => !notificationReadIds.includes(item.id)) ? "text-red-400" : "text-emerald-400"}`}>{notificationItems.filter((item) => !notificationDismissedIds.includes(item.id) && !notificationReadIds.includes(item.id)).length}</span>
             </div>
 
             {notificationActionMessage && <p role="status" className="mb-4 rounded-xl border border-border bg-card/60 px-3 py-2.5 text-sm text-muted-foreground">{notificationActionMessage}</p>}
@@ -1487,7 +1487,7 @@ function Index() {
               </div>
             ) : (
               <div className="space-y-3">
-                {USER_NOTIFICATIONS.filter((item) => !notificationDismissedIds.includes(item.id)).map((item) => {
+                {notificationItems.filter((item) => !notificationDismissedIds.includes(item.id)).map((item) => {
                   const unread = !notificationReadIds.includes(item.id);
                   const expanded = expandedNotificationIds.includes(item.id);
                   const swipeOffset = notificationSwipe?.id === item.id ? notificationSwipe.offset : 0;
