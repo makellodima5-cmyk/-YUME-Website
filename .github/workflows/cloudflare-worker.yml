@@ -78,6 +78,21 @@ jobs:
           if (!Array.isArray(rootConfig.triggers?.crons) || !rootConfig.triggers.crons.includes("* * * * *")) {
             throw new Error("Root Wrangler config does not include the expected per-minute Cron trigger.");
           }
+          const expectedRateLimits = [
+            { name: "KODIK_RATE_LIMITER", namespaceId: "202610271", limit: 30, period: 60 },
+            { name: "MEDIA_RATE_LIMITER", namespaceId: "202610272", limit: 600, period: 60 },
+          ];
+          for (const expected of expectedRateLimits) {
+            const binding = (rootConfig.ratelimits ?? []).find((item) => item.name === expected.name);
+            if (
+              !binding ||
+              binding.namespace_id !== expected.namespaceId ||
+              binding.simple?.limit !== expected.limit ||
+              binding.simple?.period !== expected.period
+            ) {
+              throw new Error(`Root Wrangler config is missing the expected ${expected.name} rate-limit binding.`);
+            }
+          }
           if (!Array.isArray(config.triggers?.crons) || !config.triggers.crons.includes("* * * * *")) {
             throw new Error("Generated Nitro Wrangler config does not preserve the expected Cron trigger.");
           }
