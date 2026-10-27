@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ANIME } from "@/data/anime";
-import { mergeLiveAnimeDetails, selectRelatedAnime } from "@/data/catalog-details";
+import { isUpcomingEpisodeDate, mergeLiveAnimeDetails, selectRelatedAnime } from "@/data/catalog-details";
 
 describe("live anime detail merge", () => {
   it("keeps the stored identity and poster while using fresh Shikimori metadata", () => {
@@ -56,6 +56,20 @@ describe("live anime detail merge", () => {
       posterUrl: "https://cdn.example/live.jpg",
       rating: 8.2,
     });
+  });
+});
+
+describe("next episode date validation", () => {
+  it("rejects past timestamps and accepts future timestamps", () => {
+    const now = Date.parse("2026-10-28T12:00:00Z");
+    expect(isUpcomingEpisodeDate("2026-10-25T12:00:00Z", now)).toBe(false);
+    expect(isUpcomingEpisodeDate("2026-10-29T12:00:00Z", now)).toBe(true);
+  });
+
+  it("keeps date-only releases through the end of their calendar day", () => {
+    const now = Date.parse("2026-10-28T23:00:00Z");
+    expect(isUpcomingEpisodeDate("2026-10-28", now)).toBe(true);
+    expect(isUpcomingEpisodeDate("2026-10-27", now)).toBe(false);
   });
 });
 
