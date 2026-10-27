@@ -6,16 +6,43 @@ type TelegramEnvironment = Record<string, unknown> & {
   TELEGRAM_WEBHOOK_SECRET?: string;
   TELEGRAM_ALLOWED_USERNAMES?: string;
 };
+type TelegramUser = {
+  id?: number;
+  first_name?: string;
+  last_name?: string;
+  username?: string;
+  language_code?: string;
+};
 type TelegramUpdate = {
-  message?: {
-    text?: string;
-    chat?: { id?: number };
-    from?: { id?: number; first_name?: string; last_name?: string; username?: string; language_code?: string };
+  message?: { text?: string; chat?: { id?: number }; from?: TelegramUser };
+  callback_query?: {
+    id?: string;
+    data?: string;
+    from?: TelegramUser;
+    message?: { message_id?: number; chat?: { id?: number } };
   };
 };
 type RuntimeGlobal = typeof globalThis & { __YUME_RUNTIME_ENV__?: unknown };
 
 const SITE_URL = "https://yume-website.yumesupport833.workers.dev";
+const PLAYER_HELP_CALLBACK = "yume_player_help";
+const PLAYER_HELP_MESSAGE = `<b>🛠 Не работает плеер?</b>
+
+Если у тебя не открывается плеер или мини-приложение, попробуй следующие шаги:
+
+<b>1. Открой YUME в браузере</b>
+Иногда доступ через Telegram может быть ограничен. Попробуй открыть сайт в обычном браузере.
+
+<b>2. Попробуй отключить VPN</b>
+Некоторые VPN могут мешать загрузке сайта или видеоплеера. Временно отключи VPN и обнови страницу.
+
+<b>3. Обнови страницу</b>
+Если сайт или плеер не загрузился, обнови страницу или открой её заново.
+
+<b>4. Попробуй другой браузер</b>
+Если проблема осталась, проверь сайт в Safari, Chrome или Firefox.
+
+💡 Если после этого плеер всё ещё не работает, доступ к сайту или плееру может быть ограничен в твоей сети или регионе.`;
 
 function environment(): TelegramEnvironment {
   try {
@@ -35,23 +62,27 @@ function json(payload: unknown, status = 200): Response {
   });
 }
 
+async function telegramApi(token: string, method: string, payload: Record<string, unknown>): Promise<Response> {
+  return fetch(`https://api.telegram.org/bot${token}/${method}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    signal: AbortSignal.timeout(5_000),
+    body: JSON.stringify(payload),
+  });
+}
+
 export async function handleTelegramWebhook(request: Request): Promise<Response> {
-  if (request.method !== "POST") {
-    return json({ ok: false, error: "Method not allowed" }, 405);
-  }
+  if (request.method !== "POST") return json({ ok: false, error: "Method not allowed" }, 405);
 
   const env = environment();
   const token = typeof env.TELEGRAM_BOT_TOKEN === "string" ? env.TELEGRAM_BOT_TOKEN.trim() : "";
   const secret = typeof env.TELEGRAM_WEBHOOK_SECRET === "string" ? env.TELEGRAM_WEBHOOK_SECRET.trim() : "";
   const allowedUsernames = (typeof env.TELEGRAM_ALLOWED_USERNAMES === "string" ? env.TELEGRAM_ALLOWED_USERNAMES : "")
-    .split(",")
-    .map((username) => username.trim().replace(/^@/, "").toLowerCase())
-    .filter(Boolean);
+    .split(",").map((username) => username.trim().replace(/^@/, "").toLowerCase()).filter(Boolean);
   if (!token || !secret || allowedUsernames.length === 0) {
     console.error("[YUME][TELEGRAM_BOT] Missing TELEGRAM_BOT_TOKEN, TELEGRAM_WEBHOOK_SECRET, or TELEGRAM_ALLOWED_USERNAMES.");
     return json({ ok: false, error: "Webhook is not configured" }, 503);
   }
-
   if (request.headers.get("X-Telegram-Bot-Api-Secret-Token") !== secret) {
     console.warn("[YUME][TELEGRAM_BOT] Rejected webhook request: secret token mismatch.");
     return json({ ok: false, error: "Unauthorized" }, 401);
@@ -62,21 +93,50 @@ export async function handleTelegramWebhook(request: Request): Promise<Response>
     const raw = await request.text();
     if (raw.length > 65_536) return json({ ok: false, error: "Request too large" }, 413);
     const parsed: unknown = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      return json({ ok: false, error: "Invalid update" }, 400);
-    }
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return json({ ok: false, error: "Invalid update" }, 400);
     update = parsed as TelegramUpdate;
   } catch {
     return json({ ok: false, error: "Invalid JSON" }, 400);
   }
 
+  const callback = update.callback_query;
+  if (callback) {
+    const username = callback.from?.username?.trim().replace(/^@/, "").toLowerCase() ?? "";
+    if (!username || !allowedUsernames.includes(username)) return json({ ok: true, ignored: true });
+    if (callback.data !== PLAYER_HELP_CALLBACK || typeof callback.id !== "string" ||
+      typeof callback.message?.message_id !== "number" || !Number.isSafeInteger(callback.message.message_id) ||
+      typeof callback.message.chat?.id !== "number" || !Number.isSafeInteger(callback.message.chat.id)) {
+      return json({ ok: true, ignored: true });
+    }
+    try {
+      const answer = await telegramApi(token, "answerCallbackQuery", { callback_query_id: callback.id });
+      if (!answer.ok) console.error("[YUME][TELEGRAM_BOT] Telegram answerCallbackQuery failed.", { status: answer.status });
+      const response = await telegramApi(token, "editMessageText", {
+        chat_id: callback.message.chat.id,
+        message_id: callback.message.message_id,
+        text: PLAYER_HELP_MESSAGE,
+        parse_mode: "HTML",
+        reply_markup: { inline_keyboard: [[{ text: "🌐 Открыть YUME в браузере", url: SITE_URL }]] },
+      });
+      if (!response.ok) {
+        console.error("[YUME][TELEGRAM_BOT] Telegram editMessageText failed.", {
+          status: response.status, response: (await response.text()).slice(0, 500),
+        });
+        return json({ ok: false, error: "Could not update help message" }, 502);
+      }
+      return json({ ok: true, action: "player_help_shown" });
+    } catch (error) {
+      console.error("[YUME][TELEGRAM_BOT] Telegram player-help action failed.", {
+        message: error instanceof Error ? error.message : String(error),
+      });
+      return json({ ok: false, error: "Telegram API request failed" }, 502);
+    }
+  }
+
   const message = update.message;
   const senderUsername = message?.from?.username?.trim().replace(/^@/, "").toLowerCase() ?? "";
-  // Fail closed: Telegram usernames are used as requested, but users without a
-  // username or outside the Cloudflare allowlist cannot invoke any bot action.
-  if (!senderUsername || !allowedUsernames.includes(senderUsername)) {
-    return json({ ok: true, ignored: true });
-  }
+  // Keep the existing fail-closed username allowlist for every bot action.
+  if (!senderUsername || !allowedUsernames.includes(senderUsername)) return json({ ok: true, ignored: true });
 
   const text = message?.text?.trim() ?? "";
   const chatId = message?.chat?.id;
@@ -87,11 +147,7 @@ export async function handleTelegramWebhook(request: Request): Promise<Response>
   }
 
   const firstName = message?.from?.first_name?.trim();
-  const safeFirstName = (firstName || "друг")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+  const safeFirstName = (firstName || "друг").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   let greeting = `<b>🌙 Привет, ${safeFirstName}! Добро пожаловать в YUME.</b>
 
 Знаешь, иногда одна история может изменить всё.
@@ -112,77 +168,59 @@ export async function handleTelegramWebhook(request: Request): Promise<Response>
 
 🌌 <b>Ну что, ${safeFirstName}, готов найти свою следующую историю?</b>
 
-Нажимай на кнопку ниже — и давай начнём ✨`;
+Нажимай на кнопку ниже — и давай начнём ✨
+
+<b>🔗 Не работает плеер?</b>`;
   let browserLogin = false;
   const startPayload = isStartCommand ? (text.split(/\s+/)[1] ?? "") : "";
   if (isStartCommand && startPayload.startsWith("yb_")) {
     const sender = message?.from;
-    if (typeof sender?.id !== "number" || !Number.isSafeInteger(sender.id) || !sender.first_name?.trim()) {
-      return json({ ok: true, ignored: true });
-    }
+    if (typeof sender?.id !== "number" || !Number.isSafeInteger(sender.id) || !sender.first_name?.trim()) return json({ ok: true, ignored: true });
     browserLogin = true;
     const result = await completeTelegramBrowserAuth(startPayload, {
-      id: sender.id,
-      firstName: sender.first_name.trim(),
+      id: sender.id, firstName: sender.first_name.trim(),
       ...(sender.last_name?.trim() ? { lastName: sender.last_name.trim() } : {}),
       ...(sender.username?.trim() ? { username: sender.username.trim() } : {}),
       ...(sender.language_code?.trim() ? { languageCode: sender.language_code.trim() } : {}),
     });
     greeting = result === "awaiting_code"
       ? "🔐 Чтобы завершить вход, отправь сюда 8-символьный код, показанный на странице YUME в браузере. Не отправляй код другим людям."
-      : result === "account_not_found"
-        ? "Аккаунт YUME не найден. Открой сайт, выбери «Регистрация» и повтори попытку."
-        : result === "consent_required"
-          ? "Для регистрации нужно принять оба документа на сайте YUME. Вернись на сайт, отметь оба флажка и начни регистрацию заново."
-          : result === "already_registered"
-            ? "Этот Telegram уже зарегистрирован. Открой сайт и выбери «Вход»."
-          : result === "expired"
-            ? "Ссылка авторизации истекла или уже использована. Вернись на сайт YUME и начни вход заново."
-            : "Не удалось завершить авторизацию. Вернись на сайт YUME и попробуй ещё раз.";
+      : result === "account_not_found" ? "Аккаунт YUME не найден. Открой сайт, выбери «Регистрация» и повтори попытку."
+      : result === "consent_required" ? "Для регистрации нужно принять оба документа на сайте YUME. Вернись на сайт, отметь оба флажка и начни регистрацию заново."
+      : result === "already_registered" ? "Этот Telegram уже зарегистрирован. Открой сайт и выбери «Вход»."
+      : result === "expired" ? "Ссылка авторизации истекла или уже использована. Вернись на сайт YUME и начни вход заново."
+      : "Не удалось завершить авторизацию. Вернись на сайт YUME и попробуй ещё раз.";
   } else if (isConfirmationCode) {
     const sender = message?.from;
-    if (typeof sender?.id !== "number" || !Number.isSafeInteger(sender.id) || !sender.first_name?.trim()) {
-      return json({ ok: true, ignored: true });
-    }
+    if (typeof sender?.id !== "number" || !Number.isSafeInteger(sender.id) || !sender.first_name?.trim()) return json({ ok: true, ignored: true });
     browserLogin = true;
     const result = await confirmTelegramBrowserAuth(text, {
-      id: sender.id,
-      firstName: sender.first_name.trim(),
+      id: sender.id, firstName: sender.first_name.trim(),
       ...(sender.last_name?.trim() ? { lastName: sender.last_name.trim() } : {}),
       ...(sender.username?.trim() ? { username: sender.username.trim() } : {}),
       ...(sender.language_code?.trim() ? { languageCode: sender.language_code.trim() } : {}),
     });
-    greeting = result === "ready"
-      ? "✅ Код подтверждён! Вернись во вкладку браузера YUME — вход завершится автоматически."
-      : result === "account_not_found"
-        ? "Аккаунт YUME не найден. Открой сайт, выбери «Регистрация» и повтори попытку."
-        : result === "consent_required"
-          ? "Для регистрации нужно принять оба документа на сайте YUME. Вернись на сайт, отметь оба флажка и начни регистрацию заново."
-          : result === "already_registered"
-            ? "Этот Telegram уже зарегистрирован. Открой сайт и выбери «Вход»."
-          : result === "expired"
-            ? "Код неверный, истёк или не относится к этому Telegram. Вернись на сайт YUME и начни авторизацию заново."
-            : "Не удалось завершить авторизацию. Вернись на сайт YUME и попробуй ещё раз.";
+    greeting = result === "ready" ? "✅ Код подтверждён! Вернись во вкладку браузера YUME — вход завершится автоматически."
+      : result === "account_not_found" ? "Аккаунт YUME не найден. Открой сайт, выбери «Регистрация» и повтори попытку."
+      : result === "consent_required" ? "Для регистрации нужно принять оба документа на сайте YUME. Вернись на сайт, отметь оба флажка и начни регистрацию заново."
+      : result === "already_registered" ? "Этот Telegram уже зарегистрирован. Открой сайт и выбери «Вход»."
+      : result === "expired" ? "Код неверный, истёк или не относится к этому Telegram. Вернись на сайт YUME и начни авторизацию заново."
+      : "Не удалось завершить авторизацию. Вернись на сайт YUME и попробуй ещё раз.";
   }
 
   try {
-    const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      signal: AbortSignal.timeout(5_000),
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: greeting,
-        parse_mode: "HTML",
-        reply_markup: browserLogin
-          ? { inline_keyboard: [[{ text: "🌸 Открыть YUME", url: SITE_URL }]] }
-          : { inline_keyboard: [[{ text: "🎬 Открыть YUME", web_app: { url: SITE_URL } }]] },
-      }),
+    const response = await telegramApi(token, "sendMessage", {
+      chat_id: chatId, text: greeting, parse_mode: "HTML",
+      reply_markup: browserLogin
+        ? { inline_keyboard: [[{ text: "🌸 Открыть YUME", url: SITE_URL }]] }
+        : { inline_keyboard: [
+            [{ text: "🎬 Открыть YUME", web_app: { url: SITE_URL } }],
+            [{ text: "🛠 Не работает плеер?", callback_data: PLAYER_HELP_CALLBACK }],
+          ] },
     });
     if (!response.ok) {
       console.error("[YUME][TELEGRAM_BOT] Telegram sendMessage failed.", {
-        status: response.status,
-        response: (await response.text()).slice(0, 500),
+        status: response.status, response: (await response.text()).slice(0, 500),
       });
       return json({ ok: false, error: "Could not send welcome message" }, 502);
     }
