@@ -343,6 +343,11 @@ function Index() {
   const [adminStats, setAdminStats] = useState<AdminTrailerStats | null>(null);
   const [adminRunning, setAdminRunning] = useState(false);
   const [adminMessage, setAdminMessage] = useState("");
+  const [notificationDraftTitle, setNotificationDraftTitle] = useState("");
+  const [notificationDraftBody, setNotificationDraftBody] = useState("");
+  const [notificationDraftTarget, setNotificationDraftTarget] = useState("");
+  const [notificationPublishBusy, setNotificationPublishBusy] = useState(false);
+  const [notificationItems, setNotificationItems] = useState<Array<{id:string;publishedAt:string;title:{ru:string;en:string};description:{ru:string;en:string};targetUrl?:string|null;dynamic?:boolean}>>([...USER_NOTIFICATIONS]);
   const [notificationReadIds, setNotificationReadIds] = useState<string[]>([]);
   const [notificationDismissedIds, setNotificationDismissedIds] = useState<string[]>([]);
   const notificationPointerStart = useRef<{ id: string; x: number; y: number; pointerId: number; startOffset: number } | null>(null);
@@ -374,7 +379,7 @@ function Index() {
   const [adminAuditLog, setAdminAuditLog] = useState<{id:number;action:string;status:string;details:Record<string,unknown>;created_at:string}[]>([]);
   const [maintenanceBusy, setMaintenanceBusy] = useState(false);
   const [maintenanceMessage, setMaintenanceMessage] = useState("");
-  const [expandedAdminSections, setExpandedAdminSections] = useState({import:false,metadata:false,quality:false,maintenance:false,audit:false,trailers:false});
+  const [expandedAdminSections, setExpandedAdminSections] = useState({import:false,metadata:false,quality:false,maintenance:false,audit:false,trailers:false,notifications:true});
   const [analyticsData, setAnalyticsData] = useState<{periods:{hours:{visits:number;visitors:number};week:{visits:number;visitors:number};month:{visits:number;visitors:number};all:{visits:number;visitors:number}};daily:{date:string;visits:number;pageViews:number;visitors:number}[];updatedAt:string}|null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [analyticsError, setAnalyticsError] = useState("");
@@ -402,16 +407,18 @@ function Index() {
           cache: "no-store",
         });
         if (!response.ok) throw new Error("Notification state unavailable");
-        const payload = await response.json() as { authenticated?: boolean; readIds?: unknown; dismissedIds?: unknown };
+        const payload = await response.json() as { authenticated?: boolean; readIds?: unknown; dismissedIds?: unknown; notifications?: unknown };
         if (cancelled) return;
         const ids = Array.isArray(payload.readIds)
           ? payload.readIds.filter((id): id is string => typeof id === "string")
           : [];
         if (payload.authenticated === true) {
+          if (Array.isArray(payload.notifications)) setNotificationItems(payload.notifications.filter((item): item is {id:string;publishedAt:string;title:{ru:string;en:string};description:{ru:string;en:string};targetUrl?:string|null;dynamic?:boolean} => Boolean(item && typeof item === "object" && typeof (item as {id?:unknown}).id === "string" && typeof (item as {title?:unknown}).title === "object" && typeof (item as {description?:unknown}).description === "object")));
           setNotificationReadIds(ids);
           setNotificationDismissedIds(Array.isArray(payload.dismissedIds) ? payload.dismissedIds.filter((id): id is string => typeof id === "string") : []);
           setNotificationRemoteAccount(true);
         } else {
+          setNotificationItems([...USER_NOTIFICATIONS]);
           setNotificationReadIds([]);
           setNotificationDismissedIds([]);
           setNotificationRemoteAccount(false);
@@ -419,6 +426,7 @@ function Index() {
         setNotificationStateLoaded(true);
       } catch {
         if (cancelled) return;
+        setNotificationItems([...USER_NOTIFICATIONS]);
         setNotificationReadIds([]);
         setNotificationDismissedIds([]);
         setNotificationRemoteAccount(false);
@@ -711,7 +719,7 @@ function Index() {
 
   const markAllNotificationsRead = async () => {
     if (notificationActionBusy) return;
-    const allIds = USER_NOTIFICATIONS.map((item) => item.id);
+    const allIds = notificationItems.map((item) => item.id);
     setNotificationActionBusy(true);
     setNotificationActionMessage("");
     try {
@@ -1328,7 +1336,7 @@ function Index() {
     <div className="relative isolate min-h-screen pb-8">
       {view === "home" && <HomeDepthAtmosphere />}
       <div className="relative z-10">
-      <Header view={view} setView={setView} onProfile={() => setView(telegramAuthReady ? "profile" : "login")} isAdmin={isAdmin} unreadNotificationCount={notificationStateLoaded && notificationRemoteAccount ? USER_NOTIFICATIONS.filter((item) => !notificationReadIds.includes(item.id) && !notificationDismissedIds.includes(item.id)).length : 0} />
+      <Header view={view} setView={setView} onProfile={() => setView(telegramAuthReady ? "profile" : "login")} isAdmin={isAdmin} unreadNotificationCount={notificationStateLoaded && notificationRemoteAccount ? notificationItems.filter((item) => !notificationReadIds.includes(item.id) && !notificationDismissedIds.includes(item.id)).length : 0} />
       {isTelegramMiniApp && telegramConsentRequired && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-background/85 px-4 py-6 backdrop-blur-md" role="dialog" aria-modal="true" aria-labelledby="telegram-consent-title">
           <section className="w-full max-w-md rounded-3xl border border-border bg-card p-6 shadow-2xl sm:p-8">
@@ -1456,7 +1464,7 @@ function Index() {
                 <h1 className="text-3xl font-bold tracking-tight text-foreground">{language === "ru" ? "Уведомления" : "Notifications"}</h1>
                 <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">{language === "ru" ? "Здесь собраны новости о новых пользовательских возможностях и функциях YUME." : "Updates about new user-facing YUME features and capabilities appear here."}</p>
               </div>
-              <button type="button" onClick={markAllNotificationsRead} disabled={notificationActionBusy || USER_NOTIFICATIONS.filter((item) => !notificationDismissedIds.includes(item.id)).every((item) => notificationReadIds.includes(item.id))} className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-primary/30 bg-primary/10 px-3 py-2 text-sm font-semibold text-foreground transition hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-45">
+              <button type="button" onClick={markAllNotificationsRead} disabled={notificationActionBusy || notificationItems.filter((item) => !notificationDismissedIds.includes(item.id)).every((item) => notificationReadIds.includes(item.id))} className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-primary/30 bg-primary/10 px-3 py-2 text-sm font-semibold text-foreground transition hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-45">
                 <CheckCheck className="h-4 w-4" />
                 {notificationActionBusy ? (language === "ru" ? "Сохраняю…" : "Saving…") : (language === "ru" ? "Прочитать всё" : "Mark all as read")}
               </button>
@@ -1466,12 +1474,12 @@ function Index() {
               <span className="text-sm text-muted-foreground">{language === "ru" ? "Всего уведомлений" : "Total notifications"}</span>
               <span className="font-semibold tabular-nums">{USER_NOTIFICATIONS.filter((item) => !notificationDismissedIds.includes(item.id)).length}</span>
               <span className="text-sm text-muted-foreground">{language === "ru" ? "Непрочитано" : "Unread"}</span>
-              <span className={`font-semibold tabular-nums ${USER_NOTIFICATIONS.some((item) => !notificationReadIds.includes(item.id)) ? "text-red-400" : "text-emerald-400"}`}>{USER_NOTIFICATIONS.filter((item) => !notificationReadIds.includes(item.id)).length}</span>
+              <span className={`font-semibold tabular-nums ${notificationItems.some((item) => !notificationReadIds.includes(item.id)) ? "text-red-400" : "text-emerald-400"}`}>{USER_NOTIFICATIONS.filter((item) => !notificationReadIds.includes(item.id)).length}</span>
             </div>
 
             {notificationActionMessage && <p role="status" className="mb-4 rounded-xl border border-border bg-card/60 px-3 py-2.5 text-sm text-muted-foreground">{notificationActionMessage}</p>}
 
-            {USER_NOTIFICATIONS.every((item) => notificationDismissedIds.includes(item.id)) ? (
+            {notificationItems.every((item) => notificationDismissedIds.includes(item.id)) ? (
               <div className="rounded-2xl border border-dashed border-border bg-card/30 px-5 py-12 text-center">
                 <Bell className="mx-auto h-8 w-8 text-muted-foreground" />
                 <h2 className="mt-3 font-semibold">{language === "ru" ? "Пока нет уведомлений" : "No notifications yet"}</h2>
@@ -1515,6 +1523,7 @@ function Index() {
                         <div className={`grid transition-[grid-template-rows,opacity] duration-300 ease-out ${expanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}>
                           <div className="overflow-hidden">
                             <p className="whitespace-pre-line pl-[52px] pt-3 text-sm leading-relaxed text-foreground/85">{item.description[language]}</p>
+                            {item.targetUrl && <div className="pl-[52px] pt-3"><button type="button" onClick={() => { const target = item.targetUrl; if (target && target.startsWith("/") && !target.startsWith("//")) window.location.assign(target); }} className="inline-flex min-h-9 items-center rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90">{language === "ru" ? "Открыть" : "Open"}</button></div>}
                             <div className="flex justify-end pl-[52px] pt-3">
                               <button type="button" onClick={() => { setNotificationSwipe(null); void dismissNotification(item.id); }} className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-muted-foreground transition hover:bg-red-500/10 hover:text-red-400">
                                 <X className="h-3.5 w-3.5" />{language === "ru" ? "Удалить уведомление" : "Delete notification"}
@@ -1756,6 +1765,17 @@ function Index() {
                 </span>
                 {(adminMessage || adminImportMessage || metadataRefreshMessage) && <p className="w-full border-t border-border/70 pt-2 text-xs text-muted-foreground" role="status">{adminMessage || adminImportMessage || metadataRefreshMessage}</p>}
               </section>
+              <details open={expandedAdminSections.notifications} onToggle={event => { const isOpen = event.currentTarget.open; setExpandedAdminSections(current => current.notifications === isOpen ? current : {...current, notifications: isOpen}); }} className="group mb-3 overflow-hidden rounded-2xl border border-[#382846] bg-[#0C0A12]" aria-label={language === "ru" ? "Уведомления пользователям" : "User notifications"}>
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 hover:bg-card/80 [&::-webkit-details-marker]:hidden">
+                  <span className="flex items-center gap-3"><Bell className="h-5 w-5 text-[#BE65FF]"/><span><span className="block font-semibold">{language === "ru" ? "Уведомления пользователям" : "Notify users"}</span><span className="mt-1 block text-xs text-muted-foreground">{language === "ru" ? "Опубликовать сообщение для всех аккаунтов" : "Publish a message for all accounts"}</span></span></span><ChevronDown className="h-4 w-4 text-muted-foreground transition-transform group-open:rotate-180"/>
+                </summary>
+                <form className="grid gap-3 border-t border-border/70 p-4" onSubmit={async event => { event.preventDefault(); if (!isAdmin || notificationPublishBusy) return; setNotificationPublishBusy(true); setAdminMessage(""); try { const response = await fetch("/api/admin-notifications", { method:"POST", credentials:"same-origin", cache:"no-store", headers:{"Content-Type":"application/json"}, body:JSON.stringify({title:notificationDraftTitle,body:notificationDraftBody,targetUrl:notificationDraftTarget || null}) }); const payload = await response.json().catch(()=>({})) as {error?:string;notification?:{id:string;title:string;body:string;targetUrl:string|null}}; if (!response.ok || !payload.notification) throw new Error(payload.error || "publish_failed"); const n = payload.notification; setNotificationItems(current => [{id:n.id,publishedAt:new Date().toISOString(),title:{ru:n.title,en:n.title},description:{ru:n.body,en:n.body},targetUrl:n.targetUrl,dynamic:true},...current]); setNotificationDraftTitle(""); setNotificationDraftBody(""); setNotificationDraftTarget(""); setAdminMessage(language === "ru" ? "Уведомление опубликовано для всех пользователей." : "Notification published for all users."); } catch { setAdminMessage(language === "ru" ? "Не удалось опубликовать уведомление. Проверь подключение и права администратора." : "Could not publish notification. Check connection and admin access."); } finally { setNotificationPublishBusy(false); } }}>
+                  <label className="grid gap-1 text-sm"><span>{language === "ru" ? "Заголовок" : "Title"}</span><input required maxLength={120} value={notificationDraftTitle} onChange={event=>setNotificationDraftTitle(event.target.value)} className="rounded-lg border border-border bg-background px-3 py-2" placeholder={language === "ru" ? "Например, технические работы" : "For example, scheduled maintenance"}/></label>
+                  <label className="grid gap-1 text-sm"><span>{language === "ru" ? "Текст уведомления" : "Notification message"}</span><textarea required maxLength={2000} rows={4} value={notificationDraftBody} onChange={event=>setNotificationDraftBody(event.target.value)} className="resize-y rounded-lg border border-border bg-background px-3 py-2" placeholder={language === "ru" ? "Сообщение для всех пользователей" : "Message for all users"}/></label>
+                  <label className="grid gap-1 text-sm"><span>{language === "ru" ? "Внутренняя ссылка (необязательно)" : "Internal link (optional)"}</span><input value={notificationDraftTarget} onChange={event=>setNotificationDraftTarget(event.target.value)} pattern="\/(?!\/).*" maxLength={500} className="rounded-lg border border-border bg-background px-3 py-2" placeholder="/"/></label>
+                  <button type="submit" disabled={notificationPublishBusy || !notificationDraftTitle.trim() || !notificationDraftBody.trim()} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">{notificationPublishBusy ? (language === "ru" ? "Публикуем…" : "Publishing…") : (language === "ru" ? "Отправить всем пользователям" : "Send to all users")}</button>
+                </form>
+              </details>
               <details open={expandedAdminSections.import} onToggle={event => { const isOpen = event.currentTarget.open; setExpandedAdminSections(current => current.import === isOpen ? current : {...current, import: isOpen}); }} className="group mb-3 overflow-hidden rounded-2xl border border-[#8D3DD6] bg-[#0D0A13] shadow-[0_0_18px_rgba(157,64,245,0.10)]" aria-label={language === "ru" ? "Пополнение каталога" : "Catalog import"}>
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 hover:bg-card/80 [&::-webkit-details-marker]:hidden">
                   <span className="flex min-w-0 items-center gap-2.5"><Download className="h-5 w-5 shrink-0 text-[#BE65FF]" /><span className="min-w-0"><span className="block font-semibold text-[#F8F4FF]">{language === "ru" ? "Пополнение каталога из Shikimori" : "Import catalogue from Shikimori"}</span><span className="mt-0.5 block text-xs text-muted-foreground">{language === "ru" ? "Добавлено " : "Added "}{adminImport.added} / {adminImport.target} · {language === "ru" ? "страница " : "page "}{adminImport.cursor}</span></span></span>

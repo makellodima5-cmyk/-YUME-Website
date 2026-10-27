@@ -93,6 +93,9 @@ function ensureSchema(db: Database): Promise<void> {
   const pending = db.batch([
     db.prepare("CREATE TABLE IF NOT EXISTS yume_notification_reads (user_id TEXT NOT NULL REFERENCES yume_users(id) ON DELETE CASCADE, notification_id TEXT NOT NULL, read_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (user_id, notification_id))"),
     db.prepare("CREATE TABLE IF NOT EXISTS yume_notification_dismissals (user_id TEXT NOT NULL REFERENCES yume_users(id) ON DELETE CASCADE, notification_id TEXT NOT NULL, dismissed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (user_id, notification_id))"),
+    db.prepare("CREATE TABLE IF NOT EXISTS yume_notifications (id TEXT PRIMARY KEY NOT NULL, title TEXT NOT NULL, body TEXT NOT NULL, type TEXT NOT NULL DEFAULT 'info', target_url TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, created_by TEXT, active INTEGER NOT NULL DEFAULT 1)"),
+    db.prepare("CREATE TABLE IF NOT EXISTS yume_notification_reads_v2 (user_id TEXT NOT NULL REFERENCES yume_users(id) ON DELETE CASCADE, notification_id TEXT NOT NULL REFERENCES yume_notifications(id) ON DELETE CASCADE, read_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, dismissed_at TEXT, PRIMARY KEY(user_id,notification_id))"),
+    db.prepare("CREATE TABLE IF NOT EXISTS yume_notification_targets (notification_id TEXT NOT NULL REFERENCES yume_notifications(id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES yume_users(id) ON DELETE CASCADE, PRIMARY KEY(notification_id,user_id))"),
     // Composite primary keys already index each table by user_id; the separate user-only indexes are redundant.
     db.prepare("DROP INDEX IF EXISTS idx_yume_notification_reads_user"),
     db.prepare("DROP INDEX IF EXISTS idx_yume_notification_dismissals_user"),
@@ -134,7 +137,16 @@ export async function handleNotifications(request: Request): Promise<Response> {
     if (request.method === "GET") {
       if (!userId) return json({ error: "authentication_required", authenticated: false }, 401);
       const state = await readNotificationState(db, userId);
-      return json({ notifications: USER_NOTIFICATIONS, authenticated: true, ...state });
+      await db.batch([
+        db.prepare("CREATE TABLE IF NOT EXISTS yume_notifications (id TEXT PRIMARY KEY NOT NULL, title TEXT NOT NULL, body TEXT NOT NULL, type TEXT NOT NULL DEFAULT 'info', target_url TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, created_by TEXT, active INTEGER NOT NULL DEFAULT 1)"),
+        db.prepare("CREATE TABLE IF NOT EXISTS yume_notification_reads_v2 (user_id TEXT NOT NULL REFERENCES yume_users(id) ON DELETE CASCADE, notification_id TEXT NOT NULL REFERENCES yume_notifications(id) ON DELETE CASCADE, read_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, dismissed_at TEXT, PRIMARY KEY(user_id,notification_id))"),
+        db.prepare("CREATE TABLE IF NOT EXISTS yume_notification_targets (notification_id TEXT NOT NULL REFERENCES yume_notifications(id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES yume_users(id) ON DELETE CASCADE, PRIMARY KEY(notification_id,user_id))")
+      ]);
+      const dynamicRows = await db.prepare("SELECT n.id,n.title,n.body,n.target_url,n.created_at,r.read_at,r.dismissed_at FROM yume_notifications n LEFT JOIN yume_notification_reads_v2 r ON r.notification_id=n.id AND r.user_id=? WHERE n.active=1 AND (NOT EXISTS (SELECT 1 FROM yume_notification_targets t WHERE t.notification_id=n.id) OR EXISTS (SELECT 1 FROM yume_notification_targets t WHERE t.notification_id=n.id AND t.user_id=?)) ORDER BY n.created_at DESC LIMIT 100").bind(userId,userId).all<{id:string;title:string;body:string;target_url:string|null;created_at:string;read_at:string|null;dismissed_at:string|null}>();
+      const dynamicNotifications = dynamicRows.results.map(n => ({ id:n.id, publishedAt:n.created_at, title:{ru:n.title,en:n.title}, description:{ru:n.body,en:n.body}, targetUrl:n.target_url, dynamic:true }));
+      const dynamicReadIds = dynamicRows.results.filter(n => n.read_at).map(n => n.id);
+      const dynamicDismissedIds = dynamicRows.results.filter(n => n.dismissed_at).map(n => n.id);
+      return json({ notifications: [...dynamicNotifications, ...USER_NOTIFICATIONS], authenticated: true, readIds:[...state.readIds,...dynamicReadIds], dismissedIds:[...state.dismissedIds,...dynamicDismissedIds] });
     }
 
     if (!userId) return json({ error: "authentication_required", authenticated: false }, 401);
@@ -148,7 +160,14 @@ export async function handleNotifications(request: Request): Promise<Response> {
     } catch { return json({ error: "invalid_request" }, 400); }
     if (body.action === "read-one" || body.action === "dismiss-one") {
       const notificationId = typeof body.notificationId === "string" ? body.notificationId : "";
-      if (!USER_NOTIFICATIONS.some((notification) => notification.id === notificationId)) return json({ error: "invalid_notification" }, 400);
+      const isStatic = USER_NOTIFICATIONS.some((notification) => notification.id === notificationId);
+      const isDynamic = !isStatic && Boolean(await db.prepare("SELECT id FROM yume_notifications WHERE id=? AND active=1").bind(notificationId).first<{id:string}>());
+      if (!isStatic && !isDynamic) return json({ error: "invalid_notification" }, 400);
+      if (isDynamic) {
+        await db.prepare("INSERT INTO yume_notification_reads_v2(user_id,notification_id,read_at) VALUES(?,?,CURRENT_TIMESTAMP) ON CONFLICT(user_id,notification_id) DO UPDATE SET read_at=CURRENT_TIMESTAMP").bind(userId,notificationId).run();
+        if (body.action === "dismiss-one") await db.prepare("UPDATE yume_notification_reads_v2 SET dismissed_at=CURRENT_TIMESTAMP WHERE user_id=? AND notification_id=?").bind(userId,notificationId).run();
+        return json({ ok:true, authenticated:true, ...(body.action === "read-one" ? {readId:notificationId} : {dismissedId:notificationId}) });
+      }
       if (body.action === "read-one") {
         await db.prepare("INSERT OR IGNORE INTO yume_notification_reads (user_id, notification_id) VALUES (?, ?)").bind(userId, notificationId).run();
         return json({ ok: true, authenticated: true, readId: notificationId });
@@ -163,7 +182,9 @@ export async function handleNotifications(request: Request): Promise<Response> {
       const values = USER_NOTIFICATIONS.flatMap((notification) => [userId, notification.id]);
       await db.prepare("INSERT OR IGNORE INTO yume_notification_reads (user_id, notification_id) VALUES " + placeholders).bind(...values).run();
     }
-    return json({ ok: true, authenticated: true, readIds: USER_NOTIFICATIONS.map((notification) => notification.id) });
+    await db.prepare("INSERT OR IGNORE INTO yume_notification_reads_v2(user_id,notification_id) SELECT ?,n.id FROM yume_notifications n WHERE n.active=1 AND (NOT EXISTS (SELECT 1 FROM yume_notification_targets t WHERE t.notification_id=n.id) OR EXISTS (SELECT 1 FROM yume_notification_targets t WHERE t.notification_id=n.id AND t.user_id=?))").bind(userId,userId).run();
+    const dynamicIds = await db.prepare("SELECT n.id FROM yume_notifications n WHERE n.active=1 AND (NOT EXISTS (SELECT 1 FROM yume_notification_targets t WHERE t.notification_id=n.id) OR EXISTS (SELECT 1 FROM yume_notification_targets t WHERE t.notification_id=n.id AND t.user_id=?))").bind(userId).all<{id:string}>();
+    return json({ ok: true, authenticated: true, readIds: [...USER_NOTIFICATIONS.map((notification) => notification.id), ...dynamicIds.results.map(n=>n.id)] });
   } catch (error) {
     console.error("[YUME][NOTIFICATIONS] Request failed.", error);
     return json({ error: "notifications_unavailable" }, 503);
