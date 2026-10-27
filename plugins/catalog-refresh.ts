@@ -1,6 +1,7 @@
 import { definePlugin } from "nitro";
 import { runScheduledTrailerUpdate } from "../src/data/admin-trailers.server";
 import { setCatalogRuntimeEnvironment } from "../src/data/catalog-d1.server";
+import { runScheduledEpisodeNotifications } from "../src/data/episode-notifications-cron.server";
 
 function hasDatabaseBinding(value: unknown): boolean {
   return Boolean(value && typeof value === "object" && "YUME_DB" in value
@@ -26,6 +27,7 @@ export default definePlugin((nitroApp) => {
     }
 
     await runScheduledTrailerUpdate(env);
+    await runScheduledEpisodeNotifications(env);
     console.info("[YUME][TRAILER_AUTO] Nitro scheduled hook completed.", {
       cron: controller.cron,
     });
