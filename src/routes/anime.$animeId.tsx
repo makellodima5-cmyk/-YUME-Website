@@ -244,7 +244,7 @@ function AnimeDetailPage() {
           animeId,
           title: displayAnimeTitle(anime, language),
           ...(anime.englishTitle ? { englishTitle: anime.englishTitle } : {}),
-          ...((anime.posterUrl || anime.bannerUrl) ? { posterUrl: anime.posterUrl || anime.bannerUrl } : {}),
+          ...((anime.bannerUrl || anime.posterUrl) ? { posterUrl: anime.bannerUrl || anime.posterUrl } : {}),
           episode: kodikEpisode,
           positionSeconds: watchedSeconds,
           durationSeconds,
