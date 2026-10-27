@@ -569,7 +569,7 @@ export const getShikimoriCatalog = createServerFn({ method: "GET" })
  */
 export const getShikimoriAnimeDetails = createServerFn({ method: "GET" })
   .validator((input: { animeId?: unknown }) => ({
-    animeId: typeof input?.animeId === "string" && /^\\d{1,12}$/.test(input.animeId)
+    animeId: typeof input?.animeId === "string" && /^\d{1,12}$/.test(input.animeId)
       ? input.animeId
       : "",
   }))
@@ -628,6 +628,8 @@ export const getShikimoriAnimeDetails = createServerFn({ method: "GET" })
           : undefined,
       };
     }
+
+    if (!anime) return { anime: null, relatedAnime: [], apiError };
 
     const filtered = filterCatalogForCurrentRequest({
       items: [anime, ...details.relatedAnime],
