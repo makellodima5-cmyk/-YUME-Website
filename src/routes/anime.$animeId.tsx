@@ -262,7 +262,10 @@ function AnimeDetailPage() {
       const durationValue = typeof rawDuration === "number" ? rawDuration : Number(rawDuration);
       const durationSeconds = Number.isFinite(durationValue) && durationValue > 0 ? durationValue : null;
       if (!Number.isFinite(watchedSeconds) || watchedSeconds < 0) return;
-      const completed = durationSeconds !== null && watchedSeconds / durationSeconds >= 0.95;
+      // Kodik currently guarantees the current playback time but may omit duration. For multi-episode anime, use a conservative 24-minute estimate so the list still shows a useful approximate progress bar.
+      const estimatedTvEpisodeDuration = durationSeconds === null && anime.episodes > 1 ? 24 * 60 : null;
+      const completionDuration = durationSeconds ?? estimatedTvEpisodeDuration;
+      const completed = completionDuration !== null && watchedSeconds / completionDuration >= 0.95;
       if (completed) {
         markPlaybackEpisodeCompleted({ ...progressEntry, positionSeconds: watchedSeconds, durationSeconds });
         lastSavedPosition = watchedSeconds;
@@ -840,8 +843,11 @@ function AnimeDetailPage() {
                           {selectedKodikSource.episodes.map((episode) => {
                             const savedProgress = episodeProgress.find((entry) => entry.episode === episode.number);
                             const isCompleted = savedProgress?.completed === true;
-                            const progressPercent = savedProgress?.durationSeconds && savedProgress.durationSeconds > 0
-                              ? Math.min(100, Math.max(0, (savedProgress.positionSeconds / savedProgress.durationSeconds) * 100))
+                            const progressDuration = savedProgress?.durationSeconds && savedProgress.durationSeconds > 0
+                              ? savedProgress.durationSeconds
+                              : (anime.episodes > 1 ? 24 * 60 : null);
+                            const progressPercent = savedProgress && progressDuration
+                              ? Math.min(savedProgress.durationSeconds ? 100 : 94, Math.max(0, (savedProgress.positionSeconds / progressDuration) * 100))
                               : 0;
                             const isSelected = kodikEpisode === episode.number;
                             return (
