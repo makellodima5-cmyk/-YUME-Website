@@ -395,7 +395,7 @@ function AnimeDetailPage() {
     <button
       type="button"
       onClick={scrollToPlayer}
-      className="inline-flex items-center justify-center gap-2 rounded-full bg-neon px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-neon transition hover:brightness-110"
+      className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-neon px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-neon transition hover:brightness-110 md:w-auto"
     >
       <Play className="h-4 w-4 fill-current" />
       {language === "en" ? "Watch" : "Смотреть"}
@@ -410,7 +410,7 @@ function AnimeDetailPage() {
         setIsFavorite(toggleSavedAnimeId(FAVORITES_STORAGE_KEY, anime.id));
         setShowListNote(true);
       }}
-      className="inline-flex items-center justify-center gap-2 rounded-full bg-secondary px-4 py-2.5 text-sm font-semibold ring-1 ring-border transition hover:bg-accent"
+      className="inline-flex w-full min-w-0 flex-col items-center justify-center gap-1 rounded-full bg-secondary px-2 py-2.5 text-center text-[11px] font-semibold leading-tight ring-1 ring-border transition hover:bg-accent md:w-auto md:flex-row md:gap-2 md:px-4 md:py-2.5 md:text-sm md:leading-normal"
       aria-pressed={isFavorite}
     >
       <Heart className={`h-4 w-4 ${isFavorite ? "fill-current text-primary" : ""}`} />
@@ -446,7 +446,7 @@ function AnimeDetailPage() {
         }
       }}
       aria-pressed={episodeSubscribed}
-      className="inline-flex items-center justify-center gap-2 rounded-full bg-secondary px-4 py-2.5 text-sm font-semibold ring-1 ring-border transition hover:bg-accent disabled:opacity-50"
+      className="inline-flex w-full min-w-0 flex-col items-center justify-center gap-1 rounded-full bg-secondary px-2 py-2.5 text-center text-[11px] font-semibold leading-tight ring-1 ring-border transition hover:bg-accent disabled:opacity-50 md:w-auto md:flex-row md:gap-2 md:px-4 md:py-2.5 md:text-sm md:leading-normal"
     >
       <Bell className={`h-4 w-4 ${episodeSubscribed ? "fill-current text-primary" : ""}`} />
       {language === "en" ? "Follow new episodes" : "Следить за новыми сериями"}
@@ -461,7 +461,7 @@ function AnimeDetailPage() {
         setInList(toggleSavedAnimeId(WATCHLIST_STORAGE_KEY, anime.id));
         setShowListNote(true);
       }}
-      className="inline-flex items-center justify-center gap-2 rounded-full bg-secondary px-4 py-2.5 text-sm font-semibold ring-1 ring-border transition hover:bg-accent"
+      className="inline-flex w-full min-w-0 flex-col items-center justify-center gap-1 rounded-full bg-secondary px-2 py-2.5 text-center text-[11px] font-semibold leading-tight ring-1 ring-border transition hover:bg-accent md:w-auto md:flex-row md:gap-2 md:px-4 md:py-2.5 md:text-sm md:leading-normal"
       aria-pressed={inList}
     >
       {inList ? <Check className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
@@ -636,29 +636,41 @@ function AnimeDetailPage() {
                       )}
                     </div>
                   )}
-                  <div className="mt-4 flex flex-col items-stretch gap-2">
-                    {watchButton}
-                    {favoriteButton}
-                    {listButton}
-                    {episodeSubscriptionButton}
-                  </div>
+
                 </div>
               </div>
-              <div className="mt-5 rounded-2xl border border-white/10 bg-card/70 p-4">
-                <h2 className="mb-2 text-sm font-semibold">{t("anime.description")}</h2>
-                {descriptionText("anime-description-mobile")}
-                {showListNote && (
-                  <p className="mt-3 text-xs text-muted-foreground" aria-live="polite">
-                    {saveSyncError
+              <div className="mt-4 grid gap-2">
+                {watchButton}
+                <div className={"grid gap-2 " + (episodeSubscriptionButton ? "grid-cols-3" : "grid-cols-2")}>
+                  {favoriteButton}
+                  {listButton}
+                  {episodeSubscriptionButton}
+                </div>
+              </div>
+              {showListNote && (
+                <p className="mt-3 text-xs text-muted-foreground" aria-live="polite">
+                  {authRequired
+                    ? (language === "ru"
+                      ? "Избранное и «Смотреть позже» доступны после входа в аккаунт."
+                      : "Favorites and Watch Later are available after signing in.")
+                    : saveSyncError
                       ? (language === "ru"
                         ? "Не удалось синхронизировать список с аккаунтом. Проверь соединение и повтори действие."
                         : "Could not sync this list to your account. Check your connection and try again.")
                       : t("anime.savedLocally")}
-                  </p>
-                )}
+                  {authRequired && (
+                    <span className="mt-2 flex flex-wrap gap-2">
+                      <button type="button" onClick={() => requestAuth("login")} className="font-semibold text-primary underline underline-offset-4">{language === "ru" ? "Войти через Telegram" : "Sign in with Telegram"}</button>
+                      <button type="button" onClick={() => requestAuth("register")} className="font-semibold text-primary underline underline-offset-4">{language === "ru" ? "Регистрация" : "Register"}</button>
+                    </span>
+                  )}
+                </p>
+              )}
+              <div className="mt-5 rounded-2xl border border-white/10 bg-card/70 p-4">
+                <h2 className="mb-2 text-sm font-semibold">{t("anime.description")}</h2>
+                {descriptionText("anime-description-mobile")}
               </div>
-            </div>
-          </section>
+
 
           {displayableScreenshots.length > 0 && (
             <section aria-labelledby="anime-screenshots-title" className="relative z-10 mt-5 md:mt-6">
