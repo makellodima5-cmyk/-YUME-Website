@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { env as cloudflareEnv } from "cloudflare:workers";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
-type Environment = Record<string, unknown> & { KODIK_API_TOKEN?: string };
+type Environment = Record<string, unknown> & { KODIK_API_TOKEN?: string; KODIK_RATE_LIMITER?: unknown };
 type EpisodeValue = string | { link?: string; title?: string | null };
 type KodikSeason = { episodes?: Record<string, EpisodeValue> };
 type KodikResult = {
@@ -14,13 +15,14 @@ type KodikResult = {
 };
 type KodikResponse = { results?: KodikResult[]; error?: string };
 
-function json(data: unknown, status = 200): Response {
+function json(data: unknown, status = 200, extraHeaders: Record<string, string> = {}): Response {
   return new Response(JSON.stringify(data), {
     status,
     headers: {
       "Content-Type": "application/json; charset=utf-8",
       "Cache-Control": "private, no-store",
       "X-Content-Type-Options": "nosniff",
+      ...extraHeaders,
     },
   });
 }
@@ -57,13 +59,25 @@ async function handleKodik(request: Request): Promise<Response> {
   if (!/^\d{1,12}$/.test(animeId) || Number(animeId) < 1) return json({ error: "Invalid anime ID." }, 400);
 
   let token = "";
+  let rateLimitBinding: unknown;
   try {
     const environment = cloudflareEnv as unknown as Environment;
     token = typeof environment.KODIK_API_TOKEN === "string" ? environment.KODIK_API_TOKEN.trim() : "";
+    rateLimitBinding = environment.KODIK_RATE_LIMITER;
   } catch {
     token = "";
+    rateLimitBinding = undefined;
   }
   if (!token) return json({ error: "Kodik API is not configured." }, 503);
+
+  // Protect the paid/credentialed upstream API from repeated anonymous lookups.
+  const rateLimit = await enforceRateLimit(rateLimitBinding, request, "kodik");
+  if (rateLimit === "limited") {
+    return json({ error: "Too many requests. Please try again in a minute." }, 429, { "Retry-After": "60" });
+  }
+  if (rateLimit !== "allowed") {
+    return json({ error: "Rate limiting is temporarily unavailable." }, 503);
+  }
 
   const url = new URL("https://kodik-api.com/search");
   url.searchParams.set("token", token);
