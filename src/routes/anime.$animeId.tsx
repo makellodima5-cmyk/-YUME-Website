@@ -267,7 +267,12 @@ function AnimeDetailPage() {
       const completionDuration = durationSeconds ?? estimatedTvEpisodeDuration;
       const completed = completionDuration !== null && watchedSeconds / completionDuration >= 0.95;
       if (completed) {
-        markPlaybackEpisodeCompleted({ ...progressEntry, positionSeconds: watchedSeconds, durationSeconds });
+        const alreadyCompleted = readPlaybackProgress().some((entry) =>
+          entry.animeId === animeId && entry.episode === kodikEpisode && entry.completed,
+        );
+        if (!alreadyCompleted) {
+          markPlaybackEpisodeCompleted({ ...progressEntry, positionSeconds: watchedSeconds, durationSeconds });
+        }
         lastSavedPosition = watchedSeconds;
       } else if (watchedSeconds >= 5 && (lastSavedPosition < 0 || watchedSeconds - lastSavedPosition >= 8 || watchedSeconds < lastSavedPosition)) {
         savePlaybackProgress({
