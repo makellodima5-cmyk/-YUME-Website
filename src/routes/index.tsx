@@ -11,12 +11,12 @@ import { CollectionsGrid, Grid, Hero, Row } from "@/components/yume/Sections";
 import { CatalogFilters, EMPTY_CATALOG_FILTERS, type CatalogFiltersValue } from "@/components/yume/CatalogFilters";
 import { Profile } from "@/components/yume/Profile";
 import { Footer } from "@/components/yume/Footer";
-import { HomePetals } from "@/components/yume/HomePetals";
-import "../home-petals.css";
+import { HomeDepthAtmosphere } from "@/components/yume/HomeDepthAtmosphere";
+import "../home-depth.css";
 import { useYumePreferences, displayGenre, type TranslationKey } from "@/data/preferences";
 import { filterAndSortCatalog, getCatalogPageCount, paginateCatalog } from "@/data/catalog-utils";
 import { validateCatalogSearch } from "@/data/catalog-search";
-import homeSocialImage from "@/assets/yume-hero-desktop-new.png.PNG";
+import homeSocialImage from "@/assets/yume-desktop.webp";
 import { absoluteImageUrl, canonicalUrl } from "@/data/seo";
 import { getTelegramWebApp, telegramHapticImpact } from "@/lib/telegram-mini-app";
 import { trackYumePage } from "@/lib/yume-analytics";
@@ -1326,7 +1326,7 @@ function Index() {
   const visibleAiringAnime = airingAnime.slice((airingPage - 1) * catalogPageSize, airingPage * catalogPageSize);
   return (
     <div className="relative isolate min-h-screen pb-8">
-      {view === "home" && <HomePetals />}
+      {view === "home" && <HomeDepthAtmosphere />}
       <div className="relative z-10">
       <Header view={view} setView={setView} onProfile={() => setView(telegramAuthReady ? "profile" : "login")} isAdmin={isAdmin} unreadNotificationCount={notificationStateLoaded && notificationRemoteAccount ? USER_NOTIFICATIONS.filter((item) => !notificationReadIds.includes(item.id) && !notificationDismissedIds.includes(item.id)).length : 0} />
       {isTelegramMiniApp && telegramConsentRequired && (
