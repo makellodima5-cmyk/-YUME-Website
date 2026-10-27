@@ -21,6 +21,46 @@ describe("Worker security headers", () => {
     expect(await response.json()).toEqual({ ok: true });
   });
 
+  it("sends a report-only CSP candidate on HTML without enforcing or blocking resources", () => {
+    const response = applySecurityHeaders(new Response("<!doctype html><html></html>", {
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+    }), "https://yume.test/");
+
+    const policy = response.headers.get("Content-Security-Policy-Report-Only");
+    expect(policy).toContain("default-src 'self'");
+    expect(policy).toContain("object-src 'none'");
+    expect(policy).toContain("frame-ancestors 'self'");
+    expect(policy).toContain("https://telegram.org");
+    expect(policy).toContain("https://fonts.googleapis.com");
+    expect(policy).toContain("https://www.youtube-nocookie.com");
+    expect(policy).toContain("https://kodik.info");
+    expect(policy).not.toContain("script-src 'self' 'unsafe-inline'");
+    expect(response.headers.get("Content-Security-Policy")).toBeNull();
+  });
+
+  it("does not attach a document CSP to JSON or image responses", () => {
+    const jsonResponse = applySecurityHeaders(new Response("{}", {
+      headers: { "Content-Type": "application/json; charset=utf-8" },
+    }), "https://yume.test/api/example");
+    const imageResponse = applySecurityHeaders(new Response("image-bytes", {
+      headers: { "Content-Type": "image/jpeg" },
+    }), "https://yume.test/api/media");
+
+    expect(jsonResponse.headers.get("Content-Security-Policy-Report-Only")).toBeNull();
+    expect(imageResponse.headers.get("Content-Security-Policy-Report-Only")).toBeNull();
+  });
+
+  it("preserves a route-specific CSP Report-Only policy", () => {
+    const response = applySecurityHeaders(new Response("<!doctype html>", {
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+        "Content-Security-Policy-Report-Only": "default-src 'none'",
+      },
+    }), "https://yume.test/");
+
+    expect(response.headers.get("Content-Security-Policy-Report-Only")).toBe("default-src 'none'");
+  });
+
   it("does not emit HSTS for non-HTTPS local requests", () => {
     const response = applySecurityHeaders(new Response("ok"), "http://localhost:3000/");
 
