@@ -188,7 +188,7 @@ function AnimeDetailPage() {
     if (resumeTargetEpisode === kodikEpisode && resumeTargetSeconds > 0) {
       try {
         const resumeUrl = new URL(kodikEmbedUrl);
-        resumeUrl.searchParams.set("start", String(resumeTargetSeconds));
+        resumeUrl.searchParams.set("start_from", String(resumeTargetSeconds));
         playerUrl = resumeUrl.toString();
       } catch {
         // The API already validates Kodik URLs; retain the original URL if parsing fails.
@@ -211,6 +211,8 @@ function AnimeDetailPage() {
     const trustedHosts = ["kodik.info", "kodik.biz", "kodik.cc", "kodik.online", "kodikplayer.com", "kodikres.com"];
     const onKodikMessage = (event: MessageEvent) => {
       if (!event.origin) return;
+      const playerFrame = document.getElementById("kodik-player") as HTMLIFrameElement | null;
+      if (playerFrame?.contentWindow && event.source !== playerFrame.contentWindow) return;
       try {
         const hostname = new URL(event.origin).hostname.toLowerCase().replace(/\.$/, "");
         if (!trustedHosts.some((host) => hostname === host || hostname.endsWith("." + host))) return;
@@ -223,13 +225,13 @@ function AnimeDetailPage() {
       }
       if (!payload || typeof payload !== "object") return;
       const message = payload as Record<string, unknown>;
-      const messageType = String(message.type ?? message.event ?? message.name ?? "").toLowerCase();
+      const messageType = String(message.type ?? message.event ?? message.name ?? message.key ?? "").toLowerCase();
       if (messageType.includes("ended") || messageType === "end" || messageType.includes("video_end")) {
         removePlaybackProgress(animeId);
         return;
       }
       if (!messageType.includes("time_update")) return;
-      const rawTime = message.time ?? message.currentTime ?? message.seconds ?? message.current_time;
+      const rawTime = message.value ?? message.time ?? message.currentTime ?? message.seconds ?? message.current_time;
       const watchedSeconds = typeof rawTime === "number" ? rawTime : Number(rawTime);
       const rawDuration = message.duration ?? message.durationSeconds ?? message.duration_seconds ?? message.totalTime ?? message.total_time;
       const durationValue = typeof rawDuration === "number" ? rawDuration : Number(rawDuration);
