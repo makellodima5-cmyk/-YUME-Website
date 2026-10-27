@@ -17,7 +17,7 @@ export async function runScheduledEpisodeNotifications(input:unknown):Promise<vo
   db.prepare("CREATE TABLE IF NOT EXISTS yume_anime_subscriptions (user_id TEXT NOT NULL REFERENCES yume_users(id) ON DELETE CASCADE,anime_id TEXT NOT NULL,created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,active INTEGER NOT NULL DEFAULT 1,PRIMARY KEY(user_id,anime_id))"),
   db.prepare("CREATE TABLE IF NOT EXISTS yume_episode_notification_state (anime_id TEXT PRIMARY KEY NOT NULL, last_episodes_aired INTEGER NOT NULL DEFAULT 0, last_checked_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)")
  ]);
- const due=await db.prepare("SELECT id,title,episodes,episodes_aired,status,next_episode_at FROM anime_catalog WHERE status='Онгоинг' AND next_episode_at IS NOT NULL AND next_episode_at<=datetime('now') AND episodes_aired<episodes ORDER BY next_episode_at ASC LIMIT 40").all<AnimeRow>();
+ const due=await db.prepare("SELECT id,title,episodes,episodes_aired,status,next_episode_at FROM anime_catalog WHERE status='Онгоинг' AND next_episode_at IS NOT NULL AND datetime(next_episode_at)<=datetime('now') AND episodes_aired<episodes ORDER BY next_episode_at ASC LIMIT 40").all<AnimeRow>();
  if(!due.results.length)return;
  const query="query EpisodeNotice($ids: [ID!]!) { animes(ids: $ids) { id name russian status episodes episodesAired nextEpisodeAt } }";
  const response=await fetch(API,{method:"POST",headers:{"Content-Type":"application/json","User-Agent":"YUME/1.0 (episode notifications)"},body:JSON.stringify({query,variables:{ids:due.results.map(a=>a.id)}}),signal:AbortSignal.timeout(12000)});
