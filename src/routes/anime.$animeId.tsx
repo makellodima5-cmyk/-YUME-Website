@@ -478,6 +478,13 @@ function AnimeDetailPage() {
       />
 
       <main id="main-content" className="px-4 pt-24 md:px-10 md:pt-28">
+        {apiError && (
+          <p role="status" className="mx-auto mb-4 max-w-7xl rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-muted-foreground">
+            {language === "en"
+              ? "Shikimori is temporarily unavailable. Saved information is shown, and the episode schedule is hidden unless its date is still upcoming."
+              : "Shikimori временно недоступен. Показана сохранённая информация; дата серии скрыта, если она уже прошла."}
+          </p>
+        )}
         <div className="mx-auto max-w-screen-2xl">
           <section className="relative isolate" aria-label={displayAnimeTitle(anime, language) + " — " + t("anime.sectionLabel")}>
             {anime.bannerUrl?.startsWith("https://s4.anilist.co/") && (
