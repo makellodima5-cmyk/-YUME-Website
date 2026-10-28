@@ -6,10 +6,6 @@ import { runScheduledCatalogStatusRefresh } from "../src/data/catalog-status-ref
 const EPISODE_CHECK_CRON = "*/5 * * * *";
 const CATALOG_REFRESH_CRONS = new Set(["37 7 * * *", "41 19 * * *"]);
 
-async function pause(milliseconds: number): Promise<void> {
-  await new Promise((resolve) => setTimeout(resolve, milliseconds));
-}
-
 function hasDatabaseBinding(value: unknown): boolean {
   return Boolean(value && typeof value === "object" && "YUME_DB" in value
     && Boolean((value as Record<string, unknown>).YUME_DB));
