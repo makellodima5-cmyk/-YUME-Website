@@ -639,8 +639,8 @@ async function ensureViewHistorySchema(db: TelegramDatabase): Promise<void> {
 
 /** Saves recently opened anime only for a verified, signed-in Telegram account. */
 export async function handleTelegramHistory(request: Request): Promise<Response> {
-  if (request.method !== "GET" && request.method !== "POST") return jsonResponse({ error: "method_not_allowed" }, 405);
-  if (request.method === "POST" && !isSameOriginRequest(request)) return jsonResponse({ error: "cross_origin_request" }, 403);
+  if (request.method !== "GET" && request.method !== "POST" && request.method !== "DELETE") return jsonResponse({ error: "method_not_allowed" }, 405);
+  if ((request.method === "POST" || request.method === "DELETE") && !isSameOriginRequest(request)) return jsonResponse({ error: "cross_origin_request" }, 403);
   const env = environment();
   const db = database(env);
   const secret = sessionSecret(env);
@@ -669,6 +669,10 @@ export async function handleTelegramHistory(request: Request): Promise<Response>
     }
     const animeId = input.animeId;
     if (typeof animeId !== "string" || !/^\d{1,12}$/.test(animeId)) return jsonResponse({ error: "invalid_anime_id" }, 400);
+    if (request.method === "DELETE") {
+      await db.prepare("DELETE FROM yume_view_history WHERE user_id = ? AND anime_id = ?").bind(userId, animeId).run();
+      return jsonResponse({ deleted: true });
+    }
     const watchedSeconds = input.watchedSeconds;
     if (typeof watchedSeconds !== "number" || !Number.isFinite(watchedSeconds) || watchedSeconds < 30 || watchedSeconds > 24 * 60 * 60) {
       return jsonResponse({ error: "playback_not_confirmed" }, 400);
