@@ -937,12 +937,11 @@ function AnimeDetailPage() {
                   className="relative mx-auto flex aspect-video w-full min-w-0 flex-col items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-[#080710] p-5 text-center sm:min-h-[300px] lg:min-h-[420px]"
                   style={{ background: "radial-gradient(ellipse at 50% 40%, oklch(0.19 0.08 " + anime.hue + ") 0%, #080710 63%)" }}
                 >
-                  <div aria-hidden="true" className="mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-primary/35 bg-primary/10 text-primary shadow-[0_0_42px_rgba(207,95,255,0.14)]">
-                    <CirclePlay className="h-9 w-9" />
+                  <div aria-hidden="true" className="mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-rose-500/40 bg-rose-500/10 text-rose-400">
+                    <X className="h-8 w-8" />
                   </div>
-                  <h3 className="text-lg font-semibold text-white">{t("anime.trailerUnavailable")}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-white/60">{t("anime.playerNotConnected")}</p>
-                  <p className="mt-2 max-w-md text-sm leading-relaxed text-white/50">{t("anime.playerPlaceholder")}</p>
+                  <h3 className="text-lg font-semibold text-rose-300">{language === "en" ? "Trailer not found" : "Трейлер не найден"}</h3>
+                  <p className="mt-2 max-w-md text-sm leading-relaxed text-rose-100/75">{language === "en" ? "There is no available trailer for this anime yet." : "Для этого аниме пока нет доступного трейлера."}</p>
                 </div>
               )}
             </div>
