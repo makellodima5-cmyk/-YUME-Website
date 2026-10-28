@@ -21,6 +21,7 @@ import {
   UserPlus,
   LogOut,
   Trash2,
+  X,
   LoaderCircle,
 } from "lucide-react";
 import type { Anime } from "@/data/anime";
