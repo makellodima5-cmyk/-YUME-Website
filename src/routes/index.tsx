@@ -512,7 +512,7 @@ function Index() {
   const [adminImport, setAdminImport] = useState<{target:number;cursor:number;added:number;skipped:number;incomplete:number;errors:number;state:string;delayMs?:number}>({target:0,cursor:1,added:0,skipped:0,incomplete:0,errors:0,state:"idle"});
   const [adminImportMessage, setAdminImportMessage] = useState("");
   const [adminImportTitleQuery, setAdminImportTitleQuery] = useState("");
-  const [adminTitleSearchResults, setAdminTitleSearchResults] = useState<Array<{id:string;title:string;englishTitle:string;originalTitle:string;year:number;kind:string|null;status:string;posterUrl:string|null;alreadyInCatalog:boolean}>>([]);
+  const [adminTitleSearchResults, setAdminTitleSearchResults] = useState<Array<{id:string;title:string;englishTitle:string;originalTitle:string;year:number;kind:string|null;status:string;posterUrl:string|null;genres:string[];ageRating:string|null;alreadyInCatalog:boolean}>>([]);
   const [adminTitleSearchBusy, setAdminTitleSearchBusy] = useState(false);
   const [adminTitleImportBusy, setAdminTitleImportBusy] = useState<string | null>(null);
   const [adminTitleSearchMessage, setAdminTitleSearchMessage] = useState("");
