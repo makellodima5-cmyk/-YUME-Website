@@ -1769,6 +1769,16 @@ function Index() {
                 </div>
               )}
               <Grid items={catalogResults} onSelect={select} empty={t("catalog.noResultsFormal")} />
+              {initialCatalogTotal > 0 && (
+                <PageNavigation
+                  page={catalogPage}
+                  totalPages={totalCatalogPages}
+                  onPageChange={(nextPage) => { setCatalogPage(nextPage); writeCatalogUrl({ page: nextPage }); }}
+                  ariaLabel={t("catalog.pages")}
+                  previousLabel={t("catalog.previous")}
+                  nextLabel={t("catalog.next")}
+                />
+              )}
             </>
           )}
         </main>
