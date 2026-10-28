@@ -193,9 +193,7 @@ export const Route = createFileRoute("/")({
       newReleases: refreshedItems
         .filter((anime) => isNewRelease(anime))
         .sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? "") || (b.rating ?? -1) - (a.rating ?? -1)),
-      announcements: (sourceFeeds
-        ? selectLiveCatalogItems(refreshedItems, sourceFeeds.announcements)
-        : refreshedItems)
+      announcements: refreshedItems
         .filter((anime) => isUpcomingAnnouncement(anime))
         .sort((a, b) => {
           const aDate = getExactReleaseDate(a.airedOn);
@@ -466,19 +464,7 @@ function Index() {
         };
         setPopularAnime(selectUpdatedFeed(feeds.popular).filter((anime) => (anime.rating ?? 0) >= 8));
 
-        setSectionFeeds((current) => current ? {
-          ...current,
-          announcements: selectUpdatedFeed(feeds.announcements)
-            .filter((anime) => isUpcomingAnnouncement(anime))
-            .sort((a, b) => {
-              const aDate = getExactReleaseDate(a.airedOn);
-              const bDate = getExactReleaseDate(b.airedOn);
-              if (aDate && bDate) return aDate.localeCompare(bDate);
-              if (aDate) return -1;
-              if (bDate) return 1;
-              return a.year - b.year || (b.rating ?? -1) - (a.rating ?? -1);
-            }),
-        } : current);
+
       } catch {
         // Keep the last successful section snapshot when Shikimori is temporarily unavailable.
       }
