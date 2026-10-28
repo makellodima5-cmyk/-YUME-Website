@@ -11,9 +11,9 @@ import { CatalogFilters, type CatalogFiltersValue } from "./CatalogFilters";
 import { useYumePreferences, displayAnimeTitle, type TranslationKey } from "@/data/preferences";
 import { telegramHapticImpact } from "@/lib/telegram-mini-app";
 
-type HalloweenIconKind = "pumpkin" | "ghost" | "bat" | "candle";
+export type HalloweenIconKind = "pumpkin" | "ghost" | "bat" | "candle";
 
-function HalloweenSectionIcon({ kind }: { kind: HalloweenIconKind }) {
+export function HalloweenSectionIcon({ kind }: { kind: HalloweenIconKind }) {
   return (
     <svg aria-hidden="true" viewBox="0 0 28 28" className="h-5 w-5 shrink-0 text-[#ff8a2b] drop-shadow-[0_0_7px_rgba(255,112,25,0.36)]" fill="none">
       {kind === "pumpkin" ? (
