@@ -180,6 +180,7 @@ export const Route = createFileRoute("/")({
       const page = Math.min(Math.max(1, deps.page ?? 1), pageCount);
       const years = allItems.map(a => a.year).filter(y => Number.isFinite(y) && y > 0);
       return {
+        catalogMode: "paged",
         anime: paginateCatalog(results, page, pageSize), popular: [],
         sectionFeeds: { airing: [], newReleases: [], announcements: [] }, catalogIds: [],
         catalogTotal: results.length, catalogPage: page,
@@ -237,7 +238,7 @@ export const Route = createFileRoute("/")({
       catalogIds,
       apiError: catalog.error,
       catalogProgress: catalog.progress,
-      catalogTotal: refreshedItems.length, catalogPage: 1, catalogFacets: null,
+      catalogMode: "full", catalogTotal: refreshedItems.length, catalogPage: 1, catalogFacets: null,
     };
   },
   component: Index,
@@ -450,7 +451,7 @@ function Index() {
     sectionFeeds: initialSectionFeeds,
     catalogIds,
     apiError,
-    catalogProgress: initialCatalogProgress, catalogTotal: initialCatalogTotal, catalogPage: loadedCatalogPage, catalogFacets,
+    catalogProgress: initialCatalogProgress, catalogMode, catalogTotal: initialCatalogTotal, catalogPage: loadedCatalogPage, catalogFacets,
   } = Route.useLoaderData();
   const [catalogAnime, setCatalogAnime] = useState<Anime[]>(loadedAnime);
   const [popularAnime, setPopularAnime] = useState<Anime[]>(initialPopularAnime);
@@ -460,7 +461,7 @@ function Index() {
   const catalogAnimeRef = useRef(catalogAnime);
   const ANIME = catalogAnime;
 
-  useEffect(() => { if (view === "catalog") { setCatalogAnime(loadedAnime); catalogAnimeRef.current = loadedAnime; } }, [loadedAnime, view]);
+  useEffect(() => { if (view === "catalog" && catalogMode === "paged") { setCatalogAnime(loadedAnime); catalogAnimeRef.current = loadedAnime; } }, [loadedAnime, view, catalogMode]);
   useEffect(() => { catalogAnimeRef.current = catalogAnime; }, [catalogAnime]);
 
   useEffect(() => {
@@ -1759,7 +1760,7 @@ function Index() {
             <h1 className="text-xl font-semibold">{submittedQuery ? `${t("catalog.results")}: «${submittedQuery}»` : t("catalog.filterResults")} <span className="text-muted-foreground">· {needsFullCatalog && catalogLoadState !== "loaded" && catalogLoadState !== "error" ? "…" : catalogResults.length}</span></h1>
             <button onClick={() => { setQuery(""); setSubmittedQuery(""); setDraftFilters(EMPTY_CATALOG_FILTERS); setActiveFilters(EMPTY_CATALOG_FILTERS); setFiltersOpen(false); setCatalogPage(1); }} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"><X className="h-4 w-4" />{t("catalog.reset")}</button>
           </div>
-          {needsFullCatalog && catalogLoadState !== "loaded" && catalogLoadState !== "error" ? (
+          {(view === "catalog" && catalogMode !== "paged") || (needsFullCatalog && catalogLoadState !== "loaded" && catalogLoadState !== "error") ? (
             <CatalogSkeleton count={8} />
           ) : (
             <>
@@ -2046,7 +2047,7 @@ function Index() {
                 </div>
               )}
               <Grid items={visibleCatalogResults} onSelect={select} empty={ANIME.length === 0 && (apiError || catalogLoadError) ? t("source.catalogUnavailable") : t("catalog.noResults")} />
-              {initialCatalogTotal > 0 && <nav aria-label={t("catalog.pages")} className="mt-8 flex flex-wrap items-center justify-center gap-1.5">
+              {catalogResults.length > 0 && <nav aria-label={t("catalog.pages")} className="mt-8 flex flex-wrap items-center justify-center gap-1.5">
                 <button type="button" disabled={catalogPage === 1} onClick={() => { const next = Math.max(1, catalogPage - 1); setCatalogPage(next); writeCatalogUrl({ page: next }); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="h-9 rounded-lg border border-border px-3 text-sm transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-35">{t("catalog.previous")}</button>
                 {Array.from({ length: totalCatalogPages }, (_, index) => index + 1)
                   .filter((page) => page === 1 || page === totalCatalogPages || Math.abs(page - catalogPage) <= 1)
