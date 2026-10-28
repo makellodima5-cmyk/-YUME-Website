@@ -1,3 +1,5 @@
+import { matchesSearchQuery } from "@/data/search-text";
+
 // Demo data. Later replaced by a Shikimori-backed source with the same shape.
 export type Anime = {
   id: string;
@@ -102,14 +104,10 @@ export const SCHEDULE = [
 export const byId = (id: string) => ANIME.find((a) => a.id === id)!;
 
 export function filterAnime(list: Anime[], query: string, genre?: string | null) {
-  const q = query.trim().toLowerCase();
   return list.filter(
     (a) =>
       (!genre || a.genres.includes(genre)) &&
-      (!q ||
-        a.title.toLowerCase().includes(q) ||
-        a.original.toLowerCase().includes(q) ||
-        a.genres.some((g) => g.toLowerCase().includes(q))),
+      matchesSearchQuery(query, [a.title, a.englishTitle ?? "", a.original, ...a.genres]),
   );
 }
 
