@@ -1623,8 +1623,6 @@ function Index() {
       section: view,
       q: q || undefined,
       page: overrides.page ?? catalogPage,
-      // The server loader ignores UI-local language; translation affects display only.
-      // All sort/filter semantics remain URL-addressable.
       sort: has("sort") ? overrides.sort : sortBy !== "rating" ? sortBy : undefined,
       genres: genres || undefined,
       status: status || undefined,
