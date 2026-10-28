@@ -179,7 +179,7 @@ function AnimeDetailPage() {
         setKodikEpisode(matchingEpisode?.number ?? matchingSource?.episodes[0]?.number ?? 1);
         setResumeTargetEpisode(matchingEpisode ? matchingEpisode.number : null);
         setResumeTargetSeconds(Number.isFinite(requestedResume) && requestedResume > 0 ? Math.floor(requestedResume) : 0);
-        if (!sources.length) setKodikError(language === "en" ? "No Kodik episodes were found for this title." : "В Kodik не найдены серии для этого аниме.");
+        // An empty successful response is a confirmed "no episodes" state, not a technical error.
       })
       .catch(() => {
         if (!cancelled) setKodikError(language === "en" ? "Could not load episodes from Kodik. Please try again later." : "Не удалось загрузить серии из Kodik. Попробуйте позже.");
