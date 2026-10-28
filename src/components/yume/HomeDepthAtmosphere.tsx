@@ -1,7 +1,24 @@
+import halloweenBackground from "@/assets/yume-halloween-background.webp";
+import { useHalloweenSeason } from "@/data/seasonal-theme";
+
 /**
- * A quiet, layered ambient backdrop that adds cinematic depth without particles.
- * The depth comes from overlapping light fields moving at a very low speed.
+ * The regular YUME ambient backdrop becomes a seasonal desktop wallpaper
+ * during October 28-November 2. The center of the artwork is intentionally
+ * almost black so cards stay readable; phones do not use the wallpaper.
  */
 export function HomeDepthAtmosphere() {
-  return <div className="yume-depth-atmosphere" aria-hidden="true" />;
+  const halloween = useHalloweenSeason();
+  return (
+    <div
+      className={"yume-depth-atmosphere" + (halloween ? " yume-depth-atmosphere--halloween" : "")}
+      style={halloween ? {
+        backgroundImage: "url(" + halloweenBackground + ")",
+        backgroundColor: "#000",
+        backgroundPosition: "center top",
+        backgroundSize: "100% auto",
+        backgroundRepeat: "repeat-y",
+      } : undefined}
+      aria-hidden="true"
+    />
+  );
 }
