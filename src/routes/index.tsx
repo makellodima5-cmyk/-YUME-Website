@@ -1595,7 +1595,7 @@ function Index() {
   const catalogPageSize = 20;
   const totalCatalogPages = getCatalogPageCount(view === "catalog" ? initialCatalogTotal : catalogResults.length, catalogPageSize);
   const visibleCatalogResults = view === "catalog" ? ANIME : paginateCatalog(catalogResults, catalogPage, catalogPageSize);
-  useEffect(() => { if (view === "catalog") { setCatalogPage(loadedCatalogPage); setCatalogQuery(urlQuery ?? ""); setSortBy(urlSort ?? "rating"); setActiveFilters({ ...EMPTY_CATALOG_FILTERS, genres: (urlGenres ?? "").split(",").filter(Boolean).slice(0,20), status: urlStatus ?? EMPTY_CATALOG_FILTERS.status, yearFrom: urlFrom === undefined ? "" : String(urlFrom), yearTo: urlTo === undefined ? "" : String(urlTo), minRating: urlRating ?? 0, type: urlKind ?? EMPTY_CATALOG_FILTERS.type, ageRating: urlAge ?? EMPTY_CATALOG_FILTERS.ageRating }); } }, [view, loadedCatalogPage, urlQuery, urlPage, urlSort, urlGenres, urlStatus, urlFrom, urlTo, urlRating, urlKind, urlAge]);
+  useEffect(() => { if (view === "catalog") { setCatalogPage(loadedCatalogPage); } }, [view, loadedCatalogPage]);
   const activeFilterCount = activeFilters.genres.length +
     Number(activeFilters.status !== "Любой") + Number(activeFilters.yearFrom !== "") +
     Number(activeFilters.yearTo !== "") + Number(activeFilters.minRating > 0) +
