@@ -103,7 +103,7 @@ export function Hero({
           fetchPriority="high"
           decoding="async"
           draggable={false}
-          className="mb-4 block h-auto w-[min(62%,260px)] object-contain object-left drop-shadow-[0_2px_18px_rgba(0,0,0,0.3)] sm:mb-5 sm:w-[min(65%,340px)] md:mb-6 md:w-[min(58%,400px)] lg:w-[min(56%,450px)]"
+          className="mb-4 block h-auto w-[min(62%,260px)] -translate-y-8 object-contain object-left drop-shadow-[0_2px_18px_rgba(0,0,0,0.3)] sm:mb-5 sm:w-[min(65%,340px)] sm:translate-y-0 md:mb-6 md:w-[min(58%,400px)] lg:w-[min(56%,450px)]"
         />
         <div className="flex flex-row flex-wrap gap-2">
           <button onClick={() => { telegramHapticImpact("light"); onRandom(); }} className="yume-tactile-control inline-flex w-fit items-center justify-center gap-1.5 rounded-full bg-neon px-3.5 py-2 text-xs font-semibold text-primary-foreground shadow-neon transition hover:brightness-110 sm:gap-2 sm:px-5 sm:py-2.5 sm:text-sm">
