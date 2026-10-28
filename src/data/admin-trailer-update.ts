@@ -15,6 +15,8 @@ type AdminTrailerPayload = {
   checked?: number;
   found?: number;
   missing?: number;
+  catalogTotal?: number;
+  catalogWithTrailer?: number;
   delayMs?: number;
   retryAfterMs?: number;
 };
@@ -87,12 +89,17 @@ export async function runAdminTrailerUpdate(options: AdminTrailerUpdateOptions):
   };
 
   const publishStats = (payload: AdminTrailerPayload) => {
+    const hasCatalogMetrics =
+      typeof payload.catalogTotal === "number" &&
+      typeof payload.catalogWithTrailer === "number";
     stats = {
-      total: numericValue(payload.total, stats.total),
+      // Queue counters from POST responses are not the same as catalog totals.
+      // Use current anime_catalog aggregates only when the API supplies them.
+      total: hasCatalogMetrics ? numericValue(payload.catalogTotal, stats.total) : stats.total,
       pending: numericValue(payload.pending, stats.pending),
       checked: numericValue(payload.checked, stats.checked),
-      found: numericValue(payload.found, stats.found),
-      // POST responses omit missing, so preserve the GET value until refreshed.
+      found: hasCatalogMetrics ? numericValue(payload.catalogWithTrailer, stats.found) : stats.found,
+      // POST responses omit the live missing count; the final GET refreshes it.
       missing: numericValue(payload.missing, stats.missing),
     };
     onStats({ ...stats });
