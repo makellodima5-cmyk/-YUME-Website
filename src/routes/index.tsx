@@ -8,13 +8,14 @@ import { getExactReleaseDate, isNewRelease, isUpcomingAnnouncement } from "@/dat
 import { Header, type View } from "@/components/yume/Header";
 import { AuthPage } from "@/components/yume/AuthPage";
 import { AnimeCard } from "@/components/yume/Poster";
-import { CollectionsGrid, Grid, Hero, Row } from "@/components/yume/Sections";
+import { CollectionsGrid, Grid, Hero, Row, HalloweenSectionIcon } from "@/components/yume/Sections";
 import { CatalogFilters, EMPTY_CATALOG_FILTERS, type CatalogFiltersValue } from "@/components/yume/CatalogFilters";
 import { Profile } from "@/components/yume/Profile";
 import { Footer } from "@/components/yume/Footer";
 import { HomeDepthAtmosphere } from "@/components/yume/HomeDepthAtmosphere";
 import "../home-depth.css";
 import { useYumePreferences, displayGenre, type TranslationKey } from "@/data/preferences";
+import { useHalloweenSeason } from "@/data/seasonal-theme";
 import { filterAndSortCatalog, getCatalogPageCount, paginateCatalog } from "@/data/catalog-utils";
 import { validateCatalogSearch } from "@/data/catalog-search";
 import homeSocialImage from "@/assets/yume-desktop.webp";
@@ -371,6 +372,7 @@ function HomeQuickControls({ onProfile }: { onProfile: () => void }) {
 
 function Index() {
   const { t, language } = useYumePreferences();
+  const halloween = useHalloweenSeason();
   const navigate = useNavigate();
   useEffect(() => {
     const metadata = language === "en"
@@ -1569,7 +1571,7 @@ function Index() {
                   </Row>}
                   <section className="mt-10 px-4 md:px-10">
                     <div className="mb-4 flex items-end justify-between">
-                      <h2 className="text-lg font-semibold md:text-xl">{t("home.collections")}</h2>
+                      <h2 className={"flex items-center gap-2 text-lg font-semibold md:text-xl " + (halloween ? "yume-halloween-section-title" : "")}>{halloween ? <HalloweenSectionIcon kind="candle" /> : null}<span>{t("home.collections")}</span></h2>
                       <SeeAll onClick={() => setView("collections")} />
                     </div>
                     <CollectionsGrid animeList={ANIME} onOpen={(id) => { setCollection(id); setView("collections"); }} />
