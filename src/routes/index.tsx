@@ -501,6 +501,13 @@ function Index() {
   const [trailerAuto, setTrailerAuto] = useState<{enabled:boolean;running:boolean;nextRunAt:number|null;lastRunAt:number|null;retryAt:number|null;lastError:string}>({enabled:false,running:false,nextRunAt:null,lastRunAt:null,retryAt:null,lastError:""});
   const [trailerAutoBusy, setTrailerAutoBusy] = useState(false);
   const [adminImportTarget, setAdminImportTarget] = useState("50");
+  const [adminBulkBlock18Plus, setAdminBulkBlock18Plus] = useState(true);
+  const [adminBulkFilterBusy, setAdminBulkFilterBusy] = useState(false);
+  const [adminDeleteQuery, setAdminDeleteQuery] = useState("");
+  const [adminDeleteResults, setAdminDeleteResults] = useState<Array<{id:string;title:string;englishTitle:string|null;originalTitle:string;year:number;posterUrl:string|null;genres:string[];ageRating:string|null}>>([]);
+  const [adminDeleteSearchBusy, setAdminDeleteSearchBusy] = useState(false);
+  const [adminDeleteBusy, setAdminDeleteBusy] = useState<string|null>(null);
+  const [adminDeleteMessage, setAdminDeleteMessage] = useState("");
   const [adminImportRunning, setAdminImportRunning] = useState(false);
   const [adminImport, setAdminImport] = useState<{target:number;cursor:number;added:number;skipped:number;incomplete:number;errors:number;state:string;delayMs?:number}>({target:0,cursor:1,added:0,skipped:0,incomplete:0,errors:0,state:"idle"});
   const [adminImportMessage, setAdminImportMessage] = useState("");
@@ -525,7 +532,7 @@ function Index() {
   const [adminAuditLog, setAdminAuditLog] = useState<{id:number;action:string;status:string;details:Record<string,unknown>;created_at:string}[]>([]);
   const [maintenanceBusy, setMaintenanceBusy] = useState(false);
   const [maintenanceMessage, setMaintenanceMessage] = useState("");
-  const [expandedAdminSections, setExpandedAdminSections] = useState({import:false,metadata:false,quality:false,maintenance:false,audit:false,trailers:false,notifications:false});
+  const [expandedAdminSections, setExpandedAdminSections] = useState({import:false,deletion:false,metadata:false,quality:false,maintenance:false,audit:false,trailers:false,notifications:false});
   const [analyticsData, setAnalyticsData] = useState<{periods:{hours:{visits:number;visitors:number};week:{visits:number;visitors:number};month:{visits:number;visitors:number};all:{visits:number;visitors:number}};daily:{date:string;visits:number;pageViews:number;visitors:number}[];updatedAt:string}|null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [analyticsError, setAnalyticsError] = useState("");
@@ -543,7 +550,7 @@ function Index() {
 
   useEffect(() => {
     if (view !== "admin") return;
-    setExpandedAdminSections({import:false,metadata:false,quality:false,maintenance:false,audit:false,trailers:false,notifications:false});
+    setExpandedAdminSections({import:false,deletion:false,metadata:false,quality:false,maintenance:false,audit:false,trailers:false,notifications:false});
     setAnalyticsOpen(false);
   }, [view]);
 
@@ -937,10 +944,11 @@ function Index() {
     if (!isAdmin) return;
     let cancelled = false;
     fetch("/api/admin/catalog-import", { credentials: "same-origin", cache: "no-store" })
-      .then(async response => ({ response, payload: await response.json().catch(() => ({})) as {isAdmin?:boolean;target?:number;cursor?:number;added?:number;skipped?:number;incomplete?:number;errors?:number;state?:string;delayMs?:number;quality?:typeof catalogQuality;qualitySummary?:typeof catalogQualitySummary;qualityOffset?:number;qualityHasMore?:boolean;auditLog?:typeof adminAuditLog} }))
+      .then(async response => ({ response, payload: await response.json().catch(() => ({})) as {isAdmin?:boolean;target?:number;cursor?:number;added?:number;skipped?:number;incomplete?:number;errors?:number;state?:string;delayMs?:number;bulkImportBlock18Plus?:boolean;quality?:typeof catalogQuality;qualitySummary?:typeof catalogQualitySummary;qualityOffset?:number;qualityHasMore?:boolean;auditLog?:typeof adminAuditLog} }))
       .then(({response,payload}) => {
         if (cancelled || !response.ok || payload.isAdmin !== true) return;
         setAdminImport({target:payload.target ?? 0,cursor:payload.cursor ?? 1,added:payload.added ?? 0,skipped:payload.skipped ?? 0,incomplete:payload.incomplete ?? 0,errors:payload.errors ?? 0,state:payload.state ?? "idle",delayMs:payload.delayMs});
+        if (typeof payload.bulkImportBlock18Plus === "boolean") setAdminBulkBlock18Plus(payload.bulkImportBlock18Plus);
         setCatalogQuality(payload.quality ?? []);
         setCatalogQualitySummary(payload.qualitySummary ?? {total:0,incomplete:0,missingYear:0,missingPoster:0,missingDescription:0});
         setCatalogQualityOffset(payload.qualityOffset ?? 0);
@@ -957,7 +965,7 @@ function Index() {
       try {
         const response = await fetch("/api/admin/catalog-import?status=1", { credentials: "same-origin", cache: "no-store" });
         const payload = await response.json().catch(() => ({})) as {
-          isAdmin?: boolean; target?:number; cursor?:number; added?:number; skipped?:number; incomplete?:number; errors?:number; state?:string; delayMs?:number;
+          isAdmin?: boolean; target?:number; cursor?:number; added?:number; skipped?:number; incomplete?:number; errors?:number; state?:string; delayMs?:number; bulkImportBlock18Plus?:boolean;
           qualitySummary?:typeof catalogQualitySummary; quality?:typeof catalogQuality; qualityOffset?:number; qualityHasMore?:boolean;
           metadataRefresh?: { autoEnabled?: boolean; phase?: string; metadataOffset?: number; screenshotOffset?: number; total?: number; screenshotFailures?: number; screenshotRetries?: number; done?: boolean; stats?: MetadataCatalogStats; bannersFoundTotal?: number; bannersMatchedTotal?: number; bannersSavedTotal?: number; bannersAddedTotal?: number; bannerErrorsTotal?: number; bannersStored?: number };
         };
@@ -971,6 +979,7 @@ function Index() {
           setCatalogQualityHasMore(payload.qualityHasMore ?? false);
         }
         if (typeof payload.target === "number") setAdminImport({target:payload.target,cursor:payload.cursor??1,added:payload.added??0,skipped:payload.skipped??0,incomplete:payload.incomplete??0,errors:payload.errors??0,state:payload.state??"idle",delayMs:payload.delayMs});
+        if (typeof payload.bulkImportBlock18Plus === "boolean") setAdminBulkBlock18Plus(payload.bulkImportBlock18Plus);
         const phase = status.phase ?? "idle";
         const total = status.total ?? 0;
         const offset = phase === "metadata" ? (status.metadataOffset ?? 0) : (status.screenshotOffset ?? 0);
@@ -1176,6 +1185,57 @@ function Index() {
   };
 
 
+
+  const saveAdminBulkImportFilter = async (enabled: boolean) => {
+    if (!isAdmin || adminBulkFilterBusy || adminImportRunning || adminImport.state === "running") return;
+    setAdminBulkFilterBusy(true); setAdminImportMessage("");
+    try {
+      const response = await fetch("/api/admin/catalog-import", {method:"POST",credentials:"same-origin",cache:"no-store",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"set_bulk_import_filter",block18Plus:enabled})});
+      const payload = await response.json().catch(()=>({})) as {isAdmin?:boolean;bulkImportBlock18Plus?:boolean;error?:string;message?:string};
+      if (!response.ok || payload.isAdmin !== true || typeof payload.bulkImportBlock18Plus !== "boolean") throw new Error(payload.message ?? payload.error ?? (language==="ru" ? "Не удалось сохранить фильтр 18+." : "Could not save the 18+ filter."));
+      setAdminBulkBlock18Plus(payload.bulkImportBlock18Plus);
+      setAdminImportMessage(language==="ru" ? (enabled ? "Фильтр 18+ сохранён: такие тайтлы будут пропускаться при новом массовом импорте." : "Фильтр 18+ отключён: рейтинг 18+ разрешён при новом массовом импорте.") : (enabled ? "18+ filter saved: these titles will be skipped by new bulk imports." : "18+ filter disabled: 18+ titles may be added by new bulk imports."));
+    } catch (error) { setAdminImportMessage(error instanceof Error ? error.message : (language==="ru" ? "Не удалось сохранить настройку." : "Could not save setting.")); }
+    finally { setAdminBulkFilterBusy(false); }
+  };
+
+  const searchCatalogDeletionTitle = async () => {
+    if (!isAdmin || adminDeleteSearchBusy || adminDeleteBusy) return;
+    const query = adminDeleteQuery.trim();
+    if (query.length < 2) { setAdminDeleteMessage(language==="ru" ? "Введи не менее двух символов названия." : "Enter at least two characters."); setAdminDeleteResults([]); return; }
+    setAdminDeleteSearchBusy(true); setAdminDeleteMessage(""); setAdminDeleteResults([]);
+    try {
+      const response = await fetch("/api/admin/catalog-import", {method:"POST",credentials:"same-origin",cache:"no-store",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"search_delete_title",query})});
+      const payload = await response.json().catch(()=>({})) as {isAdmin?:boolean;error?:string;message?:string;results?:typeof adminDeleteResults};
+      if (!response.ok || payload.isAdmin !== true) throw new Error(payload.message ?? payload.error ?? (language==="ru" ? "Не удалось найти тайтлы." : "Could not find titles."));
+      setAdminDeleteResults(payload.results ?? []);
+      setAdminDeleteMessage(payload.results?.length ? (language==="ru" ? "Выбери запись для удаления. Перед удалением будет дополнительное подтверждение." : "Choose a record to delete. You will be asked to confirm.") : (language==="ru" ? "В каталоге ничего не найдено." : "No matching titles found in the catalog."));
+    } catch (error) { setAdminDeleteMessage(error instanceof Error ? error.message : (language==="ru" ? "Ошибка поиска." : "Search failed.")); }
+    finally { setAdminDeleteSearchBusy(false); }
+  };
+
+  const deleteCatalogTitle = async (animeId: string) => {
+    if (!isAdmin || adminDeleteBusy || adminImportRunning || metadataRefreshRunning) return;
+    const selected = adminDeleteResults.find(item => item.id === animeId);
+    if (!selected) return;
+    const confirmed = window.confirm(language==="ru" ? "Удалить «" + selected.title + "» из каталога навсегда? Запись и скриншоты будут удалены. Массовый импорт больше не добавит её автоматически. Отменить это действие нельзя; ручной импорт по названию сможет добавить её снова." : "Permanently delete “" + selected.title + "” from the catalog? Its record and screenshots will be removed, and bulk import will not add it again. This cannot be undone here; an explicit title import can add it again.");
+    if (!confirmed) return;
+    setAdminDeleteBusy(animeId); setAdminDeleteMessage("");
+    try {
+      const response = await fetch("/api/admin/catalog-import", {method:"POST",credentials:"same-origin",cache:"no-store",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"delete_title",animeId})});
+      const payload = await response.json().catch(()=>({})) as {isAdmin?:boolean;deleted?:boolean;error?:string;message?:string;anime?:{id:string;title:string}};
+      if (!response.ok || payload.isAdmin !== true || payload.deleted !== true) throw new Error(payload.message ?? payload.error ?? (language==="ru" ? "Не удалось удалить тайтл." : "Could not delete title."));
+      allowedCatalogIds.delete(animeId);
+      catalogAnimeRef.current = catalogAnimeRef.current.filter(item => item.id !== animeId);
+      setCatalogAnime(catalogAnimeRef.current);
+      setPopularAnime(current => current.filter(item => item.id !== animeId));
+      setSectionFeeds(current => current ? {...current,airing:current.airing.filter(item=>item.id!==animeId),announcements:current.announcements.filter(item=>item.id!==animeId)} : current);
+      setAdminDeleteResults(current => current.filter(item => item.id !== animeId));
+      setAdminDeleteMessage(language==="ru" ? "Удалено: " + (payload.anime?.title ?? selected.title) + ". Тайтл также исключён из массового импорта." : "Deleted: " + (payload.anime?.title ?? selected.title) + ". It is also excluded from bulk import.");
+      await refreshCatalogQuality();
+    } catch (error) { setAdminDeleteMessage(error instanceof Error ? error.message : (language==="ru" ? "Не удалось удалить тайтл." : "Could not delete title.")); }
+    finally { setAdminDeleteBusy(null); }
+  };
 
   const searchCatalogTitle = async () => {
     if (!isAdmin || adminTitleSearchBusy || adminTitleImportBusy || adminImportRunning || metadataRefreshRunning) return;
@@ -2065,7 +2125,7 @@ function Index() {
                             )}
                             <div className="min-w-0 flex-1">
                               <h4 className="break-words text-sm font-medium text-white">{item.title}</h4>
-                              <p className="mt-0.5 break-words text-xs text-muted-foreground">{[item.originalTitle !== item.title ? item.originalTitle : "", item.englishTitle !== item.originalTitle ? item.englishTitle : "", item.year > 0 ? String(item.year) : "", item.kind ?? ""].filter(Boolean).join(" · ")}</p>
+                              <p className="mt-0.5 break-words text-xs text-muted-foreground">{[item.originalTitle !== item.title ? item.originalTitle : "", item.englishTitle !== item.originalTitle ? item.englishTitle : "", item.year > 0 ? String(item.year) : "", item.kind ?? "", item.ageRating ? (language==="ru" ? "Возраст: " : "Age: ") + item.ageRating : "", ...(item.genres ?? []).slice(0,3)].filter(Boolean).join(" · ")}</p>
                               <p className="mt-0.5 text-[11px] text-muted-foreground">Shikimori ID: {item.id}{item.status ? " · " + item.status : ""}</p>
                             </div>
                             <button
@@ -2097,6 +2157,14 @@ function Index() {
                       {adminImportRunning ? (language === "ru" ? "Импорт…" : "Importing…") : adminImport.state === "running" ? (language === "ru" ? "Продолжить импорт" : "Resume import") : (language === "ru" ? "Начать импорт" : "Start import")}
                     </button>
                   </div>
+                  <label className="mt-3 flex cursor-pointer items-start gap-3 rounded-xl border border-[#49375A] bg-[#100B17] p-3">
+                    <input type="checkbox" checked={adminBulkBlock18Plus} onChange={event => { void saveAdminBulkImportFilter(event.target.checked); }} disabled={adminBulkFilterBusy || adminImportRunning || adminImport.state === "running" || metadataRefreshRunning} className="mt-1 h-4 w-4 shrink-0 accent-fuchsia-400 disabled:opacity-50"/>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-semibold text-[#F8F4FF]">{language==="ru" ? "Исключать рейтинг 18+ при импорте по количеству" : "Exclude 18+ ratings from quantity imports"}</span>
+                      <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">{language==="ru" ? "Включено: тайтлы с рейтингом RX (18+) пропускаются. Хентай, яой и юри запрещены для массовой загрузки всегда. Поиск и ручной импорт по названию этими правилами не ограничиваются." : "When enabled, RX (18+) titles are skipped. Hentai, yaoi and yuri are always excluded from bulk imports. Title search and manual title imports are not affected."}</span>
+                      {adminBulkFilterBusy && <span className="mt-1 block text-xs text-[#D0A8FF]">{language==="ru" ? "Сохраняем настройку…" : "Saving setting…"}</span>}
+                    </span>
+                  </label>
                   <div className="mt-3 grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
                     <div className="rounded-lg border border-[#243D35] bg-[#050408] p-2.5"><span className="block text-xs text-[#A89CB8]">{language === "ru" ? "Добавлено" : "Added"}</span><strong className="tabular-nums text-[#36EBA6]">{adminImport.added} / {adminImport.target}</strong></div>
                     <div className="rounded-lg border border-[#27374A] bg-[#050408] p-2.5"><span className="block text-xs text-[#A89CB8]">{language === "ru" ? "Дубликаты" : "Duplicates"}</span><strong className="tabular-nums text-[#91CFFF]">{adminImport.skipped}</strong></div>
@@ -2106,6 +2174,27 @@ function Index() {
                   {adminImportRunning && <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted" role="progressbar" aria-valuemin={0} aria-valuemax={adminImport.target || 1} aria-valuenow={adminImport.added}><div className="h-full rounded-full bg-gradient-to-r from-[#A83BFA] to-[#D08AFF] transition-all" style={{width:`${adminImport.target ? Math.min(100,adminImport.added/adminImport.target*100) : 0}%`}} /></div>}
                   <p className="mt-2 text-xs text-muted-foreground">{language === "ru" ? `Состояние: ${adminImport.state}. Страница Shikimori: ${adminImport.cursor}.` : `Status: ${adminImport.state}. Shikimori page: ${adminImport.cursor}.`}</p>
                   {adminImportMessage && <p className="mt-2 rounded-lg border border-border bg-background/60 p-2.5 text-xs" role="status">{adminImportMessage}</p>}
+                </div>
+              </details>
+              <details open={expandedAdminSections.deletion} onToggle={event => { const isOpen = event.currentTarget.open; setExpandedAdminSections(current => current.deletion === isOpen ? current : {...current, deletion: isOpen}); }} className="group mb-3 overflow-hidden rounded-2xl border border-[#713342] bg-[#10090D]" aria-label={language==="ru" ? "Удаление тайтла из каталога" : "Delete title from catalog"}>
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 hover:bg-card/80 [&::-webkit-details-marker]:hidden">
+                  <span className="flex min-w-0 items-center gap-2.5"><Database className="h-5 w-5 shrink-0 text-[#FF758B]" /><span className="min-w-0"><span className="block font-semibold text-[#FFF2F4]">{language==="ru" ? "Удаление тайтла из каталога" : "Delete a title from the catalog"}</span><span className="mt-0.5 block text-xs text-muted-foreground">{language==="ru" ? "Найди запись по названию и удали её вместе со скриншотами" : "Find a catalog entry by title and remove it with its screenshots"}</span></span></span>
+                  <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+                </summary>
+                <div className="border-t border-border/70 p-3 sm:p-4">
+                  <p className="mb-3 text-xs leading-relaxed text-muted-foreground">{language==="ru" ? "Поиск выполняется только по текущему каталогу, включая русское, английское и оригинальное названия. Удалённый тайтл будет пропущен массовым импортом. Его можно добавить снова только явным импортом по названию." : "Searches only the current catalog using Russian, English and original titles. Bulk import will skip a deleted title. It can be restored only with an explicit title import."}</p>
+                  <form className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]" onSubmit={event=>{event.preventDefault();void searchCatalogDeletionTitle();}}>
+                    <input type="search" value={adminDeleteQuery} onChange={event=>{setAdminDeleteQuery(event.target.value);setAdminDeleteResults([]);setAdminDeleteMessage("");}} minLength={2} maxLength={120} placeholder={language==="ru" ? "Название тайтла для удаления" : "Title to delete"} aria-label={language==="ru" ? "Название тайтла для удаления" : "Title to delete"} disabled={adminDeleteSearchBusy || Boolean(adminDeleteBusy) || adminImportRunning || metadataRefreshRunning} className="h-11 min-w-0 rounded-xl border border-[#59303B] bg-[#050408] px-3 text-sm text-white placeholder:text-muted-foreground focus:border-[#FF758B] focus:outline-none focus:ring-1 focus:ring-[#FF758B] disabled:opacity-60"/>
+                    <button type="submit" disabled={adminDeleteSearchBusy || Boolean(adminDeleteBusy) || adminImportRunning || metadataRefreshRunning || adminDeleteQuery.trim().length<2} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#A64B5D] px-4 py-2 text-sm font-semibold text-[#FFD8DF] transition hover:bg-[#2B1119] disabled:cursor-wait disabled:opacity-50"><Search className="h-4 w-4"/>{adminDeleteSearchBusy ? (language==="ru" ? "Ищем…" : "Searching…") : (language==="ru" ? "Найти в каталоге" : "Search catalog")}</button>
+                  </form>
+                  {adminDeleteMessage && <p role="status" className="mt-3 rounded-lg border border-border bg-background/60 p-2.5 text-xs text-muted-foreground">{adminDeleteMessage}</p>}
+                  {adminDeleteResults.length>0 && <div className="mt-3 space-y-2">{adminDeleteResults.map(item=>
+                    <article key={item.id} className="flex min-w-0 items-center gap-3 rounded-xl border border-[#4B2731] bg-[#0D0A10] p-2.5 sm:p-3">
+                      {item.posterUrl ? <img src={item.posterUrl} alt="" loading="lazy" decoding="async" className="h-16 w-11 shrink-0 rounded-md bg-black/30 object-cover"/> : <div aria-hidden="true" className="grid h-16 w-11 shrink-0 place-items-center rounded-md bg-[#29151D] text-xs font-bold text-[#FF9BAB]">Y</div>}
+                      <div className="min-w-0 flex-1"><h4 className="break-words text-sm font-medium text-white">{item.title}</h4><p className="mt-0.5 break-words text-xs text-muted-foreground">{[item.originalTitle!==item.title?item.originalTitle:"",item.englishTitle&&item.englishTitle!==item.originalTitle?item.englishTitle:"",item.year>0?String(item.year):"",item.ageRating??"",...item.genres.slice(0,3)].filter(Boolean).join(" · ")}</p><p className="mt-0.5 text-[11px] text-muted-foreground">Shikimori ID: {item.id}</p></div>
+                      <button type="button" onClick={()=>{void deleteCatalogTitle(item.id);}} disabled={Boolean(adminDeleteBusy)||adminImportRunning||metadataRefreshRunning} className="min-h-9 shrink-0 rounded-lg border border-[#B84A60] px-2.5 py-2 text-[11px] font-semibold text-[#FFB6C4] transition hover:bg-[#3A1520] disabled:cursor-wait disabled:opacity-50">{adminDeleteBusy===item.id ? (language==="ru" ? "Удаляем…" : "Deleting…") : (language==="ru" ? "Удалить" : "Delete")}</button>
+                    </article>
+                  )}</div>}
                 </div>
               </details>
               <details open={expandedAdminSections.metadata} onToggle={event => { const isOpen = event.currentTarget.open; setExpandedAdminSections(current => current.metadata === isOpen ? current : {...current, metadata: isOpen}); }} className="group mb-3 overflow-hidden rounded-2xl border border-[#6C3E91] bg-[#0D0A13]" aria-label={language === "ru" ? "Обновление метаданных каталога" : "Refresh catalogue metadata"}>
