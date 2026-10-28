@@ -104,8 +104,8 @@ export async function runScheduledCatalogStatusRefresh(env: unknown): Promise<vo
         const aired = item.episodesAired == null ? null : Math.max(0, Math.floor(Number(item.episodesAired) || 0));
         const nextEpisode = status === "Онгоинг" && typeof item.nextEpisodeAt === "string" && item.nextEpisodeAt.trim() ? item.nextEpisodeAt : null;
         statements.push(db.prepare(
-          "UPDATE anime_catalog SET status=?, rating=COALESCE(?,rating), episodes=CASE WHEN ?>0 THEN ? ELSE episodes END, episodes_aired=CASE WHEN ? IS NULL THEN episodes_aired ELSE ? END, next_episode_at=?, is_new=CASE WHEN ?='Онгоинг' THEN 1 ELSE 0 END, updated_at=CURRENT_TIMESTAMP WHERE id=?"
-        ).bind(status, rating, episodes, episodes, aired, aired, nextEpisode, status, id));
+          "UPDATE anime_catalog SET status=?, rating=COALESCE(?,rating), episodes=CASE WHEN ?>0 THEN ? ELSE episodes END, episodes_aired=CASE WHEN ? IS NULL THEN episodes_aired ELSE ? END, next_episode_at=?, updated_at=CURRENT_TIMESTAMP WHERE id=?"
+        ).bind(status, rating, episodes, episodes, aired, aired, nextEpisode, id));
       }
       statements.push(db.prepare("INSERT OR IGNORE INTO anime_catalog_status_refresh_seen (cycle_id,anime_id) VALUES (?,?)").bind(cycle, id));
     }
