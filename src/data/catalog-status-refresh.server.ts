@@ -11,7 +11,6 @@ type Phase = "ongoing" | "announcements" | "other";
 const API_URL = "https://shikimori.io/api/graphql";
 const BATCH_SIZE = 40;
 const REQUEST_DELAY_MS = 1200;
-const PHASE_STATUS: Record<Phase, string> = { ongoing: "Онгоинг", announcements: "Анонс", other: "other" };
 function getEnvironment(): Environment {
   try { const value = cloudflareEnv as unknown as Environment; if (value && typeof value === "object") return value; } catch { /* Runtime fallback below. */ }
   return ((globalThis as typeof globalThis & { __YUME_RUNTIME_ENV__?: unknown }).__YUME_RUNTIME_ENV__ as Environment | undefined) ?? {};
