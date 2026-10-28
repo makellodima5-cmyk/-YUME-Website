@@ -542,6 +542,12 @@ function Index() {
   }, []);
 
   useEffect(() => {
+    if (view !== "admin") return;
+    setExpandedAdminSections({import:false,metadata:false,quality:false,maintenance:false,audit:false,trailers:false,notifications:false});
+    setAnalyticsOpen(false);
+  }, [view]);
+
+  useEffect(() => {
     if (!telegramDetectionComplete) return;
     if (isTelegramMiniApp && !telegramAuthReady && !telegramConsentRequired && !telegramAuthError) return;
     let cancelled = false;
@@ -919,7 +925,9 @@ function Index() {
       await runAdminTrailerUpdate({
         language,
         initialStats: adminStats ?? undefined,
-        onStats: setAdminStats,
+        onStats: stats => setAdminStats(current => current
+          ? { ...stats, total: current.total, found: current.found, missing: current.missing }
+          : stats),
         onMessage: setAdminMessage,
       });
     } finally {
