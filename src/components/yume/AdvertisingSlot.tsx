@@ -58,6 +58,7 @@ export function AdvertisingSlot({ slot, language }: AdvertisingSlotProps) {
                 muted
                 loop
                 playsInline
+                controls
                 preload="metadata"
                 aria-label={advertisement.alt}
               >
