@@ -838,7 +838,7 @@ function AnimeDetailPage() {
                     <div className="relative">
                       <select id="kodik-translation" value={kodikTranslationId} onChange={(event) => { const next = kodikSources.find((source) => source.id === event.target.value); setKodikTranslationId(event.target.value); setKodikEpisode(next?.episodes.some((episode) => episode.number === kodikEpisode) ? kodikEpisode : (next?.episodes[0]?.number ?? 1)); }} disabled={!kodikSources.length} className="w-full appearance-none rounded-xl border border-border bg-secondary px-4 py-3 pr-10 text-base text-foreground outline-none transition focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-60">
                         {!kodikSources.length && <option value="">{language === "en" ? "Loading voice-overs…" : "Загрузка озвучек…"}</option>}
-                        {kodikSources.map((source) => <option key={source.id} value={source.id}>{source.title}</option>)}
+                        {kodikSources.map((source) => <option key={source.id} value={source.id}>{source.title} ({source.episodes.length} ep)</option>)}
                       </select>
                       <ChevronDown aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
                     </div>
