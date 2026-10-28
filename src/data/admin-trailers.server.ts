@@ -210,11 +210,23 @@ export async function handleAdminTrailers(request: Request): Promise<Response> {
     console.info("[YUME][ADMIN_API] Queue schema ready.");
 
     if (request.method === "GET") {
-      const counts = await queueCounts(db);
-      const missing = await db.prepare("SELECT COUNT(*) AS count FROM anime_catalog WHERE youtube_trailer_id IS NULL OR youtube_trailer_id = ''")
-        .first<{ count: number }>();
+      const [counts, missing, catalogTotal, catalogWithTrailer] = await Promise.all([
+        queueCounts(db),
+        db.prepare("SELECT COUNT(*) AS count FROM anime_catalog WHERE youtube_trailer_id IS NULL OR youtube_trailer_id = ''").first<{ count: number }>(),
+        db.prepare("SELECT COUNT(*) AS count FROM anime_catalog").first<{ count: number }>(),
+        db.prepare("SELECT COUNT(*) AS count FROM anime_catalog WHERE youtube_trailer_id IS NOT NULL AND youtube_trailer_id <> ''").first<{ count: number }>(),
+      ]);
       const auto = await readAutoState(db);
-      return json({ isAdmin: true, ...counts, missing: Number(missing?.count ?? 0), batchSize: BATCH_SIZE, delayMs: REQUEST_DELAY_MS, auto });
+      return json({
+        isAdmin: true,
+        ...counts,
+        missing: Number(missing?.count ?? 0),
+        catalogTotal: Number(catalogTotal?.count ?? 0),
+        catalogWithTrailer: Number(catalogWithTrailer?.count ?? 0),
+        batchSize: BATCH_SIZE,
+        delayMs: REQUEST_DELAY_MS,
+        auto,
+      });
     }
 
     let body: { action?: unknown };
