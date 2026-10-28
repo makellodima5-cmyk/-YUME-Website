@@ -1607,7 +1607,17 @@ function Index() {
   const catalogPageSize = 20;
   const totalCatalogPages = getCatalogPageCount(view === "catalog" ? initialCatalogTotal : catalogResults.length, catalogPageSize);
   const visibleCatalogResults = view === "catalog" ? ANIME : paginateCatalog(catalogResults, catalogPage, catalogPageSize);
-  useEffect(() => { if (view === "catalog") { setCatalogPage(loadedCatalogPage); } }, [view, loadedCatalogPage]);
+  useEffect(() => {
+    if (view !== "catalog") return;
+    setCatalogPage(loadedCatalogPage);
+    const routeQuery = urlQuery ?? "";
+    if (catalogQuery.trim() !== routeQuery) setCatalogQuery(routeQuery);
+    const routeSort = urlSort ?? "rating";
+    if (sortBy !== routeSort) setSortBy(routeSort);
+    const routeFilters = filtersFromUrl;
+    setActiveFilters(current => JSON.stringify(current) === JSON.stringify(routeFilters) ? current : routeFilters);
+    setDraftFilters(current => JSON.stringify(current) === JSON.stringify(routeFilters) ? current : routeFilters);
+  }, [view, loadedCatalogPage, urlQuery, urlSort, urlGenres, urlStatus, urlFrom, urlTo, urlRating, urlKind, urlAge]);
   const activeFilterCount = activeFilters.genres.length +
     Number(activeFilters.status !== "Любой") + Number(activeFilters.yearFrom !== "") +
     Number(activeFilters.yearTo !== "") + Number(activeFilters.minRating > 0) +
