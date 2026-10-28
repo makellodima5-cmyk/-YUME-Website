@@ -119,6 +119,21 @@ html[data-season="halloween"] .yume-halloween-hero {
   box-shadow: 0 0 26px rgba(255, 91, 16, 0.12), inset 0 0 0 1px rgba(255, 169, 85, 0.08);
 }
 
+/* Warm the banner overlay only during Halloween; preserve the original violet CTA buttons. */
+html[data-season="halloween"] .yume-halloween-hero > .bg-gradient-to-r {
+  background-image: linear-gradient(90deg, rgba(8, 5, 4, 0.82) 0%, rgba(20, 9, 4, 0.48) 43%, transparent 100%) !important;
+}
+html[data-season="halloween"] .yume-halloween-hero > .bg-gradient-to-t {
+  background-image: linear-gradient(0deg, rgba(0, 0, 0, 0.76) 0%, rgba(15, 7, 3, 0.12) 44%, transparent 100%) !important;
+}
+html[data-season="halloween"] .yume-halloween-hero [data-filter-anchor] > div {
+  border-color: rgba(255, 151, 73, 0.42);
+  box-shadow: inset 0 1px 0 rgba(255, 211, 165, 0.07), 0 0 14px rgba(255, 104, 28, 0.1);
+}
+html[data-season="halloween"] .yume-halloween-section-title {
+  color: #fff4e8;
+}
+
 html[data-season="halloween"] .yume-home-quick-control {
   isolation: isolate;
   border-color: rgba(255, 126, 45, 0.52) !important;
