@@ -463,8 +463,27 @@ function Index() {
           return Array.from(selected.values());
         };
         setPopularAnime(selectUpdatedFeed(feeds.popular).filter((anime) => (anime.rating ?? 0) >= 8));
-
-
+        // Rebuild the sections from the updated local catalogue snapshot, not from
+        // Shikimori's limited section feeds. This lets changed statuses move titles
+        // out of "Сейчас выходит" on the next client refresh.
+        setSectionFeeds({
+          airing: updatedCatalog
+            .filter((anime) => isEligibleAiringAnime(anime))
+            .sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? "") || b.year - a.year),
+          newReleases: updatedCatalog
+            .filter((anime) => isNewRelease(anime))
+            .sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? "") || (b.rating ?? -1) - (a.rating ?? -1)),
+          announcements: updatedCatalog
+            .filter((anime) => isUpcomingAnnouncement(anime))
+            .sort((a, b) => {
+              const aDate = getExactReleaseDate(a.airedOn);
+              const bDate = getExactReleaseDate(b.airedOn);
+              if (aDate && bDate) return aDate.localeCompare(bDate);
+              if (aDate) return -1;
+              if (bDate) return 1;
+              return a.year - b.year || (b.rating ?? -1) - (a.rating ?? -1);
+            }),
+        });
       } catch {
         // Keep the last successful section snapshot when Shikimori is temporarily unavailable.
       }
