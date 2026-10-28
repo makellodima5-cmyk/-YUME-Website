@@ -1768,7 +1768,7 @@ function Index() {
                   <button type="button" onClick={() => { catalogLoadStarted.current = false; setCatalogLoadState("idle"); setCatalogLoadAttempt((value) => value + 1); }} className="rounded-lg border border-amber-100/20 px-3 py-1.5 font-semibold hover:bg-amber-100/10">{t("home.retry")}</button>
                 </div>
               )}
-              <Grid items={catalogResults} onSelect={select} empty={t("catalog.noResultsFormal")} />
+              <Grid items={visibleCatalogResults} onSelect={select} empty={t("catalog.noResultsFormal")} />
               {initialCatalogTotal > 0 && (
                 <PageNavigation
                   page={catalogPage}
