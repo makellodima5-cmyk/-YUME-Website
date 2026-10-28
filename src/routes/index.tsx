@@ -461,7 +461,17 @@ function Index() {
   const catalogAnimeRef = useRef(catalogAnime);
   const ANIME = catalogAnime;
 
-  useEffect(() => { if (catalogMode === "full" || view === "catalog") { setCatalogAnime(loadedAnime); catalogAnimeRef.current = loadedAnime; } }, [loadedAnime, view, catalogMode]);
+  useEffect(() => {
+    if (catalogMode === "full" || view === "catalog") {
+      setCatalogAnime(loadedAnime);
+      catalogAnimeRef.current = loadedAnime;
+    }
+    if (catalogMode === "full") {
+      setPopularAnime(initialPopularAnime);
+      setSectionFeeds(initialSectionFeeds);
+      setCatalogProgress(initialCatalogProgress);
+    }
+  }, [loadedAnime, initialPopularAnime, initialSectionFeeds, initialCatalogProgress, view, catalogMode]);
   useEffect(() => { catalogAnimeRef.current = catalogAnime; }, [catalogAnime]);
 
   useEffect(() => {
