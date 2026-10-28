@@ -183,11 +183,16 @@ export default {
         && Boolean((env as Record<string, unknown>).YUME_DB)),
     });
 
-    const [{ runScheduledCatalogMetadataRefresh }, { runScheduledTrailerUpdate }] = await Promise.all([
+    const [{ runScheduledCatalogMetadataRefresh }, { runScheduledTrailerUpdate }, { runScheduledCatalogStatusRefresh }] = await Promise.all([
       import("./data/admin-catalog-import.server"),
       import("./data/admin-trailers.server"),
+      import("./data/catalog-status-refresh.server"),
     ]);
 
+    // The catalogue status queue has priority over other scheduled maintenance.
+    const catalogStatusResult = (await Promise.allSettled([
+      runScheduledCatalogStatusRefresh(env),
+    ]))[0]!;
     const [trailersResult, catalogRefreshResult] = await Promise.allSettled([
       runScheduledTrailerUpdate(env),
       runScheduledCatalogMetadataRefresh(env),
@@ -196,9 +201,10 @@ export default {
       cron: controller.cron,
       trailerJob: trailersResult.status,
       catalogRefreshJob: catalogRefreshResult.status,
+      catalogStatusJob: catalogStatusResult.status,
     });
 
-    const failures = [trailersResult, catalogRefreshResult].filter(
+    const failures = [trailersResult, catalogRefreshResult, catalogStatusResult].filter(
       (result): result is PromiseRejectedResult => result.status === "rejected",
     );
     if (failures.length > 0) {
