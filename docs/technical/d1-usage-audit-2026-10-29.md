@@ -19,6 +19,7 @@ No authentication, session validation, same-origin checks, input validation, rat
 ## Remaining hotspots to monitor
 
 - Rendering the full catalogue requires reading all catalogue rows on a cache refill. The longer snapshot TTL reduces the frequency but does not change the shape of the client-side filtering model.
+- A cold direct visit to an anime detail page used to execute a correlated genre/JSON scan across the catalogue for up to 100 related candidates. It now loads one ordered catalog snapshot and populates the shared cache; follow-up detail visits reuse that snapshot rather than re-running the correlated query.
 - Analytics stores raw page-view events. Its admin metrics include all-time distinct counts; these become more expensive as the event table grows. Any archival/aggregation change should preserve the meaning of the current metrics and requires a separate design.
 - The admin metadata and screenshot repair workflows can perform many D1 writes when manually run. Keep these jobs manual and avoid running repair loops unnecessarily.
 - Trailer discovery stores queue state and periodically revisits titles without a saved trailer. Its schedule is less frequent now, and queue batch size remains bounded.

@@ -281,21 +281,22 @@ export async function getPersistentAnimeDetails(id: string): Promise<{ anime: An
   const row = await db.prepare("SELECT * FROM anime_catalog WHERE id = ?").bind(id).first<AnimeRow>();
   if (!row) return { anime: null, relatedAnime: [] };
 
-  const anime = rowToAnime(row);
-  const candidates = await db.prepare(
-    `SELECT a.* FROM anime_catalog AS a
-     WHERE a.id <> ?
-     ORDER BY (
-       SELECT COUNT(*)
-       FROM json_each(CASE WHEN json_valid(a.genres_json) THEN a.genres_json ELSE '[]' END) AS candidate_genre
-       WHERE candidate_genre.value IN (SELECT value FROM json_each(?))
-     ) DESC, COALESCE(a.rating, -1) DESC, a.position ASC
-     LIMIT 100`,
-  ).bind(id, JSON.stringify(anime.genres)).all<AnimeRow>();
+  // A cold direct-title visit used to execute a correlated JSON genre scan for
+  // each catalog row, then discard most data. Load and cache one ordered snapshot
+  // instead so subsequent title visits can reuse it for related titles as well.
+  const items = await readRows(db);
+  const state = await getMeta(db, "catalog_state");
+  const catalogResult: CatalogResult = {
+    items,
+    error: state === "partial" ? "Каталог загружен частично: " + items.length + " записей." : null,
+    progress: makeProgress(state === "partial" ? "partial" : "ready", items.length),
+  };
+  await writeCachedCatalog(db, catalogResult);
 
+  const anime = items.find((item) => item.id === id) ?? rowToAnime(row);
   return {
     anime,
-    relatedAnime: selectRelatedAnime(anime, candidates.results.map(rowToAnime), 6),
+    relatedAnime: selectRelatedAnime(anime, items, 6),
   };
 }
 
