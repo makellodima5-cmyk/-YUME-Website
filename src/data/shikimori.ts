@@ -548,7 +548,7 @@ async function fetchShikimoriSectionFeeds(): Promise<ShikimoriSectionFeeds | nul
 export const getShikimoriSectionFeeds = createServerFn({ method: "GET" })
   .handler(async () => fetchShikimoriSectionFeeds());
 
-const CATALOG_LIMIT = 1000;
+const CATALOG_IMPORT_TARGET = MAX_SEED_REQUESTS * 50;
 const CATALOG_CACHE_TTL_MS = 30 * 60 * 1000;
 
 const PRIORITY_SEED_REQUESTS: ShikimoriRequest[] = [
@@ -577,7 +577,7 @@ function makeCatalogProgress(
   return {
     status,
     imported,
-    target: CATALOG_LIMIT,
+    target: CATALOG_IMPORT_TARGET,
     ...(retryAfterMs !== undefined ? { retryAfterMs } : {}),
   };
 }
@@ -599,16 +599,6 @@ async function buildShikimoriCatalog(forceRefresh: boolean): Promise<CatalogResu
   }
 
   const existingItems = Array.from(fallbackItems.values());
-  if (fallbackItems.size >= CATALOG_LIMIT) {
-    const result: CatalogResult = {
-      items: existingItems.slice(0, CATALOG_LIMIT),
-      error: null,
-      progress: makeCatalogProgress("ready", Math.min(fallbackItems.size, CATALOG_LIMIT)),
-    };
-    catalogCache = { expiresAt: now + CATALOG_CACHE_TTL_MS, result };
-    return result;
-  }
-
   if (fallbackResumeAt > now) {
     return {
       items: existingItems,
@@ -619,11 +609,13 @@ async function buildShikimoriCatalog(forceRefresh: boolean): Promise<CatalogResu
 
   const request = seedRequestForCursor(fallbackCursor);
   if (!request) {
-    return {
+    const result: CatalogResult = {
       items: existingItems,
-      error: `Каталог загружен частично: ${existingItems.length} из ${CATALOG_LIMIT} записей.`,
-      progress: makeCatalogProgress("partial", existingItems.length),
+      error: null,
+      progress: makeCatalogProgress("ready", existingItems.length),
     };
+    catalogCache = { expiresAt: now + CATALOG_CACHE_TTL_MS, result };
+    return result;
   }
 
   const page = await fetchShikimoriAnimes(validateRequest(request));
@@ -638,21 +630,14 @@ async function buildShikimoriCatalog(forceRefresh: boolean): Promise<CatalogResu
   }
 
   for (const anime of page.items) {
-    if (fallbackItems.size >= CATALOG_LIMIT) break;
     if (!fallbackItems.has(anime.id)) fallbackItems.set(anime.id, anime);
   }
   fallbackCursor += 1;
   fallbackResumeAt = Date.now() + SEED_REQUEST_DELAY_MS;
 
-  const items = Array.from(fallbackItems.values()).slice(0, CATALOG_LIMIT);
-  const status = items.length >= CATALOG_LIMIT
-    ? "ready"
-    : fallbackCursor >= MAX_SEED_REQUESTS
-      ? "partial"
-      : "seeding";
-  const error = status === "partial"
-    ? `Каталог загружен частично: ${items.length} из ${CATALOG_LIMIT} записей.`
-    : null;
+  const items = Array.from(fallbackItems.values());
+  const status = fallbackCursor >= MAX_SEED_REQUESTS ? "ready" : "seeding";
+  const error = null;
   const result: CatalogResult = {
     items,
     error,

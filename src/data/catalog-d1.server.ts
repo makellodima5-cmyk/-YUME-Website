@@ -71,7 +71,7 @@ interface D1Database {
   exec(query: string): Promise<unknown>;
 }
 
-const CATALOG_LIMIT = 1000;
+const CATALOG_IMPORT_TARGET = 25_500;
 const LOCK_TTL_MS = 30 * 1000;
 const DEFAULT_RETRY_MS = 5 * 1000;
 const SEED_REQUEST_DELAY_MS = 1250;
@@ -387,7 +387,7 @@ function makeProgress(
   return {
     status,
     imported,
-    target: CATALOG_LIMIT,
+    target: CATALOG_IMPORT_TARGET,
     ...(retryAfterMs !== undefined ? { retryAfterMs } : {}),
   };
 }
@@ -425,7 +425,7 @@ export async function getPersistentCatalog(
       const result: CatalogResult = {
         items: await readRows(db),
         error: state === "partial"
-          ? "Каталог загружен частично: " + imported + " из " + CATALOG_LIMIT + " записей."
+          ? "Каталог загружен частично: " + imported + " записей."
           : null,
         progress: makeProgress(state, imported),
       };
@@ -503,13 +503,15 @@ export async function getPersistentCatalog(
       }
 
       if (page.done) {
-        await db.batch([putMeta(db, "catalog_state", "partial")]);
+        await db.batch([putMeta(db, "catalog_state", "ready")]);
         imported = await countRows(db);
-        return {
+        const result: CatalogResult = {
           items: await readRows(db),
-          error: "Каталог загружен частично: " + imported + " из " + CATALOG_LIMIT + " записей.",
-          progress: makeProgress("partial", imported),
+          error: null,
+          progress: makeProgress("ready", imported),
         };
+        if (!options.allowImport) await writeCachedCatalog(db, result);
+        return { ...result, items: options.progressOnly ? [] : result.items };
       }
 
       if (page.error) {
@@ -538,14 +540,6 @@ export async function getPersistentCatalog(
         db.prepare(INSERT_ANIME).bind(...rowValues(item, cursor * 50 + index)),
       );
       if (statements.length) {
-        statements.push(db.prepare([
-          "DELETE FROM anime_catalog",
-          "WHERE id IN (",
-          "  SELECT id FROM anime_catalog",
-          "  ORDER BY position ASC, id ASC",
-          "  LIMIT -1 OFFSET ?",
-          ")",
-        ].join("\n")).bind(CATALOG_LIMIT));
         await db.batch(statements);
         await invalidatePersistentCatalogCache();
       }
@@ -553,11 +547,7 @@ export async function getPersistentCatalog(
       imported = await countRows(db);
       const nextCursor = cursor + 1;
       const maxRequests = 20 + (500 - 11 + 1);
-      const nextState = imported >= CATALOG_LIMIT
-        ? "ready"
-        : nextCursor >= maxRequests
-          ? "partial"
-          : "seeding";
+      const nextState = nextCursor >= maxRequests ? "ready" : "seeding";
 
       await db.batch([
         putMeta(db, "catalog_cursor", String(nextCursor)),
@@ -574,9 +564,7 @@ export async function getPersistentCatalog(
         ? null
         : await readRows(db);
       const items = allItems ?? page.items.slice(0, 50);
-      const error = nextState === "partial"
-        ? "Каталог загружен частично: " + imported + " из " + CATALOG_LIMIT + " записей."
-        : null;
+      const error = null;
       return {
         items,
         error,
