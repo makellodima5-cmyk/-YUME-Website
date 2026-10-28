@@ -96,14 +96,14 @@ export function Hero({
       </div>
       <div className="relative z-10 flex h-full flex-col items-start justify-end px-5 pb-5 pt-20 sm:pb-8 md:max-w-[760px] md:justify-center md:px-10 md:pb-8 md:pt-8 lg:px-12">
         <img
-          src="/images/yume-hero-tagline.png.PNG"
+          src="/images/C81C95E3-9000-45B0-8521-5F30EDDAF183.png"
           alt="YUME — Больше, чем аниме"
-          width={1536}
+          width={1920}
           height={1024}
           fetchPriority="high"
           decoding="async"
           draggable={false}
-          className="mb-4 block h-auto aspect-[1.85/1] w-[min(88%,430px)] object-cover object-left-top drop-shadow-[0_2px_22px_rgba(0,0,0,0.35)] sm:mb-5 sm:w-[min(76%,470px)] md:mb-6 md:w-[min(72%,500px)] lg:w-[min(68%,540px)]"
+          className="mb-4 block h-auto w-[min(62%,260px)] object-contain object-left drop-shadow-[0_2px_18px_rgba(0,0,0,0.3)] sm:mb-5 sm:w-[min(65%,340px)] md:mb-6 md:w-[min(58%,400px)] lg:w-[min(56%,450px)]"
         />
         <div className="flex flex-row flex-wrap gap-2">
           <button onClick={() => { telegramHapticImpact("light"); onRandom(); }} className="yume-tactile-control inline-flex w-fit items-center justify-center gap-1.5 rounded-full bg-neon px-3.5 py-2 text-xs font-semibold text-primary-foreground shadow-neon transition hover:brightness-110 sm:gap-2 sm:px-5 sm:py-2.5 sm:text-sm">
