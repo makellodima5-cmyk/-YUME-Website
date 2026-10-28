@@ -1,7 +1,7 @@
 import type { Anime } from "@/data/anime";
 import type { Language } from "@/data/preferences";
 import type { CatalogFiltersValue } from "@/components/yume/CatalogFilters";
-import { getSearchMatchScore } from "@/data/search-text";
+import { getSearchMatchScore, normalizeSearchText } from "@/data/search-text";
 
 export type CatalogSort = "rating" | "newest" | "oldest" | "title";
 
@@ -13,8 +13,8 @@ export function filterAndSortCatalog(
   language: Language,
   translateGenre: (genre: string, language: Language) => string,
 ): Anime[] {
-  const normalizedQuery = query.trim();
   const locale = language === "en" ? "en" : "ru";
+  const normalizedQuery = normalizeSearchText(query, locale);
   const yearFrom = filters.yearFrom.trim() ? Number(filters.yearFrom) : null;
   const yearTo = filters.yearTo.trim() ? Number(filters.yearTo) : null;
   const relevance = new Map<Anime, number>();
