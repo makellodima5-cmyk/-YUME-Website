@@ -54,7 +54,9 @@ export function AdvertisingSlot({ slot, language }: AdvertisingSlotProps) {
               <video
                 className="h-full w-full object-contain"
                 src={advertisement.asset}
-                controls
+                autoPlay
+                muted
+                loop
                 playsInline
                 preload="metadata"
                 aria-label={advertisement.alt}
