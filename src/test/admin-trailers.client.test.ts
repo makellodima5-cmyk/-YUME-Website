@@ -45,7 +45,7 @@ describe("admin trailer update client workflow", () => {
       { status: 200, payload: { isAdmin: true, total: 2, pending: 2, checked: 0, found: 0 } },
       { status: 200, payload: { isAdmin: true, total: 2, pending: 1, checked: 1, found: 1, delayMs: 2000 } },
       { status: 200, payload: { isAdmin: true, total: 2, pending: 0, checked: 2, found: 1, delayMs: 2000, done: true } },
-      { status: 200, payload: { isAdmin: true, total: 2, pending: 0, checked: 2, found: 1, missing: 1 } },
+      { status: 200, payload: { isAdmin: true, total: 2, pending: 0, checked: 2, found: 0, missing: 1, catalogTotal: 2, catalogWithTrailer: 1, missingTrailers: 1 } },
     ], requests);
 
     await runAdminTrailerUpdate({
