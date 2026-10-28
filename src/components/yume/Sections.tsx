@@ -181,12 +181,34 @@ export function CollectionsGrid({ onOpen, animeList }: { onOpen: (id: string) =>
   );
 }
 
-export function Grid({ items, onSelect, empty }: { items: Anime[]; onSelect: (a: Anime) => void; empty: string }) {
+export function Grid({ items, onSelect, empty, onRemove, removeLabel }: {
+  items: Anime[];
+  onSelect: (a: Anime) => void;
+  empty: string;
+  onRemove?: (a: Anime) => void;
+  removeLabel?: string;
+}) {
+  const { language } = useYumePreferences();
   if (!items.length)
     return <div className="rounded-2xl border border-dashed p-10 text-center text-muted-foreground">{empty}</div>;
   return (
-    <div className="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 [&>button]:w-full">
-      {items.map((a) => <AnimeCard key={a.id} anime={a} onSelect={onSelect} />)}
+    <div className="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+      {items.map((anime) => (
+        <div key={anime.id} className="relative min-w-0 w-full [&>button:first-child]:w-full">
+          <AnimeCard anime={anime} onSelect={onSelect} />
+          {onRemove && (
+            <button
+              type="button"
+              aria-label={removeLabel ?? (language === "ru" ? "Убрать из списка" : "Remove from list")}
+              title={removeLabel ?? (language === "ru" ? "Убрать из списка" : "Remove from list")}
+              onClick={(event) => { event.preventDefault(); event.stopPropagation(); onRemove(anime); }}
+              className="absolute right-2 top-2 z-20 flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-red-600 text-white shadow-[0_0_0_2px_rgba(0,0,0,0.7),0_4px_12px_rgba(0,0,0,0.65)] transition hover:scale-105 hover:bg-red-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-red-300"
+            >
+              <X className="h-5 w-5" strokeWidth={3} aria-hidden="true" />
+            </button>
+          )}
+        </div>
+      ))}
     </div>
   );
 }
