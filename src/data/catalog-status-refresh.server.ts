@@ -58,7 +58,7 @@ async function fetchByIds(ids: string[]): Promise<SourceAnime[]> {
 /** Checks every existing catalogue item in a durable round-robin: all ongoing, then announcements, then the rest. */
 export async function runScheduledCatalogStatusRefresh(env: unknown): Promise<void> {
   setCatalogRuntimeEnvironment(env);
-  const db = getDatabase(getEnvironment());
+  const db = getDatabase(env && typeof env === "object" ? env as Environment : getEnvironment());
   if (!db) return;
   await db.batch([
     db.prepare("CREATE TABLE IF NOT EXISTS anime_catalog_status_refresh_seen (cycle_id TEXT NOT NULL, anime_id TEXT NOT NULL, PRIMARY KEY(cycle_id, anime_id))"),
