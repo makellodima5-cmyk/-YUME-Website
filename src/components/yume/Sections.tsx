@@ -2,63 +2,17 @@ import type { ReactNode } from "react";
 import { Play, Search, Shuffle, SlidersHorizontal, X } from "lucide-react";
 import heroArtwork from "@/assets/yume-desktop.webp";
 import mobileHeroArtwork from "@/assets/yume-mobile.webp";
-import halloweenBanner from "@/assets/yume-halloween-banner.webp";
-import halloweenMobileBanner from "@/assets/yume-halloween-mobile.webp";
-import { useHalloweenSeason } from "@/data/seasonal-theme";
 import { type Anime, CONTINUE, COLLECTIONS, byId } from "@/data/anime";
 import { AnimeCard, PosterArt } from "./Poster";
 import { CatalogFilters, type CatalogFiltersValue } from "./CatalogFilters";
 import { useYumePreferences, displayAnimeTitle, type TranslationKey } from "@/data/preferences";
 import { telegramHapticImpact } from "@/lib/telegram-mini-app";
 
-export type HalloweenIconKind = "pumpkin" | "ghost" | "bat" | "candle";
-
-export function HalloweenSectionIcon({ kind }: { kind: HalloweenIconKind }) {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 28 28" className="h-5 w-5 shrink-0 text-[#ff8a2b] drop-shadow-[0_0_7px_rgba(255,112,25,0.36)]" fill="none">
-      {kind === "pumpkin" ? (
-        <>
-          <path d="M13 5c-.4-1.8.5-3.2 2.4-3.7.4 1.8-.2 3.1-2.4 3.7Z" fill="currentColor" stroke="currentColor" strokeWidth=".7" />
-          <path d="M13.9 6.4c-2.1-2.6-6.3-2.1-8.1.7-2.6.2-3.9 3.4-3.3 6.9.7 4.9 3.8 8.4 7.4 8.4 1.2 0 2.4-.4 3.5-1.4 1.1 1 2.3 1.4 3.5 1.4 3.6 0 6.7-3.5 7.4-8.4.6-3.5-.7-6.7-3.3-6.9-1.8-2.8-6-3.3-8.1-.7Z" fill="currentColor" fillOpacity=".2" stroke="currentColor" strokeWidth="1.4" />
-          <path d="m6.5 12 3 1.2-2.4 2.1M19.8 12l-3 1.2 2.4 2.1M12.6 15.1h2.2l-1.1 1.7Z" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-          <path d="M13.8 6.5c-1.5 3.6-1.5 10.8-.4 14.4M9 7c-2.2 4.1-2.1 9.6.3 14M18.7 7c2.2 4.1 2.1 9.6-.3 14" stroke="currentColor" strokeOpacity=".8" strokeWidth="1" />
-        </>
-      ) : null}
-      {kind === "ghost" ? (
-        <>
-          <path d="M4.3 22.9V13.1a9.7 9.7 0 0 1 19.4 0v9.8l-4.3-2.7-3.2 2.7-3.2-2.7-3.2 2.7-5.5-2.7Z" fill="currentColor" fillOpacity=".2" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-          <ellipse cx="10.1" cy="12.4" rx="1.6" ry="2.1" fill="currentColor" />
-          <ellipse cx="17.9" cy="12.4" rx="1.6" ry="2.1" fill="currentColor" />
-          <path d="M12 17.3c1.3.7 2.7.7 4 0" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-        </>
-      ) : null}
-      {kind === "bat" ? (
-        <>
-          <path d="M13.8 10.3 11 5.8l-1.2 5.4-6.3-3.4 1.6 8.4c1 4.4 4.1 7.1 8.9 5.1 4.8 2 7.9-.7 8.9-5.1l1.6-8.4-6.3 3.4L17 5.8l-3.2 4.5Z" fill="currentColor" fillOpacity=".23" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
-          <path d="M11.1 13.2c.7-.7 1.5-.7 2.5 0 1-.7 1.8-.7 2.5 0M13.6 13.6l-1.1 2.5M15 13.6l1.1 2.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-        </>
-      ) : null}
-      {kind === "candle" ? (
-        <>
-          <path d="M14 2.6c2.3 2.1 2.2 4 .2 5.6-2.2-1.2-2.4-3.2-.2-5.6Z" fill="currentColor" />
-          <path d="M8.3 9h11.4v13.4c-3.6 2-7.8 2-11.4 0V9Z" fill="currentColor" fillOpacity=".18" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
-          <path d="M11.8 12.1c-1.4 2-1.2 3.5.2 4.7M16.1 12.1c1.4 2 1.2 3.5-.2 4.7M8.5 9h11" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-          <path d="M6 23c1.7-1 3.1-1 4.8 0s3.1 1 4.8 0 3.1-1 4.8 0" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
-        </>
-      ) : null}
-    </svg>
-  );
-}
-
-export function Row({ title, action, children, halloweenIcon }: { title: string; action?: ReactNode; children: ReactNode; halloweenIcon?: HalloweenIconKind }) {
-  const halloween = useHalloweenSeason();
+export function Row({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
   return (
     <section className="mt-10">
       <div className="mb-4 flex items-end justify-between px-4 md:px-10">
-        <h2 className={"flex min-w-0 items-center gap-2 text-lg font-semibold md:text-xl " + (halloween && halloweenIcon ? "yume-halloween-section-title" : "")}>
-          {halloween && halloweenIcon ? <HalloweenSectionIcon kind={halloweenIcon} /> : null}
-          <span>{title}</span>
-        </h2>
+        <h2 className="text-lg font-semibold md:text-xl">{title}</h2>
         {action}
       </div>
       <div className="scrollbar-none flex gap-4 overflow-x-auto px-4 pb-2 md:px-10">{children}</div>
@@ -106,18 +60,17 @@ export function Hero({
   yearMax: number;
 }) {
   const { t } = useYumePreferences();
-  const halloween = useHalloweenSeason();
   return (
-    <section className={"relative mx-3 mt-3 isolate h-[360px] min-h-[360px] w-[calc(100%-1.5rem)] max-w-[1920px] overflow-hidden rounded-2xl ring-1 ring-border sm:mx-4 sm:h-[390px] sm:w-[calc(100%-2rem)] md:mx-auto md:mt-3 md:h-[400px] md:min-h-[400px] md:w-[calc(100%-2.5rem)] lg:h-[440px] " + (halloween ? "yume-halloween-hero" : "")}>
+    <section className="relative mx-3 mt-3 isolate h-[360px] min-h-[360px] w-[calc(100%-1.5rem)] max-w-[1920px] overflow-hidden rounded-2xl ring-1 ring-border sm:mx-4 sm:h-[390px] sm:w-[calc(100%-2rem)] md:mx-auto md:mt-3 md:h-[400px] md:min-h-[400px] md:w-[calc(100%-2.5rem)] lg:h-[440px]">
       <picture className="absolute inset-0 block h-full w-full">
-        <source media="(max-width: 767px)" srcSet={halloween ? halloweenMobileBanner : mobileHeroArtwork} />
+        <source media="(max-width: 767px)" srcSet={mobileHeroArtwork} />
         <img
-        src={halloween ? halloweenBanner : heroArtwork}
+        src={heroArtwork}
         alt={t("hero.artAlt")}
         width={1600}
         height={640}
         fetchPriority="high"
-        className={"absolute inset-0 h-full w-full object-cover " + (halloween ? "object-[50%_center] md:object-center" : "object-[58%_center] md:object-center") }
+        className="absolute inset-0 h-full w-full object-cover object-[58%_center] md:object-center"
         />
       </picture>
       <div className="absolute inset-0 bg-gradient-to-r from-[#090714]/80 via-[#090714]/40 to-transparent md:from-[#090714]/75 md:via-[#090714]/25 md:to-transparent" />
