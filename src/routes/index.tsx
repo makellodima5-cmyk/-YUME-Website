@@ -1605,9 +1605,14 @@ function Index() {
   // Searches and filters operate on the dataset returned from D1.
   // Do not poll Shikimori or trigger imports during normal user navigation.
   useEffect(() => {
+    if (view === "catalog") {
+      setCatalogLoadState(apiError ? "error" : "loaded");
+      setCatalogLoadError(apiError);
+      return;
+    }
     setCatalogLoadState(apiError ? "error" : "loaded");
     setCatalogLoadError(apiError);
-  }, [apiError]);
+  }, [apiError, view]);
 
   const writeCatalogUrl = (overrides: { q?: string; page?: number; sort?: string; genres?: string; status?: string; from?: number; to?: number; rating?: number; kind?: string; age?: string } = {}) => {
     const has = (key: keyof typeof overrides) => Object.prototype.hasOwnProperty.call(overrides, key);
