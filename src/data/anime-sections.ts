@@ -1,4 +1,5 @@
 import type { Anime } from "@/data/anime";
+import { isUpcomingEpisodeDate } from "@/data/catalog-details";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const ISO_DATE_PREFIX = /^(\d{4}-\d{2}-\d{2})(?:$|T)/;
@@ -57,4 +58,14 @@ export function isNewRelease(
   const releaseTimestamp = Date.parse(releaseDate + "T00:00:00.000Z");
   const ageInDays = (todayTimestamp - releaseTimestamp) / DAY_MS;
   return ageInDays >= 0 && ageInDays <= maxAgeDays;
+}
+
+/**
+ * "Сейчас выходит" requires a genuinely upcoming episode and must not retain
+ * titles whose known episode count has already been fully aired.
+ */
+export function isEligibleAiringAnime(anime: Anime, now = Date.now()): boolean {
+  if (anime.status !== "Онгоинг" || !isUpcomingEpisodeDate(anime.nextEpisodeAt, now)) return false;
+  if (anime.episodes > 0 && (anime.episodesAired ?? 0) >= anime.episodes) return false;
+  return true;
 }
