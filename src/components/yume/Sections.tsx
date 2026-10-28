@@ -98,12 +98,12 @@ export function Hero({
         <img
           src="/images/yume-hero-tagline.png.PNG"
           alt="YUME — Больше, чем аниме"
-          width={900}
-          height={300}
+          width={1536}
+          height={1024}
           fetchPriority="high"
           decoding="async"
           draggable={false}
-          className="mb-4 block h-auto w-[min(88%,430px)] object-contain object-left drop-shadow-[0_2px_22px_rgba(0,0,0,0.35)] sm:mb-5 sm:w-[min(76%,470px)] md:mb-6 md:w-[min(72%,500px)] lg:w-[min(68%,540px)]"
+          className="mb-4 block h-auto aspect-[1.85/1] w-[min(88%,430px)] object-cover object-left-top drop-shadow-[0_2px_22px_rgba(0,0,0,0.35)] sm:mb-5 sm:w-[min(76%,470px)] md:mb-6 md:w-[min(72%,500px)] lg:w-[min(68%,540px)]"
         />
         <div className="flex flex-row flex-wrap gap-2">
           <button onClick={() => { telegramHapticImpact("light"); onRandom(); }} className="yume-tactile-control inline-flex w-fit items-center justify-center gap-1.5 rounded-full bg-neon px-3.5 py-2 text-xs font-semibold text-primary-foreground shadow-neon transition hover:brightness-110 sm:gap-2 sm:px-5 sm:py-2.5 sm:text-sm">
