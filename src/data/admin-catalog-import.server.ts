@@ -138,6 +138,7 @@ function ensureSchema(db: Database): Promise<void> {
     await db.batch([
     db.prepare("CREATE TABLE IF NOT EXISTS anime_catalog (id TEXT PRIMARY KEY NOT NULL, title TEXT NOT NULL, english_title TEXT, original_title TEXT NOT NULL, year INTEGER NOT NULL DEFAULT 0, episodes INTEGER NOT NULL DEFAULT 0, rating REAL, genres_json TEXT NOT NULL DEFAULT '[]', status TEXT NOT NULL DEFAULT 'Неизвестно', description TEXT NOT NULL DEFAULT '', hue INTEGER NOT NULL DEFAULT 280, glyph TEXT NOT NULL DEFAULT 'Y', is_new INTEGER NOT NULL DEFAULT 0, popular INTEGER NOT NULL DEFAULT 0, poster_url TEXT, banner_url TEXT, kind TEXT, age_rating TEXT, next_episode_at TEXT, episodes_aired INTEGER NOT NULL DEFAULT 0, aired_on TEXT, studios_json TEXT NOT NULL DEFAULT '[]', youtube_trailer_id TEXT, position INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)"),
     db.prepare("CREATE TABLE IF NOT EXISTS anime_catalog_meta (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL)"),
+    db.prepare("CREATE TABLE IF NOT EXISTS admin_catalog_exclusions (anime_id TEXT PRIMARY KEY NOT NULL, title TEXT NOT NULL, deleted_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)"),
     db.prepare("CREATE TABLE IF NOT EXISTS anime_catalog_screenshots (anime_id TEXT NOT NULL, original_url TEXT NOT NULL, preview_url TEXT NOT NULL, position INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (anime_id, original_url))"),
     db.prepare("CREATE TABLE IF NOT EXISTS anime_catalog_screenshot_status (anime_id TEXT PRIMARY KEY NOT NULL, status TEXT NOT NULL CHECK (status IN ('done','retry','failed')), attempts INTEGER NOT NULL DEFAULT 0, last_error TEXT, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)"),
     db.prepare("CREATE INDEX IF NOT EXISTS idx_anime_catalog_screenshot_status_state ON anime_catalog_screenshot_status(status, attempts, updated_at)"),
@@ -149,6 +150,7 @@ function ensureSchema(db: Database): Promise<void> {
     db.prepare("CREATE TABLE IF NOT EXISTS admin_catalog_import_items (run_id TEXT NOT NULL, anime_id TEXT NOT NULL, outcome TEXT NOT NULL CHECK (outcome IN ('added','skipped')), incomplete INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (run_id,anime_id))"),
     db.prepare("INSERT OR IGNORE INTO admin_catalog_import_lock (id,token,expires_at) VALUES (1,'',0)"),
     db.prepare("INSERT OR IGNORE INTO anime_catalog_meta (key,value) VALUES ('admin_import_state','idle')"),
+    db.prepare("INSERT OR IGNORE INTO anime_catalog_meta (key,value) VALUES ('admin_import_block_18_plus','1')"),
     db.prepare("INSERT OR IGNORE INTO anime_catalog_meta (key,value) VALUES ('admin_import_cursor','1')"),
     db.prepare("INSERT OR IGNORE INTO anime_catalog_meta (key,value) VALUES ('admin_import_target','0')"),
     db.prepare("INSERT OR IGNORE INTO anime_catalog_meta (key,value) VALUES ('admin_import_added','0')"),
@@ -277,6 +279,14 @@ export function isCatalogMetadataIncomplete(row: CatalogMetadataCompleteness): b
     blank(row.studios_json) ||
     blank(row.youtube_trailer_id);
 }
+const BULK_IMPORT_EXCLUDED_GENRES = new Set(["hentai", "хентай", "yaoi", "яой", "яои", "yuri", "юри"]);
+function hasBulkExcludedGenre(item: ShikimoriAnime): boolean {
+  return (item.genres ?? []).some(genre => [genre.name, genre.russian].some(name =>
+    BULK_IMPORT_EXCLUDED_GENRES.has(clean(name).normalize("NFKC").toLocaleLowerCase("en"))));
+}
+function isBlockedFromBulkImport(item: ShikimoriAnime, block18Plus: boolean): boolean {
+  return hasBulkExcludedGenre(item) || (block18Plus && clean(item.rating).toLocaleLowerCase("en") === "rx");
+}
 async function fetchPage(page: number): Promise<ShikimoriAnime[]> {
   const query = "query { animes(page: " + page + ", limit: " + PAGE_SIZE + ", order: popularity) { " + IMPORT_FIELDS + " } }";
   const response = await fetch(API_URL, { method:"POST", headers:{"Content-Type":"application/json",Accept:"application/json","User-Agent":"YUME/1.0"}, body:JSON.stringify({query}), signal:AbortSignal.timeout(12000) });
@@ -289,12 +299,12 @@ async function fetchPage(page: number): Promise<ShikimoriAnime[]> {
   if (!response.ok) throw new Error("Shikimori вернул HTTP " + response.status);
   const payload = await response.json() as Payload;
   if (payload.errors?.length) throw new Error(payload.errors.map(e=>e.message).filter(Boolean).join("; ") || "GraphQL error");
-  return (payload.data?.animes ?? []).filter(item => !(item.genres ?? []).some(g => [g.name,g.russian].some(n => clean(n).normalize("NFKC").toLowerCase() === "hentai" || clean(n).normalize("NFKC").toLowerCase() === "хентай")));
+  return payload.data?.animes ?? [];
 }
 async function fetchByTitle(title: string): Promise<ShikimoriAnime[]> {
   const normalized = clean(title).slice(0, 120);
   if (normalized.length < 2) return [];
-  const query = "query { animes(search: " + JSON.stringify(normalized) + ", page: 1, limit: 10, order: popularity) { id name english russian kind score status airedOn { year } poster { mainUrl previewUrl originalUrl } genres { name russian kind } } }";
+  const query = "query { animes(search: " + JSON.stringify(normalized) + ", page: 1, limit: 10, order: popularity) { id name english russian kind score status rating airedOn { year } poster { mainUrl previewUrl originalUrl } genres { name russian kind } } }";
   const response = await fetch(API_URL, { method:"POST", headers:{"Content-Type":"application/json",Accept:"application/json","User-Agent":"YUME/1.0"}, body:JSON.stringify({query}), signal:AbortSignal.timeout(12000) });
   if (response.status === 429) {
     const retryAfterMs = retryAfterMilliseconds(response.headers.get("Retry-After")) ?? 60000;
@@ -305,7 +315,7 @@ async function fetchByTitle(title: string): Promise<ShikimoriAnime[]> {
   if (!response.ok) throw new Error("Shikimori вернул HTTP " + response.status);
   const payload = await response.json() as Payload;
   if (payload.errors?.length) throw new Error(payload.errors.map(e=>e.message).filter(Boolean).join("; ") || "GraphQL error");
-  return (payload.data?.animes ?? []).filter(item => !(item.genres ?? []).some(g => [g.name,g.russian].some(n => clean(n).normalize("NFKC").toLowerCase() === "hentai" || clean(n).normalize("NFKC").toLowerCase() === "хентай")));
+  return payload.data?.animes ?? [];
 }
 async function fetchByIds(ids: string[], includeScreenshots = false): Promise<ShikimoriAnime[]> {
   const safeIds = normalizeAdminCatalogIds(ids);
@@ -334,7 +344,7 @@ async function fetchByIds(ids: string[], includeScreenshots = false): Promise<Sh
     for (const item of payload.data?.animes ?? []) resultById.set(String(item.id), item);
   }
 
-  return Array.from(resultById.values()).filter(item => !(item.genres ?? []).some(g => [g.name,g.russian].some(n => clean(n).normalize("NFKC").toLowerCase() === "hentai" || clean(n).normalize("NFKC").toLowerCase() === "хентай")));
+  return Array.from(resultById.values());
 }
 
 function catalogMetadataUpdateStatement(db: Database, item: ReturnType<typeof mapItem>, row: CatalogMetadataCompleteness & { next_episode_at: string | null; episodes_aired: number }): Statement | null {
@@ -522,7 +532,7 @@ async function maintenanceCheck(db: Database) {
   return {ok:health?.ok === 1, catalogRecords:Number(count?.count ?? 0), qualitySummary:quality.summary, checkedAt:new Date().toISOString()};
 }
 async function snapshot(db: Database) {
-  const rows = await db.prepare("SELECT key, value FROM anime_catalog_meta WHERE key IN ('admin_import_target','admin_import_cursor','admin_import_added','admin_import_skipped','admin_import_incomplete','admin_import_errors','admin_import_state')")
+  const rows = await db.prepare("SELECT key, value FROM anime_catalog_meta WHERE key IN ('admin_import_target','admin_import_cursor','admin_import_added','admin_import_skipped','admin_import_incomplete','admin_import_errors','admin_import_state','admin_import_block_18_plus')")
     .all<{ key: string; value: string }>();
   const values = new Map(rows.results.map((row) => [row.key, row.value]));
   return {
@@ -533,6 +543,7 @@ async function snapshot(db: Database) {
     incomplete: Number(values.get("admin_import_incomplete") ?? 0),
     errors: Number(values.get("admin_import_errors") ?? 0),
     state: values.get("admin_import_state") ?? "idle",
+    bulkImportBlock18Plus: values.get("admin_import_block_18_plus") !== "0",
     delayMs: REQUEST_DELAY_MS,
   };
 }
@@ -1022,12 +1033,49 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
         qualityOffset: quality.offset, qualityHasMore: quality.hasMore, auditLog: await recentAudit(db),
       });
     }
-    let body: {action?:unknown; target?:unknown; query?:unknown; animeId?:unknown};
-    try { body = await request.json() as {action?:unknown;target?:unknown}; } catch { return json({error:"invalid_request"},400); }
+    let body: {action?:unknown; target?:unknown; query?:unknown; animeId?:unknown; block18Plus?:unknown; ids?:unknown};
+    try { body = await request.json() as typeof body; } catch { return json({error:"invalid_request"},400); }
     requestedAction = body.action;
     const lockToken = await acquireLock(db);
     if (!lockToken) return json({isAdmin:true,error:"operation_in_progress",message:"Другая административная операция ещё выполняется."},409);
     try {
+      if (body.action === "set_bulk_import_filter") {
+        if (typeof body.block18Plus !== "boolean") return json({error:"invalid_filter_value",message:"Ожидалось логическое значение настройки 18+."},400);
+        if (await getMeta(db,"admin_import_state") === "running") return json({isAdmin:true,error:"import_running",message:"Нельзя менять фильтр во время активного импорта."},409);
+        await setMeta(db,"admin_import_block_18_plus",body.block18Plus ? "1" : "0").run();
+        await audit(db,"catalog.import.filter","success",{block18Plus:body.block18Plus});
+        return json({isAdmin:true,bulkImportBlock18Plus:body.block18Plus});
+      }
+      if (body.action === "search_delete_title") {
+        const titleQuery = typeof body.query === "string" ? clean(body.query).slice(0,120) : "";
+        if (titleQuery.length < 2) return json({error:"query_too_short",message:"Введи не менее двух символов названия."},400);
+        const pattern = "%" + titleQuery + "%";
+        const rows = await db.prepare("SELECT id,title,english_title,original_title,year,poster_url,genres_json,age_rating FROM anime_catalog WHERE title LIKE ? OR COALESCE(english_title,'') LIKE ? OR original_title LIKE ? ORDER BY title COLLATE NOCASE,id LIMIT 25")
+          .bind(pattern,pattern,pattern)
+          .all<{id:string;title:string;english_title:string|null;original_title:string;year:number;poster_url:string|null;genres_json:string;age_rating:string|null}>();
+        const results = rows.results.map(row => {
+          let genres: string[] = [];
+          try { const parsed: unknown = JSON.parse(row.genres_json || "[]"); if (Array.isArray(parsed)) genres = parsed.filter((value): value is string => typeof value === "string").slice(0,12); }
+          catch { /* Ignore malformed legacy genre JSON. */ }
+          return {id:row.id,title:row.title,englishTitle:row.english_title,originalTitle:row.original_title,year:Number(row.year)||0,posterUrl:row.poster_url,genres,ageRating:row.age_rating};
+        });
+        return json({isAdmin:true,query:titleQuery,results});
+      }
+      if (body.action === "delete_title") {
+        const animeId = typeof body.animeId === "string" ? body.animeId.trim() : "";
+        if (!/^[0-9]{1,20}$/.test(animeId)) return json({error:"invalid_anime_id"},400);
+        const existing = await db.prepare("SELECT id,title FROM anime_catalog WHERE id = ?").bind(animeId).first<{id:string;title:string}>();
+        if (!existing) return json({error:"title_not_in_catalog",message:"Этот тайтл уже отсутствует в каталоге."},404);
+        await db.batch([
+          db.prepare("INSERT OR REPLACE INTO admin_catalog_exclusions (anime_id,title,deleted_at) SELECT id,title,CURRENT_TIMESTAMP FROM anime_catalog WHERE id = ?").bind(animeId),
+          db.prepare("DELETE FROM anime_catalog_screenshots WHERE anime_id = ?").bind(animeId),
+          db.prepare("DELETE FROM anime_catalog_screenshot_status WHERE anime_id = ?").bind(animeId),
+          db.prepare("DELETE FROM anime_catalog WHERE id = ?").bind(animeId),
+        ]);
+        await invalidatePersistentCatalogCache();
+        await audit(db,"catalog.delete.title","success",{animeId,title:existing.title,blockedFromBulkReimport:true});
+        return json({isAdmin:true,deleted:true,anime:{id:existing.id,title:existing.title},message:"Тайтл удалён из каталога и исключён из будущего массового импорта."});
+      }
       if (body.action === "search_title") {
         const titleQuery = typeof body.query === "string" ? clean(body.query).slice(0, 120) : "";
         if (titleQuery.length < 2) return json({ error:"query_too_short", message:"Введи не менее двух символов названия." },400);
@@ -1048,6 +1096,8 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
             kind: mapped.kind,
             status: mapped.status,
             posterUrl: mapped.poster_url,
+            genres: mapped.genres_json ? JSON.parse(mapped.genres_json) as string[] : [],
+            ageRating: mapped.age_rating,
             alreadyInCatalog: existingIds.has(String(item.id)),
           };
         });
@@ -1085,6 +1135,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
         if (importedBanner) item.banner_url = importedBanner;
         const currentCount = await db.prepare("SELECT COUNT(*) AS count FROM anime_catalog").first<{count:number}>();
         const statements: Statement[] = [
+          db.prepare("DELETE FROM admin_catalog_exclusions WHERE anime_id = ?").bind(item.id),
           db.prepare("INSERT OR IGNORE INTO anime_catalog (id,title,english_title,original_title,year,episodes,rating,genres_json,status,description,hue,glyph,is_new,popular,poster_url,banner_url,kind,age_rating,next_episode_at,episodes_aired,aired_on,studios_json,youtube_trailer_id,position,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)")
             .bind(item.id,item.title,item.english_title,item.original_title,item.year,item.episodes,item.rating,item.genres_json,item.status,item.description,item.hue,item.glyph,item.is_new,item.popular,item.poster_url,item.banner_url,item.kind,item.age_rating,item.next_episode_at,item.episodes_aired,item.aired_on,item.studios_json,item.youtube_trailer_id,Number(currentCount?.count ?? 0)),
           ...screenshots.map((shot,index) => db.prepare("INSERT OR IGNORE INTO anime_catalog_screenshots (anime_id,original_url,preview_url,position,updated_at) VALUES (?,?,?,?,CURRENT_TIMESTAMP)")
@@ -1177,16 +1228,18 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
         const current = await getMeta(db,"admin_import_state");
         if (current === "running") return json({isAdmin:true,...await snapshot(db),message:"Импорт уже выполняется."},409);
         const runId = crypto.randomUUID();
+        const block18PlusForRun = (await getMeta(db,"admin_import_block_18_plus") ?? "1") !== "0";
         await db.batch([
           db.prepare("DELETE FROM admin_catalog_import_items WHERE run_id <> ?").bind(runId),
           setMeta(db,"admin_import_run_id",runId),
           setMeta(db,"admin_import_baseline_added","0"),setMeta(db,"admin_import_baseline_skipped","0"),setMeta(db,"admin_import_baseline_incomplete","0"),
           setMeta(db,"admin_import_target",String(target)),setMeta(db,"admin_import_cursor","1"),
+          setMeta(db,"admin_import_run_block_18_plus",block18PlusForRun ? "1" : "0"),
           setMeta(db,"admin_import_added","0"),setMeta(db,"admin_import_skipped","0"),
           setMeta(db,"admin_import_incomplete","0"),setMeta(db,"admin_import_errors","0"),
           setMeta(db,"admin_import_state","running"),setMeta(db,"admin_import_resume_at","0"),
         ]);
-        await audit(db,"catalog.import.start","success",{target});
+        await audit(db,"catalog.import.start","success",{target,block18Plus:block18PlusForRun,excludedGenres:["hentai","yaoi","yuri"]});
         return json({isAdmin:true,...await snapshot(db),message:"Импорт подготовлен."});
       }
       if (body.action === "step") {
@@ -1201,19 +1254,21 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
           await audit(db,"catalog.import.finish",finalState,{added:before.added,target:before.target,skipped:before.skipped,errors:before.errors});
           return json({isAdmin:true,...await snapshot(db)});
         }
-        let source: ShikimoriAnime[];
-        try { source = await fetchPage(before.cursor); }
+        let sourcePage: ShikimoriAnime[];
+        try { sourcePage = await fetchPage(before.cursor); }
         catch (error) {
           const retryAfterMs = Number((error as {retryAfterMs?:number})?.retryAfterMs ?? 5000);
           await db.batch([setMeta(db,"admin_import_errors",String(before.errors+1)),setMeta(db,"admin_import_resume_at",String(Date.now()+retryAfterMs))]);
           await audit(db,"catalog.import.source-error","warning",{cursor:before.cursor,message:error instanceof Error?error.message:"Ошибка источника.",retryAfterMs});
           return json({isAdmin:true,...await snapshot(db),retryAfterMs,error:error instanceof Error?error.message:"Ошибка источника."},503);
         }
-        if (!source.length) {
+        if (!sourcePage.length) {
           await db.batch([setMeta(db,"admin_import_state","partial")]);
           await audit(db,"catalog.import.partial","warning",{cursor:before.cursor,reason:"empty_source_page"});
           return json({isAdmin:true,...await snapshot(db),message:"Источник не вернул записи; импорт остановлен."});
         }
+        const block18PlusForRun = (await getMeta(db,"admin_import_run_block_18_plus") ?? await getMeta(db,"admin_import_block_18_plus") ?? "1") !== "0";
+        const source = sourcePage.filter(item => !isBlockedFromBulkImport(item,block18PlusForRun));
         let runId = await getMeta(db,"admin_import_run_id");
         if (!runId) {
           // Preserve statistics from an import started by the earlier implementation.
@@ -1226,12 +1281,18 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
           ]);
         }
         const sourceIds = Array.from(new Set(source.map(item => String(item.id)).filter(id => /^\d{1,20}$/.test(id))));
-        const existingRows = sourceIds.length
-          ? await db.prepare("SELECT id FROM anime_catalog WHERE id IN (" + sourceIds.map(() => "?").join(",") + ")").bind(...sourceIds).all<{id:string}>()
+        const excludedRows = sourceIds.length
+          ? await db.prepare("SELECT anime_id FROM admin_catalog_exclusions WHERE anime_id IN (" + sourceIds.map(() => "?").join(",") + ")").bind(...sourceIds).all<{anime_id:string}>()
+          : {results:[] as {anime_id:string}[]};
+        const excludedIds = new Set(excludedRows.results.map(row => row.anime_id));
+        const importableSource = source.filter(item => !excludedIds.has(String(item.id)));
+        const importableIds = Array.from(new Set(importableSource.map(item => String(item.id)).filter(id => /^\d{1,20}$/.test(id))));
+        const existingRows = importableIds.length
+          ? await db.prepare("SELECT id FROM anime_catalog WHERE id IN (" + importableIds.map(() => "?").join(",") + ")").bind(...importableIds).all<{id:string}>()
           : {results:[] as {id:string}[]};
         const existingIds = new Set(existingRows.results.map(row => row.id));
         const remainingTarget = Math.max(0, before.target - before.added);
-        const candidateSourceItems = source
+        const candidateSourceItems = importableSource
           .filter(item => !existingIds.has(String(item.id)))
           .slice(0, remainingTarget);
         const candidateMalIds = Array.from(new Set(candidateSourceItems
@@ -1262,7 +1323,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
         let position = Number(currentCount?.count ?? 0);
         let addedCandidates = 0;
         const statements: Statement[] = [];
-        for (const sourceItem of source) {
+        for (const sourceItem of importableSource) {
           const sourceId = String(sourceItem.id);
           if (seen.has(sourceId)) continue;
           seen.add(sourceId);
