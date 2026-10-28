@@ -2024,7 +2024,66 @@ function Index() {
                   <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
                 </summary>
                 <div className="border-t border-border/70 p-3 sm:p-4">
-                  <p className="text-xs leading-relaxed text-muted-foreground">{language === "ru" ? "Укажи количество новых аниме. Дубликаты пропускаются, неполные записи сохраняются для последующего восстановления. Импорт можно продолжить после паузы." : "Choose how many new anime to add. Duplicates are skipped, incomplete records are retained, and the import can be resumed."}</p>
+                  <p className="text-xs leading-relaxed text-muted-foreground">{language === "ru" ? "Можно добавить аниме по названию или оставить импорт по количеству. Оба режима сохраняют метаданные, постер и доступные скриншоты из Shikimori." : "Add anime by title or keep using the quantity-based importer. Both modes save metadata, poster and available Shikimori screenshots."}</p>
+                  <section className="mt-4 rounded-xl border border-[#3B294B] bg-[#08070D] p-3 sm:p-4" aria-label={language === "ru" ? "Импорт аниме по названию" : "Import anime by title"}>
+                    <h3 className="text-sm font-semibold text-[#F8F4FF]">{language === "ru" ? "Добавить по названию" : "Import by title"}</h3>
+                    <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{language === "ru" ? "Введи русское, английское или японское название. Поиск покажет варианты, чтобы ты выбрал правильный сезон или фильм." : "Search using the Russian, English or Japanese title. Choose the exact season or movie from the results."}</p>
+                    <form className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]" onSubmit={event => { event.preventDefault(); void searchCatalogTitle(); }}>
+                      <input
+                        type="search"
+                        value={adminImportTitleQuery}
+                        onChange={event => { setAdminImportTitleQuery(event.target.value); setAdminTitleSearchResults([]); setAdminTitleSearchMessage(""); }}
+                        maxLength={120}
+                        minLength={2}
+                        placeholder={language === "ru" ? "Например: Frieren, フリーレン, Фрирен" : "For example: Frieren, フリーレン"}
+                        aria-label={language === "ru" ? "Название аниме для поиска" : "Anime title to search"}
+                        disabled={adminTitleSearchBusy || Boolean(adminTitleImportBusy) || adminImportRunning || metadataRefreshRunning}
+                        className="h-11 min-w-0 rounded-xl border border-[#453452] bg-[#050408] px-3 text-sm text-white placeholder:text-muted-foreground focus:border-[#BE65FF] focus:outline-none focus:ring-1 focus:ring-[#BE65FF] disabled:opacity-60"
+                      />
+                      <button
+                        type="submit"
+                        disabled={adminTitleSearchBusy || Boolean(adminTitleImportBusy) || adminImportRunning || metadataRefreshRunning || adminImportTitleQuery.trim().length < 2}
+                        className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#7750A0] px-4 py-2 text-sm font-semibold text-[#E7CEFF] transition hover:bg-[#241431] disabled:cursor-wait disabled:opacity-50"
+                      >
+                        <Search className="h-4 w-4" />
+                        {adminTitleSearchBusy ? (language === "ru" ? "Ищем…" : "Searching…") : (language === "ru" ? "Найти тайтл" : "Search title")}
+                      </button>
+                    </form>
+                    {adminTitleSearchMessage && <p className="mt-3 rounded-lg border border-border bg-background/60 p-2.5 text-xs text-muted-foreground" role="status">{adminTitleSearchMessage}</p>}
+                    {adminTitleSearchResults.length > 0 && (
+                      <div className="mt-3 space-y-2">
+                        {adminTitleSearchResults.map(item => (
+                          <article key={item.id} className="flex min-w-0 items-center gap-3 rounded-xl border border-[#30263A] bg-[#0D0A13] p-2.5 sm:p-3">
+                            {item.posterUrl ? (
+                              <img src={item.posterUrl} alt="" loading="lazy" decoding="async" className="h-16 w-11 shrink-0 rounded-md object-cover bg-black/30" />
+                            ) : (
+                              <div aria-hidden="true" className="grid h-16 w-11 shrink-0 place-items-center rounded-md bg-[#251A30] text-xs font-bold text-[#CE9EFF]">Y</div>
+                            )}
+                            <div className="min-w-0 flex-1">
+                              <h4 className="break-words text-sm font-medium text-white">{item.title}</h4>
+                              <p className="mt-0.5 break-words text-xs text-muted-foreground">{[item.originalTitle !== item.title ? item.originalTitle : "", item.englishTitle !== item.originalTitle ? item.englishTitle : "", item.year > 0 ? String(item.year) : "", item.kind ?? ""].filter(Boolean).join(" · ")}</p>
+                              <p className="mt-0.5 text-[11px] text-muted-foreground">Shikimori ID: {item.id}{item.status ? " · " + item.status : ""}</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => { void importCatalogTitle(item.id); }}
+                              disabled={item.alreadyInCatalog || Boolean(adminTitleImportBusy) || adminTitleSearchBusy || adminImportRunning || metadataRefreshRunning}
+                              className={item.alreadyInCatalog
+                                ? "min-h-9 shrink-0 rounded-lg border border-border px-2.5 py-2 text-[11px] font-medium text-muted-foreground"
+                                : "min-h-9 shrink-0 rounded-lg bg-gradient-to-r from-[#AC4EFC] to-[#8736FA] px-2.5 py-2 text-[11px] font-semibold text-white transition hover:brightness-110 disabled:cursor-wait disabled:opacity-50"}
+                            >
+                              {item.alreadyInCatalog
+                                ? (language === "ru" ? "Уже добавлено" : "Already added")
+                                : adminTitleImportBusy === item.id
+                                  ? (language === "ru" ? "Добавляем…" : "Importing…")
+                                  : (language === "ru" ? "Импортировать" : "Import")}
+                            </button>
+                          </article>
+                        ))}
+                      </div>
+                    )}
+                  </section>
+                  <div className="my-4 flex items-center gap-3 text-[11px] uppercase tracking-[0.15em] text-muted-foreground"><span className="h-px flex-1 bg-border" /><span>{language === "ru" ? "или импорт по количеству" : "or import by quantity"}</span><span className="h-px flex-1 bg-border" /></div>
                   <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
                     <label className="text-sm">
                       <span className="mb-1 block text-xs text-muted-foreground">{language === "ru" ? "Количество новых записей (1–500)" : "Number of new records (1–500)"}</span>
