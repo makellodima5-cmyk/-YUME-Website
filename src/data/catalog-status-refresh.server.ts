@@ -72,7 +72,7 @@ export async function runScheduledCatalogStatusRefresh(env: unknown): Promise<vo
   if ((lock.meta?.changes ?? 0) === 0) return;
   try {
     const rawPhase = await getMeta(db, "catalog_status_refresh_phase", "ongoing");
-    let phase: Phase = rawPhase === "announcements" || rawPhase === "other" ? rawPhase : "ongoing";
+    const phase: Phase = rawPhase === "announcements" || rawPhase === "other" ? rawPhase : "ongoing";
     let cycle = await getMeta(db, "catalog_status_refresh_cycle", "1");
     const rows = await db.prepare(
       "SELECT a.id FROM anime_catalog a WHERE " + phaseWhere(phase) +
