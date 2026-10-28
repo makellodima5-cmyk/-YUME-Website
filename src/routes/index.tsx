@@ -465,6 +465,7 @@ function Index() {
   useEffect(() => { catalogAnimeRef.current = catalogAnime; }, [catalogAnime]);
 
   useEffect(() => {
+    if (view === "catalog") return;
     let cancelled = false;
     const refreshSectionFeeds = async () => {
       try {
@@ -520,7 +521,7 @@ function Index() {
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [allowedCatalogIds]);
+  }, [allowedCatalogIds, view]);
   const [catalogLoadState, setCatalogLoadState] = useState<"idle" | "loading" | "loaded" | "error">("idle");
   const [catalogLoadError, setCatalogLoadError] = useState<string | null>(null);
   const catalogLoadStarted = useRef(false);
