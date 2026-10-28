@@ -920,7 +920,7 @@ function AnimeDetailPage() {
                     {!kodikEmbedUrl && <div className="absolute inset-0 flex items-center justify-center p-5 text-center text-sm text-muted-foreground">{kodikError || (language === "en" ? "Loading Kodik player…" : "Загрузка плеера Kodik…")}</div>}
                   </div>
                 </div>
-              ) )) : anime.youtubeTrailerId ? (
+              )) : anime.youtubeTrailerId ? (
                 <div className="relative mx-auto aspect-video w-full min-w-0 overflow-hidden rounded-2xl border border-white/10 bg-[#080710] shadow-2xl">
                   <iframe
                     title={displayAnimeTitle(anime, language) + " — " + t("anime.trailerTitle")}
