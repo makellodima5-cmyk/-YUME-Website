@@ -1536,13 +1536,20 @@ function Index() {
       setCatalogPage(1);
     }
     // Re-tapping the Catalog tab clears its query and returns to the full catalog.
-    if (v === "catalog" && view === "catalog") {
+    if (v === "catalog") {
+      setCatalogQuery("");
+      setCatalogPage(1);
+      setDraftFilters(EMPTY_CATALOG_FILTERS);
+      setActiveFilters(EMPTY_CATALOG_FILTERS);
+      setFiltersOpen(false);
+    }
+    /*if (v === "catalog" && view === "catalog") {
       setCatalogQuery("");
       setDraftFilters(EMPTY_CATALOG_FILTERS);
       setActiveFilters(EMPTY_CATALOG_FILTERS);
       setFiltersOpen(false);
       setCatalogPage(1);
-    }
+    }*/
     setViewRaw(v);
     if (v === "popular") setPopularPage(1);
     if (v === "new-releases") setNewReleasesPage(1);
