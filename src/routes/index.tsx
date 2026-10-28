@@ -504,6 +504,11 @@ function Index() {
   const [adminImportRunning, setAdminImportRunning] = useState(false);
   const [adminImport, setAdminImport] = useState<{target:number;cursor:number;added:number;skipped:number;incomplete:number;errors:number;state:string;delayMs?:number}>({target:0,cursor:1,added:0,skipped:0,incomplete:0,errors:0,state:"idle"});
   const [adminImportMessage, setAdminImportMessage] = useState("");
+  const [adminImportTitleQuery, setAdminImportTitleQuery] = useState("");
+  const [adminTitleSearchResults, setAdminTitleSearchResults] = useState<Array<{id:string;title:string;englishTitle:string;originalTitle:string;year:number;kind:string|null;status:string;posterUrl:string|null;alreadyInCatalog:boolean}>>([]);
+  const [adminTitleSearchBusy, setAdminTitleSearchBusy] = useState(false);
+  const [adminTitleImportBusy, setAdminTitleImportBusy] = useState<string | null>(null);
+  const [adminTitleSearchMessage, setAdminTitleSearchMessage] = useState("");
   const [metadataRefreshRunning, setMetadataRefreshRunning] = useState(false);
   const [metadataAutoBusy, setMetadataAutoBusy] = useState(false);
   const manualMetadataStopRef = useRef(false);
@@ -520,7 +525,7 @@ function Index() {
   const [adminAuditLog, setAdminAuditLog] = useState<{id:number;action:string;status:string;details:Record<string,unknown>;created_at:string}[]>([]);
   const [maintenanceBusy, setMaintenanceBusy] = useState(false);
   const [maintenanceMessage, setMaintenanceMessage] = useState("");
-  const [expandedAdminSections, setExpandedAdminSections] = useState({import:false,metadata:false,quality:false,maintenance:false,audit:false,trailers:false,notifications:true});
+  const [expandedAdminSections, setExpandedAdminSections] = useState({import:false,metadata:false,quality:false,maintenance:false,audit:false,trailers:false,notifications:false});
   const [analyticsData, setAnalyticsData] = useState<{periods:{hours:{visits:number;visitors:number};week:{visits:number;visitors:number};month:{visits:number;visitors:number};all:{visits:number;visitors:number}};daily:{date:string;visits:number;pageViews:number;visitors:number}[];updatedAt:string}|null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [analyticsError, setAnalyticsError] = useState("");
@@ -1163,6 +1168,97 @@ function Index() {
   };
 
 
+
+  const searchCatalogTitle = async () => {
+    if (!isAdmin || adminTitleSearchBusy || adminTitleImportBusy || adminImportRunning || metadataRefreshRunning) return;
+    const query = adminImportTitleQuery.trim();
+    if (query.length < 2) {
+      setAdminTitleSearchMessage(language === "ru" ? "Введи не менее двух символов названия." : "Enter at least two characters.");
+      setAdminTitleSearchResults([]);
+      return;
+    }
+    setAdminTitleSearchBusy(true);
+    setAdminTitleSearchMessage("");
+    setAdminTitleSearchResults([]);
+    try {
+      const response = await fetch("/api/admin/catalog-import", {
+        method: "POST",
+        credentials: "same-origin",
+        cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "search_title", query }),
+      });
+      const payload = await response.json().catch(() => ({})) as {
+        isAdmin?: boolean;
+        error?: string;
+        message?: string;
+        results?: typeof adminTitleSearchResults;
+      };
+      if (!response.ok || payload.isAdmin !== true) {
+        throw new Error(payload.message ?? payload.error ?? (language === "ru" ? "Не удалось найти тайтл." : "Could not search for this title."));
+      }
+      const results = payload.results ?? [];
+      setAdminTitleSearchResults(results);
+      setAdminTitleSearchMessage(results.length
+        ? (language === "ru" ? "Выбери нужный тайтл из результатов." : "Choose the correct title from the results.")
+        : (language === "ru" ? "Ничего не найдено. Попробуй другое название или написание." : "No results. Try a different spelling or title."));
+    } catch (error) {
+      setAdminTitleSearchMessage(error instanceof Error ? error.message : (language === "ru" ? "Ошибка поиска." : "Search failed."));
+    } finally {
+      setAdminTitleSearchBusy(false);
+    }
+  };
+
+  const importCatalogTitle = async (animeId: string) => {
+    if (!isAdmin || adminTitleImportBusy || adminImportRunning || metadataRefreshRunning) return;
+    setAdminTitleImportBusy(animeId);
+    setAdminTitleSearchMessage("");
+    try {
+      const response = await fetch("/api/admin/catalog-import", {
+        method: "POST",
+        credentials: "same-origin",
+        cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "import_title", animeId }),
+      });
+      const payload = await response.json().catch(() => ({})) as {
+        isAdmin?: boolean;
+        error?: string;
+        message?: string;
+        alreadyInCatalog?: boolean;
+        imported?: boolean;
+        anime?: { id: string; title: string; year?: number; originalTitle?: string; englishTitle?: string };
+        screenshots?: number;
+        catalogTotal?: number;
+        catalogWithTrailer?: number;
+        missingTrailers?: number;
+      };
+      if (response.status === 409 && payload.alreadyInCatalog) {
+        setAdminTitleSearchResults(current => current.map(item => item.id === animeId ? { ...item, alreadyInCatalog: true } : item));
+        setAdminTitleSearchMessage(payload.message ?? (language === "ru" ? "Этот тайтл уже есть в каталоге." : "This title is already in the catalog."));
+        return;
+      }
+      if (!response.ok || payload.isAdmin !== true || payload.imported !== true) {
+        throw new Error(payload.message ?? payload.error ?? (language === "ru" ? "Не удалось импортировать тайтл." : "Could not import this title."));
+      }
+      setAdminTitleSearchResults(current => current.map(item => item.id === animeId ? { ...item, alreadyInCatalog: true } : item));
+      setAdminTitleSearchMessage(language === "ru"
+        ? `Добавлено: ${payload.anime?.title ?? animeId}. Скриншотов сохранено: ${payload.screenshots ?? 0}.`
+        : `Added: ${payload.anime?.title ?? animeId}. Screenshots saved: ${payload.screenshots ?? 0}.`);
+      setAdminStats(current => ({
+        total: payload.catalogTotal ?? current?.total ?? 0,
+        pending: current?.pending ?? 0,
+        checked: current?.checked ?? 0,
+        found: payload.catalogWithTrailer ?? current?.found ?? 0,
+        missing: payload.missingTrailers ?? current?.missing ?? 0,
+      }));
+      await refreshCatalogQuality();
+    } catch (error) {
+      setAdminTitleSearchMessage(error instanceof Error ? error.message : (language === "ru" ? "Ошибка импорта." : "Import failed."));
+    } finally {
+      setAdminTitleImportBusy(null);
+    }
+  };
 
   // Keep the selected section aligned with the URL, including browser Back/Forward.
   useEffect(() => {
