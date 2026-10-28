@@ -1543,13 +1543,7 @@ function Index() {
       setActiveFilters(EMPTY_CATALOG_FILTERS);
       setFiltersOpen(false);
     }
-    /*if (v === "catalog" && view === "catalog") {
-      setCatalogQuery("");
-      setDraftFilters(EMPTY_CATALOG_FILTERS);
-      setActiveFilters(EMPTY_CATALOG_FILTERS);
-      setFiltersOpen(false);
-      setCatalogPage(1);
-    }*/
+
     setViewRaw(v);
     if (v === "popular") setPopularPage(1);
     if (v === "new-releases") setNewReleasesPage(1);
