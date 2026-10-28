@@ -287,8 +287,9 @@ function hasBulkExcludedGenre(item: ShikimoriAnime): boolean {
 function isBlockedFromBulkImport(item: ShikimoriAnime, block18Plus: boolean): boolean {
   return hasBulkExcludedGenre(item) || (block18Plus && clean(item.rating).toLocaleLowerCase("en") === "rx");
 }
-async function fetchPage(page: number): Promise<ShikimoriAnime[]> {
-  const query = "query { animes(page: " + page + ", limit: " + PAGE_SIZE + ", order: popularity) { " + IMPORT_FIELDS + " } }";
+async function fetchPage(page: number, statusFilter: string | null = null): Promise<ShikimoriAnime[]> {
+  const statusArgument = statusFilter ? ', status: "' + statusFilter + '"' : "";
+  const query = "query { animes(page: " + page + ", limit: " + PAGE_SIZE + ", order: popularity" + statusArgument + ") { " + IMPORT_FIELDS + " } }";
   const response = await fetch(API_URL, { method:"POST", headers:{"Content-Type":"application/json",Accept:"application/json","User-Agent":"YUME/1.0"}, body:JSON.stringify({query}), signal:AbortSignal.timeout(12000) });
   if (response.status === 429) {
     const retryAfterMs = retryAfterMilliseconds(response.headers.get("Retry-After")) ?? 60000;
@@ -532,7 +533,7 @@ async function maintenanceCheck(db: Database) {
   return {ok:health?.ok === 1, catalogRecords:Number(count?.count ?? 0), qualitySummary:quality.summary, checkedAt:new Date().toISOString()};
 }
 async function snapshot(db: Database) {
-  const rows = await db.prepare("SELECT key, value FROM anime_catalog_meta WHERE key IN ('admin_import_target','admin_import_cursor','admin_import_added','admin_import_skipped','admin_import_incomplete','admin_import_errors','admin_import_state','admin_import_block_18_plus')")
+  const rows = await db.prepare("SELECT key, value FROM anime_catalog_meta WHERE key IN ('admin_import_target','admin_import_cursor','admin_import_added','admin_import_skipped','admin_import_incomplete','admin_import_errors','admin_import_state','admin_import_block_18_plus','admin_import_status_filter')")
     .all<{ key: string; value: string }>();
   const values = new Map(rows.results.map((row) => [row.key, row.value]));
   return {
@@ -544,6 +545,7 @@ async function snapshot(db: Database) {
     errors: Number(values.get("admin_import_errors") ?? 0),
     state: values.get("admin_import_state") ?? "idle",
     bulkImportBlock18Plus: values.get("admin_import_block_18_plus") !== "0",
+    statusFilter: values.get("admin_import_status_filter") ?? "",
     delayMs: REQUEST_DELAY_MS,
   };
 }
@@ -1033,7 +1035,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
         qualityOffset: quality.offset, qualityHasMore: quality.hasMore, auditLog: await recentAudit(db),
       });
     }
-    let body: {action?:unknown; target?:unknown; query?:unknown; animeId?:unknown; block18Plus?:unknown; ids?:unknown};
+    let body: {action?:unknown; target?:unknown; query?:unknown; animeId?:unknown; block18Plus?:unknown; ids?:unknown; statusFilter?:unknown};
     try { body = await request.json() as typeof body; } catch { return json({error:"invalid_request"},400); }
     requestedAction = body.action;
     const lockToken = await acquireLock(db);
@@ -1225,6 +1227,9 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
       if (body.action === "start") {
         const target = Number(body.target);
         if (!Number.isInteger(target) || target < 1 || target > MAX_TARGET) return json({error:"invalid_target",max:MAX_TARGET},400);
+        const requestedStatus = typeof body.statusFilter === "string" ? body.statusFilter : "";
+        const allowedStatusFilters = new Set(["", "ongoing", "anons", "released"]);
+        if (!allowedStatusFilters.has(requestedStatus)) return json({error:"invalid_status_filter",message:"Недопустимый статус для массового импорта."},400);
         const current = await getMeta(db,"admin_import_state");
         if (current === "running") return json({isAdmin:true,...await snapshot(db),message:"Импорт уже выполняется."},409);
         const runId = crypto.randomUUID();
@@ -1234,12 +1239,13 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
           setMeta(db,"admin_import_run_id",runId),
           setMeta(db,"admin_import_baseline_added","0"),setMeta(db,"admin_import_baseline_skipped","0"),setMeta(db,"admin_import_baseline_incomplete","0"),
           setMeta(db,"admin_import_target",String(target)),setMeta(db,"admin_import_cursor","1"),
+          setMeta(db,"admin_import_status_filter",requestedStatus),
           setMeta(db,"admin_import_run_block_18_plus",block18PlusForRun ? "1" : "0"),
           setMeta(db,"admin_import_added","0"),setMeta(db,"admin_import_skipped","0"),
           setMeta(db,"admin_import_incomplete","0"),setMeta(db,"admin_import_errors","0"),
           setMeta(db,"admin_import_state","running"),setMeta(db,"admin_import_resume_at","0"),
         ]);
-        await audit(db,"catalog.import.start","success",{target,block18Plus:block18PlusForRun,excludedGenres:["hentai","yaoi","yuri"]});
+        await audit(db,"catalog.import.start","success",{target,statusFilter:requestedStatus || null,block18Plus:block18PlusForRun,excludedGenres:["hentai","yaoi","yuri"]});
         return json({isAdmin:true,...await snapshot(db),message:"Импорт подготовлен."});
       }
       if (body.action === "step") {
@@ -1255,7 +1261,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
           return json({isAdmin:true,...await snapshot(db)});
         }
         let sourcePage: ShikimoriAnime[];
-        try { sourcePage = await fetchPage(before.cursor); }
+        try { sourcePage = await fetchPage(before.cursor, before.statusFilter || null); }
         catch (error) {
           const retryAfterMs = Number((error as {retryAfterMs?:number})?.retryAfterMs ?? 5000);
           await db.batch([setMeta(db,"admin_import_errors",String(before.errors+1)),setMeta(db,"admin_import_resume_at",String(Date.now()+retryAfterMs))]);
@@ -1359,7 +1365,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
           await invalidatePersistentCatalogCache();
         }
         const after = await snapshot(db);
-        await audit(db,"catalog.import.page","success",{page:before.cursor,added:after.added-before.added,skipped:after.skipped-before.skipped,incomplete:after.incomplete-before.incomplete,bannersResolved:importedBannersByCatalogId.size,bannersMatched:importedBannerLookup.matched,bannerErrors:importedBannerLookup.failedBatches,sourceRowsWithoutMalId:candidateSourceItems.filter(item => !normalizeAniListMalId(item.malId)).length,state:after.state});
+        await audit(db,"catalog.import.page","success",{page:before.cursor,statusFilter:before.statusFilter || null,added:after.added-before.added,skipped:after.skipped-before.skipped,incomplete:after.incomplete-before.incomplete,bannersResolved:importedBannersByCatalogId.size,bannersMatched:importedBannerLookup.matched,bannerErrors:importedBannerLookup.failedBatches,sourceRowsWithoutMalId:candidateSourceItems.filter(item => !normalizeAniListMalId(item.malId)).length,state:after.state});
         if (after.state !== "running") {
           await audit(db,"catalog.import.finish",after.state,{added:after.added,target:after.target,skipped:after.skipped,errors:after.errors});
         }
