@@ -461,7 +461,7 @@ function Index() {
   const catalogAnimeRef = useRef(catalogAnime);
   const ANIME = catalogAnime;
 
-  useEffect(() => { if (view === "catalog" && catalogMode === "paged") { setCatalogAnime(loadedAnime); catalogAnimeRef.current = loadedAnime; } }, [loadedAnime, view, catalogMode]);
+  useEffect(() => { if (catalogMode === "full" || view === "catalog") { setCatalogAnime(loadedAnime); catalogAnimeRef.current = loadedAnime; } }, [loadedAnime, view, catalogMode]);
   useEffect(() => { catalogAnimeRef.current = catalogAnime; }, [catalogAnime]);
 
   useEffect(() => {
