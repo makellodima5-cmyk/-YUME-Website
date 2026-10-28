@@ -643,6 +643,8 @@ function Index() {
           checked?: number;
           found?: number;
           missing?: number;
+          catalogTotal?: number;
+          catalogWithTrailer?: number;
           auto?: {enabled?:boolean;running?:boolean;nextRunAt?:number|null;lastRunAt?:number|null;retryAt?:number|null;lastError?:string};
         };
         if (cancelled) return;
@@ -655,10 +657,10 @@ function Index() {
         setIsAdmin(true);
         if (result.auto) setTrailerAuto({enabled:result.auto.enabled===true,running:result.auto.running===true,nextRunAt:result.auto.nextRunAt ?? null,lastRunAt:result.auto.lastRunAt ?? null,retryAt:result.auto.retryAt ?? null,lastError:result.auto.lastError ?? ""});
         setAdminStats({
-          total: Number(result.total ?? 0),
+          total: Number(result.catalogTotal ?? 0),
           pending: Number(result.pending ?? 0),
           checked: Number(result.checked ?? 0),
-          found: Number(result.found ?? 0),
+          found: Number(result.catalogWithTrailer ?? 0),
           missing: Number(result.missing ?? 0),
         });
         setAdminCheckComplete(true);
@@ -984,8 +986,8 @@ function Index() {
           };
         });
         const trailerResponse = await fetch("/api/admin/trailers", {credentials:"same-origin",cache:"no-store"});
-        const trailerStats = await trailerResponse.json().catch(() => ({})) as {isAdmin?:boolean;total?:number;pending?:number;checked?:number;found?:number;missing?:number};
-        if (!cancelled && trailerResponse.ok && trailerStats.isAdmin) setAdminStats({total:trailerStats.total??0,pending:trailerStats.pending??0,checked:trailerStats.checked??0,found:trailerStats.found??0,missing:trailerStats.missing??0});
+        const trailerStats = await trailerResponse.json().catch(() => ({})) as {isAdmin?:boolean;total?:number;pending?:number;checked?:number;found?:number;missing?:number;catalogTotal?:number;catalogWithTrailer?:number};
+        if (!cancelled && trailerResponse.ok && trailerStats.isAdmin) setAdminStats({total:trailerStats.catalogTotal??0,pending:trailerStats.pending??0,checked:trailerStats.checked??0,found:trailerStats.catalogWithTrailer??0,missing:trailerStats.missing??0});
       } catch { /* Status polling must not interrupt the server-side job. */ }
     };
     void poll();
@@ -1044,8 +1046,8 @@ function Index() {
       setMetadataRefreshMessage(payload.message ?? (language === "ru" ? "Прогресс сброшен." : "Progress reset."));
       await refreshCatalogQuality(0);
       const trailerResponse = await fetch("/api/admin/trailers", {credentials:"same-origin",cache:"no-store"});
-      const trailerStats = await trailerResponse.json().catch(() => ({})) as {isAdmin?:boolean;total?:number;pending?:number;checked?:number;found?:number;missing?:number};
-      if (trailerResponse.ok && trailerStats.isAdmin) setAdminStats({total:trailerStats.total??0,pending:trailerStats.pending??0,checked:trailerStats.checked??0,found:trailerStats.found??0,missing:trailerStats.missing??0});
+      const trailerStats = await trailerResponse.json().catch(() => ({})) as {isAdmin?:boolean;total?:number;pending?:number;checked?:number;found?:number;missing?:number;catalogTotal?:number;catalogWithTrailer?:number};
+      if (trailerResponse.ok && trailerStats.isAdmin) setAdminStats({total:trailerStats.catalogTotal??0,pending:trailerStats.pending??0,checked:trailerStats.checked??0,found:trailerStats.catalogWithTrailer??0,missing:trailerStats.missing??0});
     } catch (error) {
       setMetadataRefreshMessage(error instanceof Error ? error.message : (language === "ru" ? "Не удалось сбросить прогресс." : "Could not reset progress."));
     } finally { setMetadataAutoBusy(false); }
