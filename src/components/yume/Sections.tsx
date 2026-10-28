@@ -108,7 +108,7 @@ export function Hero({
   const { t } = useYumePreferences();
   const halloween = useHalloweenSeason();
   return (
-    <section className={"relative mx-3 mt-3 isolate h-[360px] min-h-[360px] w-[calc(100%-1.5rem)] max-w-[1920px] overflow-hidden rounded-2xl ring-1 ring-border sm:mx-4 sm:h-[390px] sm:w-[calc(100%-2rem)] md:mx-auto md:mt-3 md:h-[400px] md:min-h-[400px] md:w-[calc(100%-2.5rem)] lg:h-[440px]">
+    <section className={"relative mx-3 mt-3 isolate h-[360px] min-h-[360px] w-[calc(100%-1.5rem)] max-w-[1920px] overflow-hidden rounded-2xl ring-1 ring-border sm:mx-4 sm:h-[390px] sm:w-[calc(100%-2rem)] md:mx-auto md:mt-3 md:h-[400px] md:min-h-[400px] md:w-[calc(100%-2.5rem)] lg:h-[440px] " + (halloween ? "yume-halloween-hero" : "")}>
       <picture className="absolute inset-0 block h-full w-full">
         <source media="(max-width: 767px)" srcSet={halloween ? halloweenMobileBanner : mobileHeroArtwork} />
         <img
