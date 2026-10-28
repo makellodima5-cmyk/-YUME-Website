@@ -94,14 +94,18 @@ export function Hero({
         </div>
         <CatalogFilters open={filtersOpen} placement="home" draft={draftFilters} setDraft={setDraftFilters} onApply={onApplyFilters} onReset={onResetFilters} onClose={() => setFiltersOpen(false)} genres={genres} statuses={statuses} types={types} ageRatings={ageRatings} yearMin={yearMin} yearMax={yearMax} />
       </div>
-      <div className="relative z-10 flex h-full flex-col justify-end px-5 pb-5 pt-20 sm:pb-8 md:max-w-[760px] md:justify-center md:px-10 md:pb-8 md:pt-8 lg:px-12">
-        <h1 className="max-w-[13ch] text-3xl font-bold leading-[1.05] sm:text-4xl md:max-w-none md:text-4xl lg:text-5xl">
-          <span className="text-white">{t("hero.title")}</span>
-        </h1>
-        <p className="mt-2 line-clamp-3 max-w-xl text-sm leading-relaxed text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.95)] sm:line-clamp-none md:mt-3 md:text-base">
-          {t("hero.description")}
-        </p>
-        <div className="mt-4 flex flex-row flex-wrap gap-2 sm:mt-5 md:mt-6">
+      <div className="relative z-10 flex h-full flex-col items-start justify-end px-5 pb-5 pt-20 sm:pb-8 md:max-w-[760px] md:justify-center md:px-10 md:pb-8 md:pt-8 lg:px-12">
+        <img
+          src="/images/yume-hero-tagline.png.PNG"
+          alt="YUME — Больше, чем аниме"
+          width={900}
+          height={300}
+          fetchPriority="high"
+          decoding="async"
+          draggable={false}
+          className="mb-4 block h-auto w-[min(88%,430px)] object-contain object-left drop-shadow-[0_2px_22px_rgba(0,0,0,0.35)] sm:mb-5 sm:w-[min(76%,470px)] md:mb-6 md:w-[min(72%,500px)] lg:w-[min(68%,540px)]"
+        />
+        <div className="flex flex-row flex-wrap gap-2">
           <button onClick={() => { telegramHapticImpact("light"); onRandom(); }} className="yume-tactile-control inline-flex w-fit items-center justify-center gap-1.5 rounded-full bg-neon px-3.5 py-2 text-xs font-semibold text-primary-foreground shadow-neon transition hover:brightness-110 sm:gap-2 sm:px-5 sm:py-2.5 sm:text-sm">
             <Play className="h-4 w-4 fill-current" /> {t("hero.random")}
           </button>
