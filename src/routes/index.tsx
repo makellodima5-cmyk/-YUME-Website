@@ -3,8 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowDownWideNarrow, ChevronDown, ChevronRight, Search, SlidersHorizontal, X, UserRound, Globe, Sun, Moon, Monitor, ShieldCheck, Play, ListChecks, CircleCheck, Clock3, ChartNoAxesCombined, Download, Database, Settings, History, Bell, CheckCheck, Sparkles } from "lucide-react";
 import { COLLECTIONS, type Anime } from "@/data/anime";
 import { getShikimoriCatalog, getShikimoriSectionFeeds, type ShikimoriSectionFeeds } from "@/data/shikimori";
-import { isEligibleAiringAnime } from "@/data/anime-sections";
-import { getExactReleaseDate, isNewRelease, isUpcomingAnnouncement } from "@/data/anime-sections";
+import { getExactReleaseDate, isEligibleAiringAnime, isNewRelease, isUpcomingAnnouncement } from "@/data/anime-sections";
 import { Header, type View } from "@/components/yume/Header";
 import { AuthPage } from "@/components/yume/AuthPage";
 import { AnimeCard } from "@/components/yume/Poster";
@@ -36,8 +35,6 @@ function mergeLiveSectionAnime(stored: Anime, live: Anime): Anime {
     episodesAired: live.episodesAired ?? stored.episodesAired,
     nextEpisodeAt: live.nextEpisodeAt,
     popular: live.popular ?? stored.popular,
-    // Keep the shared merge for fields that are intentionally provider-backed,
-    // but explicitly restore the stable catalog presentation fields above.
     id: stored.id,
     title: stored.title,
     englishTitle: stored.englishTitle ?? live.englishTitle,
