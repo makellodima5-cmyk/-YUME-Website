@@ -114,7 +114,7 @@ async function authorize(request: Request, env: Environment, db: Database): Prom
 
 async function queueCounts(db: Database): Promise<{ total: number; pending: number; checked: number; found: number }> {
   const row = await db.prepare(
-    "SELECT COUNT(*) AS total, SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS pending, SUM(CASE WHEN status = 'checked' THEN 1 ELSE 0 END) AS checked, SUM(CASE WHEN trailer_found = 1 THEN 1 ELSE 0 END) AS found FROM anime_trailer_update_queue",
+    "SELECT COUNT(*) AS total, SUM(CASE WHEN q.status = 'pending' THEN 1 ELSE 0 END) AS pending, SUM(CASE WHEN q.status = 'checked' THEN 1 ELSE 0 END) AS checked, SUM(CASE WHEN q.trailer_found = 1 THEN 1 ELSE 0 END) AS found FROM anime_trailer_update_queue q INNER JOIN anime_catalog a ON a.id = q.anime_id",
   ).first<{ total: number; pending: number; checked: number; found: number }>();
   return { total: Number(row?.total ?? 0), pending: Number(row?.pending ?? 0), checked: Number(row?.checked ?? 0), found: Number(row?.found ?? 0) };
 }
@@ -267,7 +267,7 @@ export async function handleAdminTrailers(request: Request): Promise<Response> {
     }
     if (body.action !== "step") return json({ error: "invalid_action" }, 400);
 
-    const pending = await db.prepare("SELECT anime_id FROM anime_trailer_update_queue WHERE status = 'pending' ORDER BY anime_id LIMIT ?")
+    const pending = await db.prepare("SELECT q.anime_id FROM anime_trailer_update_queue q INNER JOIN anime_catalog a ON a.id = q.anime_id WHERE q.status = 'pending' ORDER BY q.anime_id LIMIT ?")
       .bind(BATCH_SIZE).all<QueueRow>();
     if (!pending.results.length) { const counts = await queueCounts(db); await audit(db,"trailers.scan.finish","success",counts); return json({ isAdmin: true, ...counts, done: true }); }
 
