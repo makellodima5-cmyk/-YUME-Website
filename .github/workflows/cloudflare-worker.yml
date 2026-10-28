@@ -103,16 +103,19 @@ jobs:
           if (!/callHook\(["']cloudflare:scheduled["']/.test(workerEntry)) {
             throw new Error("Generated Worker entry has no Cloudflare scheduled-hook dispatch.");
           }
-          if (!workerEntry.includes("[YUME][TRAILER_AUTO] Nitro scheduled hook received.")) {
-            throw new Error("Generated Worker entry has no registered trailer update scheduled-hook subscriber.");
+          if (!workerEntry.includes("[YUME][SCHEDULED] Nitro scheduled hook received.")) {
+            throw new Error("Generated Worker entry has no registered scheduled-hook subscriber.");
           }
           if (workerEntry.includes("runScheduledCatalogMetadataRefresh")) {
             throw new Error("Catalog metadata refresh must not be scheduled; it is manual-only.");
           }
-          if (!workerEntry.includes("runScheduledTrailerUpdate")) {
-            throw new Error("Generated Worker entry does not include the configured trailer update job.");
+          if (workerEntry.includes("runScheduledTrailerUpdate")) {
+            throw new Error("Automatic trailer lookup must remain manual-only.");
           }
-          console.log("Verified generated Worker entry dispatches Cloudflare Cron only to the configured trailer updater.");
+          if (!workerEntry.includes("runScheduledCatalogStatusRefresh") || !workerEntry.includes("runScheduledEpisodeNotifications")) {
+            throw new Error("Generated Worker entry is missing catalog status refresh or episode notification jobs.");
+          }
+          console.log("Verified generated Worker entry schedules catalog status refresh and episode notifications, without automatic trailer lookup.");
 
           console.log("Verified generated Worker config, root entry, assets, Cron trigger, and YUME_DB binding.");
           NODE
