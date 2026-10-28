@@ -2372,9 +2372,9 @@ function Index() {
                         title={language === "ru" ? "Удалить из истории" : "Remove from history"}
                         disabled={deleting}
                         onClick={(event) => { event.preventDefault(); event.stopPropagation(); void removeHistoryItem(item); }}
-                        className="absolute right-2 top-2 z-20 flex h-10 w-10 items-center justify-center rounded-full border-2 border-white bg-red-600 text-white shadow-[0_0_0_3px_rgba(0,0,0,0.65),0_5px_16px_rgba(0,0,0,0.7)] transition hover:scale-105 hover:bg-red-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-red-300 disabled:cursor-wait disabled:opacity-70"
+                        className="absolute right-2 top-2 z-20 flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-red-600 text-white shadow-[0_0_0_2px_rgba(0,0,0,0.7),0_4px_12px_rgba(0,0,0,0.65)] transition hover:scale-105 hover:bg-red-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-red-300 disabled:cursor-wait disabled:opacity-70"
                       >
-                        <X className="h-6 w-6" strokeWidth={3} aria-hidden="true" />
+                        <X className="h-5 w-5" strokeWidth={3} aria-hidden="true" />
                       </button>
                       <p className="mt-2 text-xs text-muted-foreground">{language === "ru" ? "Открыт" : "Opened"}: {new Date(item.viewedAt).toLocaleString(language === "ru" ? "ru-RU" : "en-GB")}</p>
                     </div>
