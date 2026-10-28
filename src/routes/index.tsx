@@ -187,7 +187,7 @@ export const Route = createFileRoute("/")({
           genres: Array.from(new Set(allItems.flatMap(a => a.genres))).sort((a,b)=>a.localeCompare(b,"ru")),
           statuses: ["Онгоинг","Анонс","Вышел","Неизвестно"],
           types: Array.from(new Set(allItems.map(a=>a.kind?.trim() || (a.episodes===1 ? "Фильм" : "TV")))).filter(Boolean).sort((a,b)=>a.localeCompare(b,"ru")),
-          ageRatings: Array.from(new Set(allItems.map(a=>a.ageRating).filter((v):v is string=>Boolean(v))),
+          ageRatings: Array.from(new Set(allItems.map(a=>a.ageRating).filter((v):v is string=>Boolean(v)))),
           yearMin: years.length ? Math.min(...years) : 1900,
           yearMax: years.length ? Math.max(...years) : new Date().getFullYear(),
         },
