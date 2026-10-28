@@ -1,6 +1,7 @@
 import type { Anime } from "@/data/anime";
 import type { Language } from "@/data/preferences";
 import type { CatalogFiltersValue } from "@/components/yume/CatalogFilters";
+import { getSearchMatchScore } from "@/data/search-text";
 
 export type CatalogSort = "rating" | "newest" | "oldest" | "title";
 
@@ -12,19 +13,24 @@ export function filterAndSortCatalog(
   language: Language,
   translateGenre: (genre: string, language: Language) => string,
 ): Anime[] {
-  const normalizedQuery = query.trim().toLocaleLowerCase(language === "en" ? "en" : "ru");
+  const normalizedQuery = query.trim();
+  const locale = language === "en" ? "en" : "ru";
   const yearFrom = filters.yearFrom.trim() ? Number(filters.yearFrom) : null;
   const yearTo = filters.yearTo.trim() ? Number(filters.yearTo) : null;
+  const relevance = new Map<Anime, number>();
 
   return animeItems.filter((anime) => {
-    const matchesQuery = !normalizedQuery ||
-      anime.title.toLocaleLowerCase(language === "en" ? "en" : "ru").includes(normalizedQuery) ||
-      (anime.englishTitle ?? "").toLocaleLowerCase(language === "en" ? "en" : "ru").includes(normalizedQuery) ||
-      anime.original.toLocaleLowerCase(language === "en" ? "en" : "ru").includes(normalizedQuery) ||
-      anime.genres.some((genre) =>
-        genre.toLocaleLowerCase(language === "en" ? "en" : "ru").includes(normalizedQuery) ||
-        translateGenre(genre, language).toLocaleLowerCase(language === "en" ? "en" : "ru").includes(normalizedQuery),
-      );
+    const matchScore = getSearchMatchScore(normalizedQuery, [
+      { value: anime.title, priority: 0 },
+      { value: anime.englishTitle ?? "", priority: 0 },
+      { value: anime.original, priority: 0 },
+      ...anime.genres.flatMap((genre) => [
+        { value: genre, priority: 100 },
+        { value: translateGenre(genre, language), priority: 100 },
+      ]),
+    ], locale);
+    const matchesQuery = matchScore !== null;
+    if (matchScore !== null) relevance.set(anime, matchScore);
     const matchesGenres = filters.genres.length === 0 || filters.genres.some((genre) => anime.genres.includes(genre));
     const matchesStatus = filters.status === "Любой" || anime.status === filters.status;
     const matchesFrom = yearFrom === null || anime.year >= yearFrom;
@@ -37,6 +43,11 @@ export function filterAndSortCatalog(
     return matchesQuery && matchesGenres && matchesStatus && matchesFrom && matchesTo &&
       matchesRating && matchesType && matchesAge;
   }).sort((a, b) => {
+    if (normalizedQuery) {
+      const relevanceDifference = (relevance.get(a) ?? Number.MAX_SAFE_INTEGER) -
+        (relevance.get(b) ?? Number.MAX_SAFE_INTEGER);
+      if (relevanceDifference !== 0) return relevanceDifference;
+    }
     if (sortBy === "newest") return b.year - a.year || (b.rating ?? -1) - (a.rating ?? -1);
     if (sortBy === "oldest") return a.year - b.year || (b.rating ?? -1) - (a.rating ?? -1);
     if (sortBy === "title") {
