@@ -1525,6 +1525,7 @@ function Index() {
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
+    // Keep the URL as the single source of truth for paged catalog data.
     // Tapping Home is also a quick way out of search results: restore the default home state.
     if (v === "home") {
       setQuery("");
@@ -1589,16 +1590,16 @@ function Index() {
   const availableAgeRatings = useMemo(() => { if (catalogFacets) return catalogFacets.ageRatings; const order=["Без ограничений","12+","16+","18+"]; return Array.from(new Set(ANIME.map(a=>a.ageRating).filter((v):v is string=>Boolean(v)))).sort((a,b)=>order.indexOf(a)-order.indexOf(b)); }, [ANIME,catalogFacets]);
   const catalogYearRange = useMemo(() => { if (catalogFacets) return {min:catalogFacets.yearMin,max:catalogFacets.yearMax}; const years=ANIME.map(a=>a.year).filter(y=>Number.isFinite(y)&&y>0); return {min:years.length?Math.min(...years):1900,max:years.length?Math.max(...years):new Date().getFullYear()}; }, [ANIME,catalogFacets]);
   const searchText = view === "catalog" ? catalogQuery.trim() : view === "home" ? submittedQuery.trim() : "";
-  const catalogResults = useMemo(() => view === "catalog" ? ANIME : filterAndSortCatalog(ANIME, searchText, activeFilters, sortBy, language, displayGenre), [ANIME,searchText,activeFilters,sortBy,language,view]);
+  const catalogResults = useMemo(() => filterAndSortCatalog(ANIME, searchText, activeFilters, sortBy, language, displayGenre), [ANIME,searchText,activeFilters,sortBy,language]);
   const catalogPageSize = 20;
   const totalCatalogPages = getCatalogPageCount(view === "catalog" ? initialCatalogTotal : catalogResults.length, catalogPageSize);
-  const visibleCatalogResults = view === "catalog" ? catalogResults : paginateCatalog(catalogResults, catalogPage, catalogPageSize);
+  const visibleCatalogResults = view === "catalog" ? ANIME : paginateCatalog(catalogResults, catalogPage, catalogPageSize);
   const activeFilterCount = activeFilters.genres.length +
     Number(activeFilters.status !== "Любой") + Number(activeFilters.yearFrom !== "") +
     Number(activeFilters.yearTo !== "") + Number(activeFilters.minRating > 0) +
     Number(activeFilters.type !== "Любой") + Number(activeFilters.ageRating !== "Любой");
   const searching = view === "home" && (submittedQuery.length > 0 || activeFilterCount > 0);
-  const needsFullCatalog = ["catalog", "popular", "new-releases", "announcements", "airing"].includes(view) ||
+  const needsFullCatalog = ["popular", "new-releases", "announcements", "airing"].includes(view) ||
     (view === "home" && (Boolean(submittedQuery.trim()) || activeFilterCount > 0 || filtersOpen));
   // Searches and filters operate on the dataset returned from D1.
   // Do not poll Shikimori or trigger imports during normal user navigation.
