@@ -106,6 +106,7 @@ const CREATE_SCHEMA_STATEMENTS = [
   )`,
   "CREATE INDEX IF NOT EXISTS idx_anime_catalog_title ON anime_catalog(title)",
   "CREATE INDEX IF NOT EXISTS idx_anime_catalog_position ON anime_catalog(position)",
+  "CREATE INDEX IF NOT EXISTS idx_anime_catalog_due_episodes ON anime_catalog(status, datetime(next_episode_at)) WHERE next_episode_at IS NOT NULL",
   "CREATE INDEX IF NOT EXISTS idx_anime_catalog_missing_trailer ON anime_catalog(id) WHERE youtube_trailer_id IS NULL OR youtube_trailer_id = ''",
   `CREATE TABLE IF NOT EXISTS anime_catalog_screenshots (anime_id TEXT NOT NULL, original_url TEXT NOT NULL, preview_url TEXT NOT NULL, position INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (anime_id, original_url))`,
   "CREATE INDEX IF NOT EXISTS idx_anime_catalog_screenshots_position ON anime_catalog_screenshots(anime_id, position)",
@@ -117,7 +118,7 @@ const CREATE_SCHEMA_STATEMENTS = [
 
 let schemaReady = false;
 let missingBindingWarningLogged = false;
-const CATALOG_READ_CACHE_TTL_MS = 30_000;
+const CATALOG_READ_CACHE_TTL_MS = 300_000;
 const CATALOG_EDGE_CACHE_KEY = "https://yume-catalog-cache.internal/v1/snapshot";
 type WorkerCacheLike = {
   match(request: Request): Promise<Response | undefined>;
@@ -164,7 +165,7 @@ async function writeCachedCatalog(db: D1Database, result: CatalogResult): Promis
   if (!edge) return;
   try {
     await edge.put(new Request(CATALOG_EDGE_CACHE_KEY), new Response(JSON.stringify({ cachedAt, result }), {
-      headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "public, max-age=30" },
+      headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "public, max-age=300" },
     }));
   } catch {
     // Cache is an optimization only; D1 remains the source of truth.

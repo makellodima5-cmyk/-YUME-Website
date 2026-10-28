@@ -75,8 +75,8 @@ jobs:
           if (rootConfig.assets?.run_worker_first !== true) {
             throw new Error("HTTP-to-HTTPS redirect must run before any static asset is served.");
           }
-          if (!Array.isArray(rootConfig.triggers?.crons) || !rootConfig.triggers.crons.includes("* * * * *")) {
-            throw new Error("Root Wrangler config does not include the expected per-minute Cron trigger.");
+          if (!Array.isArray(rootConfig.triggers?.crons) || !rootConfig.triggers.crons.includes("*/5 * * * *")) {
+            throw new Error("Root Wrangler config does not include the expected five-minute Cron trigger.");
           }
           const expectedRateLimits = [
             { name: "KODIK_RATE_LIMITER", namespaceId: "202610271", limit: 30, period: 60 },
@@ -93,7 +93,7 @@ jobs:
               throw new Error(`Root Wrangler config is missing the expected ${expected.name} rate-limit binding.`);
             }
           }
-          if (!Array.isArray(config.triggers?.crons) || !config.triggers.crons.includes("* * * * *")) {
+          if (!Array.isArray(config.triggers?.crons) || !config.triggers.crons.includes("*/5 * * * *")) {
             throw new Error("Generated Nitro Wrangler config does not preserve the expected Cron trigger.");
           }
 

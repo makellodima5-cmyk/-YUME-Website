@@ -4,10 +4,11 @@ import { resolve } from "node:path";
 
 describe("Cloudflare Worker scheduled entrypoint", () => {
   it("registers the Nitro Cloudflare scheduled hook and its real job handlers", async () => {
-    const [viteConfig, cronPlugin, catalogImporter] = await Promise.all([
+    const [viteConfig, cronPlugin, catalogImporter, wranglerConfig] = await Promise.all([
       readFile(resolve(process.cwd(), "vite.config.ts"), "utf8"),
       readFile(resolve(process.cwd(), "plugins/catalog-refresh.ts"), "utf8"),
       readFile(resolve(process.cwd(), "src/data/admin-catalog-import.server.ts"), "utf8"),
+      readFile(resolve(process.cwd(), "wrangler.jsonc"), "utf8"),
     ]);
 
     // The Worker deploys Nitro's generated entry, not TanStack's SSR entry.
@@ -23,5 +24,6 @@ describe("Cloudflare Worker scheduled entrypoint", () => {
     expect(cronPlugin).toContain("runScheduledTrailerUpdate(env)");
     expect(cronPlugin).not.toContain("CATALOG_AUTO_REFRESH");
     expect(catalogImporter).toContain("automatic_metadata_refresh_disabled");
+    expect(wranglerConfig).toContain('"crons": ["*/5 * * * *"]');
   });
 });

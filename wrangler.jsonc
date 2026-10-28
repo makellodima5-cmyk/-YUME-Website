@@ -6,7 +6,7 @@
   "keep_vars": true,
   "main": ".output/server/index.mjs",
   "triggers": {
-    "crons": ["* * * * *"]
+    "crons": ["*/5 * * * *"]
   },
   "ratelimits": [
     {
