@@ -291,6 +291,22 @@ async function fetchPage(page: number): Promise<ShikimoriAnime[]> {
   if (payload.errors?.length) throw new Error(payload.errors.map(e=>e.message).filter(Boolean).join("; ") || "GraphQL error");
   return (payload.data?.animes ?? []).filter(item => !(item.genres ?? []).some(g => [g.name,g.russian].some(n => clean(n).normalize("NFKC").toLowerCase() === "hentai" || clean(n).normalize("NFKC").toLowerCase() === "хентай")));
 }
+async function fetchByTitle(title: string): Promise<ShikimoriAnime[]> {
+  const normalized = clean(title).slice(0, 120);
+  if (normalized.length < 2) return [];
+  const query = "query { animes(search: " + JSON.stringify(normalized) + ", page: 1, limit: 10, order: popularity, censored: true) { id name english russian kind score status airedOn { year } poster { mainUrl previewUrl originalUrl } genres { name russian kind } } }";
+  const response = await fetch(API_URL, { method:"POST", headers:{"Content-Type":"application/json",Accept:"application/json","User-Agent":"YUME/1.0"}, body:JSON.stringify({query}), signal:AbortSignal.timeout(12000) });
+  if (response.status === 429) {
+    const retryAfterMs = retryAfterMilliseconds(response.headers.get("Retry-After")) ?? 60000;
+    const error = new Error("Shikimori ограничил частоту запросов.");
+    (error as Error & {retryAfterMs?:number}).retryAfterMs = retryAfterMs;
+    throw error;
+  }
+  if (!response.ok) throw new Error("Shikimori вернул HTTP " + response.status);
+  const payload = await response.json() as Payload;
+  if (payload.errors?.length) throw new Error(payload.errors.map(e=>e.message).filter(Boolean).join("; ") || "GraphQL error");
+  return (payload.data?.animes ?? []).filter(item => !(item.genres ?? []).some(g => [g.name,g.russian].some(n => clean(n).normalize("NFKC").toLowerCase() === "hentai" || clean(n).normalize("NFKC").toLowerCase() === "хентай")));
+}
 async function fetchByIds(ids: string[], includeScreenshots = false): Promise<ShikimoriAnime[]> {
   const safeIds = normalizeAdminCatalogIds(ids);
   if (!safeIds.length) return [];
@@ -1006,12 +1022,97 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
         qualityOffset: quality.offset, qualityHasMore: quality.hasMore, auditLog: await recentAudit(db),
       });
     }
-    let body: {action?:unknown; target?:unknown};
+    let body: {action?:unknown; target?:unknown; query?:unknown; animeId?:unknown};
     try { body = await request.json() as {action?:unknown;target?:unknown}; } catch { return json({error:"invalid_request"},400); }
     requestedAction = body.action;
     const lockToken = await acquireLock(db);
     if (!lockToken) return json({isAdmin:true,error:"operation_in_progress",message:"Другая административная операция ещё выполняется."},409);
     try {
+      if (body.action === "search_title") {
+        const titleQuery = typeof body.query === "string" ? clean(body.query).slice(0, 120) : "";
+        if (titleQuery.length < 2) return json({ error:"query_too_short", message:"Введи не менее двух символов названия." },400);
+        const source = await fetchByTitle(titleQuery);
+        const ids = source.map(item => String(item.id)).filter(id => /^\\d{1,20}$/.test(id));
+        const existingRows = ids.length
+          ? await db.prepare("SELECT id FROM anime_catalog WHERE id IN (" + ids.map(() => "?").join(",") + ")").bind(...ids).all<{id:string}>()
+          : { results: [] as {id:string}[] };
+        const existingIds = new Set(existingRows.results.map(row => row.id));
+        const results = source.map(item => {
+          const mapped = mapItem(item);
+          return {
+            id: String(item.id),
+            title: mapped.title,
+            englishTitle: mapped.english_title,
+            originalTitle: mapped.original_title,
+            year: mapped.year,
+            kind: mapped.kind,
+            status: mapped.status,
+            posterUrl: mapped.poster_url,
+            alreadyInCatalog: existingIds.has(String(item.id)),
+          };
+        });
+        await audit(db,"catalog.import.title.search","success",{query:titleQuery,results:results.length});
+        return json({isAdmin:true,query:titleQuery,results});
+      }
+      if (body.action === "import_title") {
+        const animeId = typeof body.animeId === "string" ? body.animeId.trim() : "";
+        if (!/^\\d{1,20}$/.test(animeId)) return json({error:"invalid_anime_id"},400);
+        const already = await db.prepare("SELECT id,title FROM anime_catalog WHERE id = ?").bind(animeId).first<{id:string;title:string}>();
+        if (already) return json({isAdmin:true,alreadyInCatalog:true,anime:{id:already.id,title:already.title},message:"Этот тайтл уже находится в каталоге."},409);
+        const sourceItems = await fetchByIds([animeId],true);
+        const sourceItem = sourceItems[0];
+        if (!sourceItem) return json({error:"anime_not_found",message:"Тайтл не найден в Shikimori. Повтори поиск."},404);
+        const item = mapItem(sourceItem);
+        const screenshots = mapAdminCatalogScreenshots(sourceItem);
+        let importedBanner: string | null = null;
+        const malId = normalizeAniListMalId(sourceItem.malId);
+        if (malId) {
+          const bannerLookup = await getAniListBannersByMalIdsWithStats([malId]);
+          importedBanner = bannerLookup.banners.get(malId) ?? null;
+        }
+        if (!importedBanner) {
+          const titles = [sourceItem.english, sourceItem.name]
+            .flatMap(value => Array.isArray(value) ? value : [value])
+            .filter((value): value is string => typeof value === "string" && value.trim().length > 1)
+            .map(value => value.trim())
+            .filter((value,index,all) => all.findIndex(other => other.toLocaleLowerCase() === value.toLocaleLowerCase()) === index)
+            .slice(0,2);
+          for (const title of titles) {
+            importedBanner = await getAniListBannerByTitle(title);
+            if (importedBanner) break;
+          }
+        }
+        if (importedBanner) item.banner_url = importedBanner;
+        const currentCount = await db.prepare("SELECT COUNT(*) AS count FROM anime_catalog").first<{count:number}>();
+        const statements: Statement[] = [
+          db.prepare("INSERT OR IGNORE INTO anime_catalog (id,title,english_title,original_title,year,episodes,rating,genres_json,status,description,hue,glyph,is_new,popular,poster_url,banner_url,kind,age_rating,next_episode_at,episodes_aired,aired_on,studios_json,youtube_trailer_id,position,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)")
+            .bind(item.id,item.title,item.english_title,item.original_title,item.year,item.episodes,item.rating,item.genres_json,item.status,item.description,item.hue,item.glyph,item.is_new,item.popular,item.poster_url,item.banner_url,item.kind,item.age_rating,item.next_episode_at,item.episodes_aired,item.aired_on,item.studios_json,item.youtube_trailer_id,Number(currentCount?.count ?? 0)),
+          ...screenshots.map((shot,index) => db.prepare("INSERT OR IGNORE INTO anime_catalog_screenshots (anime_id,original_url,preview_url,position,updated_at) VALUES (?,?,?,?,CURRENT_TIMESTAMP)")
+            .bind(item.id,shot.original,shot.preview,index)),
+          screenshotStatusStatement(db,item.id,"done",0,screenshots.length ? null : "Источник не вернул кадров"),
+          db.prepare("INSERT OR IGNORE INTO admin_catalog_import_items (run_id,anime_id,outcome,incomplete) VALUES (?,?, 'added', ?)")
+            .bind("title-" + crypto.randomUUID(),item.id,incomplete(item)?1:0),
+        ];
+        await db.batch(statements);
+        const stored = await db.prepare("SELECT id FROM anime_catalog WHERE id = ?").bind(item.id).first<{id:string}>();
+        if (!stored) throw new Error("Не удалось сохранить запись аниме.");
+        await invalidatePersistentCatalogCache();
+        const [catalogCount,catalogWithTrailer] = await Promise.all([
+          db.prepare("SELECT COUNT(*) AS count FROM anime_catalog").first<{count:number}>(),
+          db.prepare("SELECT COUNT(*) AS count FROM anime_catalog WHERE youtube_trailer_id IS NOT NULL AND youtube_trailer_id <> ''").first<{count:number}>(),
+        ]);
+        await audit(db,"catalog.import.title","success",{animeId:item.id,title:item.title,year:item.year,screenshots:screenshots.length,hasTrailer:Boolean(item.youtube_trailer_id),hasBanner:Boolean(importedBanner)});
+        return json({
+          isAdmin:true,
+          imported:true,
+          anime:{id:item.id,title:item.title,year:item.year,englishTitle:item.english_title,originalTitle:item.original_title},
+          screenshots:screenshots.length,
+          catalogTotal:Number(catalogCount?.count ?? 0),
+          catalogWithTrailer:Number(catalogWithTrailer?.count ?? 0),
+          missingTrailers:Math.max(0,Number(catalogCount?.count ?? 0)-Number(catalogWithTrailer?.count ?? 0)),
+          message:"Тайтл добавлен в каталог вместе с метаданными и доступными скриншотами.",
+        });
+      }
       if (body.action === "delete") {
         const safeIds = normalizeAdminCatalogIds((body as { ids?: unknown }).ids);
         if (!safeIds.length) return json({error:"no_valid_ids"},400);
