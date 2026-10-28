@@ -190,6 +190,9 @@ export const Route = createFileRoute("/")({
       airing: refreshedItems
         .filter((anime) => isEligibleAiringAnime(anime))
         .sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? "") || b.year - a.year),
+      newReleases: refreshedItems
+        .filter((anime) => isNewRelease(anime))
+        .sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? "") || (b.rating ?? -1) - (a.rating ?? -1)),
       announcements: (sourceFeeds
         ? selectLiveCatalogItems(refreshedItems, sourceFeeds.announcements)
         : refreshedItems)
@@ -1647,8 +1650,8 @@ function Index() {
     ? ANIME.filter((anime) => activeCollection.genres.some((genre) => anime.genres.includes(genre)))
         .sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1))
     : [];
-  const newReleaseAnime = ANIME
-    .filter((anime) => isNewRelease(anime))
+  const newReleaseAnime = (sectionFeeds?.newReleases ?? ANIME
+    .filter((anime) => isNewRelease(anime)))
     .sort((a, b) => {
       const aDate = getExactReleaseDate(a.airedOn);
       const bDate = getExactReleaseDate(b.airedOn);
