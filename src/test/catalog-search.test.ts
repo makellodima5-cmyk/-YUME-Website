@@ -16,6 +16,7 @@ describe("catalog URL search validation", () => {
       rating: "10",
       kind: "TV",
       age: "12+",
+      lang: "en",
     })).toEqual({
       section: "catalog",
       q: "  Naruto  ",
@@ -28,6 +29,7 @@ describe("catalog URL search validation", () => {
       rating: 9,
       kind: "TV",
       age: "12+",
+      lang: "en",
     });
   });
 
@@ -51,6 +53,7 @@ describe("catalog URL search validation", () => {
       rating: undefined,
       kind: undefined,
       age: undefined,
+      lang: undefined,
     });
   });
 
@@ -61,6 +64,7 @@ describe("catalog URL search validation", () => {
       genres: "g".repeat(700),
       kind: "k".repeat(100),
       age: "a".repeat(40),
+      lang: "fr",
     });
     expect(result.page).toBe(10000);
     expect(result.q).toHaveLength(120);
