@@ -18,7 +18,6 @@ import { DEFAULT_META_DESCRIPTION, SITE_NAME } from "@/data/seo";
 import { initializeTelegramMiniApp } from "@/lib/telegram-mini-app";
 import { trackYumePage } from "@/lib/yume-analytics";
 import { CookieConsentBanner } from "@/components/yume/CookieConsentBanner";
-import { applySeasonalTheme } from "@/data/seasonal-theme";
 
 type InterfaceLanguage = "ru" | "en";
 
@@ -144,7 +143,7 @@ function RootShell({ children }: { children: ReactNode }) {
         <script src="https://telegram.org/js/telegram-web-app.js"></script>
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem("yume-theme")||"dark";var r=t==="system"?(matchMedia("(prefers-color-scheme: light)").matches?"light":"dark"):t;document.documentElement.dataset.theme=r;document.documentElement.style.colorScheme=r;document.documentElement.classList.toggle("dark",r==="dark")}catch(e){document.documentElement.dataset.theme="dark";document.documentElement.classList.add("dark")}try{var p=new Intl.DateTimeFormat("en-GB",{timeZone:"Europe/Berlin",month:"numeric",day:"numeric"}).formatToParts(new Date());var m=Number(p.find(function(x){return x.type==="month"}).value);var d=Number(p.find(function(x){return x.type==="day"}).value);if((m===10&&d>=28)||(m===11&&d<=2)){document.documentElement.dataset.season="halloween"}else{delete document.documentElement.dataset.season}}catch(e){delete document.documentElement.dataset.season}})();`,
+            __html: `(function(){try{var t=localStorage.getItem("yume-theme")||"dark";var r=t==="system"?(matchMedia("(prefers-color-scheme: light)").matches?"light":"dark"):t;document.documentElement.dataset.theme=r;document.documentElement.style.colorScheme=r;document.documentElement.classList.toggle("dark",r==="dark")}catch(e){document.documentElement.dataset.theme="dark";document.documentElement.classList.add("dark")}})();`,
           }}
         />
         <HeadContent />
@@ -174,20 +173,6 @@ function SkipToContent() {
   );
 }
 
-function SeasonalThemeController() {
-  useEffect(() => {
-    const sync = () => applySeasonalTheme();
-    sync();
-    window.addEventListener("focus", sync);
-    const timer = window.setInterval(sync, 60_000);
-    return () => {
-      window.removeEventListener("focus", sync);
-      window.clearInterval(timer);
-    };
-  }, []);
-  return null;
-}
-
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const pathname = useLocation({ select: (location) => location.pathname });
@@ -200,7 +185,6 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <YumePreferencesProvider>
-        <SeasonalThemeController />
         <DocumentLanguageSync />
         <SkipToContent />
         <CookieConsentBanner isHome={pathname === "/"} />
