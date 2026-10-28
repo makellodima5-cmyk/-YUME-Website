@@ -1590,7 +1590,7 @@ function Index() {
   const availableAgeRatings = useMemo(() => { if (catalogFacets) return catalogFacets.ageRatings; const order=["Без ограничений","12+","16+","18+"]; return Array.from(new Set(ANIME.map(a=>a.ageRating).filter((v):v is string=>Boolean(v)))).sort((a,b)=>order.indexOf(a)-order.indexOf(b)); }, [ANIME,catalogFacets]);
   const catalogYearRange = useMemo(() => { if (catalogFacets) return {min:catalogFacets.yearMin,max:catalogFacets.yearMax}; const years=ANIME.map(a=>a.year).filter(y=>Number.isFinite(y)&&y>0); return {min:years.length?Math.min(...years):1900,max:years.length?Math.max(...years):new Date().getFullYear()}; }, [ANIME,catalogFacets]);
   const searchText = view === "catalog" ? catalogQuery.trim() : view === "home" ? submittedQuery.trim() : "";
-  const catalogResults = useMemo(() => filterAndSortCatalog(ANIME, searchText, activeFilters, sortBy, language, displayGenre), [ANIME,searchText,activeFilters,sortBy,language]);
+  const catalogResults = useMemo(() => view === "catalog" ? ANIME : filterAndSortCatalog(ANIME, searchText, activeFilters, sortBy, language, displayGenre), [ANIME,searchText,activeFilters,sortBy,language,view]);
   const catalogPageSize = 20;
   const totalCatalogPages = getCatalogPageCount(view === "catalog" ? initialCatalogTotal : catalogResults.length, catalogPageSize);
   const visibleCatalogResults = view === "catalog" ? ANIME : paginateCatalog(catalogResults, catalogPage, catalogPageSize);
