@@ -2,7 +2,7 @@
 
 ## Current design
 
-Catalog metadata enrichment is manual-only. The Cloudflare Cron Trigger no longer runs the catalog metadata refresh; the scheduled hook is retained only for the separately configured trailer updater. The admin interface no longer exposes start/stop controls for catalog auto-refresh.
+Catalog metadata enrichment is manual-only. The Cloudflare Cron Trigger runs lightweight episode checks every five minutes. Trailer lookup and catalog status synchronization run in two daily windows at 07:37 and 19:41 UTC. The separate full metadata/screenshot enrichment remains manual-only. The admin interface no longer exposes start/stop controls for catalog auto-refresh.
 
 New catalog imports now request scene screenshot URLs in the same Shikimori GraphQL response as titles, descriptions, posters, trailers, genres, and other metadata. YUME stores at most five unique screenshots for newly imported anime. The screenshot URLs and per-title status are written in the same D1 batch as the catalog records. Previously saved screenshot rows are preserved rather than destructively trimmed by this change.
 

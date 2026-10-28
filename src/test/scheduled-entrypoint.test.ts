@@ -24,6 +24,9 @@ describe("Cloudflare Worker scheduled entrypoint", () => {
     expect(cronPlugin).toContain("runScheduledTrailerUpdate(env)");
     expect(cronPlugin).not.toContain("CATALOG_AUTO_REFRESH");
     expect(catalogImporter).toContain("automatic_metadata_refresh_disabled");
-    expect(wranglerConfig).toContain('"crons": ["*/5 * * * *"]');
+    expect(wranglerConfig).toContain('"crons": ["*/5 * * * *","37 7 * * *","41 19 * * *"]');
+    expect(cronPlugin).toContain('const CATALOG_REFRESH_CRONS = new Set(["37 7 * * *", "41 19 * * *"]);\n');
+    expect(cronPlugin).toContain("runScheduledCatalogStatusRefresh(env)");
+    expect(cronPlugin).toContain("runScheduledEpisodeNotifications(env)");
   });
 });

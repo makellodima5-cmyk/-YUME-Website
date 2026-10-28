@@ -6,8 +6,8 @@
 ## Changes applied
 
 - Increased the persistent catalog snapshot cache from 30 seconds to 5 minutes, including the Cache API response TTL. With 1,155 catalog rows, a cache region refilling once per TTL would read about 3.33 million catalog rows/day at 30 seconds versus about 333 thousand/day at 5 minutes, before invalidations and cache misses. Actual usage depends on traffic, isolates, and Cloudflare cache locality.
-- Changed the Worker Cron cadence from every minute to every five minutes. This reduces scheduled invocations from 1,440 to 288 per day (80% fewer). Trailer processing continues in bounded batches; episode notifications may be delayed by up to about five minutes.
-- Added an expression index on `(status, datetime(next_episode_at))` for rows with an episode date. The due-episode query can narrow the scan to ongoing entries with dates that have passed instead of repeatedly checking the full catalogue.
+- Split the Worker schedule: episode checks still run every five minutes, but upstream trailer and catalog-status work runs in two daily windows at 07:37 and 19:41 UTC. Each daily window processes up to ten trailer batches and ten status batches, with a pause between trailer requests. Notifications still check D1 every five minutes and contact Shikimori only when due episodes exist.
+- Added an expression index on `(status, datetime(next_episode_at))` for rows with an episode date. The due-episode query can narrow the scan to ongoing entries with dates that have passed instead of repeatedly checking the full catalogue. The index is created by the existing catalog schema initializer, so no standalone migration is needed.
 - Cached schema-initialization promises for the episode-notification and subscription handlers within a warm Worker isolate.
 - Removed a second redundant set of `CREATE TABLE IF NOT EXISTS` statements from every authenticated notification GET request.
 - Fixed the episode-notification job's status persistence to map Shikimori enum values (`ongoing`, `anons`, `released`) to the catalog's stored labels instead of writing raw API values. Non-ongoing titles now have their next-episode date cleared by this job.

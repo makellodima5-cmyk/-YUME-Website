@@ -55,7 +55,7 @@ async function fetchByIds(ids: string[]): Promise<SourceAnime[]> {
 }
 
 /** Checks every existing catalogue item in a durable round-robin: all ongoing, then announcements, then the rest. */
-export async function runScheduledCatalogStatusRefresh(env: unknown): Promise<void> {
+async function runScheduledCatalogStatusRefreshBatch(env: unknown): Promise<void> {
   setCatalogRuntimeEnvironment(env);
   const db = getDatabase(env && typeof env === "object" ? env as Environment : getEnvironment());
   if (!db) return;
@@ -120,5 +120,13 @@ export async function runScheduledCatalogStatusRefresh(env: unknown): Promise<vo
     throw error;
   } finally {
     await db.prepare("UPDATE anime_catalog_status_refresh_lock SET locked_until=0 WHERE id=1").run();
+  }
+}
+
+
+/** Process a bounded number of upstream batches per daily window. */
+export async function runScheduledCatalogStatusRefresh(env: unknown): Promise<void> {
+  for (let batch = 0; batch < 10; batch++) {
+    await runScheduledCatalogStatusRefreshBatch(env);
   }
 }
