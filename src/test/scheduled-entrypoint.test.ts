@@ -16,12 +16,11 @@ describe("Cloudflare Worker scheduled entrypoint", () => {
     expect(viteConfig).toContain('plugins: ["./plugins/catalog-refresh.ts"]');
     expect(cronPlugin).toContain('nitroApp.hooks.hook("cloudflare:scheduled"');
 
-    expect(cronPlugin).toContain('from "../src/data/admin-trailers.server"');
     expect(cronPlugin).toContain('from "../src/data/catalog-d1.server"');
     expect(cronPlugin).not.toContain('from "../../src/data/');
 
     expect(cronPlugin).not.toContain("runScheduledCatalogMetadataRefresh");
-    expect(cronPlugin).toContain("runScheduledTrailerUpdate(env)");
+    expect(cronPlugin).not.toContain("runScheduledTrailerUpdate");
     expect(cronPlugin).not.toContain("CATALOG_AUTO_REFRESH");
     expect(catalogImporter).toContain("automatic_metadata_refresh_disabled");
     expect(wranglerConfig).toContain('"crons": ["*/5 * * * *","37 7 * * *","41 19 * * *"]');
