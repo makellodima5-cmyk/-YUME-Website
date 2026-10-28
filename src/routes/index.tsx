@@ -539,6 +539,7 @@ function Index() {
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
   const [cookieNoticeAcknowledged, setCookieNoticeAcknowledged] = useState(false);
   const [historyItems, setHistoryItems] = useState<{ animeId: string; viewedAt: string; viewCount: number }[]>([]);
+  const [historyDeletingIds, setHistoryDeletingIds] = useState<string[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyAuthenticated, setHistoryAuthenticated] = useState(false);
   const [historyError, setHistoryError] = useState("");
@@ -1434,6 +1435,34 @@ function Index() {
     return () => { cancelled = true; };
   }, [view, language]);
 
+  const removeHistoryItem = async (item: { animeId: string; viewedAt: string; viewCount: number }) => {
+    if (historyDeletingIds.includes(item.animeId)) return;
+    setHistoryDeletingIds((current) => current.includes(item.animeId) ? current : [...current, item.animeId]);
+    setHistoryItems((current) => current.filter((entry) => entry.animeId !== item.animeId));
+    setHistoryError("");
+
+    try {
+      const response = await fetch("/api/telegram/history", {
+        method: "DELETE",
+        credentials: "same-origin",
+        cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ animeId: item.animeId }),
+      });
+      const payload = await response.json().catch(() => ({})) as { deleted?: boolean; error?: string };
+      if (!response.ok || payload.deleted !== true) throw new Error(payload.error || "history_delete_failed");
+    } catch {
+      setHistoryItems((current) => current.some((entry) => entry.animeId === item.animeId)
+        ? current
+        : [...current, item].sort((a, b) => b.viewedAt.localeCompare(a.viewedAt)));
+      setHistoryError(language === "ru"
+        ? "Не удалось удалить тайтл из истории. Попробуй ещё раз."
+        : "Could not remove this title from history. Please try again.");
+    } finally {
+      setHistoryDeletingIds((current) => current.filter((id) => id !== item.animeId));
+    }
+  };
+
   const setView = (v: View) => {
     telegramHapticImpact("light");
     if (v === "login" || v === "register") {
@@ -2324,21 +2353,35 @@ function Index() {
           ) : historyItems.length === 0 ? (
             <p className="rounded-2xl border border-dashed border-border bg-card/40 px-5 py-8 text-sm text-muted-foreground">{language === "ru" ? "История пока пуста. Открывай страницы аниме — они появятся здесь." : "Your history is empty. Open anime pages and they will appear here."}</p>
           ) : (
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
-              {historyItems.map((item) => {
-                const anime = ANIME.find((entry) => entry.id === item.animeId);
-                return (
-                  <div key={item.animeId} className="min-w-0">
-                    {anime ? <AnimeCard anime={anime} onSelect={select} /> : (
-                      <button type="button" onClick={() => navigate({ to: "/anime/$animeId", params: { animeId: item.animeId } })} className="w-full rounded-xl border border-border bg-card/50 p-4 text-left text-sm hover:bg-accent">
-                        {language === "ru" ? "Открыть тайтл" : "Open title"} #{item.animeId}
+            <>
+              {historyError && <p role="alert" className="mb-4 rounded-xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">{historyError}</p>}
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
+                {historyItems.map((item) => {
+                  const anime = ANIME.find((entry) => entry.id === item.animeId);
+                  const deleting = historyDeletingIds.includes(item.animeId);
+                  return (
+                    <div key={item.animeId} className="relative min-w-0">
+                      {anime ? <AnimeCard anime={anime} onSelect={select} /> : (
+                        <button type="button" onClick={() => navigate({ to: "/anime/$animeId", params: { animeId: item.animeId } })} className="w-full rounded-xl border border-border bg-card/50 p-4 text-left text-sm hover:bg-accent">
+                          {language === "ru" ? "Открыть тайтл" : "Open title"} #{item.animeId}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        aria-label={language === "ru" ? "Удалить из истории просмотров" : "Remove from viewing history"}
+                        title={language === "ru" ? "Удалить из истории" : "Remove from history"}
+                        disabled={deleting}
+                        onClick={(event) => { event.preventDefault(); event.stopPropagation(); void removeHistoryItem(item); }}
+                        className="absolute right-2 top-2 z-20 flex h-10 w-10 items-center justify-center rounded-full border-2 border-white bg-red-600 text-white shadow-[0_0_0_3px_rgba(0,0,0,0.65),0_5px_16px_rgba(0,0,0,0.7)] transition hover:scale-105 hover:bg-red-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-red-300 disabled:cursor-wait disabled:opacity-70"
+                      >
+                        <X className="h-6 w-6" strokeWidth={3} aria-hidden="true" />
                       </button>
-                    )}
-                    <p className="mt-2 text-xs text-muted-foreground">{language === "ru" ? "Открыт" : "Opened"}: {new Date(item.viewedAt).toLocaleString(language === "ru" ? "ru-RU" : "en-GB")}</p>
-                  </div>
-                );
-              })}
-            </div>
+                      <p className="mt-2 text-xs text-muted-foreground">{language === "ru" ? "Открыт" : "Opened"}: {new Date(item.viewedAt).toLocaleString(language === "ru" ? "ru-RU" : "en-GB")}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
           )}
         </main>
       ) : null}
