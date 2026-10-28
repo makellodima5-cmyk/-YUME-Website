@@ -925,9 +925,7 @@ function Index() {
       await runAdminTrailerUpdate({
         language,
         initialStats: adminStats ?? undefined,
-        onStats: stats => setAdminStats(current => current
-          ? { ...stats, total: current.total, found: current.found, missing: current.missing }
-          : stats),
+        onStats: setAdminStats,
         onMessage: setAdminMessage,
       });
     } finally {
