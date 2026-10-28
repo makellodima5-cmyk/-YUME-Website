@@ -17,6 +17,7 @@ import {
 import { getShikimoriAnimeDetails, getShikimoriAnimeScreenshots, type ShikimoriScreenshot } from "@/data/shikimori";
 import { Header, type View } from "@/components/yume/Header";
 import { Footer } from "@/components/yume/Footer";
+import { AdvertisingSlot } from "@/components/yume/AdvertisingSlot";
 import { AnimeCard, PosterArt } from "@/components/yume/Poster";
 import { useYumePreferences, displayAnimeTitle, displayAnimeStatus, displayGenre, displayAnimeKind } from "@/data/preferences";
 import {
@@ -923,6 +924,8 @@ function AnimeDetailPage() {
               )}
             </div>
           </section>
+
+          <AdvertisingSlot slot="anime-below-player" language={language} />
 
           <section className="mt-8">
             <div className="mb-4 flex items-end justify-between">
