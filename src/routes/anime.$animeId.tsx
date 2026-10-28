@@ -130,6 +130,7 @@ function AnimeDetailPage() {
   const [resumeTargetEpisode, setResumeTargetEpisode] = useState<number | null>(null);
   const [resumeTargetSeconds, setResumeTargetSeconds] = useState(0);
   const [kodikError, setKodikError] = useState("");
+  const [kodikLoading, setKodikLoading] = useState(false);
   const [episodeProgress, setEpisodeProgress] = useState<PlaybackProgressEntry[]>([]);
 
   useEffect(() => {
@@ -161,6 +162,7 @@ function AnimeDetailPage() {
     setKodikTranslationId("");
     setKodikEpisode(1);
     setKodikError("");
+    setKodikLoading(true);
     fetch("/api/kodik?animeId=" + encodeURIComponent(animeId), { credentials: "same-origin", cache: "no-store", headers: { Accept: "application/json" } })
       .then(async (response) => {
         const result = await response.json().catch(() => ({})) as { sources?: Array<{ id: string; title: string; episodes: Array<{ number: number; title: string; link: string }> }>; error?: string };
@@ -168,6 +170,7 @@ function AnimeDetailPage() {
         if (cancelled) return;
         const sources = Array.isArray(result.sources) ? result.sources : [];
         setKodikSources(sources);
+        setKodikLoading(false);
         const params = new URLSearchParams(window.location.search);
         const requestedEpisode = Number(params.get("episode"));
         const requestedResume = Number(params.get("resume"));
@@ -179,10 +182,13 @@ function AnimeDetailPage() {
         setKodikEpisode(matchingEpisode?.number ?? matchingSource?.episodes[0]?.number ?? 1);
         setResumeTargetEpisode(matchingEpisode ? matchingEpisode.number : null);
         setResumeTargetSeconds(Number.isFinite(requestedResume) && requestedResume > 0 ? Math.floor(requestedResume) : 0);
-        // An empty successful response is a confirmed "no episodes" state, not a technical error.
+        // Empty successful responses are rendered as the dedicated no-episodes state.
       })
       .catch(() => {
-        if (!cancelled) setKodikError(language === "en" ? "Could not load episodes from Kodik. Please try again later." : "Не удалось загрузить серии из Kodik. Попробуйте позже.");
+        if (!cancelled) {
+          setKodikLoading(false);
+          setKodikError(language === "en" ? "Temporary technical issue. Refresh the page or try again later." : "Временная техническая ошибка. Обновите страницу или попробуйте позже.");
+        }
       });
     return () => { cancelled = true; };
   }, [watchMode, animeId, anime, language]);
@@ -831,7 +837,24 @@ function AnimeDetailPage() {
               </button>
             </div>
             <div className="mx-auto w-full max-w-6xl min-w-0">
-              {watchMode === "episodes" ? (
+              {watchMode === "episodes" ? (kodikLoading ? (
+                <div role="status" className="mx-auto flex min-h-40 w-full max-w-6xl flex-col items-center justify-center rounded-2xl border border-white/10 bg-[#080710] p-6 text-center">
+                  <div className="mb-3 h-6 w-6 animate-spin rounded-full border-2 border-white/20 border-t-primary" aria-hidden="true" />
+                  <p className="text-sm text-muted-foreground">{language === "en" ? "Checking episode availability…" : "Проверяем доступность серий…"}</p>
+                </div>
+              ) : kodikError ? (
+                <div role="alert" className="mx-auto flex min-h-40 w-full max-w-6xl flex-col items-center justify-center rounded-2xl border border-rose-500/40 bg-rose-950/20 p-6 text-center">
+                  <div aria-hidden="true" className="mb-3 flex h-12 w-12 items-center justify-center rounded-full border border-rose-500/40 bg-rose-500/10 text-rose-400"><X className="h-6 w-6" /></div>
+                  <h3 className="text-lg font-semibold text-rose-300">{language === "en" ? "Temporary technical issue" : "Временная техническая ошибка"}</h3>
+                  <p className="mt-2 max-w-md text-sm leading-relaxed text-rose-100/75">{language === "en" ? "Refresh the page or try again later." : "Обновите страницу или попробуйте позже."}</p>
+                </div>
+              ) : kodikSources.length === 0 ? (
+                <div role="status" className="mx-auto flex min-h-40 w-full max-w-6xl flex-col items-center justify-center rounded-2xl border border-rose-500/40 bg-rose-950/20 p-6 text-center">
+                  <div aria-hidden="true" className="mb-3 flex h-12 w-12 items-center justify-center rounded-full border border-rose-500/40 bg-rose-500/10 text-rose-400"><X className="h-6 w-6" /></div>
+                  <h3 className="text-lg font-semibold text-rose-300">{language === "en" ? "No episodes available" : "Нет доступных серий"}</h3>
+                  <p className="mt-2 max-w-md text-sm leading-relaxed text-rose-100/75">{language === "en" ? "Episodes for this anime have not been found in the player yet." : "Для этого аниме пока не найдены серии в плеере."}</p>
+                </div>
+              ) : (
                 <div className="space-y-4">
                   <div className="rounded-2xl border border-white/10 bg-card/70 p-4 sm:p-5">
                     <label htmlFor="kodik-translation" className="mb-2 block text-sm font-medium text-muted-foreground">{language === "en" ? "Voice-over" : "Озвучка"}</label>
@@ -897,7 +920,7 @@ function AnimeDetailPage() {
                     {!kodikEmbedUrl && <div className="absolute inset-0 flex items-center justify-center p-5 text-center text-sm text-muted-foreground">{kodikError || (language === "en" ? "Loading Kodik player…" : "Загрузка плеера Kodik…")}</div>}
                   </div>
                 </div>
-              ) : anime.youtubeTrailerId ? (
+              ) )) : anime.youtubeTrailerId ? (
                 <div className="relative mx-auto aspect-video w-full min-w-0 overflow-hidden rounded-2xl border border-white/10 bg-[#080710] shadow-2xl">
                   <iframe
                     title={displayAnimeTitle(anime, language) + " — " + t("anime.trailerTitle")}

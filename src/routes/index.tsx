@@ -177,14 +177,6 @@ export const Route = createFileRoute("/")({
     const seedRecent = [...refreshedItems]
       .sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? "") || b.year - a.year)
       .slice(0, 50);
-    const unique = new Map<string, Anime>();
-    [...popular, ...seedRecent].forEach((anime) => unique.set(anime.id, anime));
-    if (sourceFeeds) {
-      for (const item of liveItems) {
-        const refreshed = refreshedById.get(item.id);
-        if (refreshed) unique.set(refreshed.id, refreshed);
-      }
-    }
 
     const sectionFeeds = {
       airing: refreshedItems
@@ -206,7 +198,7 @@ export const Route = createFileRoute("/")({
     };
 
     return {
-      anime: Array.from(unique.values()),
+      anime: refreshedItems,
       popular,
       sectionFeeds,
       catalogIds,
