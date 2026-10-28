@@ -95,7 +95,7 @@ export async function runScheduledCatalogStatusRefresh(env: unknown): Promise<vo
     const statements: Statement[] = [];
     for (const id of ids) {
       const item = sourceById.get(id);
-      if (item) {
+      if (item && ["ongoing", "anons", "released"].includes(item.status ?? "")) {
         const status = mapStatus(item.status);
         const score = item.score == null || item.score === "" ? null : Number(item.score);
         const rating = score !== null && Number.isFinite(score) && score > 0 && score <= 10 ? score : null;
