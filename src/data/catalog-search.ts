@@ -12,6 +12,7 @@ export type CatalogSearch = {
   rating?: number;
   kind?: string;
   age?: string;
+  lang?: "ru" | "en";
 };
 
 function parseSearchNumber(value: unknown): number | undefined {
@@ -47,6 +48,7 @@ export function validateCatalogSearch(search: Record<string, unknown>): CatalogS
     rating: rating !== undefined ? Math.max(0, Math.min(rating, 9)) : undefined,
     kind: typeof search.kind === "string" ? search.kind.slice(0, 80) : undefined,
     age: typeof search.age === "string" ? search.age.slice(0, 30) : undefined,
+    lang: search.lang === "ru" || search.lang === "en" ? search.lang : undefined,
     section: typeof search.section === "string" && validSections.includes(search.section as View)
       ? search.section as View
       : undefined,

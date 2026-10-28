@@ -155,13 +155,47 @@ export const Route = createFileRoute("/")({
     };
   },
   validateSearch: validateCatalogSearch,
-  loader: async () => {
-    // D1 remains the durable catalog, while short-lived Shikimori feeds refresh
-    // section membership and scores without rewriting the persistent seed.
-    const [catalog, sourceFeeds] = await Promise.all([
-      getShikimoriCatalog({ data: {} }),
-      getShikimoriSectionFeeds(),
-    ]);
+  loaderDeps: ({ search }) => ({
+    section: search.section, q: search.q, page: search.page, sort: search.sort,
+    genres: search.genres, status: search.status, from: search.from, to: search.to,
+    rating: search.rating, kind: search.kind, age: search.age, lang: search.lang,
+  }),
+  loader: async ({ deps }) => {
+    const catalog = await getShikimoriCatalog({ data: {} });
+    if (deps.section === "catalog") {
+      const allItems = catalog.items;
+      const filters: CatalogFiltersValue = {
+        ...EMPTY_CATALOG_FILTERS,
+        genres: (deps.genres ?? "").split(",").filter(Boolean).slice(0, 20),
+        status: deps.status ?? EMPTY_CATALOG_FILTERS.status,
+        yearFrom: deps.from === undefined ? "" : String(deps.from),
+        yearTo: deps.to === undefined ? "" : String(deps.to),
+        minRating: deps.rating ?? 0,
+        type: deps.kind ?? EMPTY_CATALOG_FILTERS.type,
+        ageRating: deps.age ?? EMPTY_CATALOG_FILTERS.ageRating,
+      };
+      const sort = (deps.sort ?? "rating") as "rating" | "newest" | "oldest" | "title";
+      const results = filterAndSortCatalog(allItems, deps.q ?? "", filters, sort, deps.lang ?? "ru", displayGenre);
+      const pageSize = 20, pageCount = getCatalogPageCount(results.length, pageSize);
+      const page = Math.min(Math.max(1, deps.page ?? 1), pageCount);
+      const years = allItems.map(a => a.year).filter(y => Number.isFinite(y) && y > 0);
+      return {
+        catalogMode: "paged",
+        anime: paginateCatalog(results, page, pageSize), popular: [],
+        sectionFeeds: { airing: [], newReleases: [], announcements: [] }, catalogIds: [],
+        catalogTotal: results.length, catalogPage: page,
+        catalogFacets: {
+          genres: Array.from(new Set(allItems.flatMap(a => a.genres))).sort((a,b)=>a.localeCompare(b,"ru")),
+          statuses: ["Онгоинг","Анонс","Вышел","Неизвестно"],
+          types: Array.from(new Set(allItems.map(a=>a.kind?.trim() || (a.episodes===1 ? "Фильм" : "TV")))).filter(Boolean).sort((a,b)=>a.localeCompare(b,"ru")),
+          ageRatings: Array.from(new Set(allItems.map(a=>a.ageRating).filter((v):v is string=>Boolean(v)))),
+          yearMin: years.length ? Math.min(...years) : 1900,
+          yearMax: years.length ? Math.max(...years) : new Date().getFullYear(),
+        },
+        apiError: catalog.error, catalogProgress: catalog.progress,
+      };
+    }
+    const sourceFeeds = await getShikimoriSectionFeeds();
     const persistentItems = catalog.items;
     const catalogIds = persistentItems.map((anime) => anime.id);
     const allowedIds = new Set(catalogIds);
@@ -204,6 +238,7 @@ export const Route = createFileRoute("/")({
       catalogIds,
       apiError: catalog.error,
       catalogProgress: catalog.progress,
+      catalogMode: "full", catalogTotal: refreshedItems.length, catalogPage: 1, catalogFacets: null,
     };
   },
   component: Index,
@@ -409,14 +444,14 @@ function Index() {
     document.querySelector('meta[property="og:title"]')?.setAttribute("content", metadata.ogTitle);
     document.querySelector('meta[property="og:description"]')?.setAttribute("content", metadata.ogDescription);
   }, [language]);
-  const { section, q: urlQuery, page: urlPage, sort: urlSort, genres: urlGenres, status: urlStatus, from: urlFrom, to: urlTo, rating: urlRating, kind: urlKind, age: urlAge } = Route.useSearch();
+  const { section, q: urlQuery, page: urlPage, sort: urlSort, genres: urlGenres, status: urlStatus, from: urlFrom, to: urlTo, rating: urlRating, kind: urlKind, age: urlAge, lang: urlLang } = Route.useSearch();
   const {
     anime: loadedAnime,
     popular: initialPopularAnime,
     sectionFeeds: initialSectionFeeds,
     catalogIds,
     apiError,
-    catalogProgress: initialCatalogProgress,
+    catalogProgress: initialCatalogProgress, catalogMode, catalogTotal: initialCatalogTotal, catalogPage: loadedCatalogPage, catalogFacets,
   } = Route.useLoaderData();
   const [catalogAnime, setCatalogAnime] = useState<Anime[]>(loadedAnime);
   const [popularAnime, setPopularAnime] = useState<Anime[]>(initialPopularAnime);
@@ -427,10 +462,20 @@ function Index() {
   const ANIME = catalogAnime;
 
   useEffect(() => {
-    catalogAnimeRef.current = catalogAnime;
-  }, [catalogAnime]);
+    if (catalogMode === "full" || view === "catalog") {
+      setCatalogAnime(loadedAnime);
+      catalogAnimeRef.current = loadedAnime;
+    }
+    if (catalogMode === "full") {
+      setPopularAnime(initialPopularAnime);
+      setSectionFeeds(initialSectionFeeds);
+      setCatalogProgress(initialCatalogProgress);
+    }
+  }, [loadedAnime, initialPopularAnime, initialSectionFeeds, initialCatalogProgress, view, catalogMode]);
+  useEffect(() => { catalogAnimeRef.current = catalogAnime; }, [catalogAnime]);
 
   useEffect(() => {
+    if (view === "catalog") return;
     let cancelled = false;
     const refreshSectionFeeds = async () => {
       try {
@@ -486,7 +531,7 @@ function Index() {
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [allowedCatalogIds]);
+  }, [allowedCatalogIds, view]);
   const [catalogLoadState, setCatalogLoadState] = useState<"idle" | "loading" | "loaded" | "error">("idle");
   const [catalogLoadError, setCatalogLoadError] = useState<string | null>(null);
   const catalogLoadStarted = useRef(false);
@@ -1492,6 +1537,7 @@ function Index() {
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
+    // Keep the URL as the single source of truth for paged catalog data.
     // Tapping Home is also a quick way out of search results: restore the default home state.
     if (v === "home") {
       setQuery("");
@@ -1502,20 +1548,21 @@ function Index() {
       setCatalogPage(1);
     }
     // Re-tapping the Catalog tab clears its query and returns to the full catalog.
-    if (v === "catalog" && view === "catalog") {
+    if (v === "catalog") {
       setCatalogQuery("");
+      setCatalogPage(1);
       setDraftFilters(EMPTY_CATALOG_FILTERS);
       setActiveFilters(EMPTY_CATALOG_FILTERS);
       setFiltersOpen(false);
-      setCatalogPage(1);
     }
+
     setViewRaw(v);
     if (v === "popular") setPopularPage(1);
     if (v === "new-releases") setNewReleasesPage(1);
     if (v === "announcements") setAnnouncementsPage(1);
     if (v === "airing") setAiringPage(1);
     // Persist the selected section in the URL so refreshing the page keeps the same view.
-    navigate({ to: "/", search: { section: v, q: undefined, page: undefined, sort: undefined, genres: undefined, status: undefined, from: undefined, to: undefined, rating: undefined, kind: undefined, age: undefined } });
+    navigate({ to: "/", search: { section: v, q: undefined, page: undefined, sort: undefined, genres: undefined, status: undefined, from: undefined, to: undefined, rating: undefined, kind: undefined, age: undefined, lang: v === "catalog" ? language : undefined } });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
   const select = (anime: Anime) =>
@@ -1550,54 +1597,45 @@ function Index() {
   };
 
 
-  const availableGenres = useMemo(
-    () => Array.from(new Set(ANIME.flatMap((anime) => anime.genres))).sort((a, b) => a.localeCompare(b, "ru")),
-    [ANIME],
-  );
-  const availableStatuses = useMemo(() => {
-    const found = new Set(ANIME.map((anime) => anime.status));
-    const order = ["Онгоинг", "Анонс", "Вышел", "Неизвестно"];
-    return Array.from(found).sort((a, b) => order.indexOf(a) - order.indexOf(b));
-  }, [ANIME]);
-  const availableTypes = useMemo(
-    () => Array.from(new Set(ANIME.map((anime) => anime.kind?.trim() || (anime.episodes === 1 ? "Фильм" : "TV"))))
-      .filter(Boolean)
-      .sort((a, b) => a.localeCompare(b, "ru")),
-    [ANIME],
-  );
-  const availableAgeRatings = useMemo(() => {
-    const order = ["Без ограничений", "12+", "16+", "18+"];
-    return Array.from(new Set(ANIME.map((anime) => anime.ageRating).filter((value): value is string => Boolean(value))))
-      .sort((a, b) => order.indexOf(a) - order.indexOf(b));
-  }, [ANIME]);
-  const catalogYearRange = useMemo(() => {
-    const years = ANIME.map((anime) => anime.year).filter((year) => Number.isFinite(year) && year > 0);
-    return {
-      min: years.length ? Math.min(...years) : 1900,
-      max: years.length ? Math.max(...years) : new Date().getFullYear(),
-    };
-  }, [ANIME]);
+  const availableGenres = useMemo(() => catalogFacets?.genres ?? Array.from(new Set(ANIME.flatMap(a => a.genres))).sort((a,b)=>a.localeCompare(b,"ru")), [ANIME,catalogFacets]);
+  const availableStatuses = useMemo(() => { if (catalogFacets) return catalogFacets.statuses; const found = new Set(ANIME.map(a=>a.status)); const order=["Онгоинг","Анонс","Вышел","Неизвестно"]; return Array.from(found).sort((a,b)=>order.indexOf(a)-order.indexOf(b)); }, [ANIME,catalogFacets]);
+  const availableTypes = useMemo(() => catalogFacets?.types ?? Array.from(new Set(ANIME.map(a=>a.kind?.trim() || (a.episodes===1 ? "Фильм":"TV")))).filter(Boolean).sort((a,b)=>a.localeCompare(b,"ru")), [ANIME,catalogFacets]);
+  const availableAgeRatings = useMemo(() => { if (catalogFacets) return catalogFacets.ageRatings; const order=["Без ограничений","12+","16+","18+"]; return Array.from(new Set(ANIME.map(a=>a.ageRating).filter((v):v is string=>Boolean(v)))).sort((a,b)=>order.indexOf(a)-order.indexOf(b)); }, [ANIME,catalogFacets]);
+  const catalogYearRange = useMemo(() => { if (catalogFacets) return {min:catalogFacets.yearMin,max:catalogFacets.yearMax}; const years=ANIME.map(a=>a.year).filter(y=>Number.isFinite(y)&&y>0); return {min:years.length?Math.min(...years):1900,max:years.length?Math.max(...years):new Date().getFullYear()}; }, [ANIME,catalogFacets]);
   const searchText = view === "catalog" ? catalogQuery.trim() : view === "home" ? submittedQuery.trim() : "";
-  const catalogResults = useMemo(
-    () => filterAndSortCatalog(ANIME, searchText, activeFilters, sortBy, language, displayGenre),
-    [ANIME, searchText, activeFilters, sortBy, language],
-  );
+  const catalogResults = useMemo(() => view === "catalog" ? ANIME : filterAndSortCatalog(ANIME, searchText, activeFilters, sortBy, language, displayGenre), [ANIME,searchText,activeFilters,sortBy,language,view]);
   const catalogPageSize = 20;
-  const totalCatalogPages = getCatalogPageCount(catalogResults.length, catalogPageSize);
-  const visibleCatalogResults = paginateCatalog(catalogResults, catalogPage, catalogPageSize);
+  const totalCatalogPages = getCatalogPageCount(view === "catalog" ? initialCatalogTotal : catalogResults.length, catalogPageSize);
+  const visibleCatalogResults = view === "catalog" ? ANIME : paginateCatalog(catalogResults, catalogPage, catalogPageSize);
+  useEffect(() => {
+    if (view !== "catalog") return;
+    setCatalogPage(loadedCatalogPage);
+    const routeQuery = urlQuery ?? "";
+    if (catalogQuery.trim() !== routeQuery) setCatalogQuery(routeQuery);
+    const routeSort = urlSort ?? "rating";
+    if (sortBy !== routeSort) setSortBy(routeSort);
+    const routeFilters = filtersFromUrl;
+    setActiveFilters(current => JSON.stringify(current) === JSON.stringify(routeFilters) ? current : routeFilters);
+    setDraftFilters(current => JSON.stringify(current) === JSON.stringify(routeFilters) ? current : routeFilters);
+  }, [view, loadedCatalogPage, urlQuery, urlSort, urlGenres, urlStatus, urlFrom, urlTo, urlRating, urlKind, urlAge]);
   const activeFilterCount = activeFilters.genres.length +
     Number(activeFilters.status !== "Любой") + Number(activeFilters.yearFrom !== "") +
     Number(activeFilters.yearTo !== "") + Number(activeFilters.minRating > 0) +
     Number(activeFilters.type !== "Любой") + Number(activeFilters.ageRating !== "Любой");
   const searching = view === "home" && (submittedQuery.length > 0 || activeFilterCount > 0);
-  const needsFullCatalog = ["catalog", "popular", "new-releases", "announcements", "airing"].includes(view) ||
+  const needsFullCatalog = ["popular", "new-releases", "announcements", "airing"].includes(view) ||
     (view === "home" && (Boolean(submittedQuery.trim()) || activeFilterCount > 0 || filtersOpen));
   // Searches and filters operate on the dataset returned from D1.
   // Do not poll Shikimori or trigger imports during normal user navigation.
   useEffect(() => {
+    if (view === "catalog") {
+      setCatalogLoadState(apiError ? "error" : "loaded");
+      setCatalogLoadError(apiError);
+      return;
+    }
     setCatalogLoadState(apiError ? "error" : "loaded");
     setCatalogLoadError(apiError);
-  }, [apiError]);
+  }, [apiError, view]);
 
   const writeCatalogUrl = (overrides: { q?: string; page?: number; sort?: string; genres?: string; status?: string; from?: number; to?: number; rating?: number; kind?: string; age?: string } = {}) => {
     const has = (key: keyof typeof overrides) => Object.prototype.hasOwnProperty.call(overrides, key);
@@ -1621,8 +1659,18 @@ function Index() {
       rating: rating || undefined,
       kind: kind || undefined,
       age: age || undefined,
+      lang: view === "catalog" ? language : undefined,
     } });
   };
+  useEffect(() => {
+    if (view !== "catalog" || (urlLang ?? "ru") === language) return;
+    void navigate({ to: "/", replace: true, search: {
+      section: "catalog", q: urlQuery, page: urlPage, sort: urlSort,
+      genres: urlGenres, status: urlStatus, from: urlFrom, to: urlTo,
+      rating: urlRating, kind: urlKind, age: urlAge, lang: language,
+    } });
+  }, [view, language, urlLang, urlQuery, urlPage, urlSort, urlGenres, urlStatus, urlFrom, urlTo, urlRating, urlKind, urlAge, navigate]);
+  
   const submitHomeSearch = () => {
     const nextQuery = query.trim();
     setSubmittedQuery(nextQuery);
@@ -1752,7 +1800,17 @@ function Index() {
                   <button type="button" onClick={() => { catalogLoadStarted.current = false; setCatalogLoadState("idle"); setCatalogLoadAttempt((value) => value + 1); }} className="rounded-lg border border-amber-100/20 px-3 py-1.5 font-semibold hover:bg-amber-100/10">{t("home.retry")}</button>
                 </div>
               )}
-              <Grid items={catalogResults} onSelect={select} empty={t("catalog.noResultsFormal")} />
+              <Grid items={visibleCatalogResults} onSelect={select} empty={t("catalog.noResultsFormal")} />
+              {catalogResults.length > 0 && (
+                <PageNavigation
+                  page={catalogPage}
+                  totalPages={totalCatalogPages}
+                  onPageChange={(nextPage) => { setCatalogPage(nextPage); writeCatalogUrl({ page: nextPage }); }}
+                  ariaLabel={t("catalog.pages")}
+                  previousLabel={t("catalog.previous")}
+                  nextLabel={t("catalog.next")}
+                />
+              )}
             </>
           )}
         </main>
@@ -2008,7 +2066,7 @@ function Index() {
               <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
             </label>
           </div>
-          {needsFullCatalog && catalogLoadState !== "loaded" && catalogLoadState !== "error" ? (
+          {catalogMode !== "paged" || (needsFullCatalog && catalogLoadState !== "loaded" && catalogLoadState !== "error") ? (
             <CatalogSkeleton count={12} />
           ) : (
             <>
