@@ -186,11 +186,13 @@ export const Route = createFileRoute("/")({
       }
     }
 
-    const sectionFeeds = sourceFeeds ? {
-      airing: selectLiveCatalogItems(refreshedItems, sourceFeeds.airing)
+    const sectionFeeds = {
+      airing: refreshedItems
         .filter((anime) => isEligibleAiringAnime(anime))
         .sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? "") || b.year - a.year),
-      announcements: selectLiveCatalogItems(refreshedItems, sourceFeeds.announcements)
+      announcements: (sourceFeeds
+        ? selectLiveCatalogItems(refreshedItems, sourceFeeds.announcements)
+        : refreshedItems)
         .filter((anime) => isUpcomingAnnouncement(anime))
         .sort((a, b) => {
           const aDate = getExactReleaseDate(a.airedOn);
@@ -200,7 +202,7 @@ export const Route = createFileRoute("/")({
           if (bDate) return 1;
           return a.year - b.year || (b.rating ?? -1) - (a.rating ?? -1);
         }),
-    } : null;
+    };
 
     return {
       anime: Array.from(unique.values()),
@@ -461,10 +463,8 @@ function Index() {
         };
         setPopularAnime(selectUpdatedFeed(feeds.popular).filter((anime) => (anime.rating ?? 0) >= 8));
 
-        setSectionFeeds({
-          airing: selectUpdatedFeed(feeds.airing)
-            .filter((anime) => isEligibleAiringAnime(anime))
-            .sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? "") || b.year - a.year),
+        setSectionFeeds((current) => current ? {
+          ...current,
           announcements: selectUpdatedFeed(feeds.announcements)
             .filter((anime) => isUpcomingAnnouncement(anime))
             .sort((a, b) => {
@@ -475,7 +475,7 @@ function Index() {
               if (bDate) return 1;
               return a.year - b.year || (b.rating ?? -1) - (a.rating ?? -1);
             }),
-        });
+        } : current);
       } catch {
         // Keep the last successful section snapshot when Shikimori is temporarily unavailable.
       }
@@ -521,6 +521,7 @@ function Index() {
   const [trailerAuto, setTrailerAuto] = useState<{enabled:boolean;running:boolean;nextRunAt:number|null;lastRunAt:number|null;retryAt:number|null;lastError:string}>({enabled:false,running:false,nextRunAt:null,lastRunAt:null,retryAt:null,lastError:""});
   const [trailerAutoBusy, setTrailerAutoBusy] = useState(false);
   const [adminImportTarget, setAdminImportTarget] = useState("50");
+  const [adminImportStatusFilter, setAdminImportStatusFilter] = useState("");
   const [adminBulkBlock18Plus, setAdminBulkBlock18Plus] = useState(true);
   const [adminBulkFilterBusy, setAdminBulkFilterBusy] = useState(false);
   const [adminDeleteQuery, setAdminDeleteQuery] = useState("");
@@ -529,7 +530,7 @@ function Index() {
   const [adminDeleteBusy, setAdminDeleteBusy] = useState<string|null>(null);
   const [adminDeleteMessage, setAdminDeleteMessage] = useState("");
   const [adminImportRunning, setAdminImportRunning] = useState(false);
-  const [adminImport, setAdminImport] = useState<{target:number;cursor:number;added:number;skipped:number;incomplete:number;errors:number;state:string;delayMs?:number}>({target:0,cursor:1,added:0,skipped:0,incomplete:0,errors:0,state:"idle"});
+  const [adminImport, setAdminImport] = useState<{target:number;cursor:number;added:number;skipped:number;incomplete:number;errors:number;state:string;delayMs?:number;statusFilter?:string}>({target:0,cursor:1,added:0,skipped:0,incomplete:0,errors:0,state:"idle",statusFilter:""});
   const [adminImportMessage, setAdminImportMessage] = useState("");
   const [adminImportTitleQuery, setAdminImportTitleQuery] = useState("");
   const [adminTitleSearchResults, setAdminTitleSearchResults] = useState<Array<{id:string;title:string;englishTitle:string;originalTitle:string;year:number;kind:string|null;status:string;posterUrl:string|null;genres:string[];ageRating:string|null;alreadyInCatalog:boolean}>>([]);
@@ -965,10 +966,11 @@ function Index() {
     if (!isAdmin) return;
     let cancelled = false;
     fetch("/api/admin/catalog-import", { credentials: "same-origin", cache: "no-store" })
-      .then(async response => ({ response, payload: await response.json().catch(() => ({})) as {isAdmin?:boolean;target?:number;cursor?:number;added?:number;skipped?:number;incomplete?:number;errors?:number;state?:string;delayMs?:number;bulkImportBlock18Plus?:boolean;quality?:typeof catalogQuality;qualitySummary?:typeof catalogQualitySummary;qualityOffset?:number;qualityHasMore?:boolean;auditLog?:typeof adminAuditLog} }))
+      .then(async response => ({ response, payload: await response.json().catch(() => ({})) as {isAdmin?:boolean;target?:number;cursor?:number;added?:number;skipped?:number;incomplete?:number;errors?:number;state?:string;delayMs?:number;statusFilter?:string;bulkImportBlock18Plus?:boolean;quality?:typeof catalogQuality;qualitySummary?:typeof catalogQualitySummary;qualityOffset?:number;qualityHasMore?:boolean;auditLog?:typeof adminAuditLog} }))
       .then(({response,payload}) => {
         if (cancelled || !response.ok || payload.isAdmin !== true) return;
-        setAdminImport({target:payload.target ?? 0,cursor:payload.cursor ?? 1,added:payload.added ?? 0,skipped:payload.skipped ?? 0,incomplete:payload.incomplete ?? 0,errors:payload.errors ?? 0,state:payload.state ?? "idle",delayMs:payload.delayMs});
+        setAdminImport({target:payload.target ?? 0,cursor:payload.cursor ?? 1,added:payload.added ?? 0,skipped:payload.skipped ?? 0,incomplete:payload.incomplete ?? 0,errors:payload.errors ?? 0,state:payload.state ?? "idle",delayMs:payload.delayMs,statusFilter:payload.statusFilter ?? ""});
+        if (typeof payload.statusFilter === "string") setAdminImportStatusFilter(payload.statusFilter);
         if (typeof payload.bulkImportBlock18Plus === "boolean") setAdminBulkBlock18Plus(payload.bulkImportBlock18Plus);
         setCatalogQuality(payload.quality ?? []);
         setCatalogQualitySummary(payload.qualitySummary ?? {total:0,incomplete:0,missingYear:0,missingPoster:0,missingDescription:0});
@@ -1171,7 +1173,7 @@ function Index() {
     setAdminImportMessage("");
     try {
       if (adminImport.state !== "running") {
-        const start = await fetch("/api/admin/catalog-import", {method:"POST",credentials:"same-origin",cache:"no-store",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"start",target})});
+        const start = await fetch("/api/admin/catalog-import", {method:"POST",credentials:"same-origin",cache:"no-store",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"start",target,statusFilter:adminImportStatusFilter})});
         const started = await start.json().catch(() => ({})) as typeof adminImport & {isAdmin?:boolean;error?:string;message?:string};
         if (!start.ok || started.isAdmin !== true) throw new Error(started.error ?? (language === "ru" ? "Не удалось запустить импорт." : "Could not start import."));
         setAdminImport(started);
@@ -2195,10 +2197,19 @@ function Index() {
                     )}
                   </section>
                   <div className="my-4 flex items-center gap-3 text-[11px] uppercase tracking-[0.15em] text-muted-foreground"><span className="h-px flex-1 bg-border" /><span>{language === "ru" ? "или импорт по количеству" : "or import by quantity"}</span><span className="h-px flex-1 bg-border" /></div>
-                  <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+                  <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
                     <label className="text-sm">
                       <span className="mb-1 block text-xs text-muted-foreground">{language === "ru" ? "Количество новых записей (1–500)" : "Number of new records (1–500)"}</span>
                       <input type="number" min={1} max={500} step={1} value={adminImportTarget} onChange={event => setAdminImportTarget(event.target.value)} disabled={adminImportRunning || adminImport.state === "running"} className="h-10 w-full rounded-xl border border-[#453452] bg-[#050408] px-3 text-[#FFFFFF] focus:border-[#BE65FF] focus:outline-none focus:ring-1 focus:ring-[#BE65FF]" />
+                    </label>
+                    <label className="text-sm">
+                      <span className="mb-1 block text-xs text-muted-foreground">{language === "ru" ? "Статус для массового импорта" : "Bulk import status"}</span>
+                      <select value={adminImportStatusFilter} onChange={event => setAdminImportStatusFilter(event.target.value)} disabled={adminImportRunning || adminImport.state === "running"} className="h-10 w-full rounded-xl border border-[#453452] bg-[#050408] px-3 text-[#FFFFFF] focus:border-[#BE65FF] focus:outline-none focus:ring-1 focus:ring-[#BE65FF]">
+                        <option value="">{language === "ru" ? "Любой статус" : "Any status"}</option>
+                        <option value="ongoing">{language === "ru" ? "Онгоинг" : "Ongoing"}</option>
+                        <option value="anons">{language === "ru" ? "Анонс" : "Announced"}</option>
+                        <option value="released">{language === "ru" ? "Вышедшее" : "Released"}</option>
+                      </select>
                     </label>
                     <button type="button" onClick={runCatalogImport} disabled={adminImportRunning || metadataRefreshRunning || (adminImport.state !== "running" && (!Number.isInteger(Number(adminImportTarget)) || Number(adminImportTarget)<1 || Number(adminImportTarget)>500))} className="self-end rounded-xl bg-gradient-to-r from-[#AC4EFC] to-[#8736FA] px-4 py-2.5 text-sm font-semibold text-white shadow-[0_0_16px_rgba(155,65,245,0.18)] transition hover:brightness-110 disabled:cursor-wait disabled:opacity-50">
                       {adminImportRunning ? (language === "ru" ? "Импорт…" : "Importing…") : adminImport.state === "running" ? (language === "ru" ? "Продолжить импорт" : "Resume import") : (language === "ru" ? "Начать импорт" : "Start import")}
