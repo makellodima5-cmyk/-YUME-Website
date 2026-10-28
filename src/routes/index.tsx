@@ -444,7 +444,7 @@ function Index() {
     document.querySelector('meta[property="og:title"]')?.setAttribute("content", metadata.ogTitle);
     document.querySelector('meta[property="og:description"]')?.setAttribute("content", metadata.ogDescription);
   }, [language]);
-  const { section, q: urlQuery, page: urlPage, sort: urlSort, genres: urlGenres, status: urlStatus, from: urlFrom, to: urlTo, rating: urlRating, kind: urlKind, age: urlAge } = Route.useSearch();
+  const { section, q: urlQuery, page: urlPage, sort: urlSort, genres: urlGenres, status: urlStatus, from: urlFrom, to: urlTo, rating: urlRating, kind: urlKind, age: urlAge, lang: urlLang } = Route.useSearch();
   const {
     anime: loadedAnime,
     popular: initialPopularAnime,
@@ -1662,6 +1662,15 @@ function Index() {
       lang: view === "catalog" ? language : undefined,
     } });
   };
+  useEffect(() => {
+    if (view !== "catalog" || (urlLang ?? "ru") === language) return;
+    void navigate({ to: "/", replace: true, search: {
+      section: "catalog", q: urlQuery, page: urlPage, sort: urlSort,
+      genres: urlGenres, status: urlStatus, from: urlFrom, to: urlTo,
+      rating: urlRating, kind: urlKind, age: urlAge, lang: language,
+    } });
+  }, [view, language, urlLang, urlQuery, urlPage, urlSort, urlGenres, urlStatus, urlFrom, urlTo, urlRating, urlKind, urlAge, navigate]);
+  
   const submitHomeSearch = () => {
     const nextQuery = query.trim();
     setSubmittedQuery(nextQuery);
