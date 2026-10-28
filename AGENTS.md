@@ -11,3 +11,4 @@
 
 - Anime data lives in src/data/anime.ts (mock) behind a typed `Anime` shape; components never fetch directly — swap the source module for real integrations later.
 - YUME UI components live in src/components/yume/; the homepage switches views via local state in src/routes/index.tsx (prototype stage).
+- При каждом изменении сайта обязательно обновляй версию в `package.json`, чтобы отображаемая пользователю версия сайта всегда была актуальной.
