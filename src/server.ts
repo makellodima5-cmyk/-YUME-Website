@@ -189,10 +189,13 @@ export default {
       import("./data/catalog-status-refresh.server"),
     ]);
 
-    const [trailersResult, catalogRefreshResult, catalogStatusResult] = await Promise.allSettled([
+    // The catalogue status queue has priority over other scheduled maintenance.
+    const catalogStatusResult = (await Promise.allSettled([
+      runScheduledCatalogStatusRefresh(env),
+    ]))[0]!;
+    const [trailersResult, catalogRefreshResult] = await Promise.allSettled([
       runScheduledTrailerUpdate(env),
       runScheduledCatalogMetadataRefresh(env),
-      runScheduledCatalogStatusRefresh(env),
     ]);
     console.info("[YUME][CATALOG_AUTO_REFRESH] Worker scheduled handler completed.", {
       cron: controller.cron,
