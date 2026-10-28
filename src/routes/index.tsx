@@ -401,7 +401,7 @@ function Index() {
     apiError,
     catalogProgress: initialCatalogProgress,
   } = Route.useLoaderData();
-  const [catalogAnime, setCatalogAnime] = useState<Anime[]>(loadedAnime.slice(0, 1000));
+  const [catalogAnime, setCatalogAnime] = useState<Anime[]>(loadedAnime);
   const [popularAnime, setPopularAnime] = useState<Anime[]>(initialPopularAnime);
   const [catalogProgress, setCatalogProgress] = useState(initialCatalogProgress);
   const [sectionFeeds, setSectionFeeds] = useState(initialSectionFeeds);
