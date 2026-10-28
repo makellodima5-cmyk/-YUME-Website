@@ -460,7 +460,7 @@ function Index() {
   const catalogAnimeRef = useRef(catalogAnime);
   const ANIME = catalogAnime;
 
-  useEffect(() => { if (view === "catalog") { setCatalogAnime(loadedAnime); catalogAnimeRef.current = loadedAnime; setCatalogPage(loadedCatalogPage); } }, [loadedAnime, loadedCatalogPage, view]);
+  useEffect(() => { if (view === "catalog") { setCatalogAnime(loadedAnime); catalogAnimeRef.current = loadedAnime; } }, [loadedAnime, view]);
   useEffect(() => { catalogAnimeRef.current = catalogAnime; }, [catalogAnime]);
 
   useEffect(() => {
