@@ -294,7 +294,7 @@ async function fetchPage(page: number): Promise<ShikimoriAnime[]> {
 async function fetchByTitle(title: string): Promise<ShikimoriAnime[]> {
   const normalized = clean(title).slice(0, 120);
   if (normalized.length < 2) return [];
-  const query = "query { animes(search: " + JSON.stringify(normalized) + ", page: 1, limit: 10, order: popularity, censored: true) { id name english russian kind score status airedOn { year } poster { mainUrl previewUrl originalUrl } genres { name russian kind } } }";
+  const query = "query { animes(search: " + JSON.stringify(normalized) + ", page: 1, limit: 10, order: popularity) { id name english russian kind score status airedOn { year } poster { mainUrl previewUrl originalUrl } genres { name russian kind } } }";
   const response = await fetch(API_URL, { method:"POST", headers:{"Content-Type":"application/json",Accept:"application/json","User-Agent":"YUME/1.0"}, body:JSON.stringify({query}), signal:AbortSignal.timeout(12000) });
   if (response.status === 429) {
     const retryAfterMs = retryAfterMilliseconds(response.headers.get("Retry-After")) ?? 60000;
