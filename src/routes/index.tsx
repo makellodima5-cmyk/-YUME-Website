@@ -4,6 +4,7 @@ import { ArrowDownWideNarrow, ChevronDown, ChevronRight, Search, SlidersHorizont
 import { COLLECTIONS, type Anime } from "@/data/anime";
 import { getShikimoriCatalog, getShikimoriSectionFeeds, type ShikimoriSectionFeeds } from "@/data/shikimori";
 import { mergeLiveAnimeDetails } from "@/data/catalog-details";
+import { isEligibleAiringAnime } from "@/data/anime-sections";
 import { getExactReleaseDate, isNewRelease, isUpcomingAnnouncement } from "@/data/anime-sections";
 import { Header, type View } from "@/components/yume/Header";
 import { AuthPage } from "@/components/yume/AuthPage";
@@ -29,11 +30,33 @@ import { runAdminTrailerUpdate, type AdminTrailerStats } from "@/data/admin-trai
 function mergeLiveSectionAnime(stored: Anime, live: Anime): Anime {
   const merged = mergeLiveAnimeDetails(stored, live);
   return {
-    ...merged,
-    description: live.description || stored.description,
-    studios: live.studios?.length ? live.studios : stored.studios,
-    youtubeTrailerId: live.youtubeTrailerId ?? stored.youtubeTrailerId,
-    ageRating: live.ageRating ?? stored.ageRating,
+    ...stored,
+    // These values can change as episodes air; catalog identity and artwork stay fixed.
+    status: live.status,
+    rating: live.rating ?? stored.rating,
+    episodes: live.episodes > 0 ? live.episodes : stored.episodes,
+    episodesAired: live.episodesAired ?? stored.episodesAired,
+    nextEpisodeAt: live.nextEpisodeAt,
+    popular: live.popular ?? stored.popular,
+    // Keep the shared merge for fields that are intentionally provider-backed,
+    // but explicitly restore the stable catalog presentation fields above.
+    id: stored.id,
+    title: stored.title,
+    englishTitle: stored.englishTitle ?? live.englishTitle,
+    original: stored.original,
+    year: stored.year,
+    genres: stored.genres,
+    description: stored.description,
+    hue: stored.hue,
+    glyph: stored.glyph,
+    isNew: stored.isNew,
+    posterUrl: stored.posterUrl,
+    bannerUrl: stored.bannerUrl,
+    kind: stored.kind,
+    ageRating: stored.ageRating,
+    airedOn: stored.airedOn,
+    studios: stored.studios,
+    youtubeTrailerId: stored.youtubeTrailerId,
   };
 }
 
@@ -150,9 +173,12 @@ export const Route = createFileRoute("/")({
     const liveItems = sourceFeeds ? allSectionFeedItems(sourceFeeds) : [];
     const refreshedItems = mergeLiveFeedIntoCurrent(persistentItems, liveItems, allowedIds);
     const refreshedById = new Map(refreshedItems.map((anime) => [anime.id, anime]));
-    const popular = refreshedItems
-      .filter((anime) => anime.rating !== null)
-      .sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1));
+    const popular = sourceFeeds
+      ? selectLiveCatalogItems(refreshedItems, sourceFeeds.popular)
+          .filter((anime) => (anime.rating ?? 0) >= 8)
+      : refreshedItems
+          .filter((anime) => (anime.rating ?? 0) >= 8)
+          .sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1));
     const seedRecent = [...refreshedItems]
       .sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? "") || b.year - a.year)
       .slice(0, 50);
@@ -167,6 +193,7 @@ export const Route = createFileRoute("/")({
 
     const sectionFeeds = sourceFeeds ? {
       airing: selectLiveCatalogItems(refreshedItems, sourceFeeds.airing)
+        .filter((anime) => isEligibleAiringAnime(anime))
         .sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? "") || b.year - a.year),
       announcements: selectLiveCatalogItems(refreshedItems, sourceFeeds.announcements)
         .filter((anime) => isUpcomingAnnouncement(anime))
@@ -427,11 +454,6 @@ function Index() {
         );
         catalogAnimeRef.current = updatedCatalog;
         setCatalogAnime(updatedCatalog);
-        setPopularAnime((current) =>
-          mergeLiveFeedIntoCurrent(current, feeds.popular, allowedCatalogIds)
-            .filter((anime) => anime.rating !== null),
-        );
-
         const refreshedById = new Map(updatedCatalog.map((anime) => [anime.id, anime]));
         const selectUpdatedFeed = (items: Anime[]) => {
           const selected = new Map<string, Anime>();
@@ -442,8 +464,11 @@ function Index() {
           }
           return Array.from(selected.values());
         };
+        setPopularAnime(selectUpdatedFeed(feeds.popular).filter((anime) => (anime.rating ?? 0) >= 8));
+
         setSectionFeeds({
           airing: selectUpdatedFeed(feeds.airing)
+            .filter((anime) => isEligibleAiringAnime(anime))
             .sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? "") || b.year - a.year),
           announcements: selectUpdatedFeed(feeds.announcements)
             .filter((anime) => isUpcomingAnnouncement(anime))
@@ -1639,9 +1664,7 @@ function Index() {
   const totalNewReleasesPages = Math.max(1, Math.ceil(newReleaseAnime.length / catalogPageSize));
   const visibleNewReleaseAnime = newReleaseAnime.slice((newReleasesPage - 1) * catalogPageSize, newReleasesPage * catalogPageSize);
 
-  const sortedPopularAnime = popularAnime
-    .filter((anime) => anime.rating !== null)
-    .sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1));
+  const sortedPopularAnime = popularAnime.filter((anime) => (anime.rating ?? 0) >= 8);
   const popularCards = sortedPopularAnime.slice(0, 12);
   const totalPopularPages = Math.max(1, Math.ceil(sortedPopularAnime.length / catalogPageSize));
   const visiblePopularAnime = sortedPopularAnime.slice((popularPage - 1) * catalogPageSize, popularPage * catalogPageSize);
@@ -1665,7 +1688,7 @@ function Index() {
   const airingAnime = sectionFeeds
     ? sectionFeeds.airing
     : ANIME
-      .filter((anime) => anime.status === "Онгоинг")
+      .filter((anime) => isEligibleAiringAnime(anime))
       .sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? "") || b.year - a.year);
   const airingCards = airingAnime.slice(0, 12);
   const totalAiringPages = Math.max(1, Math.ceil(airingAnime.length / catalogPageSize));
