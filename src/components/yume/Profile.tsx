@@ -36,6 +36,7 @@ import {
   readSavedAnimeIds,
   WATCHLIST_STORAGE_KEY,
   setProfileStorageAuthenticated,
+  toggleSavedAnimeId,
 } from "@/data/profile-storage";
 
 type ProfilePanel =
@@ -575,20 +576,30 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
               {favorites.length ? (
                 <div className="scrollbar-none flex gap-3 overflow-x-auto pb-2">
                   {favorites.slice(0, 4).map((anime) => (
-                    <button
-                      key={anime.id}
-                      type="button"
-                      aria-label={displayAnimeTitle(anime, language)}
-                      onClick={() => onSelect(anime)}
-                      className="group w-[98px] shrink-0 overflow-hidden rounded-xl text-left transition hover:-translate-y-1 sm:w-[118px]"
-                    >
-                      <span className="block overflow-hidden rounded-xl ring-1 ring-white/10 transition group-hover:ring-primary">
-                        <PosterArt anime={anime} className="aspect-[2/3] w-full transition duration-300 group-hover:scale-[1.02]" />
-                      </span>
-                      <span className="mt-2 block line-clamp-2 min-h-8 px-0.5 text-[11px] leading-snug text-foreground/90 sm:text-xs">
-                        {displayAnimeTitle(anime, language)}
-                      </span>
-                    </button>
+                    <div key={anime.id} className="relative w-[98px] shrink-0 sm:w-[118px]">
+                      <button
+                        type="button"
+                        aria-label={displayAnimeTitle(anime, language)}
+                        onClick={() => onSelect(anime)}
+                        className="group w-full overflow-hidden rounded-xl text-left transition hover:-translate-y-1"
+                      >
+                        <span className="block overflow-hidden rounded-xl ring-1 ring-white/10 transition group-hover:ring-primary">
+                          <PosterArt anime={anime} className="aspect-[2/3] w-full transition duration-300 group-hover:scale-[1.02]" />
+                        </span>
+                        <span className="mt-2 block line-clamp-2 min-h-8 px-0.5 text-[11px] leading-snug text-foreground/90 sm:text-xs">
+                          {displayAnimeTitle(anime, language)}
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={language === "ru" ? "Убрать из избранного" : "Remove from favorites"}
+                        title={language === "ru" ? "Убрать из избранного" : "Remove from favorites"}
+                        onClick={(event) => { event.preventDefault(); event.stopPropagation(); toggleSavedAnimeId(FAVORITES_STORAGE_KEY, anime.id); }}
+                        className="absolute right-1.5 top-1.5 z-20 flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-red-600 text-white shadow-[0_0_0_2px_rgba(0,0,0,0.7),0_4px_12px_rgba(0,0,0,0.65)] transition hover:scale-105 hover:bg-red-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-red-300"
+                      >
+                        <X className="h-5 w-5" strokeWidth={3} aria-hidden="true" />
+                      </button>
+                    </div>
                   ))}
                 </div>
               ) : (
@@ -649,7 +660,7 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
             {panel === "favorites" && (
               <>
                 {favorites.length
-                  ? <Grid items={favorites} onSelect={onSelect} empty={t("profile.emptyFavoritesTitle")} />
+                  ? <Grid items={favorites} onSelect={onSelect} empty={t("profile.emptyFavoritesTitle")} onRemove={(anime) => toggleSavedAnimeId(FAVORITES_STORAGE_KEY, anime.id)} removeLabel={language === "ru" ? "Убрать из избранного" : "Remove from favorites"} />
                   : favoriteIds.length > 0
                     ? <div className="rounded-2xl border border-dashed border-border bg-card/40 px-5 py-8 text-center">
                         <p className="text-sm leading-relaxed text-muted-foreground">
@@ -667,7 +678,7 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
             {panel === "watchlist" && (
               <>
                 {watchlist.length
-                  ? <Grid items={watchlist} onSelect={onSelect} empty={t("profile.emptyWatchlistTitle")} />
+                  ? <Grid items={watchlist} onSelect={onSelect} empty={t("profile.emptyWatchlistTitle")} onRemove={(anime) => toggleSavedAnimeId(WATCHLIST_STORAGE_KEY, anime.id)} removeLabel={language === "ru" ? "Убрать из списка «Смотреть позже»" : "Remove from Watch Later"} />
                   : watchlistIds.length > 0
                     ? <div className="rounded-2xl border border-dashed border-border bg-card/40 px-5 py-8 text-center">
                         <p className="text-sm leading-relaxed text-muted-foreground">
