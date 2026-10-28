@@ -6,6 +6,7 @@ export const Route = createFileRoute("/api/telegram/history")({
     handlers: {
       GET: ({ request }) => handleTelegramHistory(request),
       POST: ({ request }) => handleTelegramHistory(request),
+      DELETE: ({ request }) => handleTelegramHistory(request),
     },
   },
 });
