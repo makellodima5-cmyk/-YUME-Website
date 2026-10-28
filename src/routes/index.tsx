@@ -8,14 +8,13 @@ import { getExactReleaseDate, isNewRelease, isUpcomingAnnouncement } from "@/dat
 import { Header, type View } from "@/components/yume/Header";
 import { AuthPage } from "@/components/yume/AuthPage";
 import { AnimeCard } from "@/components/yume/Poster";
-import { CollectionsGrid, Grid, Hero, Row, HalloweenSectionIcon } from "@/components/yume/Sections";
+import { CollectionsGrid, Grid, Hero, Row } from "@/components/yume/Sections";
 import { CatalogFilters, EMPTY_CATALOG_FILTERS, type CatalogFiltersValue } from "@/components/yume/CatalogFilters";
 import { Profile } from "@/components/yume/Profile";
 import { Footer } from "@/components/yume/Footer";
 import { HomeDepthAtmosphere } from "@/components/yume/HomeDepthAtmosphere";
 import "../home-depth.css";
 import { useYumePreferences, displayGenre, type TranslationKey } from "@/data/preferences";
-import { useHalloweenSeason } from "@/data/seasonal-theme";
 import { filterAndSortCatalog, getCatalogPageCount, paginateCatalog } from "@/data/catalog-utils";
 import { validateCatalogSearch } from "@/data/catalog-search";
 import homeSocialImage from "@/assets/yume-desktop.webp";
@@ -294,7 +293,7 @@ function HomeQuickControls({ onProfile }: { onProfile: () => void }) {
       <button
         type="button"
         onClick={onProfile}
-        className="yume-home-quick-control relative overflow-hidden flex min-h-12 w-full items-center justify-center gap-2 whitespace-nowrap rounded-full border border-primary/35 bg-card/80 px-2 text-sm font-medium text-foreground shadow-[0_4px_18px_rgba(156,92,255,0.08)] transition hover:border-primary/70 hover:bg-accent/70 sm:text-base"
+        className="flex min-h-12 w-full items-center justify-center gap-2 whitespace-nowrap rounded-full border border-primary/35 bg-card/80 px-2 text-sm font-medium text-foreground shadow-[0_4px_18px_rgba(156,92,255,0.08)] transition hover:border-primary/70 hover:bg-accent/70 sm:text-base"
       >
         <UserRound className="h-4 w-4 shrink-0 sm:h-5 sm:w-5" />
         <span>{t("nav.profileButton")}</span>
@@ -306,7 +305,7 @@ function HomeQuickControls({ onProfile }: { onProfile: () => void }) {
           aria-haspopup="listbox"
           aria-expanded={openMenu === "language"}
           onClick={() => setOpenMenu((current) => current === "language" ? null : "language")}
-          className={`yume-home-quick-control relative overflow-hidden flex min-h-12 w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-full border px-2 text-sm font-medium transition sm:gap-2 sm:text-base ${openMenu === "language" ? "border-primary bg-accent/70 shadow-neon" : "border-primary/35 bg-card/80 hover:border-primary/70 hover:bg-accent/70"}`}
+          className={`flex min-h-12 w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-full border px-2 text-sm font-medium transition sm:gap-2 sm:text-base ${openMenu === "language" ? "border-primary bg-accent/70 shadow-neon" : "border-primary/35 bg-card/80 hover:border-primary/70 hover:bg-accent/70"}`}
         >
           <Globe className="h-4 w-4 shrink-0 sm:h-5 sm:w-5" />
           <span className="whitespace-nowrap">{language === "ru" ? "Язык" : "Language"}</span>
@@ -338,7 +337,7 @@ function HomeQuickControls({ onProfile }: { onProfile: () => void }) {
           aria-haspopup="listbox"
           aria-expanded={openMenu === "theme"}
           onClick={() => setOpenMenu((current) => current === "theme" ? null : "theme")}
-          className={`yume-home-quick-control relative overflow-hidden flex min-h-12 w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-full border px-2 text-sm font-medium transition sm:gap-2 sm:text-base ${openMenu === "theme" ? "border-primary bg-accent/70 shadow-neon" : "border-primary/35 bg-card/80 hover:border-primary/70 hover:bg-accent/70"}`}
+          className={`flex min-h-12 w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-full border px-2 text-sm font-medium transition sm:gap-2 sm:text-base ${openMenu === "theme" ? "border-primary bg-accent/70 shadow-neon" : "border-primary/35 bg-card/80 hover:border-primary/70 hover:bg-accent/70"}`}
         >
           {theme === "light" ? <Sun className="h-4 w-4 shrink-0 sm:h-5 sm:w-5" /> : theme === "system" ? <Monitor className="h-4 w-4 shrink-0 sm:h-5 sm:w-5" /> : <Moon className="h-4 w-4 shrink-0 sm:h-5 sm:w-5" />}
           <span className="whitespace-nowrap">{language === "ru" ? "Тема" : "Theme"}</span>
@@ -372,7 +371,6 @@ function HomeQuickControls({ onProfile }: { onProfile: () => void }) {
 
 function Index() {
   const { t, language } = useYumePreferences();
-  const halloween = useHalloweenSeason();
   const navigate = useNavigate();
   useEffect(() => {
     const metadata = language === "en"
@@ -1557,21 +1555,21 @@ function Index() {
                 </section>
               ) : (
                 <>
-                  {popularCards.length > 0 && <Row title={t("home.popular")} halloweenIcon="pumpkin" action={<SeeAll onClick={() => setView("popular")} />}>
+                  {popularCards.length > 0 && <Row title={t("home.popular")} action={<SeeAll onClick={() => setView("popular")} />}>
                     {popularCards.map((a) => <AnimeCard key={a.id} anime={a} onSelect={select} />)}
                   </Row>}
-                  {newReleaseCards.length > 0 && <Row title={t("home.newReleases")} halloweenIcon="ghost" action={<SeeAll onClick={() => setView("new-releases")} />}>
+                  {newReleaseCards.length > 0 && <Row title={t("home.newReleases")} action={<SeeAll onClick={() => setView("new-releases")} />}>
                     {newReleaseCards.map((a) => <AnimeCard key={a.id} anime={a} onSelect={select} />)}
                   </Row>}
-                  {announcementCards.length > 0 && <Row title={t("home.announcements")} halloweenIcon="candle" action={<SeeAll onClick={() => setView("announcements")} />}>
+                  {announcementCards.length > 0 && <Row title={t("home.announcements")} action={<SeeAll onClick={() => setView("announcements")} />}>
                     {announcementCards.map((a) => <AnimeCard key={a.id} anime={a} onSelect={select} />)}
                   </Row>}
-                  {airingCards.length > 0 && <Row title={t("home.airing")} halloweenIcon="bat" action={<SeeAll onClick={() => setView("airing")} />}>
+                  {airingCards.length > 0 && <Row title={t("home.airing")} action={<SeeAll onClick={() => setView("airing")} />}>
                     {airingCards.map((a) => <AnimeCard key={a.id} anime={a} onSelect={select} />)}
                   </Row>}
                   <section className="mt-10 px-4 md:px-10">
                     <div className="mb-4 flex items-end justify-between">
-                      <h2 className={"flex items-center gap-2 text-lg font-semibold md:text-xl " + (halloween ? "yume-halloween-section-title" : "")}>{halloween ? <HalloweenSectionIcon kind="candle" /> : null}<span>{t("home.collections")}</span></h2>
+                      <h2 className="text-lg font-semibold md:text-xl">{t("home.collections")}</h2>
                       <SeeAll onClick={() => setView("collections")} />
                     </div>
                     <CollectionsGrid animeList={ANIME} onOpen={(id) => { setCollection(id); setView("collections"); }} />
