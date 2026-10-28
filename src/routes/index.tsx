@@ -1594,6 +1594,7 @@ function Index() {
   const catalogPageSize = 20;
   const totalCatalogPages = getCatalogPageCount(view === "catalog" ? initialCatalogTotal : catalogResults.length, catalogPageSize);
   const visibleCatalogResults = view === "catalog" ? ANIME : paginateCatalog(catalogResults, catalogPage, catalogPageSize);
+  useEffect(() => { if (view === "catalog") { setCatalogPage(loadedCatalogPage); setCatalogQuery(urlQuery ?? ""); setSortBy(urlSort ?? "rating"); setActiveFilters({ ...EMPTY_CATALOG_FILTERS, genres: (urlGenres ?? "").split(",").filter(Boolean).slice(0,20), status: urlStatus ?? EMPTY_CATALOG_FILTERS.status, yearFrom: urlFrom === undefined ? "" : String(urlFrom), yearTo: urlTo === undefined ? "" : String(urlTo), minRating: urlRating ?? 0, type: urlKind ?? EMPTY_CATALOG_FILTERS.type, ageRating: urlAge ?? EMPTY_CATALOG_FILTERS.ageRating }); } }, [view, loadedCatalogPage, urlQuery, urlPage, urlSort, urlGenres, urlStatus, urlFrom, urlTo, urlRating, urlKind, urlAge]);
   const activeFilterCount = activeFilters.genres.length +
     Number(activeFilters.status !== "Любой") + Number(activeFilters.yearFrom !== "") +
     Number(activeFilters.yearTo !== "") + Number(activeFilters.minRating > 0) +
@@ -2028,7 +2029,7 @@ function Index() {
                 </div>
               )}
               <Grid items={visibleCatalogResults} onSelect={select} empty={ANIME.length === 0 && (apiError || catalogLoadError) ? t("source.catalogUnavailable") : t("catalog.noResults")} />
-              {catalogResults.length > 0 && <nav aria-label={t("catalog.pages")} className="mt-8 flex flex-wrap items-center justify-center gap-1.5">
+              {initialCatalogTotal > 0 && <nav aria-label={t("catalog.pages")} className="mt-8 flex flex-wrap items-center justify-center gap-1.5">
                 <button type="button" disabled={catalogPage === 1} onClick={() => { const next = Math.max(1, catalogPage - 1); setCatalogPage(next); writeCatalogUrl({ page: next }); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="h-9 rounded-lg border border-border px-3 text-sm transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-35">{t("catalog.previous")}</button>
                 {Array.from({ length: totalCatalogPages }, (_, index) => index + 1)
                   .filter((page) => page === 1 || page === totalCatalogPages || Math.abs(page - catalogPage) <= 1)
