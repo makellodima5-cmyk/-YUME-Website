@@ -158,7 +158,7 @@ export const Route = createFileRoute("/")({
   loaderDeps: ({ search }) => ({
     section: search.section, q: search.q, page: search.page, sort: search.sort,
     genres: search.genres, status: search.status, from: search.from, to: search.to,
-    rating: search.rating, kind: search.kind, age: search.age,
+    rating: search.rating, kind: search.kind, age: search.age, lang: search.lang,
   }),
   loader: async ({ deps }) => {
     const catalog = await getShikimoriCatalog({ data: {} });
@@ -175,7 +175,7 @@ export const Route = createFileRoute("/")({
         ageRating: deps.age ?? EMPTY_CATALOG_FILTERS.ageRating,
       };
       const sort = (deps.sort ?? "rating") as "rating" | "newest" | "oldest" | "title";
-      const results = filterAndSortCatalog(allItems, deps.q ?? "", filters, sort, "ru", displayGenre);
+      const results = filterAndSortCatalog(allItems, deps.q ?? "", filters, sort, deps.lang ?? "ru", displayGenre);
       const pageSize = 20, pageCount = getCatalogPageCount(results.length, pageSize);
       const page = Math.min(Math.max(1, deps.page ?? 1), pageCount);
       const years = allItems.map(a => a.year).filter(y => Number.isFinite(y) && y > 0);
@@ -1550,7 +1550,7 @@ function Index() {
     if (v === "announcements") setAnnouncementsPage(1);
     if (v === "airing") setAiringPage(1);
     // Persist the selected section in the URL so refreshing the page keeps the same view.
-    navigate({ to: "/", search: { section: v, q: undefined, page: undefined, sort: undefined, genres: undefined, status: undefined, from: undefined, to: undefined, rating: undefined, kind: undefined, age: undefined } });
+    navigate({ to: "/", search: { section: v, q: undefined, page: undefined, sort: undefined, genres: undefined, status: undefined, from: undefined, to: undefined, rating: undefined, kind: undefined, age: undefined, lang: v === "catalog" ? language : undefined } });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
   const select = (anime: Anime) =>
@@ -1637,6 +1637,7 @@ function Index() {
       rating: rating || undefined,
       kind: kind || undefined,
       age: age || undefined,
+      lang: view === "catalog" ? language : undefined,
     } });
   };
   const submitHomeSearch = () => {
