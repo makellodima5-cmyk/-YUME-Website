@@ -1963,23 +1963,19 @@ function Index() {
               </p>
             ) : isAdmin ? (
               <>
-              <section className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4" aria-label={language === "ru" ? "Ключевые показатели" : "Key metrics"}>
-                <button type="button" onClick={() => setExpandedAdminSections(s=>({...s,trailers:true}))} className="rounded-xl border border-[#382D46] bg-[#0C0C16] p-3 text-left transition hover:border-[#6A527A]">
-                  <span className="flex items-center gap-2.5"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#271024]"><Play className="h-5 w-5 fill-[#FF3D91] text-[#FF3D91]"/></span><span className="text-xs text-[#D3C3D7]">{language==="ru"?"Без трейлера":"Missing trailers"}</span></span>
+              <section className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-3" aria-label={language === "ru" ? "Актуальные показатели каталога" : "Current catalog metrics"}>
+                <div className="rounded-xl border border-[#382D46] bg-[#0C0C16] p-3">
+                  <span className="flex items-center gap-2.5"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#271024]"><Play className="h-5 w-5 fill-[#FF3D91] text-[#FF3D91]"/></span><span className="text-xs text-[#D3C3D7]">{language==="ru"?"Без трейлера":"Missing trailer"}</span></span>
                   <span className="mt-1 block text-xl font-bold tabular-nums text-[#FF3D91]">{adminStats ? adminStats.missing.toLocaleString(language==="ru"?"ru-RU":"en-US") : "—"}</span>
-                </button>
-                <button type="button" onClick={() => setExpandedAdminSections(s=>({...s,trailers:true}))} className="rounded-xl border border-[#382D46] bg-[#0C0C16] p-3 text-left transition hover:border-[#6A527A]">
-                  <span className="flex items-center gap-2.5"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#0C1F3D]"><ListChecks className="h-5 w-5 text-[#4FC8F3]"/></span><span className="text-xs text-[#C3D3E1]">{language==="ru"?"Проверено":"Checked"}</span></span>
-                  <span className="mt-1 block text-xl font-bold tabular-nums text-[#B8D7FF]">{adminStats ? adminStats.checked.toLocaleString(language==="ru"?"ru-RU":"en-US") : "—"}</span>
-                </button>
-                <button type="button" onClick={() => setExpandedAdminSections(s=>({...s,trailers:true}))} className="rounded-xl border border-[#382D46] bg-[#0C0C16] p-3 text-left transition hover:border-[#6A527A]">
-                  <span className="flex items-center gap-2.5"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#0D2621]"><CircleCheck className="h-5 w-5 fill-[#36EBA6] text-[#36EBA6]"/></span><span className="text-xs text-[#C3D8D0]">{language==="ru"?"Найдено трейлеров":"Trailers found"}</span></span>
+                </div>
+                <div className="rounded-xl border border-[#382D46] bg-[#0C0C16] p-3">
+                  <span className="flex items-center gap-2.5"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#0C1F3D]"><Database className="h-5 w-5 text-[#4FC8F3]"/></span><span className="text-xs text-[#C3D3E1]">{language==="ru"?"Всего в каталоге":"Total in catalog"}</span></span>
+                  <span className="mt-1 block text-xl font-bold tabular-nums text-[#B8D7FF]">{adminStats ? adminStats.total.toLocaleString(language==="ru"?"ru-RU":"en-US") : "—"}</span>
+                </div>
+                <div className="rounded-xl border border-[#382D46] bg-[#0C0C16] p-3">
+                  <span className="flex items-center gap-2.5"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#0D2621]"><CircleCheck className="h-5 w-5 fill-[#36EBA6] text-[#36EBA6]"/></span><span className="text-xs text-[#C3D8D0]">{language==="ru"?"С трейлером":"With trailer"}</span></span>
                   <span className="mt-1 block text-xl font-bold tabular-nums text-[#36EBA6]">{adminStats ? adminStats.found.toLocaleString(language==="ru"?"ru-RU":"en-US") : "—"}</span>
-                </button>
-                <button type="button" onClick={() => setExpandedAdminSections(s=>({...s,trailers:true}))} className="rounded-xl border border-[#382D46] bg-[#0C0C16] p-3 text-left transition hover:border-[#6A527A]">
-                  <span className="flex items-center gap-2.5"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#251A18]"><Clock3 className="h-5 w-5 text-[#FFAA43]"/></span><span className="text-xs text-[#D9C9B3]">{language==="ru"?"Очередь":"Queue"}</span></span>
-                  <span className="mt-1 block text-xl font-bold tabular-nums text-[#FFAA43]">{adminStats ? adminStats.pending.toLocaleString(language==="ru"?"ru-RU":"en-US") : "—"}</span>
-                </button>
+                </div>
               </section>
               <details open={analyticsOpen} onToggle={event=>setAnalyticsOpen(event.currentTarget.open)} className="group mb-3 overflow-hidden rounded-2xl border border-[#57317A] bg-[#0D0A14]" aria-label={language==="ru"?"Посещаемость YUME":"YUME visits analytics"}>
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 hover:bg-[#171020] [&::-webkit-details-marker]:hidden">
