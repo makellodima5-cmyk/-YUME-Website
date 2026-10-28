@@ -1601,7 +1601,7 @@ function Index() {
     Number(activeFilters.yearTo !== "") + Number(activeFilters.minRating > 0) +
     Number(activeFilters.type !== "Любой") + Number(activeFilters.ageRating !== "Любой");
   const searching = view === "home" && (submittedQuery.length > 0 || activeFilterCount > 0);
-  const needsFullCatalog = view === "catalog" || ["popular", "new-releases", "announcements", "airing"].includes(view) ||
+  const needsFullCatalog = ["popular", "new-releases", "announcements", "airing"].includes(view) ||
     (view === "home" && (Boolean(submittedQuery.trim()) || activeFilterCount > 0 || filtersOpen));
   // Searches and filters operate on the dataset returned from D1.
   // Do not poll Shikimori or trigger imports during normal user navigation.
