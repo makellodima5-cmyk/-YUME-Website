@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { validateCatalogSearch } from "@/data/catalog-search";
+import { getCatalogPageCount, paginateCatalog } from "@/data/catalog-utils";
 
 describe("catalog URL search validation", () => {
   it("accepts supported state and normalizes bounded numeric values", () => {
@@ -66,5 +67,15 @@ describe("catalog URL search validation", () => {
     expect(result.genres).toHaveLength(500);
     expect(result.kind).toHaveLength(80);
     expect(result.age).toHaveLength(30);
+  });
+});
+
+
+describe("server catalog pagination contract", () => {
+  it("returns only the requested 20-item slice and preserves stable page boundaries", () => {
+    const all = Array.from({ length: 63 }, (_, index) => ({ id: index + 1 }));
+    expect(paginateCatalog(all, 2, 20).map((item) => item.id)).toEqual(Array.from({ length: 20 }, (_, index) => index + 21));
+    expect(getCatalogPageCount(all.length, 20)).toBe(4);
+    expect(paginateCatalog(all, 4, 20).map((item) => item.id)).toEqual([61, 62, 63]);
   });
 });
