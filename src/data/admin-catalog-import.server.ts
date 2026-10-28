@@ -1032,7 +1032,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
         const titleQuery = typeof body.query === "string" ? clean(body.query).slice(0, 120) : "";
         if (titleQuery.length < 2) return json({ error:"query_too_short", message:"Введи не менее двух символов названия." },400);
         const source = await fetchByTitle(titleQuery);
-        const ids = source.map(item => String(item.id)).filter(id => /^\\d{1,20}$/.test(id));
+        const ids = source.map(item => String(item.id)).filter(id => /^[0-9]{1,20}$/.test(id));
         const existingRows = ids.length
           ? await db.prepare("SELECT id FROM anime_catalog WHERE id IN (" + ids.map(() => "?").join(",") + ")").bind(...ids).all<{id:string}>()
           : { results: [] as {id:string}[] };
@@ -1056,7 +1056,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
       }
       if (body.action === "import_title") {
         const animeId = typeof body.animeId === "string" ? body.animeId.trim() : "";
-        if (!/^\\d{1,20}$/.test(animeId)) return json({error:"invalid_anime_id"},400);
+        if (!/^[0-9]{1,20}$/.test(animeId)) return json({error:"invalid_anime_id"},400);
         const already = await db.prepare("SELECT id,title FROM anime_catalog WHERE id = ?").bind(animeId).first<{id:string;title:string}>();
         if (already) return json({isAdmin:true,alreadyInCatalog:true,anime:{id:already.id,title:already.title},message:"Этот тайтл уже находится в каталоге."},409);
         const sourceItems = await fetchByIds([animeId],true);
