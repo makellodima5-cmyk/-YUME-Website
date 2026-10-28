@@ -1790,7 +1790,7 @@ function Index() {
             <h1 className="text-xl font-semibold">{submittedQuery ? `${t("catalog.results")}: «${submittedQuery}»` : t("catalog.filterResults")} <span className="text-muted-foreground">· {needsFullCatalog && catalogLoadState !== "loaded" && catalogLoadState !== "error" ? "…" : catalogResults.length}</span></h1>
             <button onClick={() => { setQuery(""); setSubmittedQuery(""); setDraftFilters(EMPTY_CATALOG_FILTERS); setActiveFilters(EMPTY_CATALOG_FILTERS); setFiltersOpen(false); setCatalogPage(1); }} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"><X className="h-4 w-4" />{t("catalog.reset")}</button>
           </div>
-          {(view === "catalog" && catalogMode !== "paged") || (needsFullCatalog && catalogLoadState !== "loaded" && catalogLoadState !== "error") ? (
+          {needsFullCatalog && catalogLoadState !== "loaded" && catalogLoadState !== "error" ? (
             <CatalogSkeleton count={8} />
           ) : (
             <>
@@ -1801,7 +1801,7 @@ function Index() {
                 </div>
               )}
               <Grid items={visibleCatalogResults} onSelect={select} empty={t("catalog.noResultsFormal")} />
-              {initialCatalogTotal > 0 && (
+              {catalogResults.length > 0 && (
                 <PageNavigation
                   page={catalogPage}
                   totalPages={totalCatalogPages}
@@ -2066,7 +2066,7 @@ function Index() {
               <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
             </label>
           </div>
-          {needsFullCatalog && catalogLoadState !== "loaded" && catalogLoadState !== "error" ? (
+          {catalogMode !== "paged" || (needsFullCatalog && catalogLoadState !== "loaded" && catalogLoadState !== "error") ? (
             <CatalogSkeleton count={12} />
           ) : (
             <>
