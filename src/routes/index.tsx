@@ -293,7 +293,7 @@ function HomeQuickControls({ onProfile }: { onProfile: () => void }) {
       <button
         type="button"
         onClick={onProfile}
-        className="flex min-h-12 w-full items-center justify-center gap-2 whitespace-nowrap rounded-full border border-primary/35 bg-card/80 px-2 text-sm font-medium text-foreground shadow-[0_4px_18px_rgba(156,92,255,0.08)] transition hover:border-primary/70 hover:bg-accent/70 sm:text-base"
+        className="yume-home-quick-control relative overflow-hidden flex min-h-12 w-full items-center justify-center gap-2 whitespace-nowrap rounded-full border border-primary/35 bg-card/80 px-2 text-sm font-medium text-foreground shadow-[0_4px_18px_rgba(156,92,255,0.08)] transition hover:border-primary/70 hover:bg-accent/70 sm:text-base"
       >
         <UserRound className="h-4 w-4 shrink-0 sm:h-5 sm:w-5" />
         <span>{t("nav.profileButton")}</span>
@@ -305,7 +305,7 @@ function HomeQuickControls({ onProfile }: { onProfile: () => void }) {
           aria-haspopup="listbox"
           aria-expanded={openMenu === "language"}
           onClick={() => setOpenMenu((current) => current === "language" ? null : "language")}
-          className={`flex min-h-12 w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-full border px-2 text-sm font-medium transition sm:gap-2 sm:text-base ${openMenu === "language" ? "border-primary bg-accent/70 shadow-neon" : "border-primary/35 bg-card/80 hover:border-primary/70 hover:bg-accent/70"}`}
+          className={`yume-home-quick-control relative overflow-hidden flex min-h-12 w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-full border px-2 text-sm font-medium transition sm:gap-2 sm:text-base ${openMenu === "language" ? "border-primary bg-accent/70 shadow-neon" : "border-primary/35 bg-card/80 hover:border-primary/70 hover:bg-accent/70"}`}
         >
           <Globe className="h-4 w-4 shrink-0 sm:h-5 sm:w-5" />
           <span className="whitespace-nowrap">{language === "ru" ? "Язык" : "Language"}</span>
@@ -337,7 +337,7 @@ function HomeQuickControls({ onProfile }: { onProfile: () => void }) {
           aria-haspopup="listbox"
           aria-expanded={openMenu === "theme"}
           onClick={() => setOpenMenu((current) => current === "theme" ? null : "theme")}
-          className={`flex min-h-12 w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-full border px-2 text-sm font-medium transition sm:gap-2 sm:text-base ${openMenu === "theme" ? "border-primary bg-accent/70 shadow-neon" : "border-primary/35 bg-card/80 hover:border-primary/70 hover:bg-accent/70"}`}
+          className={`yume-home-quick-control relative overflow-hidden flex min-h-12 w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-full border px-2 text-sm font-medium transition sm:gap-2 sm:text-base ${openMenu === "theme" ? "border-primary bg-accent/70 shadow-neon" : "border-primary/35 bg-card/80 hover:border-primary/70 hover:bg-accent/70"}`}
         >
           {theme === "light" ? <Sun className="h-4 w-4 shrink-0 sm:h-5 sm:w-5" /> : theme === "system" ? <Monitor className="h-4 w-4 shrink-0 sm:h-5 sm:w-5" /> : <Moon className="h-4 w-4 shrink-0 sm:h-5 sm:w-5" />}
           <span className="whitespace-nowrap">{language === "ru" ? "Тема" : "Theme"}</span>
@@ -1555,16 +1555,16 @@ function Index() {
                 </section>
               ) : (
                 <>
-                  {popularCards.length > 0 && <Row title={t("home.popular")} action={<SeeAll onClick={() => setView("popular")} />}>
+                  {popularCards.length > 0 && <Row title={t("home.popular")} halloweenIcon="pumpkin" action={<SeeAll onClick={() => setView("popular")} />}>
                     {popularCards.map((a) => <AnimeCard key={a.id} anime={a} onSelect={select} />)}
                   </Row>}
-                  {newReleaseCards.length > 0 && <Row title={t("home.newReleases")} action={<SeeAll onClick={() => setView("new-releases")} />}>
+                  {newReleaseCards.length > 0 && <Row title={t("home.newReleases")} halloweenIcon="ghost" action={<SeeAll onClick={() => setView("new-releases")} />}>
                     {newReleaseCards.map((a) => <AnimeCard key={a.id} anime={a} onSelect={select} />)}
                   </Row>}
-                  {announcementCards.length > 0 && <Row title={t("home.announcements")} action={<SeeAll onClick={() => setView("announcements")} />}>
+                  {announcementCards.length > 0 && <Row title={t("home.announcements")} halloweenIcon="candle" action={<SeeAll onClick={() => setView("announcements")} />}>
                     {announcementCards.map((a) => <AnimeCard key={a.id} anime={a} onSelect={select} />)}
                   </Row>}
-                  {airingCards.length > 0 && <Row title={t("home.airing")} action={<SeeAll onClick={() => setView("airing")} />}>
+                  {airingCards.length > 0 && <Row title={t("home.airing")} halloweenIcon="bat" action={<SeeAll onClick={() => setView("airing")} />}>
                     {airingCards.map((a) => <AnimeCard key={a.id} anime={a} onSelect={select} />)}
                   </Row>}
                   <section className="mt-10 px-4 md:px-10">
