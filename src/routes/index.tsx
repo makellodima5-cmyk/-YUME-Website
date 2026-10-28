@@ -155,13 +155,46 @@ export const Route = createFileRoute("/")({
     };
   },
   validateSearch: validateCatalogSearch,
-  loader: async () => {
-    // D1 remains the durable catalog, while short-lived Shikimori feeds refresh
-    // section membership and scores without rewriting the persistent seed.
-    const [catalog, sourceFeeds] = await Promise.all([
-      getShikimoriCatalog({ data: {} }),
-      getShikimoriSectionFeeds(),
-    ]);
+  loaderDeps: ({ search }) => ({
+    section: search.section, q: search.q, page: search.page, sort: search.sort,
+    genres: search.genres, status: search.status, from: search.from, to: search.to,
+    rating: search.rating, kind: search.kind, age: search.age,
+  }),
+  loader: async ({ deps }) => {
+    const catalog = await getShikimoriCatalog({ data: {} });
+    if (deps.section === "catalog") {
+      const allItems = catalog.items;
+      const filters: CatalogFiltersValue = {
+        ...EMPTY_CATALOG_FILTERS,
+        genres: (deps.genres ?? "").split(",").filter(Boolean).slice(0, 20),
+        status: deps.status ?? EMPTY_CATALOG_FILTERS.status,
+        yearFrom: deps.from === undefined ? "" : String(deps.from),
+        yearTo: deps.to === undefined ? "" : String(deps.to),
+        minRating: deps.rating ?? 0,
+        type: deps.kind ?? EMPTY_CATALOG_FILTERS.type,
+        ageRating: deps.age ?? EMPTY_CATALOG_FILTERS.ageRating,
+      };
+      const sort = (deps.sort ?? "rating") as "rating" | "newest" | "oldest" | "title";
+      const results = filterAndSortCatalog(allItems, deps.q ?? "", filters, sort, "ru", displayGenre);
+      const pageSize = 20, pageCount = getCatalogPageCount(results.length, pageSize);
+      const page = Math.min(Math.max(1, deps.page ?? 1), pageCount);
+      const years = allItems.map(a => a.year).filter(y => Number.isFinite(y) && y > 0);
+      return {
+        anime: paginateCatalog(results, page, pageSize), popular: [],
+        sectionFeeds: { airing: [], newReleases: [], announcements: [] }, catalogIds: [],
+        catalogTotal: results.length, catalogPage: page,
+        catalogFacets: {
+          genres: Array.from(new Set(allItems.flatMap(a => a.genres))).sort((a,b)=>a.localeCompare(b,"ru")),
+          statuses: ["Онгоинг","Анонс","Вышел","Неизвестно"],
+          types: Array.from(new Set(allItems.map(a=>a.kind?.trim() || (a.episodes===1 ? "Фильм" : "TV")))).filter(Boolean).sort((a,b)=>a.localeCompare(b,"ru")),
+          ageRatings: Array.from(new Set(allItems.map(a=>a.ageRating).filter((v):v is string=>Boolean(v))),
+          yearMin: years.length ? Math.min(...years) : 1900,
+          yearMax: years.length ? Math.max(...years) : new Date().getFullYear(),
+        },
+        apiError: catalog.error, catalogProgress: catalog.progress,
+      };
+    }
+    const sourceFeeds = await getShikimoriSectionFeeds();
     const persistentItems = catalog.items;
     const catalogIds = persistentItems.map((anime) => anime.id);
     const allowedIds = new Set(catalogIds);
@@ -204,6 +237,7 @@ export const Route = createFileRoute("/")({
       catalogIds,
       apiError: catalog.error,
       catalogProgress: catalog.progress,
+      catalogTotal: refreshedItems.length, catalogPage: 1, catalogFacets: null,
     };
   },
   component: Index,
@@ -416,7 +450,7 @@ function Index() {
     sectionFeeds: initialSectionFeeds,
     catalogIds,
     apiError,
-    catalogProgress: initialCatalogProgress,
+    catalogProgress: initialCatalogProgress, catalogTotal: initialCatalogTotal, catalogPage: loadedCatalogPage, catalogFacets,
   } = Route.useLoaderData();
   const [catalogAnime, setCatalogAnime] = useState<Anime[]>(loadedAnime);
   const [popularAnime, setPopularAnime] = useState<Anime[]>(initialPopularAnime);
@@ -426,9 +460,8 @@ function Index() {
   const catalogAnimeRef = useRef(catalogAnime);
   const ANIME = catalogAnime;
 
-  useEffect(() => {
-    catalogAnimeRef.current = catalogAnime;
-  }, [catalogAnime]);
+  useEffect(() => { if (view === "catalog") { setCatalogAnime(loadedAnime); catalogAnimeRef.current = loadedAnime; setCatalogPage(loadedCatalogPage); } }, [loadedAnime, loadedCatalogPage, view]);
+  useEffect(() => { catalogAnimeRef.current = catalogAnime; }, [catalogAnime]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1550,41 +1583,16 @@ function Index() {
   };
 
 
-  const availableGenres = useMemo(
-    () => Array.from(new Set(ANIME.flatMap((anime) => anime.genres))).sort((a, b) => a.localeCompare(b, "ru")),
-    [ANIME],
-  );
-  const availableStatuses = useMemo(() => {
-    const found = new Set(ANIME.map((anime) => anime.status));
-    const order = ["Онгоинг", "Анонс", "Вышел", "Неизвестно"];
-    return Array.from(found).sort((a, b) => order.indexOf(a) - order.indexOf(b));
-  }, [ANIME]);
-  const availableTypes = useMemo(
-    () => Array.from(new Set(ANIME.map((anime) => anime.kind?.trim() || (anime.episodes === 1 ? "Фильм" : "TV"))))
-      .filter(Boolean)
-      .sort((a, b) => a.localeCompare(b, "ru")),
-    [ANIME],
-  );
-  const availableAgeRatings = useMemo(() => {
-    const order = ["Без ограничений", "12+", "16+", "18+"];
-    return Array.from(new Set(ANIME.map((anime) => anime.ageRating).filter((value): value is string => Boolean(value))))
-      .sort((a, b) => order.indexOf(a) - order.indexOf(b));
-  }, [ANIME]);
-  const catalogYearRange = useMemo(() => {
-    const years = ANIME.map((anime) => anime.year).filter((year) => Number.isFinite(year) && year > 0);
-    return {
-      min: years.length ? Math.min(...years) : 1900,
-      max: years.length ? Math.max(...years) : new Date().getFullYear(),
-    };
-  }, [ANIME]);
+  const availableGenres = useMemo(() => catalogFacets?.genres ?? Array.from(new Set(ANIME.flatMap(a => a.genres))).sort((a,b)=>a.localeCompare(b,"ru")), [ANIME,catalogFacets]);
+  const availableStatuses = useMemo(() => { if (catalogFacets) return catalogFacets.statuses; const found = new Set(ANIME.map(a=>a.status)); const order=["Онгоинг","Анонс","Вышел","Неизвестно"]; return Array.from(found).sort((a,b)=>order.indexOf(a)-order.indexOf(b)); }, [ANIME,catalogFacets]);
+  const availableTypes = useMemo(() => catalogFacets?.types ?? Array.from(new Set(ANIME.map(a=>a.kind?.trim() || (a.episodes===1 ? "Фильм":"TV")))).filter(Boolean).sort((a,b)=>a.localeCompare(b,"ru")), [ANIME,catalogFacets]);
+  const availableAgeRatings = useMemo(() => { if (catalogFacets) return catalogFacets.ageRatings; const order=["Без ограничений","12+","16+","18+"]; return Array.from(new Set(ANIME.map(a=>a.ageRating).filter((v):v is string=>Boolean(v)))).sort((a,b)=>order.indexOf(a)-order.indexOf(b)); }, [ANIME,catalogFacets]);
+  const catalogYearRange = useMemo(() => { if (catalogFacets) return {min:catalogFacets.yearMin,max:catalogFacets.yearMax}; const years=ANIME.map(a=>a.year).filter(y=>Number.isFinite(y)&&y>0); return {min:years.length?Math.min(...years):1900,max:years.length?Math.max(...years):new Date().getFullYear()}; }, [ANIME,catalogFacets]);
   const searchText = view === "catalog" ? catalogQuery.trim() : view === "home" ? submittedQuery.trim() : "";
-  const catalogResults = useMemo(
-    () => filterAndSortCatalog(ANIME, searchText, activeFilters, sortBy, language, displayGenre),
-    [ANIME, searchText, activeFilters, sortBy, language],
-  );
+  const catalogResults = useMemo(() => view === "catalog" ? ANIME : filterAndSortCatalog(ANIME, searchText, activeFilters, sortBy, language, displayGenre), [ANIME,searchText,activeFilters,sortBy,language,view]);
   const catalogPageSize = 20;
-  const totalCatalogPages = getCatalogPageCount(catalogResults.length, catalogPageSize);
-  const visibleCatalogResults = paginateCatalog(catalogResults, catalogPage, catalogPageSize);
+  const totalCatalogPages = getCatalogPageCount(view === "catalog" ? initialCatalogTotal : catalogResults.length, catalogPageSize);
+  const visibleCatalogResults = view === "catalog" ? catalogResults : paginateCatalog(catalogResults, catalogPage, catalogPageSize);
   const activeFilterCount = activeFilters.genres.length +
     Number(activeFilters.status !== "Любой") + Number(activeFilters.yearFrom !== "") +
     Number(activeFilters.yearTo !== "") + Number(activeFilters.minRating > 0) +
