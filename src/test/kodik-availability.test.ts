@@ -25,7 +25,7 @@ describe("Kodik availability parsing", () => {
       results: [{
         title: "Unsafe",
         episodes: {
-          "1": "http://kodik.info/serial/1",
+          "1": "http://attacker.example/serial/1",
           "2": "https://kodik.info.attacker.example/serial/2",
           "0": "https://kodik.info/serial/0",
           "bad": "https://kodik.info/serial/bad",
