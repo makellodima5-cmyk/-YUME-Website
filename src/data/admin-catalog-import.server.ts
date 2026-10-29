@@ -1258,7 +1258,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
           await invalidatePersistentCatalogCache();
         }
         const after = await snapshot(db);
-        await audit(db,"catalog.import.page","success",{page:before.cursor,statusFilter:before.statusFilter || null,added:after.added-before.added,skipped:after.skipped-before.skipped,incomplete:after.incomplete-before.incomplete,bannersResolved:importedBannersByCatalogId.size,bannersMatched:importedBannerLookup.matched,bannerErrors:importedBannerLookup.failedBatches,sourceRowsWithoutMalId:candidateSourceItems.filter(item => !normalizeAniListMalId(item.malId)).length,state:after.state});
+        await audit(db,"catalog.import.page","success",{page:before.cursor,statusFilter:before.statusFilter || null,added:after.added-before.added,skipped:after.skipped-before.skipped,incomplete:after.incomplete-before.incomplete,state:after.state});
         if (after.state !== "running") {
           await audit(db,"catalog.import.finish",after.state,{added:after.added,target:after.target,skipped:after.skipped,errors:after.errors});
         }
