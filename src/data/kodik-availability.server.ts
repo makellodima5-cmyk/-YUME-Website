@@ -1,5 +1,5 @@
 import { env as cloudflareEnv } from "cloudflare:workers";
-import { invalidatePersistentCatalogCache, setCatalogRuntimeEnvironment } from "@/data/catalog-d1.server";
+import { invalidatePersistentCatalogCache, setCatalogRuntimeEnvironment } from "./catalog-d1.server";
 
 type Environment = Record<string, unknown> & { YUME_DB?: unknown; KODIK_API_TOKEN?: string };
 type Statement = {
