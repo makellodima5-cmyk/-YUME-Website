@@ -21,6 +21,8 @@ const CSP_REPORT_ONLY = [
   "media-src 'self' blob: data: https:",
   "worker-src 'self' blob:",
   "manifest-src 'self'",
+  "report-uri /api/csp-report",
+  "report-to csp-endpoint",
 ].join("; ");
 
 export function applySecurityHeaders(response: Response, requestUrl: string): Response {
@@ -42,6 +44,9 @@ export function applySecurityHeaders(response: Response, requestUrl: string): Re
     !headers.has("Content-Security-Policy-Report-Only")
   ) {
     headers.set("Content-Security-Policy-Report-Only", CSP_REPORT_ONLY);
+    if (!headers.has("Reporting-Endpoints")) {
+      headers.set("Reporting-Endpoints", 'csp-endpoint="/api/csp-report"');
+    }
   }
 
   try {
