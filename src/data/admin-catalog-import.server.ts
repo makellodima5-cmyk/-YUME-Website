@@ -441,8 +441,6 @@ async function catalogRefreshStats(db: Database) {
     `).first<{savedScreenshotUrls:number|null;screenshotDone:number|null;screenshotRetry:number|null;screenshotFailed:number|null}>(),
     db.prepare(`
       SELECT
-        SUM(CASE WHEN banner_url LIKE 'https://s4.anilist.co/%' THEN 1 ELSE 0 END) AS anilistBanners,
-        SUM(CASE WHEN banner_url IS NULL OR TRIM(COALESCE(banner_url,'')) = '' OR banner_url NOT LIKE 'https://s4.anilist.co/%' THEN 1 ELSE 0 END) AS missingAniListBanners
       FROM anime_catalog
     `).first<{anilistBanners:number|null;missingAniListBanners:number|null}>(),
   ]);
@@ -562,7 +560,6 @@ async function snapshot(db: Database) {
 async function runCatalogMetadataRefreshStep(db: Database): Promise<Response> {
     let state = await getMeta(db, "metadata_refresh_state") ?? "metadata";
     if (state === "done") {
-      const bannerCountRow = await db.prepare("SELECT COUNT(*) AS count FROM anime_catalog WHERE banner_url LIKE 'https://s4.anilist.co/%'").first<{count:number}>();
       await db.batch([
         setMeta(db, "metadata_refresh_state", "metadata"),
         setMeta(db, "metadata_refresh_cursor", "0"),
@@ -615,7 +612,6 @@ async function runCatalogMetadataRefreshStep(db: Database): Promise<Response> {
 
       // Refresh missing/non-AniList banners by resolving each Shikimori ID to its real MAL ID first.
       // AniList's idMal is a MyAnimeList ID, not the Shikimori catalogue ID stored in D1.
-      const bannerRows = catalogPage.results.filter(row => !row.banner_url?.startsWith("https://s4.anilist.co/"));
       const ids = catalogPage.results.filter(isCatalogMetadataIncomplete).map(row => row.id);
       const sourceIdsToFetch = normalizeAdminCatalogIds([...bannerRows.map(row => row.id), ...ids]);
       // Reuse this Shikimori lookup both for MAL-ID mapping and any metadata backfill in this step.
@@ -655,7 +651,6 @@ async function runCatalogMetadataRefreshStep(db: Database): Promise<Response> {
       for (const row of bannerRows) {
         const bannerUrl = anilistBannersByCatalogId.get(row.id);
         if (!bannerUrl || bannerUrl === row.banner_url) continue;
-        if (!row.banner_url?.startsWith("https://s4.anilist.co/")) bannersAdded++;
         bannerUpdates.push(db.prepare("UPDATE anime_catalog SET banner_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(bannerUrl, row.id));
         row.banner_url = bannerUrl;
         bannersSaved++;
@@ -1192,7 +1187,6 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
           setMeta(db, "metadata_refresh_banners_saved", "0"),
           setMeta(db, "metadata_refresh_banners_added", "0"),
           setMeta(db, "metadata_refresh_banner_errors", "0"),
-          setMeta(db, "metadata_refresh_banners_stored", String((await db.prepare("SELECT COUNT(*) AS count FROM anime_catalog WHERE banner_url LIKE 'https://s4.anilist.co/%'").first<{count:number}>())?.count ?? 0)),
           db.prepare("UPDATE anime_catalog_screenshot_status SET status='retry',attempts=0,last_error=NULL,updated_at=CURRENT_TIMESTAMP WHERE anime_id IN (SELECT a.id FROM anime_catalog a WHERE NOT EXISTS (SELECT 1 FROM anime_catalog_screenshots s WHERE s.anime_id=a.id AND s.original_url NOT LIKE '%example.com%' AND s.preview_url NOT LIKE '%example.com%'))"),
           db.prepare("INSERT INTO anime_catalog_screenshot_status (anime_id,status,attempts,last_error,updated_at) SELECT a.id,'retry',0,NULL,CURRENT_TIMESTAMP FROM anime_catalog a WHERE NOT EXISTS (SELECT 1 FROM anime_catalog_screenshots s WHERE s.anime_id=a.id AND s.original_url NOT LIKE '%example.com%' AND s.preview_url NOT LIKE '%example.com%') ON CONFLICT(anime_id) DO UPDATE SET status='retry',attempts=0,last_error=NULL,updated_at=CURRENT_TIMESTAMP"),
         ]);
