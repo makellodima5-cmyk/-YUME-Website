@@ -21,6 +21,14 @@
         "limit": 600,
         "period": 60
       }
+    },
+    {
+      "name": "CSP_REPORT_RATE_LIMITER",
+      "namespace_id": "202610273",
+      "simple": {
+        "limit": 30,
+        "period": 60
+      }
     }
   ],
   "observability": {
