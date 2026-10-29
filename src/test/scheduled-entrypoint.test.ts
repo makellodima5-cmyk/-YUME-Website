@@ -15,7 +15,7 @@ describe("automatic Worker maintenance", () => {
     expect(viteConfig).not.toContain("catalog-refresh.ts");
     expect(wranglerConfig).not.toContain('"crons"');
     expect(workflow).toContain("Automatic scheduled Worker jobs must remain disabled.");
-    expect(workflow).toContain("Generated Worker entry must not register a scheduled callback.");
+    expect(workflow).toContain("Generated Worker entry still includes scheduled job");
     expect(catalogImporter).toContain('body.action === "refresh_section_metadata"');
     expect(catalogImporter).toContain('body.statusFilter === "ongoing" || body.statusFilter === "announcements"');
     expect(catalogImporter).toContain("UPDATE anime_catalog SET status=?, episodes=CASE WHEN ?>0 THEN ? ELSE episodes END, next_episode_at=?");
