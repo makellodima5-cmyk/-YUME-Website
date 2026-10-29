@@ -10,6 +10,9 @@ export function TelegramSubscriptionGate({ children }: { children: ReactNode }) 
   const [checking, setChecking] = useState(false);
   const webApp = getTelegramWebApp();
   const initData = webApp?.initData ?? "";
+  // Telegram injects the WebApp bridge script on ordinary pages too. An empty initData
+  // plus an unknown/missing platform is a regular browser, not an authenticated Mini App.
+  const isTelegramMiniApp = Boolean(webApp && (initData || (webApp.platform && webApp.platform !== "unknown")));
 
   const checkSubscription = useCallback(async () => {
     if (!initData) {
@@ -39,7 +42,7 @@ export function TelegramSubscriptionGate({ children }: { children: ReactNode }) 
   }, [initData]);
 
   useEffect(() => {
-    if (!webApp) {
+    if (!isTelegramMiniApp) {
       setStatus("subscribed");
       return;
     }
@@ -48,9 +51,9 @@ export function TelegramSubscriptionGate({ children }: { children: ReactNode }) 
       return;
     }
     void checkSubscription();
-  }, [webApp, initData, checkSubscription]);
+  }, [isTelegramMiniApp, initData, checkSubscription]);
 
-  if (!webApp || status === "subscribed") return <>{children}</>;
+  if (!isTelegramMiniApp || status === "subscribed") return <>{children}</>;
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-background px-5 py-10 text-foreground">
