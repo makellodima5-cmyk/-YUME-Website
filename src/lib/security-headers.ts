@@ -26,6 +26,8 @@ const CSP_REPORT_ONLY = [
 export function applySecurityHeaders(response: Response, requestUrl: string): Response {
   const headers = new Headers(response.headers);
   if (!headers.has("X-Content-Type-Options")) headers.set("X-Content-Type-Options", "nosniff");
+  if (!headers.has("X-Permitted-Cross-Domain-Policies")) headers.set("X-Permitted-Cross-Domain-Policies", "none");
+  if (!headers.has("X-DNS-Prefetch-Control")) headers.set("X-DNS-Prefetch-Control", "off");
   if (!headers.has("Referrer-Policy")) headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
   if (!headers.has("X-Frame-Options")) headers.set("X-Frame-Options", "SAMEORIGIN");
   if (!headers.has("Permissions-Policy")) {
