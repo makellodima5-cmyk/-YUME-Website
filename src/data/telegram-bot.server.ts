@@ -283,21 +283,43 @@ export async function handleTelegramWebhook(request: Request): Promise<Response>
       : "Не удалось завершить авторизацию. Вернись на сайт YUME и попробуй ещё раз.";
   }
 
+  let subscriptionGate: "first" | "return" | null = null;
+  let telegramUserId: number | null = null;
+  let subscriptionDbInstance: TelegramDb | null = null;
+  if (isStartCommand && !browserLogin && typeof message?.from?.id === "number") {
+    telegramUserId = message.from.id;
+    subscriptionDbInstance = subscriptionDb(env);
+    const state = await getSubscriptionState(subscriptionDbInstance, telegramUserId);
+    const subscribed = await isChannelMember(token, env, telegramUserId);
+    if (subscribed === null) {
+      greeting = "Не удалось проверить подписку прямо сейчас. Попробуй ещё раз через минуту, отправив /start.";
+    } else if (!subscribed) {
+      subscriptionGate = state?.had_access ? "return" : "first";
+      greeting = subscriptionGate === "return" ? RETURN_GATE_MESSAGE : FIRST_GATE_MESSAGE;
+    }
+  }
+
   try {
     const response = await telegramApi(token, "sendMessage", {
       chat_id: chatId, text: greeting, parse_mode: "HTML",
       reply_markup: browserLogin
         ? { inline_keyboard: [[{ text: "🌸 Открыть YUME", url: SITE_URL }]] }
-        : { inline_keyboard: [
-            [{ text: "🎬 Открыть YUME", web_app: { url: SITE_URL } }],
-            [{ text: "🛠 Не работает плеер?", callback_data: PLAYER_HELP_CALLBACK }],
-          ] },
+        : subscriptionGate
+          ? gateKeyboard()
+          : welcomeKeyboard(),
     });
     if (!response.ok) {
       console.error("[YUME][TELEGRAM_BOT] Telegram sendMessage failed.", {
         status: response.status, response: (await response.text()).slice(0, 500),
       });
       return json({ ok: false, error: "Could not send welcome message" }, 502);
+    }
+    if (telegramUserId !== null && !browserLogin) {
+      const payload = await response.json() as { result?: { message_id?: number } };
+      const messageId = typeof payload.result?.message_id === "number" ? payload.result.message_id : null;
+      const previous = await getSubscriptionState(subscriptionDbInstance, telegramUserId);
+      const subscribed = subscriptionGate === null;
+      await saveSubscriptionState(subscriptionDbInstance, telegramUserId, chatId, messageId, subscribed || Boolean(previous?.had_access), subscriptionGate === "return");
     }
     return json({ ok: true });
   } catch (error) {
