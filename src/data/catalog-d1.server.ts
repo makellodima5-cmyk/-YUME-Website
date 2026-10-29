@@ -553,8 +553,7 @@ export async function getPersistentCatalog(
 
       imported = await countRows(db);
       const nextCursor = cursor + 1;
-      const maxRequests = 20 + (500 - 11 + 1);
-      const nextState = nextCursor >= maxRequests ? "ready" : "seeding";
+      const nextState = "seeding";
 
       await db.batch([
         putMeta(db, "catalog_cursor", String(nextCursor)),
