@@ -313,20 +313,35 @@ export async function handleTelegramWebhook(request: Request): Promise<Response>
         return json({ ok: true, action: "subscription_left" });
       }
       if (!state.awaiting_resubscribe) return json({ ok: true, ignored: true });
-      const response = await telegramApi(token, "editMessageText", {
-        chat_id: Number(state.chat_id), message_id: state.message_id,
-        text: RESTORED_MESSAGE, reply_markup: welcomeKeyboard(),
+      // Send a fresh restored-access message, then remove the stale subscription gate.
+      // Sending first avoids leaving the user with no message if Telegram rejects the send.
+      const response = await telegramApi(token, "sendMessage", {
+        chat_id: Number(state.chat_id),
+        text: RESTORED_MESSAGE,
+        reply_markup: welcomeKeyboard(),
       });
       if (!response.ok) {
         const responseText = (await response.text()).slice(0, 500);
-        if (!responseText.toLowerCase().includes("message is not modified")) {
-          console.error("[YUME][TELEGRAM_BOT] Telegram restored-access message edit failed.", {
-            status: response.status, response: responseText,
-          });
-          return json({ ok: false, error: "Could not update restored access message" }, response.status >= 500 ? 502 : 200);
-        }
+        console.error("[YUME][TELEGRAM_BOT] Telegram restored-access message send failed.", {
+          status: response.status, response: responseText,
+        });
+        return json({ ok: false, error: "Could not send restored access message" }, response.status >= 500 ? 502 : 200);
       }
-      await saveSubscriptionState(db, userId, Number(state.chat_id), state.message_id, true, false);
+      const sent = await response.json() as { ok?: boolean; result?: { message_id?: number } };
+      const restoredMessageId = sent.result?.message_id;
+      if (typeof restoredMessageId !== "number" || !Number.isSafeInteger(restoredMessageId)) {
+        console.error("[YUME][TELEGRAM_BOT] Telegram restored-access response had no message_id.");
+        return json({ ok: false, error: "Restored access message ID missing" }, 502);
+      }
+      const deleteResponse = await telegramApi(token, "deleteMessage", {
+        chat_id: Number(state.chat_id), message_id: state.message_id,
+      });
+      if (!deleteResponse.ok) {
+        console.warn("[YUME][TELEGRAM_BOT] Could not delete the previous subscription gate.", {
+          status: deleteResponse.status, response: (await deleteResponse.text()).slice(0, 500),
+        });
+      }
+      await saveSubscriptionState(db, userId, Number(state.chat_id), restoredMessageId, true, false);
       return json({ ok: true, action: "subscription_restored" });
     } catch (error) {
       console.error("[YUME][TELEGRAM_BOT] Membership update failed.", error);
