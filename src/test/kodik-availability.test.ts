@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { parseKodikAvailability } from "@/data/kodik-availability.server";
 
 describe("Kodik availability parsing", () => {
-  it("recognizes valid episodes in a season map without merging season identities", () => {
+  it("checks the selected season for this exact Shikimori ID without merging seasons", () => {
     expect(parseKodikAvailability({
       results: [{
         translation: { id: 7, title: "Voice A" },
@@ -11,7 +11,7 @@ describe("Kodik availability parsing", () => {
           "2": { episodes: { "1": { link: "https://kodikres.com/serial/second" }, "2": "https://kodik.info/serial/third" } },
         },
       }],
-    })).toEqual({ hasEpisodes: true, episodeCount: 3 });
+    })).toEqual({ hasEpisodes: true, episodeCount: 1 });
   });
 
   it("treats a valid empty search response as no episodes", () => {
