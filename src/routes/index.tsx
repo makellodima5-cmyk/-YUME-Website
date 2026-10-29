@@ -213,9 +213,14 @@ export const Route = createFileRoute("/")({
       .slice(0, 50);
 
     const sectionFeeds = {
-      airing: refreshedItems
-        .filter((anime) => isEligibleAiringAnime(anime))
-        .sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? "") || b.year - a.year),
+      // Use the live Shikimori airing feed as the source of truth for membership.
+      // Filtering the persistent catalogue by status alone can retain stale "Онгоинг"
+      // records when a title has finished and no longer appears in the current feed.
+      airing: sourceFeeds
+        ? selectLiveCatalogItems(refreshedItems, sourceFeeds.airing)
+            .filter((anime) => isEligibleAiringAnime(anime))
+            .sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? "") || b.year - a.year)
+        : [],
       newReleases: refreshedItems
         .filter((anime) => isNewRelease(anime))
         .sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? "") || (b.rating ?? -1) - (a.rating ?? -1)),
