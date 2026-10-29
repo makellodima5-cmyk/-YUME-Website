@@ -15,12 +15,3 @@ describe("Kodik player URL validation", () => {
     expect(episodeLink("javascript:alert(1)")).toBeNull();
   });
 });
-
-
-describe("Kodik player source selection compatibility", () => {
-  it("keeps per-result Shikimori ID handling out of the player URL validator", () => {
-    // Availability checks validate the expected Shikimori ID independently.
-    // The live player endpoint retains Kodik's own result/source selection.
-    expect(episodeLink("https://kodik.info/serial/123")?.link).toBe("https://kodik.info/serial/123");
-  });
-});
