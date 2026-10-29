@@ -557,7 +557,7 @@ const PRIORITY_SEED_REQUESTS: ShikimoriRequest[] = [
   ...Array.from({ length: 2 }, (_, index) => ({ page: index + 1, limit: 50, order: "popularity" as const, status: "anons" as const })),
 ];
 
-function seedRequestForCursor(cursor: number): ShikimoriRequest | null {
+export function seedRequestForCursor(cursor: number): ShikimoriRequest | null {
   if (cursor < 0) return null;
   if (cursor < PRIORITY_SEED_REQUESTS.length) return PRIORITY_SEED_REQUESTS[cursor]!;
   return {
