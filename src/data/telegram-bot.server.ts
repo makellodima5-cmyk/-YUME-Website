@@ -4,6 +4,8 @@ import { completeTelegramBrowserAuth, confirmTelegramBrowserAuth } from "@/data/
 type TelegramEnvironment = Record<string, unknown> & {
   TELEGRAM_BOT_TOKEN?: string;
   TELEGRAM_WEBHOOK_SECRET?: string;
+  TELEGRAM_CHANNEL_ID?: string;
+  YUME_DB?: unknown;
 };
 type TelegramUser = {
   id?: number;
@@ -14,6 +16,7 @@ type TelegramUser = {
 };
 type TelegramUpdate = {
   message?: { text?: string; chat?: { id?: number }; from?: TelegramUser };
+  chat_member?: { chat?: { id?: number }; from?: TelegramUser; old_chat_member?: { status?: string }; new_chat_member?: { status?: string; user?: TelegramUser } };
   callback_query?: {
     id?: string;
     data?: string;
@@ -25,6 +28,11 @@ type RuntimeGlobal = typeof globalThis & { __YUME_RUNTIME_ENV__?: unknown };
 
 const SITE_URL = "https://yume-website.yumesupport833.workers.dev";
 const PLAYER_HELP_CALLBACK = "yume_player_help";
+const CHECK_SUBSCRIPTION_CALLBACK = "yume_check_subscription";
+const CHANNEL_URL = "https://t.me/yumeanime_news";
+const FIRST_GATE_MESSAGE = "👀 Кажется, ты на шаг от входа в YUME!\n\nОсталось только подписаться на наш канал. Не переживай, это не квест на 100 серий 😏 Зато будешь в курсе новостей и обновлений проекта.\n\nПодписывайся и заходи! 💜";
+const RETURN_GATE_MESSAGE = "👀 Опа, кажется, ты немного поторопился с выходом из нашего канала!\n\nБез подписки доступ к YUME закрывается 😢 Но не переживай, никто не отбирает у тебя любимое аниме навсегда.\n\nВозвращайся в канал, подписывайся, и мы снова откроем тебе двери! 💜\n\nА то как же мы без тебя? 😏";
+const RESTORED_MESSAGE = "👀 О, явился! Решил, что без YUME жизнь слишком скучная?\n\n🔓 Доступ восстановлен! Возвращайся к аниме, пока мы не добавили тебе арку возвращения 🍿💜";
 const PLAYER_HELP_MESSAGE = `<b>🛠 Не работает плеер?</b>
 
 Если у тебя не открывается плеер или мини-приложение, попробуй следующие шаги:
@@ -70,6 +78,53 @@ async function telegramApi(token: string, method: string, payload: Record<string
   });
 }
 
+type SubscriptionState = { telegram_user_id: string; chat_id: string; message_id: number | null; had_access: number; awaiting_resubscribe: number };
+type TelegramDb = { prepare(sql: string): { bind(...values: unknown[]): { first<T = Record<string, unknown>>(): Promise<T | null>; run(): Promise<unknown> } } };
+
+function subscriptionDb(env: TelegramEnvironment): TelegramDb | null {
+  return env.YUME_DB && typeof env.YUME_DB === "object" ? env.YUME_DB as TelegramDb : null;
+}
+
+async function getSubscriptionState(db: TelegramDb | null, userId: number): Promise<SubscriptionState | null> {
+  if (!db) return null;
+  await db.prepare("CREATE TABLE IF NOT EXISTS yume_telegram_subscription_state (telegram_user_id TEXT PRIMARY KEY, chat_id TEXT NOT NULL, message_id INTEGER, had_access INTEGER NOT NULL DEFAULT 0, awaiting_resubscribe INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)").bind().run();
+  return db.prepare("SELECT telegram_user_id, chat_id, message_id, had_access, awaiting_resubscribe FROM yume_telegram_subscription_state WHERE telegram_user_id = ?").bind(String(userId)).first<SubscriptionState>();
+}
+
+async function saveSubscriptionState(db: TelegramDb | null, userId: number, chatId: number, messageId: number | null, hadAccess: boolean, awaiting: boolean): Promise<void> {
+  if (!db) return;
+  await db.prepare("CREATE TABLE IF NOT EXISTS yume_telegram_subscription_state (telegram_user_id TEXT PRIMARY KEY, chat_id TEXT NOT NULL, message_id INTEGER, had_access INTEGER NOT NULL DEFAULT 0, awaiting_resubscribe INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)").bind().run();
+  await db.prepare("INSERT INTO yume_telegram_subscription_state (telegram_user_id, chat_id, message_id, had_access, awaiting_resubscribe, updated_at) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP) ON CONFLICT(telegram_user_id) DO UPDATE SET chat_id = excluded.chat_id, message_id = excluded.message_id, had_access = excluded.had_access, awaiting_resubscribe = excluded.awaiting_resubscribe, updated_at = CURRENT_TIMESTAMP")
+    .bind(String(userId), String(chatId), messageId, hadAccess ? 1 : 0, awaiting ? 1 : 0).run();
+}
+
+async function isChannelMember(token: string, env: TelegramEnvironment, userId: number): Promise<boolean | null> {
+  const channelId = typeof env.TELEGRAM_CHANNEL_ID === "string" && env.TELEGRAM_CHANNEL_ID.trim() ? env.TELEGRAM_CHANNEL_ID.trim() : "@yumeanime_news";
+  try {
+    const response = await telegramApi(token, "getChatMember", { chat_id: channelId, user_id: userId });
+    const payload = await response.json() as { ok?: boolean; result?: { status?: string; is_member?: boolean } };
+    if (!response.ok || payload.ok !== true || !payload.result?.status) return null;
+    return ["creator", "administrator", "member"].includes(payload.result.status) ||
+      (payload.result.status === "restricted" && payload.result.is_member === true);
+  } catch {
+    return null;
+  }
+}
+
+function gateKeyboard(): Record<string, unknown> {
+  return { inline_keyboard: [
+    [{ text: "😏 Ладно, подписываюсь", url: CHANNEL_URL }],
+    [{ text: "🔎 Проверить подписку", callback_data: CHECK_SUBSCRIPTION_CALLBACK }],
+  ] };
+}
+
+function welcomeKeyboard(): Record<string, unknown> {
+  return { inline_keyboard: [
+    [{ text: "🎬 Открыть YUME", web_app: { url: SITE_URL } }],
+    [{ text: "🛠 Не работает плеер?", callback_data: PLAYER_HELP_CALLBACK }],
+  ] };
+}
+
 export async function handleTelegramWebhook(request: Request): Promise<Response> {
   if (request.method !== "POST") return json({ ok: false, error: "Method not allowed" }, 405);
 
@@ -98,7 +153,7 @@ export async function handleTelegramWebhook(request: Request): Promise<Response>
 
   const callback = update.callback_query;
   if (callback) {
-    if (callback.data !== PLAYER_HELP_CALLBACK || typeof callback.id !== "string" ||
+    if ((callback.data !== PLAYER_HELP_CALLBACK && callback.data !== CHECK_SUBSCRIPTION_CALLBACK) || typeof callback.id !== "string" ||
       typeof callback.message?.message_id !== "number" || !Number.isSafeInteger(callback.message.message_id) ||
       typeof callback.message.chat?.id !== "number" || !Number.isSafeInteger(callback.message.chat.id)) {
       return json({ ok: true, ignored: true });
@@ -106,6 +161,35 @@ export async function handleTelegramWebhook(request: Request): Promise<Response>
     try {
       const answer = await telegramApi(token, "answerCallbackQuery", { callback_query_id: callback.id });
       if (!answer.ok) console.error("[YUME][TELEGRAM_BOT] Telegram answerCallbackQuery failed.", { status: answer.status });
+      const callbackUserId = callback.from?.id;
+      if (typeof callbackUserId !== "number" || !Number.isSafeInteger(callbackUserId)) return json({ ok: true, ignored: true });
+      const db = subscriptionDb(env);
+      const state = await getSubscriptionState(db, callbackUserId);
+      const subscribed = await isChannelMember(token, env, callbackUserId);
+      if (subscribed === null) {
+        await telegramApi(token, "answerCallbackQuery", { callback_query_id: callback.id, text: "Не удалось проверить подписку. Попробуй ещё раз.", show_alert: true });
+        return json({ ok: true, action: "subscription_check_failed" });
+      }
+      if (!subscribed) {
+        const gateText = state?.had_access ? RETURN_GATE_MESSAGE : FIRST_GATE_MESSAGE;
+        const gateResponse = await telegramApi(token, "editMessageText", {
+          chat_id: callback.message.chat.id, message_id: callback.message.message_id,
+          text: gateText, reply_markup: gateKeyboard(),
+        });
+        if (!gateResponse.ok) return json({ ok: false, error: "Could not update subscription gate" }, 502);
+        await saveSubscriptionState(db, callbackUserId, callback.message.chat.id, callback.message.message_id, Boolean(state?.had_access), Boolean(state?.had_access));
+        return json({ ok: true, action: "subscription_required" });
+      }
+      if (callback.data === CHECK_SUBSCRIPTION_CALLBACK) {
+        const response = await telegramApi(token, "editMessageText", {
+          chat_id: callback.message.chat.id, message_id: callback.message.message_id,
+          text: "🌙 Подписка подтверждена! Добро пожаловать в YUME.\n\nНажимай на кнопку ниже — и давай начнём ✨",
+          reply_markup: welcomeKeyboard(),
+        });
+        if (!response.ok) return json({ ok: false, error: "Could not update welcome message" }, 502);
+        await saveSubscriptionState(db, callbackUserId, callback.message.chat.id, callback.message.message_id, true, false);
+        return json({ ok: true, action: "subscription_confirmed" });
+      }
       const response = await telegramApi(token, "editMessageText", {
         chat_id: callback.message.chat.id,
         message_id: callback.message.message_id,
@@ -125,6 +209,34 @@ export async function handleTelegramWebhook(request: Request): Promise<Response>
         message: error instanceof Error ? error.message : String(error),
       });
       return json({ ok: false, error: "Telegram API request failed" }, 502);
+    }
+  }
+
+
+  if (update.chat_member) {
+    const event = update.chat_member;
+    const userId = event.new_chat_member?.user?.id;
+    if (typeof userId !== "number" || !Number.isSafeInteger(userId)) return json({ ok: true, ignored: true });
+    const oldStatus = event.old_chat_member?.status;
+    const newStatus = event.new_chat_member?.status;
+    const nowMember = ["creator", "administrator", "member"].includes(newStatus ?? "") ||
+      (newStatus === "restricted" && (event.new_chat_member as { is_member?: boolean }).is_member === true);
+    const wasMember = ["creator", "administrator", "member"].includes(oldStatus ?? "");
+    if (!nowMember || wasMember) return json({ ok: true, ignored: true });
+    try {
+      const db = subscriptionDb(env);
+      const state = await getSubscriptionState(db, userId);
+      if (!state?.awaiting_resubscribe || !state.message_id) return json({ ok: true, ignored: true });
+      const response = await telegramApi(token, "editMessageText", {
+        chat_id: Number(state.chat_id), message_id: state.message_id,
+        text: RESTORED_MESSAGE, reply_markup: welcomeKeyboard(),
+      });
+      if (!response.ok) return json({ ok: false, error: "Could not update restored access message" }, 502);
+      await saveSubscriptionState(db, userId, Number(state.chat_id), state.message_id, true, false);
+      return json({ ok: true, action: "subscription_restored" });
+    } catch (error) {
+      console.error("[YUME][TELEGRAM_BOT] Membership update failed.", error);
+      return json({ ok: false, error: "Membership update failed" }, 502);
     }
   }
 
@@ -199,21 +311,44 @@ export async function handleTelegramWebhook(request: Request): Promise<Response>
       : "Не удалось завершить авторизацию. Вернись на сайт YUME и попробуй ещё раз.";
   }
 
+  let subscriptionGate: "first" | "return" | null = null;
+  let telegramUserId: number | null = null;
+  let subscriptionDbInstance: TelegramDb | null = null;
+  if (isStartCommand && !browserLogin && typeof message?.from?.id === "number") {
+    telegramUserId = message.from.id;
+    subscriptionDbInstance = subscriptionDb(env);
+    const state = await getSubscriptionState(subscriptionDbInstance, telegramUserId);
+    const subscribed = await isChannelMember(token, env, telegramUserId);
+    if (subscribed === null) {
+      subscriptionGate = "error";
+      greeting = "Не удалось проверить подписку прямо сейчас. Попробуй ещё раз через минуту, отправив /start.";
+    } else if (!subscribed) {
+      subscriptionGate = state?.had_access ? "return" : "first";
+      greeting = subscriptionGate === "return" ? RETURN_GATE_MESSAGE : FIRST_GATE_MESSAGE;
+    }
+  }
+
   try {
     const response = await telegramApi(token, "sendMessage", {
       chat_id: chatId, text: greeting, parse_mode: "HTML",
       reply_markup: browserLogin
         ? { inline_keyboard: [[{ text: "🌸 Открыть YUME", url: SITE_URL }]] }
-        : { inline_keyboard: [
-            [{ text: "🎬 Открыть YUME", web_app: { url: SITE_URL } }],
-            [{ text: "🛠 Не работает плеер?", callback_data: PLAYER_HELP_CALLBACK }],
-          ] },
+        : subscriptionGate
+          ? gateKeyboard()
+          : welcomeKeyboard(),
     });
     if (!response.ok) {
       console.error("[YUME][TELEGRAM_BOT] Telegram sendMessage failed.", {
         status: response.status, response: (await response.text()).slice(0, 500),
       });
       return json({ ok: false, error: "Could not send welcome message" }, 502);
+    }
+    if (telegramUserId !== null && !browserLogin) {
+      const payload = await response.json() as { result?: { message_id?: number } };
+      const messageId = typeof payload.result?.message_id === "number" ? payload.result.message_id : null;
+      const previous = await getSubscriptionState(subscriptionDbInstance, telegramUserId);
+      const subscribed = subscriptionGate === null;
+      await saveSubscriptionState(subscriptionDbInstance, telegramUserId, chatId, messageId, subscribed || Boolean(previous?.had_access), subscriptionGate === "return");
     }
     return json({ ok: true });
   } catch (error) {
