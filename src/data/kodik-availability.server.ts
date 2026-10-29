@@ -43,7 +43,9 @@ function validPlayerLink(value: EpisodeValue | null | undefined): string | null 
   try {
     const url = new URL(raw.startsWith("//") ? "https:" + raw : raw);
     const hostname = url.hostname.toLowerCase().replace(/\.$/, "");
-    if (url.protocol !== "https:" || !PLAYER_HOSTS.some(host => hostname === host || hostname.endsWith("." + host))) return null;
+    if (!PLAYER_HOSTS.some(host => hostname === host || hostname.endsWith("." + host))) return null;
+    if (url.protocol === "http:") url.protocol = "https:";
+    if (url.protocol !== "https:") return null;
     return url.toString();
   } catch {
     return null;
