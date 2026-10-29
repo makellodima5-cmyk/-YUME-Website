@@ -100,8 +100,15 @@ async function handleKodik(request: Request): Promise<Response> {
     return json({ error: "Kodik API returned invalid JSON." }, 502);
   }
 
+  if (typeof payload.error === "string" && payload.error.trim()) {
+    return json({ error: "Kodik API returned an error." }, 502);
+  }
+  if (!Array.isArray(payload.results)) {
+    return json({ error: "Kodik API returned an invalid response." }, 502);
+  }
+
   const sources = new Map<string, { id: string; title: string; episodes: Map<number, { number: number; title: string; link: string }> }>();
-  for (const result of Array.isArray(payload.results) ? payload.results : []) {
+  for (const result of payload.results) {
     const translationId = String(result.translation?.id ?? result.id ?? "");
     const translationTitle = (result.translation?.title || result.title || "").trim();
     if (!translationId || !translationTitle) continue;
