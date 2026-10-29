@@ -66,7 +66,7 @@ function saveLocalNotificationIds(ids: string[]): boolean {
   }
 }
 
-type MetadataCatalogStats = { total:number; incomplete:number; complete:number; announced:number; missingTrailer:number; hasTrailer:number; savedScreenshotUrls:number; screenshotDone:number; screenshotRetry:number; screenshotFailed:number; anilistBanners:number; missingAniListBanners:number };
+type MetadataCatalogStats = { total:number; incomplete:number; complete:number; announced:number; missingTrailer:number; hasTrailer:number; savedScreenshotUrls:number; screenshotDone:number; screenshotRetry:number; screenshotFailed:number };
 
 export const Route = createFileRoute("/")({
   head: () => {
@@ -2131,7 +2131,7 @@ function Index() {
                 </summary>
                 <div className="border-t border-border/70 p-3 sm:p-4">
                 <div className="flex flex-col gap-3">
-                  <p className="text-xs leading-relaxed text-muted-foreground">{language === "ru" ? "Дозаполняет отсутствующие метаданные и кадры из Shikimori, а широкие баннеры получает из AniList и сохраняет в D1. Уже заполненные метаданные не перезаписываются; новые записи не добавляются." : "Fills missing metadata and screenshots from Shikimori, and fetches wide banners from AniList into D1. Existing metadata is preserved; no records are added."}</p>
+                  <p className="text-xs leading-relaxed text-muted-foreground">{language === "ru" ? "Дозаполняет отсутствующие метаданные и кадры из Shikimori. Уже заполненные метаданные не перезаписываются; новые записи не добавляются." : "Fills missing metadata and screenshots from Shikimori, and fetches wide banners from AniList into D1. Existing metadata is preserved; no records are added."}</p>
                   <div className="grid grid-cols-2 gap-1.5">
                     <button type="button" onClick={resetMetadataRefresh} disabled={metadataRefreshRunning || metadataAutoBusy || adminImportRunning || adminRunning} className="col-span-2 w-full rounded-lg border border-amber-500/40 bg-amber-500/10 px-2.5 py-2 text-xs font-semibold text-amber-200 disabled:cursor-not-allowed disabled:opacity-45">{language === "ru" ? "Сбросить прогресс и начать сначала" : "Reset progress and start over"}</button>
                     <button type="button" onClick={runMetadataRefresh} disabled={metadataRefreshRunning || metadataAutoBusy || adminImportRunning || adminRunning} className="w-full rounded-lg bg-gradient-to-r from-[#AC4EFC] to-[#8736FA] px-2.5 py-2 text-xs font-semibold text-white shadow-[0_0_12px_rgba(155,65,245,0.15)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-45">{metadataRefreshRunning ? (language === "ru" ? "Выполняется вручную…" : "Manual run active…") : (language === "ru" ? "Запустить вручную" : "Run manually")}</button>
@@ -2142,7 +2142,7 @@ function Index() {
                   <div className="mt-3">
                     <div className="mb-1 flex flex-wrap justify-between gap-2 text-xs text-muted-foreground">
                       <span>{metadataRefreshProgress.phase === "metadata" ? (language === "ru" ? "Метаданные" : "Metadata") : metadataRefreshProgress.phase === "screenshots" ? (language === "ru" ? "Проверено тайтлов" : "Titles checked") : metadataRefreshProgress.phase === "screenshots_retry" ? (language === "ru" ? "Повтор кадров" : "Screenshot retries") : (language === "ru" ? "Завершено" : "Completed")}: {metadataRefreshProgress.offset} / {metadataRefreshProgress.total}</span>
-                      <span>{language === "ru" ? "Дополнено тайтлов" : "Titles enriched"}: {metadataRefreshProgress.updated} · {language === "ru" ? "Совпадений AniList" : "AniList matches"}: {metadataRefreshProgress.bannersMatched} · {language === "ru" ? "Найдено баннеров" : "Banners found"}: {metadataRefreshProgress.bannersFound} · {language === "ru" ? "Добавлено в D1" : "New banners saved"}: {metadataRefreshProgress.bannersAdded} · {language === "ru" ? "В D1 сейчас" : "Stored in D1"}: {metadataRefreshProgress.bannersStored} · {language === "ru" ? "Ошибок AniList" : "AniList errors"}: {metadataRefreshProgress.bannerErrors} · {language === "ru" ? "URL кадров" : "Screenshot URLs"}: {metadataRefreshProgress.screenshotsSaved} · {language === "ru" ? "Ошибок кадров" : "Failed shots"}: {metadataRefreshProgress.screenshotFailures} · {language === "ru" ? "Ожидают повтора" : "Waiting to retry"}: {metadataRefreshProgress.screenshotRetries}</span>
+                      <span>{language === "ru" ? "Дополнено тайтлов" : "Titles enriched"}: {metadataRefreshProgress.updated} · {language === "ru" ? "Найдено баннеров" : "Banners found"}: {metadataRefreshProgress.bannersFound} · {language === "ru" ? "Добавлено в D1" : "New banners saved"}: {metadataRefreshProgress.bannersAdded} · {language === "ru" ? "В D1 сейчас" : "Stored in D1"}: {metadataRefreshProgress.bannersStored} · {language === "ru" ? "Ошибок AniList" : "AniList errors"}: {metadataRefreshProgress.bannerErrors} · {language === "ru" ? "URL кадров" : "Screenshot URLs"}: {metadataRefreshProgress.screenshotsSaved} · {language === "ru" ? "Ошибок кадров" : "Failed shots"}: {metadataRefreshProgress.screenshotFailures} · {language === "ru" ? "Ожидают повтора" : "Waiting to retry"}: {metadataRefreshProgress.screenshotRetries}</span>
                     </div>
                     <div role="progressbar" aria-valuemin={0} aria-valuemax={metadataRefreshProgress.total} aria-valuenow={metadataRefreshProgress.offset} className="h-1.5 overflow-hidden rounded-full bg-muted">
                       <div className="h-full rounded-full bg-gradient-to-r from-[#A83BFA] to-[#D08AFF] transition-all" style={{ width: (metadataRefreshProgress.total ? Math.min(100, metadataRefreshProgress.offset / metadataRefreshProgress.total * 100) : 0) + "%" }} />
@@ -2159,9 +2159,7 @@ function Index() {
                         [language === "ru" ? "Анонсы" : "Announced", metadataCatalogStats.announced],
                         [language === "ru" ? "Без трейлера" : "Missing trailer", metadataCatalogStats.missingTrailer],
                         [language === "ru" ? "С трейлером" : "Has trailer", metadataCatalogStats.hasTrailer],
-                        [language === "ru" ? "Баннеры AniList в D1" : "AniList banners in D1", 0],
-                        [language === "ru" ? "Без баннера AniList" : "Missing AniList banner", 0],
-                        [language === "ru" ? "URL кадров" : "Screenshot URLs", metadataCatalogStats.savedScreenshotUrls],
+                                                    [language === "ru" ? "URL кадров" : "Screenshot URLs", metadataCatalogStats.savedScreenshotUrls],
                         [language === "ru" ? "Кадры проверены" : "Screenshots checked", metadataCatalogStats.screenshotDone],
                         [language === "ru" ? "Кадры: повторы" : "Screenshot retries", metadataCatalogStats.screenshotRetry],
                         [language === "ru" ? "Кадры: ошибки" : "Screenshot failures", metadataCatalogStats.screenshotFailed],
