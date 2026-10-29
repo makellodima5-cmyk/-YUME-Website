@@ -557,6 +557,10 @@ const PRIORITY_SEED_REQUESTS: ShikimoriRequest[] = [
   ...Array.from({ length: 2 }, (_, index) => ({ page: index + 1, limit: 50, order: "popularity" as const, status: "anons" as const })),
 ];
 
+export function isSuccessfulEmptySeedPage(items: readonly unknown[], error: string | null | undefined, cursor: number): boolean {
+  return !error && items.length === 0 && cursor >= PRIORITY_SEED_REQUESTS.length;
+}
+
 export function seedRequestForCursor(cursor: number): ShikimoriRequest | null {
   if (cursor < 0) return null;
   if (cursor < PRIORITY_SEED_REQUESTS.length) return PRIORITY_SEED_REQUESTS[cursor]!;
@@ -630,7 +634,7 @@ async function buildShikimoriCatalog(forceRefresh: boolean): Promise<CatalogResu
   for (const anime of page.items) {
     if (!fallbackItems.has(anime.id)) fallbackItems.set(anime.id, anime);
   }
-  if (!page.error && page.items.length === 0 && fallbackCursor >= PRIORITY_SEED_REQUESTS.length) {
+  if (isSuccessfulEmptySeedPage(page.items, page.error, fallbackCursor)) {
     const result: CatalogResult = {
       items: existingItems,
       error: null,
@@ -667,7 +671,7 @@ export const getShikimoriCatalog = createServerFn({ method: "GET" })
         if (!request) return { items: [], error: null, done: true };
         // Trailer metadata is imported with catalog rows as part of the admin-only seed.
         const page = await fetchShikimoriAnimes({ ...request, includeVideos: true });
-        return !page.error && page.items.length === 0 && cursor >= PRIORITY_SEED_REQUESTS.length
+        return isSuccessfulEmptySeedPage(page.items, page.error, cursor)
           ? { ...page, done: true }
           : page;
       },
