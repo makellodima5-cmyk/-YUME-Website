@@ -135,12 +135,6 @@ function ensureSchema(db: Database): Promise<void> {
     db.prepare("INSERT OR IGNORE INTO anime_catalog_meta (key,value) VALUES ('admin_import_errors','0')"),
     db.prepare("INSERT OR IGNORE INTO anime_catalog_meta (key,value) VALUES ('admin_import_resume_at','0')"),
     db.prepare("INSERT OR IGNORE INTO anime_catalog_meta (key,value) VALUES ('metadata_refresh_auto_enabled','0')"),
-    db.prepare("INSERT OR IGNORE INTO anime_catalog_meta (key,value) VALUES ('metadata_refresh_banners_found','0')"),
-    db.prepare("INSERT OR IGNORE INTO anime_catalog_meta (key,value) VALUES ('metadata_refresh_banners_matched','0')"),
-    db.prepare("INSERT OR IGNORE INTO anime_catalog_meta (key,value) VALUES ('metadata_refresh_banners_saved','0')"),
-    db.prepare("INSERT OR IGNORE INTO anime_catalog_meta (key,value) VALUES ('metadata_refresh_banners_added','0')"),
-    db.prepare("INSERT OR IGNORE INTO anime_catalog_meta (key,value) VALUES ('metadata_refresh_banner_errors','0')"),
-    db.prepare("INSERT OR IGNORE INTO anime_catalog_meta (key,value) VALUES ('metadata_refresh_banners_stored','0')"),
     ]);
   })().catch((error) => {
     adminImportSchemaPromises.delete(key);
@@ -499,7 +493,6 @@ async function runCatalogMetadataRefreshStep(db: Database): Promise<Response> {
         setMeta(db, "metadata_refresh_state", "metadata"),
         setMeta(db, "metadata_refresh_cursor", "0"),
         setMeta(db, "metadata_refresh_screenshot_cursor", "0"),
-        setMeta(db, "metadata_refresh_banner_errors", "0"),
         db.prepare("UPDATE anime_catalog_screenshot_status SET status='retry',attempts=0,last_error=NULL,updated_at=CURRENT_TIMESTAMP WHERE status='failed'"),
       ]);
       state = "metadata";
@@ -572,7 +565,6 @@ async function runCatalogMetadataRefreshStep(db: Database): Promise<Response> {
       await db.batch([
         setMeta(db, "metadata_refresh_cursor", String(nextOffset)),
         setMeta(db, "metadata_refresh_state", nextState),
-        setMeta(db, "metadata_refresh_banner_errors", String(bannerCounters.bannerErrors)),
         ...(nextState === "screenshots" ? [setMeta(db, "metadata_refresh_screenshot_cursor", "0")] : []),
       ]);
       if (updated > 0) await invalidatePersistentCatalogCache();
@@ -843,12 +835,6 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
             metadataOffset: Math.max(0, Number(metadataCursor ?? "0") || 0),
             screenshotOffset: Math.max(0, Number(screenshotCursor ?? "0") || 0),
             done: phase === "done",
-            bannersFoundTotal: bannerCounters.bannersFound,
-            bannersMatchedTotal: bannerCounters.bannersMatched,
-            bannersSavedTotal: bannerCounters.bannersSaved,
-            bannersAddedTotal: bannerCounters.bannersAdded,
-            bannerErrorsTotal: bannerCounters.bannerErrors,
-            bannersStored: bannerCounters.bannersStored,
             lastTickAt: await getMeta(db, "metadata_refresh_last_tick_at"),
             lastSuccessAt: await getMeta(db, "metadata_refresh_last_success_at"),
             lastError: await getMeta(db, "metadata_refresh_last_error"),
@@ -1021,7 +1007,6 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
           setMeta(db, "metadata_refresh_screenshot_cursor", "0"),
           setMeta(db, "metadata_refresh_auto_enabled", "0"),
           setMeta(db, "metadata_refresh_last_error", ""),
-          setMeta(db, "metadata_refresh_banner_errors", "0"),
           db.prepare("UPDATE anime_catalog_screenshot_status SET status='retry',attempts=0,last_error=NULL,updated_at=CURRENT_TIMESTAMP WHERE anime_id IN (SELECT a.id FROM anime_catalog a WHERE NOT EXISTS (SELECT 1 FROM anime_catalog_screenshots s WHERE s.anime_id=a.id AND s.original_url NOT LIKE '%example.com%' AND s.preview_url NOT LIKE '%example.com%'))"),
           db.prepare("INSERT INTO anime_catalog_screenshot_status (anime_id,status,attempts,last_error,updated_at) SELECT a.id,'retry',0,NULL,CURRENT_TIMESTAMP FROM anime_catalog a WHERE NOT EXISTS (SELECT 1 FROM anime_catalog_screenshots s WHERE s.anime_id=a.id AND s.original_url NOT LIKE '%example.com%' AND s.preview_url NOT LIKE '%example.com%') ON CONFLICT(anime_id) DO UPDATE SET status='retry',attempts=0,last_error=NULL,updated_at=CURRENT_TIMESTAMP"),
         ]);
