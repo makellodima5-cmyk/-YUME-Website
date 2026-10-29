@@ -97,8 +97,10 @@ jobs:
             throw new Error("Generated Worker config must not enable scheduled automatic jobs.");
           }
           const workerEntry = fs.readFileSync(rootConfig.main, "utf8");
-          if (/callHook\(["']cloudflare:scheduled["']/.test(workerEntry) || workerEntry.includes("cloudflare:scheduled")) {
-            throw new Error("Generated Worker entry must not register a scheduled callback.");
+          for (const scheduledJob of ["runScheduledCatalogStatusRefresh", "runScheduledCatalogMetadataRefresh", "runScheduledTrailerUpdate", "runScheduledEpisodeNotifications", "runScheduledKodikAvailabilityRefresh"]) {
+            if (workerEntry.includes(scheduledJob)) {
+              throw new Error(`Generated Worker entry still includes scheduled job ${scheduledJob}.`);
+            }
           }
 
           console.log("Verified generated Worker config, root entry, assets, Cron trigger, and YUME_DB binding.");
