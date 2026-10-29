@@ -885,15 +885,11 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
                         "Сайт может использовать cookie-файлы, локальное хранилище браузера и аналогичные технологии для поддержки основных функций, сохранения настроек и обеспечения безопасности.",
                         "Строго необходимые технологии могут использоваться для работы запрошенных пользователем функций. Аналитические, рекламные и иные необязательные технологии применяются только при наличии соответствующих инструментов и с учётом выбора пользователя и применимых требований.",
                         "Пользователь может ограничить или удалить cookie-файлы в настройках браузера. Это может повлиять на доступность отдельных функций или сохранение настроек.",
-                        "Пользователь может в любой момент открыть «Настройки cookie» внизу сайта или на этой странице и изменить выбор. Аналитика YUME включается только после явного выбора «Принять все»; выбор «Только необходимые» отключает необязательную аналитику. Закрытие уведомления или продолжение просмотра само по себе не считается согласием.",
-                        "Если браузер передаёт сигнал Global Privacy Control (Sec-GPC: 1), YUME не записывает новые события необязательной аналитики, даже если ранее было сохранено согласие.",
                         "Для каталожных постеров YUME использует ограниченный прокси на собственном домене, чтобы браузер не обращался к домену изображений напрямую. При иных прямых запросах к ресурсам Shikimori её защитная инфраструктура может устанавливать собственные технические cookie; их назначение, сроки действия и условия обработки контролируются сторонним поставщиком, а не YUME. Подробности следует уточнять в политиках Shikimori/DDoS-Guard."
                       ] : [
                         "The site may use cookies, browser local storage, and similar technologies to support core features, save preferences, and maintain security.",
                         "Strictly necessary technologies may be used to provide features requested by the user. Analytics, advertising, and other optional technologies are used only if actually implemented and in line with user choices and applicable requirements.",
                         "Users can restrict or delete cookies in browser settings. This may affect some features or saved preferences.",
-                        "Users can reopen Cookie settings at the bottom of the site or on this page and change their choice at any time. YUME analytics is enabled only after an explicit “Accept all” choice; “Essential only” keeps optional analytics disabled. Closing a notice or continuing to browse is not by itself treated as consent.",
-                        "When a browser sends the Global Privacy Control signal (Sec-GPC: 1), YUME does not record new optional analytics events even if a consent choice was saved previously.",
                         "YUME uses a restricted same-origin proxy for catalog posters so the browser does not contact the image host directly. Other direct requests to Shikimori resources, if any, may cause its protection infrastructure to set technical cookies; their purpose, lifetime and processing terms are controlled by the third-party provider, not YUME. Consult Shikimori/DDoS-Guard policies for details."
                       ]
                     },
@@ -975,10 +971,7 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
                   {language === "ru" ? "По вопросам конфиденциальности: " : "Privacy inquiries: "}
                   <a className="text-primary underline underline-offset-4" href="mailto:yumesupport833@gmail.com">yumesupport833@gmail.com</a>
                 </p>
-                <button type="button" onClick={() => window.dispatchEvent(new Event("yume-open-cookie-settings"))} className="inline-flex min-h-10 items-center justify-center rounded-xl border border-border px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                  {language === "ru" ? "Настройки cookie" : "Cookie settings"}
-                </button>
-              </article>
+                              </article>
             ) : null}
 
             {panel === "about" && (
