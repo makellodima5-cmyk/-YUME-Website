@@ -5,9 +5,6 @@
   "compatibility_flags": ["nodejs_compat"],
   "keep_vars": true,
   "main": ".output/server/index.mjs",
-  "triggers": {
-    "crons": ["*/5 * * * *","37 7 * * *","41 19 * * *"]
-  },
   "ratelimits": [
     {
       "name": "KODIK_RATE_LIMITER",
