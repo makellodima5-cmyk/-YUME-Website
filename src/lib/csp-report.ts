@@ -24,7 +24,19 @@ function asRecord(value: unknown): RecordValue | null {
 function firstString(record: RecordValue, ...keys: string[]): string | undefined {
   for (const key of keys) {
     const value = record[key];
-    if (typeof value === "string" && value.trim()) return value.trim().slice(0, MAX_FIELD_LENGTH);
+    if (typeof value === "string" && value.trim()) {
+      return value.trim().slice(0, MAX_FIELD_LENGTH);
+    }
+  }
+  return undefined;
+}
+
+function firstDirective(record: RecordValue, ...keys: string[]): string | undefined {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value !== "string") continue;
+    const directive = value.trim().split(/\\s+/, 1)[0]?.toLowerCase();
+    if (directive && /^[a-z][a-z0-9-]{0,63}$/.test(directive)) return directive;
   }
   return undefined;
 }
@@ -51,8 +63,16 @@ function summarizeViolation(input: unknown): ViolationSummary | null {
 
   const disposition = firstString(record, "disposition");
   const documentOrigin = safeOrigin(record["document-uri"] ?? record.documentURL ?? record.documentUrl);
-  const effectiveDirective = firstString(record, "effective-directive", "effectiveDirective");
-  const violatedDirective = firstString(record, "violated-directive", "violatedDirective");
+  const effectiveDirective = firstDirective(
+    record,
+    "effective-directive",
+    "effectiveDirective",
+  );
+  const violatedDirective = firstDirective(
+    record,
+    "violated-directive",
+    "violatedDirective",
+  );
   const blockedOrigin = safeOrigin(record["blocked-uri"] ?? record.blockedURL ?? record.blockedUrl, documentOrigin);
   const sourceOrigin = safeOrigin(record["source-file"] ?? record.sourceFile, documentOrigin);
   const statusValue = record["status-code"] ?? record.statusCode;
