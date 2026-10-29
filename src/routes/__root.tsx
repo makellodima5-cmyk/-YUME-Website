@@ -15,6 +15,7 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import { YumePreferencesProvider, useYumePreferences } from "@/data/preferences";
 import { DEFAULT_META_DESCRIPTION, SITE_NAME } from "@/data/seo";
 import { initializeTelegramMiniApp } from "@/lib/telegram-mini-app";
+import { TelegramSubscriptionGate } from "@/components/yume/TelegramSubscriptionGate";
 
 type InterfaceLanguage = "ru" | "en";
 
@@ -180,7 +181,7 @@ function RootComponent() {
       <YumePreferencesProvider>
         <DocumentLanguageSync />
         <SkipToContent />
-        <Outlet />
+        <TelegramSubscriptionGate><Outlet /></TelegramSubscriptionGate>
       </YumePreferencesProvider>
     </QueryClientProvider>
   );
