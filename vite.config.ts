@@ -12,11 +12,6 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
-  // Nitro's Cloudflare Worker entry dispatches Cron via its native scheduled hook.
-  // Register the plugin explicitly; files under /plugins are not auto-discovered here.
-  nitro: {
-    plugins: ["./plugins/catalog-refresh.ts"],
-  },
   vite: {
     // cloudflare:workers is a runtime-provided module, not an npm dependency.
     // Leave it external so Vite can build the SSR bundle and Workers can resolve it at runtime.

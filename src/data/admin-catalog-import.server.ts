@@ -1207,6 +1207,36 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
         await audit(db, "catalog.metadata.auto_stop", "success", { phase: await getMeta(db,"metadata_refresh_state") ?? "idle" });
         return json({isAdmin:true,autoEnabled:false,phase:await getMeta(db,"metadata_refresh_state") ?? "idle",message:"Автоматическое обновление остановлено. Прогресс сохранён."});
       }
+      if (body.action === "refresh_section_metadata") {
+        const section = body.statusFilter === "ongoing" || body.statusFilter === "announcements" ? body.statusFilter : null;
+        if (!section) return json({ error: "invalid_section", message: "Выбери раздел «Сейчас выходит» или «Анонсы»." }, 400);
+        const status = section === "ongoing" ? "Онгоинг" : "Анонс";
+        const rows = await db.prepare("SELECT id FROM anime_catalog WHERE status = ? ORDER BY position,id").bind(status).all<{ id: string }>();
+        const ids = rows.results.map(row => row.id);
+        if (!ids.length) return json({ isAdmin: true, section, total: 0, updated: 0, message: "В выбранном разделе нет тайтлов." });
+        let updated = 0;
+        for (let offset = 0; offset < ids.length; offset += METADATA_LOOKUP_BATCH_SIZE) {
+          const batchIds = ids.slice(offset, offset + METADATA_LOOKUP_BATCH_SIZE);
+          const source = await fetchByIds(batchIds);
+          const sourceById = new Map(source.map(item => [String(item.id), item]));
+          const statements: Statement[] = [];
+          for (const id of batchIds) {
+            const item = sourceById.get(id);
+            if (!item || !["ongoing", "anons", "released"].includes(item.status ?? "")) continue;
+            const nextStatus = item.status === "ongoing" ? "Онгоинг" : item.status === "anons" ? "Анонс" : "Вышел";
+            const episodes = Math.max(0, Math.floor(Number(item.episodes ?? 0) || 0));
+            const nextEpisodeAt = nextStatus === "Онгоинг" && typeof item.nextEpisodeAt === "string" && item.nextEpisodeAt.trim() ? item.nextEpisodeAt : null;
+            statements.push(db.prepare("UPDATE anime_catalog SET status=?, episodes=?, next_episode_at=?, updated_at=CURRENT_TIMESTAMP WHERE id=?")
+              .bind(nextStatus, episodes, nextEpisodeAt, id));
+            updated++;
+          }
+          if (statements.length) await db.batch(statements);
+          if (offset + METADATA_LOOKUP_BATCH_SIZE < ids.length) await new Promise(resolve => setTimeout(resolve, REQUEST_DELAY_MS));
+        }
+        await invalidatePersistentCatalogCache();
+        await audit(db, "catalog.section.metadata.refresh", "success", { section, total: ids.length, updated });
+        return json({ isAdmin: true, section, total: ids.length, updated, message: "Обновлены только статус, дата следующей серии и общее количество серий." });
+      }
       if (body.action === "refresh_metadata") return await runCatalogMetadataRefreshStep(db);
       if (body.action === "repair") {
         const safeIds = normalizeAdminCatalogIds((body as { ids?: unknown }).ids);

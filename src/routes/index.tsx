@@ -2,8 +2,8 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowDownWideNarrow, ChevronDown, ChevronRight, Search, SlidersHorizontal, X, UserRound, Globe, Sun, Moon, Monitor, ShieldCheck, Play, ListChecks, CircleCheck, Clock3, ChartNoAxesCombined, Download, Database, Settings, History, Bell, CheckCheck, Sparkles } from "lucide-react";
 import { COLLECTIONS, type Anime } from "@/data/anime";
-import { getShikimoriCatalog, getShikimoriSectionFeeds, type ShikimoriSectionFeeds } from "@/data/shikimori";
-import { filterEligibleAiringAnime, getExactReleaseDate, isEligibleAiringAnime, isNewRelease, isUpcomingAnnouncement } from "@/data/anime-sections";
+import { getShikimoriCatalog } from "@/data/shikimori";
+import { getExactReleaseDate, isNewRelease, isUpcomingAnnouncement } from "@/data/anime-sections";
 import { Header, type View } from "@/components/yume/Header";
 import { AuthPage } from "@/components/yume/AuthPage";
 import { AnimeCard } from "@/components/yume/Poster";
@@ -23,67 +23,6 @@ import { trackYumePage } from "@/lib/yume-analytics";
 import { setProfileStorageAuthenticated, syncTelegramLibrary } from "@/data/profile-storage";
 import { USER_NOTIFICATIONS } from "@/data/notifications.shared";
 import { runAdminTrailerUpdate, type AdminTrailerStats } from "@/data/admin-trailer-update";
-
-function mergeLiveSectionAnime(stored: Anime, live: Anime): Anime {
-  return {
-    ...stored,
-    // These values can change as episodes air; catalog identity and artwork stay fixed.
-    status: live.status,
-    rating: live.rating ?? stored.rating,
-    episodes: live.episodes > 0 ? live.episodes : stored.episodes,
-    episodesAired: live.episodesAired ?? stored.episodesAired,
-    nextEpisodeAt: live.nextEpisodeAt,
-    popular: live.popular ?? stored.popular,
-    id: stored.id,
-    title: stored.title,
-    englishTitle: stored.englishTitle ?? live.englishTitle,
-    original: stored.original,
-    year: stored.year,
-    genres: stored.genres,
-    description: stored.description,
-    hue: stored.hue,
-    glyph: stored.glyph,
-    isNew: stored.isNew,
-    posterUrl: stored.posterUrl,
-    bannerUrl: stored.bannerUrl,
-    kind: stored.kind,
-    ageRating: stored.ageRating,
-    airedOn: stored.airedOn,
-    studios: stored.studios,
-    youtubeTrailerId: stored.youtubeTrailerId,
-  };
-}
-
-function mergeLiveFeedIntoCurrent(
-  currentItems: Anime[],
-  incomingItems: readonly Anime[],
-  allowedIds: ReadonlySet<string>,
-): Anime[] {
-  const byId = new Map(currentItems.map((item) => [item.id, item]));
-  for (const live of incomingItems) {
-    if (!allowedIds.has(live.id)) continue;
-    const current = byId.get(live.id);
-    byId.set(live.id, current ? mergeLiveSectionAnime(current, live) : live);
-  }
-  return Array.from(byId.values());
-}
-
-function selectLiveCatalogItems(
-  catalogItems: readonly Anime[],
-  incomingItems: readonly Anime[],
-): Anime[] {
-  const catalogById = new Map(catalogItems.map((item) => [item.id, item]));
-  const result = new Map<string, Anime>();
-  for (const live of incomingItems) {
-    const stored = catalogById.get(live.id);
-    if (stored) result.set(live.id, mergeLiveSectionAnime(stored, live));
-  }
-  return Array.from(result.values());
-}
-
-function allSectionFeedItems(feeds: ShikimoriSectionFeeds): Anime[] {
-  return [...feeds.popular, ...feeds.newReleases, ...feeds.announcements, ...feeds.airing];
-}
 
 const NOTIFICATION_STORAGE_KEY = "yume-user-notifications-read-v1";
 const NOTIFICATION_DISMISSED_STORAGE_KEY = "yume-user-notifications-dismissed-v1";
@@ -194,40 +133,18 @@ export const Route = createFileRoute("/")({
         apiError: catalog.error, catalogProgress: catalog.progress,
       };
     }
-    const sourceFeeds = await getShikimoriSectionFeeds();
-    const persistentItems = catalog.items;
-    const catalogIds = persistentItems.map((anime) => anime.id);
-    const allowedIds = new Set(catalogIds);
-    const liveItems = sourceFeeds ? allSectionFeedItems(sourceFeeds) : [];
-    const refreshedItems = mergeLiveFeedIntoCurrent(persistentItems, liveItems, allowedIds);
-    const refreshedById = new Map(refreshedItems.map((anime) => [anime.id, anime]));
-    const popular = sourceFeeds
-      ? selectLiveCatalogItems(refreshedItems, sourceFeeds.popular)
-          .filter((anime) => (anime.rating ?? 0) >= 8)
-      : refreshedItems
-          .filter((anime) => (anime.rating ?? 0) >= 8)
-          .sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1));
-    const seedRecent = [...refreshedItems]
-      .sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? "") || b.year - a.year)
-      .slice(0, 50);
-
-    const currentAiringIds = new Set(sourceFeeds?.airing.map((anime) => anime.id) ?? []);
+    const refreshedItems = catalog.items;
+    const popular = refreshedItems.filter((anime) => (anime.rating ?? 0) >= 8).sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1));
     const sectionFeeds = {
-      airing: filterEligibleAiringAnime(refreshedItems, currentAiringIds)
-        .sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? "") || b.year - a.year),
-      newReleases: refreshedItems
-        .filter((anime) => isNewRelease(anime))
-        .sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? "") || (b.rating ?? -1) - (a.rating ?? -1)),
-      announcements: refreshedItems
-        .filter((anime) => isUpcomingAnnouncement(anime))
-        .sort((a, b) => {
-          const aDate = getExactReleaseDate(a.airedOn);
-          const bDate = getExactReleaseDate(b.airedOn);
-          if (aDate && bDate) return aDate.localeCompare(bDate);
-          if (aDate) return -1;
-          if (bDate) return 1;
-          return a.year - b.year || (b.rating ?? -1) - (a.rating ?? -1);
-        }),
+      airing: refreshedItems.filter((anime) => anime.status === "Онгоинг").sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? "") || b.year - a.year),
+      newReleases: refreshedItems.filter((anime) => isNewRelease(anime)).sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? "") || (b.rating ?? -1) - (a.rating ?? -1)),
+      announcements: refreshedItems.filter((anime) => anime.status === "Анонс").sort((a, b) => {
+        const aDate = getExactReleaseDate(a.airedOn), bDate = getExactReleaseDate(b.airedOn);
+        if (aDate && bDate) return aDate.localeCompare(bDate);
+        if (aDate) return -1;
+        if (bDate) return 1;
+        return a.year - b.year || (b.rating ?? -1) - (a.rating ?? -1);
+      }),
     };
 
     return {
@@ -476,69 +393,6 @@ function Index() {
   }, [loadedAnime, initialPopularAnime, initialSectionFeeds, initialCatalogProgress, view, catalogMode]);
   useEffect(() => { catalogAnimeRef.current = catalogAnime; }, [catalogAnime]);
 
-  useEffect(() => {
-    if (view === "catalog") return;
-    let cancelled = false;
-    const refreshSectionFeeds = async () => {
-      try {
-        const feeds = await getShikimoriSectionFeeds();
-        if (cancelled) return;
-        if (!feeds) {
-          // A transient Shikimori failure must not erase the last known-good
-          // airing list. Replace it only after a successful feed refresh.
-          return;
-        }
-        const incoming = allSectionFeedItems(feeds);
-        const updatedCatalog = mergeLiveFeedIntoCurrent(
-          catalogAnimeRef.current,
-          incoming,
-          allowedCatalogIds,
-        );
-        catalogAnimeRef.current = updatedCatalog;
-        setCatalogAnime(updatedCatalog);
-        const refreshedById = new Map(updatedCatalog.map((anime) => [anime.id, anime]));
-        const selectUpdatedFeed = (items: Anime[]) => {
-          const selected = new Map<string, Anime>();
-          for (const live of items) {
-            if (!allowedCatalogIds.has(live.id)) continue;
-            const anime = refreshedById.get(live.id);
-            if (anime) selected.set(anime.id, anime);
-          }
-          return Array.from(selected.values());
-        };
-        setPopularAnime(selectUpdatedFeed(feeds.popular).filter((anime) => (anime.rating ?? 0) >= 8));
-        // Shikimori's live ongoing feed is the source of truth for membership.
-        // D1 status alone can be stale; Kodik availability is an independent filter.
-        const currentAiringIds = new Set(feeds.airing.map((anime) => anime.id));
-        setSectionFeeds({
-          airing: filterEligibleAiringAnime(updatedCatalog, currentAiringIds)
-            .sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? "") || b.year - a.year),
-          newReleases: updatedCatalog
-            .filter((anime) => isNewRelease(anime))
-            .sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? "") || (b.rating ?? -1) - (a.rating ?? -1)),
-          announcements: updatedCatalog
-            .filter((anime) => isUpcomingAnnouncement(anime))
-            .sort((a, b) => {
-              const aDate = getExactReleaseDate(a.airedOn);
-              const bDate = getExactReleaseDate(b.airedOn);
-              if (aDate && bDate) return aDate.localeCompare(bDate);
-              if (aDate) return -1;
-              if (bDate) return 1;
-              return a.year - b.year || (b.rating ?? -1) - (a.rating ?? -1);
-            }),
-        });
-      } catch {
-        // Keep the last known-good section data on transient refresh failures.
-        // The next successful Shikimori refresh will replace the list.
-      }
-    };
-
-    const timer = window.setInterval(() => { void refreshSectionFeeds(); }, 5 * 60 * 1000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(timer);
-    };
-  }, [allowedCatalogIds, view]);
   const [catalogLoadState, setCatalogLoadState] = useState<"idle" | "loading" | "loaded" | "error">("idle");
   const [catalogLoadError, setCatalogLoadError] = useState<string | null>(null);
   const catalogLoadStarted = useRef(false);
@@ -589,6 +443,8 @@ function Index() {
   const [adminTitleImportBusy, setAdminTitleImportBusy] = useState<string | null>(null);
   const [adminTitleSearchMessage, setAdminTitleSearchMessage] = useState("");
   const [metadataRefreshRunning, setMetadataRefreshRunning] = useState(false);
+  const [sectionMetadataTarget, setSectionMetadataTarget] = useState<"ongoing" | "announcements">("ongoing");
+  const [sectionMetadataBusy, setSectionMetadataBusy] = useState(false);
   const [metadataAutoBusy, setMetadataAutoBusy] = useState(false);
   const manualMetadataStopRef = useRef(false);
   const [metadataRefreshProgress, setMetadataRefreshProgress] = useState({ offset: 0, total: 0, updated: 0, screenshotsSaved: 0, bannersFound: 0, bannersMatched: 0, bannersSaved: 0, bannersAdded: 0, bannerErrors: 0, bannersStored: 0, phase: "metadata", metadataOffset: 0, screenshotOffset: 0, screenshotFailures: 0, screenshotRetries: 0 });
@@ -2318,7 +2174,17 @@ function Index() {
                   )}</div>}
                 </div>
               </details>
-              <details open={expandedAdminSections.metadata} onToggle={event => { const isOpen = event.currentTarget.open; setExpandedAdminSections(current => current.metadata === isOpen ? current : {...current, metadata: isOpen}); }} className="group mb-3 overflow-hidden rounded-2xl border border-[#6C3E91] bg-[#0D0A13]" aria-label={language === "ru" ? "Обновление метаданных каталога" : "Refresh catalogue metadata"}>
+              <details open={false} className="group mb-3 overflow-hidden rounded-2xl border border-[#6C3E91] bg-[#0D0A13]" aria-label={language === "ru" ? "Ручное обновление разделов" : "Manual section refresh"}>
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 hover:bg-card/80 [&::-webkit-details-marker]:hidden">
+                  <span className="flex min-w-0 items-center gap-2.5"><Database className="h-5 w-5 shrink-0 text-[#BE65FF]" /><span><span className="block font-semibold text-[#F8F4FF]">{language === "ru" ? "Обновление разделов главной" : "Home section metadata refresh"}</span><span className="mt-1 block text-xs text-muted-foreground">{language === "ru" ? "Только выбранный раздел и три поля метаданных" : "Only the selected section and three metadata fields"}</span></span></span><ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180"/>
+                </summary>
+                <div className="grid gap-3 border-t border-border/70 p-4">
+                  <label className="grid gap-1.5 text-sm"><span>{language === "ru" ? "Раздел для обновления" : "Section to refresh"}</span><select value={sectionMetadataTarget} onChange={event=>setSectionMetadataTarget(event.target.value as "ongoing" | "announcements")} className="min-h-11 rounded-lg border border-border bg-background px-3 py-2"><option value="ongoing">{language === "ru" ? "Сейчас выходит" : "Currently airing"}</option><option value="announcements">{language === "ru" ? "Анонсы" : "Announcements"}</option></select></label>
+                  <p className="text-xs leading-relaxed text-muted-foreground">{language === "ru" ? "Проверяются только тайтлы выбранного раздела. Обновляются статус, дата следующей серии и общее количество серий. Остальные данные каталога не изменяются." : "Only titles in the selected section are checked. Status, next episode date, and total episode count are updated; other catalogue data is untouched."}</p>
+                  <button type="button" disabled={sectionMetadataBusy || metadataRefreshRunning || adminImportRunning} onClick={async()=>{if(!isAdmin||sectionMetadataBusy)return;setSectionMetadataBusy(true);setAdminMessage("");try{const response=await fetch("/api/admin/catalog-import",{method:"POST",credentials:"same-origin",cache:"no-store",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"refresh_section_metadata",statusFilter:sectionMetadataTarget})});const payload=await response.json().catch(()=>({})) as {isAdmin?:boolean;error?:string;message?:string;total?:number;updated?:number};if(!response.ok||payload.isAdmin!==true)throw new Error(payload.message||payload.error||(language==="ru"?"Не удалось обновить раздел.":"Could not refresh section."));setAdminMessage(language==="ru"?(payload.total===0?"В выбранном разделе нет тайтлов.":`Готово: проверено ${payload.total}, обновлено ${payload.updated??0}.`):`Done: checked ${payload.total??0}, updated ${payload.updated??0}.`);}catch(error){setAdminMessage(error instanceof Error?error.message:(language==="ru"?"Ошибка обновления раздела.":"Section refresh failed."));}finally{setSectionMetadataBusy(false);}}} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">{sectionMetadataBusy?(language==="ru"?"Обновляем…":"Refreshing…"):(language==="ru"?"Обновить выбранный раздел":"Refresh selected section")}</button>
+                </div>
+              </details>
+              <details open={expandedAdminSections.metadata} onToggle={event => { const isOpen = event.currentTarget.open; setExpandedAdminSections(current => current.metadata === isOpen ? current : {...current, metadata: isOpen}); }} style={{display:"none"}} className="group mb-3 overflow-hidden rounded-2xl border border-[#6C3E91] bg-[#0D0A13]" aria-label={language === "ru" ? "Обновление метаданных каталога" : "Refresh catalogue metadata"}>
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 hover:bg-card/80 [&::-webkit-details-marker]:hidden">
                   <span className="flex min-w-0 items-center gap-2.5"><Database className="h-5 w-5 shrink-0 text-[#BE65FF]" /><span className="min-w-0"><span className="block font-semibold text-[#F8F4FF]">{language === "ru" ? "Обновление метаданных каталога" : "Refresh catalogue metadata"}</span><span className="mt-0.5 block text-xs text-muted-foreground">{language === "ru" ? "Прогресс сохраняется; можно сбросить и начать проверку заново" : "Progress is saved; reset it to start a fresh scan"}</span></span></span>
                   <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
