@@ -547,7 +547,6 @@ async function fetchShikimoriSectionFeeds(): Promise<ShikimoriSectionFeeds | nul
 export const getShikimoriSectionFeeds = createServerFn({ method: "GET" })
   .handler(async () => fetchShikimoriSectionFeeds());
 
-const CATALOG_IMPORT_TARGET = 0;
 const CATALOG_CACHE_TTL_MS = 30 * 60 * 1000;
 
 const PRIORITY_SEED_REQUESTS: ShikimoriRequest[] = [
@@ -576,7 +575,7 @@ function makeCatalogProgress(
   return {
     status,
     imported,
-    target: CATALOG_IMPORT_TARGET,
+    target: null,
     ...(retryAfterMs !== undefined ? { retryAfterMs } : {}),
   };
 }
