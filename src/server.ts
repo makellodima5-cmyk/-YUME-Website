@@ -3,6 +3,7 @@ import { applySecurityHeaders } from "./lib/security-headers";
 import { redirectHttpToHttps } from "./lib/https-redirect";
 import { handleShikimoriImageProxy } from "./lib/shikimori-image-proxy";
 import { enforceRateLimit } from "./lib/rate-limit";
+import { handleCspReport } from "./lib/csp-report";
 import { env as cloudflareEnv } from "cloudflare:workers";
 
 import { consumeLastCapturedError } from "./lib/error-capture";
@@ -174,6 +175,17 @@ export default {
     if (httpsRedirect) return httpsRedirect;
 
     const requestUrl = new URL(request.url);
+    if (requestUrl.pathname === "/api/csp-report") {
+      let rateLimitBinding: unknown;
+      try {
+        const cloudflareBindings = cloudflareEnv as unknown as Record<string, unknown>;
+        rateLimitBinding = cloudflareBindings.CSP_REPORT_RATE_LIMITER;
+      } catch {
+        rateLimitBinding = undefined;
+      }
+      return applySecurityHeaders(await handleCspReport(request, rateLimitBinding), request.url);
+    }
+
     if (requestUrl.pathname === "/api/media/shikimori") {
       let response: Response;
       if (request.method !== "GET") {
