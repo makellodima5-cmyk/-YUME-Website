@@ -530,7 +530,7 @@ function Index() {
       } catch {
         // Other sections may keep their last snapshot, but airing must not imply a current status
         // that Shikimori could not confirm on this refresh.
-        setSectionFeeds((current) => current ? { ...current, airing: [] } : current);
+        if (!cancelled) setSectionFeeds((current) => current ? { ...current, airing: [] } : current);
       }
     };
 
