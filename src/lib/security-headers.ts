@@ -45,7 +45,12 @@ export function applySecurityHeaders(response: Response, requestUrl: string): Re
   ) {
     headers.set("Content-Security-Policy-Report-Only", CSP_REPORT_ONLY);
     if (!headers.has("Reporting-Endpoints")) {
-      headers.set("Reporting-Endpoints", 'csp-endpoint="/api/csp-report"');
+      try {
+        const endpointUrl = new URL("/api/csp-report", requestUrl).toString();
+        headers.set("Reporting-Endpoints", `csp-endpoint="${endpointUrl}"`);
+      } catch {
+        // Do not prevent a response when a local test supplies an invalid URL.
+      }
     }
   }
 
