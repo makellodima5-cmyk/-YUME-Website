@@ -14,7 +14,7 @@ export function setCatalogRuntimeEnvironment(env: unknown): void {
 export type CatalogProgress = {
   status: "seeding" | "cooldown" | "ready" | "partial";
   imported: number;
-  target: number;
+  target: number | null;
   retryAfterMs?: number;
 };
 
@@ -72,7 +72,6 @@ interface D1Database {
   exec(query: string): Promise<unknown>;
 }
 
-const CATALOG_IMPORT_TARGET = 25_500;
 const LOCK_TTL_MS = 30 * 1000;
 const DEFAULT_RETRY_MS = 5 * 1000;
 const SEED_REQUEST_DELAY_MS = 1250;
@@ -395,7 +394,7 @@ function makeProgress(
   return {
     status,
     imported,
-    target: CATALOG_IMPORT_TARGET,
+    target: null,
     ...(retryAfterMs !== undefined ? { retryAfterMs } : {}),
   };
 }
