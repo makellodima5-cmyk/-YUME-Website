@@ -212,6 +212,34 @@ export async function handleTelegramWebhook(request: Request): Promise<Response>
     }
   }
 
+
+  if (update.chat_member) {
+    const event = update.chat_member;
+    const userId = event.new_chat_member?.user?.id;
+    if (typeof userId !== "number" || !Number.isSafeInteger(userId)) return json({ ok: true, ignored: true });
+    const oldStatus = event.old_chat_member?.status;
+    const newStatus = event.new_chat_member?.status;
+    const nowMember = ["creator", "administrator", "member"].includes(newStatus ?? "") ||
+      (newStatus === "restricted" && (event.new_chat_member as { is_member?: boolean }).is_member === true);
+    const wasMember = ["creator", "administrator", "member"].includes(oldStatus ?? "");
+    if (!nowMember || wasMember) return json({ ok: true, ignored: true });
+    try {
+      const db = subscriptionDb(env);
+      const state = await getSubscriptionState(db, userId);
+      if (!state?.awaiting_resubscribe || !state.message_id) return json({ ok: true, ignored: true });
+      const response = await telegramApi(token, "editMessageText", {
+        chat_id: Number(state.chat_id), message_id: state.message_id,
+        text: RESTORED_MESSAGE, reply_markup: welcomeKeyboard(),
+      });
+      if (!response.ok) return json({ ok: false, error: "Could not update restored access message" }, 502);
+      await saveSubscriptionState(db, userId, Number(state.chat_id), state.message_id, true, false);
+      return json({ ok: true, action: "subscription_restored" });
+    } catch (error) {
+      console.error("[YUME][TELEGRAM_BOT] Membership update failed.", error);
+      return json({ ok: false, error: "Membership update failed" }, 502);
+    }
+  }
+
   const message = update.message;
   const text = message?.text?.trim() ?? "";
   const chatId = message?.chat?.id;
