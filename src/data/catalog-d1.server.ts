@@ -106,6 +106,7 @@ const CREATE_SCHEMA_STATEMENTS = [
   )`,
   "CREATE INDEX IF NOT EXISTS idx_anime_catalog_title ON anime_catalog(title)",
   "CREATE INDEX IF NOT EXISTS idx_anime_catalog_position ON anime_catalog(position)",
+  "CREATE INDEX IF NOT EXISTS idx_anime_catalog_status_position_id ON anime_catalog(status, position, id)",
   "CREATE INDEX IF NOT EXISTS idx_anime_catalog_due_episodes ON anime_catalog(status, datetime(next_episode_at)) WHERE next_episode_at IS NOT NULL",
   "CREATE INDEX IF NOT EXISTS idx_anime_catalog_missing_trailer ON anime_catalog(id) WHERE youtube_trailer_id IS NULL OR youtube_trailer_id = ''",
   `CREATE TABLE IF NOT EXISTS anime_kodik_availability (anime_id TEXT PRIMARY KEY NOT NULL, has_episodes INTEGER NOT NULL DEFAULT 0 CHECK (has_episodes IN (0,1)), episode_count INTEGER NOT NULL DEFAULT 0, checked_at TEXT, last_attempt_at TEXT, last_error TEXT)`,
@@ -283,13 +284,12 @@ export async function getPersistentAnimeDetails(id: string): Promise<{ anime: An
     };
   }
 
-  const row = await db.prepare("SELECT * FROM anime_catalog WHERE id = ?").bind(id).first<AnimeRow>();
-  if (!row) return { anime: null, relatedAnime: [] };
-
-  // A cold direct-title visit used to execute a correlated JSON genre scan for
-  // each catalog row, then discard most data. Load and cache one ordered snapshot
-  // instead so subsequent title visits can reuse it for related titles as well.
+  // Related titles require the ordered catalog snapshot anyway, so avoid a
+  // separate point lookup before loading the same rows.
   const items = await readRows(db);
+  const anime = items.find((item) => item.id === id) ?? null;
+  if (!anime) return { anime: null, relatedAnime: [] };
+
   const state = await getMeta(db, "catalog_state");
   const catalogResult: CatalogResult = {
     items,
@@ -298,7 +298,6 @@ export async function getPersistentAnimeDetails(id: string): Promise<{ anime: An
   };
   await writeCachedCatalog(db, catalogResult);
 
-  const anime = items.find((item) => item.id === id) ?? rowToAnime(row);
   return {
     anime,
     relatedAnime: selectRelatedAnime(anime, items, 6),
@@ -426,11 +425,12 @@ export async function getPersistentCatalog(
     await ensureSchema(db);
 
     const state = await getMeta(db, "catalog_state");
-    let imported = await countRows(db);
 
     if (state === "ready" || state === "partial") {
+      const items = await readRows(db);
+      const imported = items.length;
       const result: CatalogResult = {
-        items: await readRows(db),
+        items,
         error: state === "partial"
           ? "Каталог загружен частично: " + imported + " записей."
           : null,
@@ -439,6 +439,10 @@ export async function getPersistentCatalog(
       if (!options.allowImport) await writeCachedCatalog(db, result);
       return { ...result, items: options.progressOnly ? [] : result.items };
     }
+
+    // A ready catalog's row count comes from readRows above. Only query COUNT(*)
+    // while seeding or recovering legacy rows, when the count is needed separately.
+    let imported = await countRows(db);
 
     // Preserve manually inserted catalog rows from earlier deployments.
     if (!state && imported > 0) {
