@@ -1211,8 +1211,8 @@ function Index() {
   const runCatalogImport = async () => {
     if (!isAdmin || adminImportRunning || metadataRefreshRunning) return;
     const target = Number(adminImportTarget);
-    if (adminImport.state !== "running" && (!Number.isInteger(target) || target < 1 || target > 500)) {
-      setAdminImportMessage(language === "ru" ? "Укажи целое число от 1 до 500." : "Enter a whole number from 1 to 500.");
+    if (adminImport.state !== "running" && (!Number.isSafeInteger(target) || target < 1)) {
+      setAdminImportMessage(language === "ru" ? "Укажи положительное целое число." : "Enter a positive whole number.");
       return;
     }
     setAdminImportRunning(true);
@@ -2257,8 +2257,8 @@ function Index() {
                   <div className="my-4 flex items-center gap-3 text-[11px] uppercase tracking-[0.15em] text-muted-foreground"><span className="h-px flex-1 bg-border" /><span>{language === "ru" ? "или импорт по количеству" : "or import by quantity"}</span><span className="h-px flex-1 bg-border" /></div>
                   <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
                     <label className="text-sm">
-                      <span className="mb-1 block text-xs text-muted-foreground">{language === "ru" ? "Количество новых записей (1–500)" : "Number of new records (1–500)"}</span>
-                      <input type="number" min={1} max={500} step={1} value={adminImportTarget} onChange={event => setAdminImportTarget(event.target.value)} disabled={adminImportRunning || adminImport.state === "running"} className="h-10 w-full rounded-xl border border-[#453452] bg-[#050408] px-3 text-[#FFFFFF] focus:border-[#BE65FF] focus:outline-none focus:ring-1 focus:ring-[#BE65FF]" />
+                      <span className="mb-1 block text-xs text-muted-foreground">{language === "ru" ? "Количество новых записей" : "Number of new records"}</span>
+                      <input type="number" min={1} step={1} value={adminImportTarget} onChange={event => setAdminImportTarget(event.target.value)} disabled={adminImportRunning || adminImport.state === "running"} className="h-10 w-full rounded-xl border border-[#453452] bg-[#050408] px-3 text-[#FFFFFF] focus:border-[#BE65FF] focus:outline-none focus:ring-1 focus:ring-[#BE65FF]" />
                     </label>
                     <label className="text-sm">
                       <span className="mb-1 block text-xs text-muted-foreground">{language === "ru" ? "Статус для массового импорта" : "Bulk import status"}</span>
@@ -2269,7 +2269,7 @@ function Index() {
                         <option value="released">{language === "ru" ? "Вышедшее" : "Released"}</option>
                       </select>
                     </label>
-                    <button type="button" onClick={runCatalogImport} disabled={adminImportRunning || metadataRefreshRunning || (adminImport.state !== "running" && (!Number.isInteger(Number(adminImportTarget)) || Number(adminImportTarget)<1 || Number(adminImportTarget)>500))} className="self-end rounded-xl bg-gradient-to-r from-[#AC4EFC] to-[#8736FA] px-4 py-2.5 text-sm font-semibold text-white shadow-[0_0_16px_rgba(155,65,245,0.18)] transition hover:brightness-110 disabled:cursor-wait disabled:opacity-50">
+                    <button type="button" onClick={runCatalogImport} disabled={adminImportRunning || metadataRefreshRunning || (adminImport.state !== "running" && (!Number.isSafeInteger(Number(adminImportTarget)) || Number(adminImportTarget)<1))} className="self-end rounded-xl bg-gradient-to-r from-[#AC4EFC] to-[#8736FA] px-4 py-2.5 text-sm font-semibold text-white shadow-[0_0_16px_rgba(155,65,245,0.18)] transition hover:brightness-110 disabled:cursor-wait disabled:opacity-50">
                       {adminImportRunning ? (language === "ru" ? "Импорт…" : "Importing…") : adminImport.state === "running" ? (language === "ru" ? "Продолжить импорт" : "Resume import") : (language === "ru" ? "Начать импорт" : "Start import")}
                     </button>
                   </div>
