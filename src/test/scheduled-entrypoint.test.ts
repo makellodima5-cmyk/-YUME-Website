@@ -18,7 +18,7 @@ describe("automatic Worker maintenance", () => {
     expect(workflow).toContain("Generated Worker entry still includes scheduled job");
     expect(catalogImporter).toContain('body.action === "refresh_section_metadata"');
     expect(catalogImporter).toContain('body.statusFilter === "ongoing" || body.statusFilter === "announcements"');
-    expect(catalogImporter).toContain("UPDATE anime_catalog SET status=?, episodes=CASE WHEN ?>0 THEN ? ELSE episodes END, next_episode_at=?");
+    expect(catalogImporter).toContain("UPDATE anime_catalog SET status=?, episodes=?, next_episode_at=?");
     expect(homeRoute).toContain('action:"refresh_section_metadata"');
     expect(homeRoute).not.toContain("setInterval(() => { void refreshSectionFeeds(); }");
     expect(homeRoute).toContain('anime.status === "Онгоинг"');
