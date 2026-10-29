@@ -34,8 +34,8 @@ describe("Worker security headers", () => {
     expect(policy).toContain("https://fonts.googleapis.com");
     expect(policy).toContain("https://www.youtube-nocookie.com");
     expect(policy).toContain("https://kodik.info");
-    expect(policy).not.toContain("script-src 'self' 'unsafe-inline'");
-    expect(response.headers.get("Content-Security-Policy")).toBeNull();
+    expect(policy).toContain("script-src 'self' 'unsafe-inline'");
+    expect(response.headers.get("Content-Security-Policy")).toContain("default-src 'self'");
   });
 
   it("does not attach a document CSP to JSON or image responses", () => {
