@@ -81,6 +81,7 @@ jobs:
           const expectedRateLimits = [
             { name: "KODIK_RATE_LIMITER", namespaceId: "202610271", limit: 30, period: 60 },
             { name: "MEDIA_RATE_LIMITER", namespaceId: "202610272", limit: 600, period: 60 },
+            { name: "CSP_REPORT_RATE_LIMITER", namespaceId: "202610273", limit: 30, period: 60 },
           ];
           for (const expected of expectedRateLimits) {
             const binding = (rootConfig.ratelimits ?? []).find((item) => item.name === expected.name);

@@ -1,18 +1,18 @@
 /**
  * Apply browser security headers to every Worker response.
  *
- * CSP is initially deployed in Report-Only mode. This gives us a safe way to
- * inventory browser violations before enforcing a policy: HTML bootstrapping
- * contains inline scripts, and the site relies on Telegram auth plus external
- * video embeds. Report-Only never blocks those resources.
+ * CSP is enforced with an explicit resource allowlist. Inline scripts remain
+ * permitted for the current SSR hydration bootstrap; third-party script
+ * execution is restricted to the documented Telegram origins. Keep Report-Only
+ * enabled as well so any missed resource dependency is observable during rollout.
  */
-const CSP_REPORT_ONLY = [
+const CSP_POLICY = [
   "default-src 'self'",
   "base-uri 'self'",
   "object-src 'none'",
   "frame-ancestors 'self'",
   "form-action 'self' https://oauth.telegram.org",
-  "script-src 'self' https://telegram.org https://oauth.telegram.org",
+  "script-src 'self' 'unsafe-inline' https://telegram.org https://oauth.telegram.org",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com data:",
   "img-src 'self' data: blob: https:",
@@ -36,14 +36,15 @@ export function applySecurityHeaders(response: Response, requestUrl: string): Re
     headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
   }
 
-  // CSP affects documents, not ordinary JSON/API/image responses. Start with a
-  // non-enforcing policy and preserve any stricter policy set by a route.
+  // Apply CSP only to HTML documents. Preserve stricter route-specific policies.
   const contentType = headers.get("Content-Type") ?? "";
-  if (
-    contentType.toLowerCase().includes("text/html") &&
-    !headers.has("Content-Security-Policy-Report-Only")
-  ) {
-    headers.set("Content-Security-Policy-Report-Only", CSP_REPORT_ONLY);
+  if (contentType.toLowerCase().includes("text/html")) {
+    if (!headers.has("Content-Security-Policy")) {
+      headers.set("Content-Security-Policy", CSP_POLICY);
+    }
+    if (!headers.has("Content-Security-Policy-Report-Only")) {
+      headers.set("Content-Security-Policy-Report-Only", CSP_POLICY);
+    }
     if (!headers.has("Reporting-Endpoints")) {
       try {
         const endpointUrl = new URL("/api/csp-report", requestUrl).toString();
