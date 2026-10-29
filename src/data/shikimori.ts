@@ -761,15 +761,6 @@ export const getShikimoriAnimeDetails = createServerFn({ method: "GET" })
     }).items;
     const visibleById = new Map(filtered.map((item) => [item.id, item]));
     anime = visibleById.get(details.anime.id) ?? null;
-    if (anime) {
-      try {
-        const { getAniListBannerByMalId } = await import("@/data/anilist-banner.server");
-        const aniListBanner = await getAniListBannerByMalId(anime.id);
-        if (aniListBanner) anime.bannerUrl = aniListBanner;
-      } catch {
-        // Keep the stored artwork when AniList enrichment is unavailable.
-      }
-    }
     return {
       anime,
       relatedAnime: details.relatedAnime
