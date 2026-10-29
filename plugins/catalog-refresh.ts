@@ -1,6 +1,7 @@
 import { definePlugin } from "nitro";
 import { setCatalogRuntimeEnvironment } from "../src/data/catalog-d1.server";
 import { runScheduledEpisodeNotifications } from "../src/data/episode-notifications-cron.server";
+import { runScheduledKodikAvailabilityRefresh } from "../src/data/kodik-availability.server";
 import { runScheduledCatalogStatusRefresh } from "../src/data/catalog-status-refresh.server";
 
 const EPISODE_CHECK_CRON = "*/5 * * * *";
@@ -32,7 +33,10 @@ export default definePlugin((nitroApp) => {
     if (controller.cron === EPISODE_CHECK_CRON) {
       // This frequent tick reads D1 first and calls Shikimori only when due
       // episodes actually need to be checked.
-      await runScheduledEpisodeNotifications(env);
+      await Promise.all([
+        runScheduledEpisodeNotifications(env),
+        runScheduledKodikAvailabilityRefresh(env),
+      ]);
     } else if (CATALOG_REFRESH_CRONS.has(controller.cron)) {
       // Trailer discovery is intentionally manual-only. Refresh catalog statuses only.
       await runScheduledCatalogStatusRefresh(env);
