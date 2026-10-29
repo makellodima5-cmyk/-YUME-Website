@@ -460,6 +460,9 @@ function Index() {
   const allowedCatalogIds = useMemo(() => new Set(catalogIds), [catalogIds]);
   const catalogAnimeRef = useRef(catalogAnime);
   const ANIME = catalogAnime;
+  // Initialize view before effects that read it during server-side rendering.
+  const [view, setViewRaw] = useState<View>(section ?? "home");
+
 
   useEffect(() => {
     if (catalogMode === "full" || view === "catalog") {
@@ -536,7 +539,6 @@ function Index() {
   const [catalogLoadError, setCatalogLoadError] = useState<string | null>(null);
   const catalogLoadStarted = useRef(false);
   const [catalogLoadAttempt, setCatalogLoadAttempt] = useState(0);
-  const [view, setViewRaw] = useState<View>(section ?? "home");
   const [isTelegramMiniApp, setIsTelegramMiniApp] = useState(false);
   const [telegramDetectionComplete, setTelegramDetectionComplete] = useState(false);
   const [telegramConsentRequired, setTelegramConsentRequired] = useState(false);
