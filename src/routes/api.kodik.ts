@@ -50,7 +50,9 @@ export function episodeLink(value: EpisodeValue): { link: string; title: string 
   } catch {
     return null;
   }
-  if (url.protocol !== "https:" || !isTrustedKodikHost(url.hostname)) return null;
+  if (!isTrustedKodikHost(url.hostname)) return null;
+  if (url.protocol === "http:") url.protocol = "https:";
+  if (url.protocol !== "https:") return null;
   return { link: url.toString(), title: typeof value === "object" && typeof value.title === "string" ? value.title : "" };
 }
 
