@@ -12,7 +12,7 @@ describe("Kodik availability parsing", () => {
           "2": { episodes: { "1": { link: "https://kodikres.com/serial/second" }, "2": "https://kodik.info/serial/third" } },
         },
       }],
-    }), "42").toEqual({ hasEpisodes: true, episodeCount: 1 });
+    }, "42")).toEqual({ hasEpisodes: true, episodeCount: 1 });
   });
 
   it("treats a valid empty search response as no episodes", () => {
@@ -33,11 +33,13 @@ describe("Kodik availability parsing", () => {
           "bad": "https://kodik.info/serial/bad",
         },
       }],
-    }), "42").toEqual({ hasEpisodes: false, episodeCount: 0 });
+    }, "42")).toEqual({ hasEpisodes: false, episodeCount: 0 });
   });
 
   it("rejects non-empty results that belong to another Shikimori ID", () => {
-    expect(() => parseKodikAvailability({ results: [{ shikimori_id: "61987", episodes: { "1": "https://kodik.info/serial/1" } }] }, "61469")).toThrow(/does not match/);
+    expect(() => parseKodikAvailability({
+      results: [{ shikimori_id: "61987", episodes: { "1": "https://kodik.info/serial/1" } }],
+    }, "61469")).toThrow(/does not match/);
   });
 
   it("distinguishes API errors and malformed payloads from an empty result", () => {
