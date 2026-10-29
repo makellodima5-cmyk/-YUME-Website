@@ -100,6 +100,18 @@ function json(payload: unknown, status = 200): Response {
   });
 }
 
+async function answerCallback(token: string, callbackId: string, text?: string): Promise<void> {
+  const payload: Record<string, unknown> = { callback_query_id: callbackId };
+  if (text) payload.text = text;
+  const response = await telegramApi(token, "answerCallbackQuery", payload);
+  if (!response.ok) {
+    const responseText = (await response.text()).slice(0, 500);
+    console.warn("[YUME][TELEGRAM_BOT] Telegram answerCallbackQuery failed; continuing webhook processing.", {
+      status: response.status, response: responseText,
+    });
+  }
+}
+
 async function telegramApi(token: string, method: string, payload: Record<string, unknown>): Promise<Response> {
   return fetch(`https://api.telegram.org/bot${token}/${method}`, {
     method: "POST",
@@ -149,6 +161,10 @@ function gateKeyboard(): Record<string, unknown> {
   ] };
 }
 
+function returnGateKeyboard(): Record<string, unknown> {
+  return { inline_keyboard: [[{ text: "😏 Подписаться на канал", url: CHANNEL_URL }]] };
+}
+
 function welcomeKeyboard(): Record<string, unknown> {
   return { inline_keyboard: [
     [{ text: "🎬 Открыть YUME", web_app: { url: SITE_URL } }],
@@ -190,27 +206,21 @@ export async function handleTelegramWebhook(request: Request): Promise<Response>
       return json({ ok: true, ignored: true });
     }
     try {
-      const answer = await telegramApi(token, "answerCallbackQuery", { callback_query_id: callback.id });
-      if (!answer.ok) {
-        const responseText = (await answer.text()).slice(0, 500);
-        console.warn("[YUME][TELEGRAM_BOT] Telegram answerCallbackQuery failed; continuing webhook processing.", {
-          status: answer.status, response: responseText,
-        });
-      }
       const callbackUserId = callback.from?.id;
       if (typeof callbackUserId !== "number" || !Number.isSafeInteger(callbackUserId)) return json({ ok: true, ignored: true });
       const db = subscriptionDb(env);
       const state = await getSubscriptionState(db, callbackUserId);
       const subscribed = await isChannelMember(token, env, callbackUserId);
       if (subscribed === null) {
-        // The callback query has already been answered above. Telegram only allows one answer per callback.
+        await answerCallback(token, callback.id, "Не удалось проверить подписку. Попробуй ещё раз чуть позже.");
         return json({ ok: true, action: "subscription_check_failed" });
       }
       if (!subscribed) {
+        await answerCallback(token, callback.id, "Ты ещё не подписан на канал YUME. Подпишись, затем нажми «Проверить подписку».");
         const gateText = state?.had_access ? RETURN_GATE_MESSAGE : FIRST_GATE_MESSAGE;
         const gateResponse = await telegramApi(token, "editMessageText", {
           chat_id: callback.message.chat.id, message_id: callback.message.message_id,
-          text: gateText, reply_markup: gateKeyboard(),
+          text: gateText, reply_markup: state?.had_access ? returnGateKeyboard() : gateKeyboard(),
         });
         if (!gateResponse.ok) {
           const responseText = (await gateResponse.text()).slice(0, 500);
@@ -224,6 +234,7 @@ export async function handleTelegramWebhook(request: Request): Promise<Response>
         await saveSubscriptionState(db, callbackUserId, callback.message.chat.id, callback.message.message_id, Boolean(state?.had_access), Boolean(state?.had_access));
         return json({ ok: true, action: "subscription_required" });
       }
+      await answerCallback(token, callback.id);
       if (callback.data === CHECK_SUBSCRIPTION_CALLBACK) {
         const response = await telegramApi(token, "editMessageText", {
           chat_id: callback.message.chat.id, message_id: callback.message.message_id,
@@ -278,11 +289,30 @@ export async function handleTelegramWebhook(request: Request): Promise<Response>
     const nowMember = ["creator", "administrator", "member"].includes(newStatus ?? "") ||
       (newStatus === "restricted" && (event.new_chat_member as { is_member?: boolean }).is_member === true);
     const wasMember = ["creator", "administrator", "member"].includes(oldStatus ?? "");
-    if (!nowMember || wasMember) return json({ ok: true, ignored: true });
+    if (nowMember === wasMember) return json({ ok: true, ignored: true });
     try {
       const db = subscriptionDb(env);
       const state = await getSubscriptionState(db, userId);
-      if (!state?.awaiting_resubscribe || !state.message_id) return json({ ok: true, ignored: true });
+      if (!state?.message_id) return json({ ok: true, ignored: true });
+      if (!nowMember) {
+        if (!state.had_access) return json({ ok: true, ignored: true });
+        const gateResponse = await telegramApi(token, "editMessageText", {
+          chat_id: Number(state.chat_id), message_id: state.message_id,
+          text: RETURN_GATE_MESSAGE, reply_markup: returnGateKeyboard(),
+        });
+        if (!gateResponse.ok) {
+          const responseText = (await gateResponse.text()).slice(0, 500);
+          if (!responseText.toLowerCase().includes("message is not modified")) {
+            console.error("[YUME][TELEGRAM_BOT] Telegram return-gate edit failed.", {
+              status: gateResponse.status, response: responseText,
+            });
+            return json({ ok: false, error: "Could not update return gate" }, gateResponse.status >= 500 ? 502 : 200);
+          }
+        }
+        await saveSubscriptionState(db, userId, Number(state.chat_id), state.message_id, true, true);
+        return json({ ok: true, action: "subscription_left" });
+      }
+      if (!state.awaiting_resubscribe) return json({ ok: true, ignored: true });
       const response = await telegramApi(token, "editMessageText", {
         chat_id: Number(state.chat_id), message_id: state.message_id,
         text: RESTORED_MESSAGE, reply_markup: welcomeKeyboard(),
@@ -397,9 +427,11 @@ export async function handleTelegramWebhook(request: Request): Promise<Response>
       chat_id: chatId, text: greeting, parse_mode: "HTML",
       reply_markup: browserLogin
         ? { inline_keyboard: [[{ text: "🌸 Открыть YUME", url: SITE_URL }]] }
-        : subscriptionGate
-          ? gateKeyboard()
-          : welcomeKeyboard(),
+        : subscriptionGate === "return"
+          ? returnGateKeyboard()
+          : subscriptionGate === "first"
+            ? gateKeyboard()
+            : welcomeKeyboard(),
     });
     if (!response.ok) {
       console.error("[YUME][TELEGRAM_BOT] Telegram sendMessage failed.", {
