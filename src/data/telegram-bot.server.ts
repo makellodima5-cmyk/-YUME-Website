@@ -153,7 +153,7 @@ export async function handleTelegramWebhook(request: Request): Promise<Response>
 
   const callback = update.callback_query;
   if (callback) {
-    if (callback.data !== PLAYER_HELP_CALLBACK || typeof callback.id !== "string" ||
+    if ((callback.data !== PLAYER_HELP_CALLBACK && callback.data !== CHECK_SUBSCRIPTION_CALLBACK) || typeof callback.id !== "string" ||
       typeof callback.message?.message_id !== "number" || !Number.isSafeInteger(callback.message.message_id) ||
       typeof callback.message.chat?.id !== "number" || !Number.isSafeInteger(callback.message.chat.id)) {
       return json({ ok: true, ignored: true });
@@ -161,6 +161,35 @@ export async function handleTelegramWebhook(request: Request): Promise<Response>
     try {
       const answer = await telegramApi(token, "answerCallbackQuery", { callback_query_id: callback.id });
       if (!answer.ok) console.error("[YUME][TELEGRAM_BOT] Telegram answerCallbackQuery failed.", { status: answer.status });
+      const callbackUserId = callback.from?.id;
+      if (typeof callbackUserId !== "number" || !Number.isSafeInteger(callbackUserId)) return json({ ok: true, ignored: true });
+      const db = subscriptionDb(env);
+      const state = await getSubscriptionState(db, callbackUserId);
+      const subscribed = await isChannelMember(token, env, callbackUserId);
+      if (subscribed === null) {
+        await telegramApi(token, "answerCallbackQuery", { callback_query_id: callback.id, text: "Не удалось проверить подписку. Попробуй ещё раз.", show_alert: true });
+        return json({ ok: true, action: "subscription_check_failed" });
+      }
+      if (!subscribed) {
+        const gateText = state?.had_access ? RETURN_GATE_MESSAGE : FIRST_GATE_MESSAGE;
+        const gateResponse = await telegramApi(token, "editMessageText", {
+          chat_id: callback.message.chat.id, message_id: callback.message.message_id,
+          text: gateText, reply_markup: gateKeyboard(),
+        });
+        if (!gateResponse.ok) return json({ ok: false, error: "Could not update subscription gate" }, 502);
+        await saveSubscriptionState(db, callbackUserId, callback.message.chat.id, callback.message.message_id, Boolean(state?.had_access), Boolean(state?.had_access));
+        return json({ ok: true, action: "subscription_required" });
+      }
+      if (callback.data === CHECK_SUBSCRIPTION_CALLBACK) {
+        const response = await telegramApi(token, "editMessageText", {
+          chat_id: callback.message.chat.id, message_id: callback.message.message_id,
+          text: "🌙 Подписка подтверждена! Добро пожаловать в YUME.\n\nНажимай на кнопку ниже — и давай начнём ✨",
+          reply_markup: welcomeKeyboard(),
+        });
+        if (!response.ok) return json({ ok: false, error: "Could not update welcome message" }, 502);
+        await saveSubscriptionState(db, callbackUserId, callback.message.chat.id, callback.message.message_id, true, false);
+        return json({ ok: true, action: "subscription_confirmed" });
+      }
       const response = await telegramApi(token, "editMessageText", {
         chat_id: callback.message.chat.id,
         message_id: callback.message.message_id,
