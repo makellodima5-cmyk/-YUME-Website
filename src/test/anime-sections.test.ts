@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isEligibleAiringAnime, isNewRelease, isUpcomingAnnouncement, getExactReleaseDate } from "@/data/anime-sections";
+import { filterEligibleAiringAnime, isEligibleAiringAnime, isNewRelease, isUpcomingAnnouncement, getExactReleaseDate } from "@/data/anime-sections";
 import { ANIME } from "@/data/anime";
 import type { Anime } from "@/data/anime";
 
@@ -56,6 +56,15 @@ describe("anime section classification", () => {
       expect(isEligibleAiringAnime({ ...base, status: "Онгоинг", kodikAvailable: undefined })).toBe(false);
       expect(isEligibleAiringAnime({ ...base, status: "Вышел", kodikAvailable: true })).toBe(false);
       expect(isEligibleAiringAnime({ ...base, status: "Анонс", kodikAvailable: true })).toBe(false);
+    });
+
+    it("does not retain a stale D1 ongoing status when the title is absent from the current Shikimori ongoing feed", () => {
+      const stale = { ...ANIME[0]!, id: "42", status: "Онгоинг" as const, kodikAvailable: true };
+      const current = { ...ANIME[1]!, id: "43", status: "Онгоинг" as const, kodikAvailable: true };
+      const released = { ...ANIME[2]!, id: "44", status: "Вышел" as const, kodikAvailable: true };
+      expect(filterEligibleAiringAnime([stale, current, released], new Set(["43"])))
+        .toEqual([current]);
+      expect(filterEligibleAiringAnime([stale, current], new Set())).toEqual([]);
     });
   });
 
