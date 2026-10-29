@@ -7,6 +7,7 @@ type EpisodeValue = string | { link?: string; title?: string | null };
 type KodikSeason = { episodes?: Record<string, EpisodeValue> };
 type KodikResult = {
   id?: string;
+  shikimori_id?: string | number;
   link?: string;
   title?: string;
   translation?: { id?: number | string; title?: string; type?: string } | null;
@@ -109,8 +110,13 @@ async function handleKodik(request: Request): Promise<Response> {
     return json({ error: "Kodik API returned an invalid response." }, 502);
   }
 
+  const matchingResults = payload.results.filter((result) => String(result.shikimori_id ?? "") === animeId);
+  if (payload.results.length > 0 && matchingResults.length === 0) {
+    return json({ error: "Kodik API returned results for a different Shikimori title." }, 502);
+  }
+
   const sources = new Map<string, { id: string; title: string; episodes: Map<number, { number: number; title: string; link: string }> }>();
-  for (const result of payload.results) {
+  for (const result of matchingResults) {
     const translationId = String(result.translation?.id ?? result.id ?? "");
     const translationTitle = (result.translation?.title || result.title || "").trim();
     if (!translationId || !translationTitle) continue;
