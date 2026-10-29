@@ -151,7 +151,7 @@ export const Route = createFileRoute("/")({
       anime: refreshedItems,
       popular,
       sectionFeeds,
-      catalogIds,
+      catalogIds: refreshedItems.map((anime) => anime.id),
       apiError: catalog.error,
       catalogProgress: catalog.progress,
       catalogMode: "full", catalogTotal: refreshedItems.length, catalogPage: 1, catalogFacets: null,
