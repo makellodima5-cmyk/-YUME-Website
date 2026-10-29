@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowDownWideNarrow, ChevronDown, ChevronRight, Search, SlidersHorizontal, X, UserRound, Globe, Sun, Moon, Monitor, ShieldCheck, Play, ListChecks, CircleCheck, Clock3, ChartNoAxesCombined, Download, Database, Settings, History, Bell, CheckCheck, Sparkles } from "lucide-react";
 import { COLLECTIONS, type Anime } from "@/data/anime";
 import { getShikimoriCatalog, getShikimoriSectionFeeds, type ShikimoriSectionFeeds } from "@/data/shikimori";
-import { getExactReleaseDate, isEligibleAiringAnime, isNewRelease, isUpcomingAnnouncement } from "@/data/anime-sections";
+import { filterEligibleAiringAnime, getExactReleaseDate, isEligibleAiringAnime, isNewRelease, isUpcomingAnnouncement } from "@/data/anime-sections";
 import { Header, type View } from "@/components/yume/Header";
 import { AuthPage } from "@/components/yume/AuthPage";
 import { AnimeCard } from "@/components/yume/Poster";
@@ -211,9 +211,9 @@ export const Route = createFileRoute("/")({
       .sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? "") || b.year - a.year)
       .slice(0, 50);
 
+    const currentAiringIds = new Set(sourceFeeds?.airing.map((anime) => anime.id) ?? []);
     const sectionFeeds = {
-      airing: refreshedItems
-        .filter((anime) => isEligibleAiringAnime(anime))
+      airing: filterEligibleAiringAnime(refreshedItems, currentAiringIds)
         .sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? "") || b.year - a.year),
       newReleases: refreshedItems
         .filter((anime) => isNewRelease(anime))
@@ -482,7 +482,12 @@ function Index() {
     const refreshSectionFeeds = async () => {
       try {
         const feeds = await getShikimoriSectionFeeds();
-        if (cancelled || !feeds) return;
+        if (cancelled) return;
+        if (!feeds) {
+          // Do not present a stale airing list as current when Shikimori cannot confirm status.
+          setSectionFeeds((current) => current ? { ...current, airing: [] } : current);
+          return;
+        }
         const incoming = allSectionFeedItems(feeds);
         const updatedCatalog = mergeLiveFeedIntoCurrent(
           catalogAnimeRef.current,
@@ -502,12 +507,11 @@ function Index() {
           return Array.from(selected.values());
         };
         setPopularAnime(selectUpdatedFeed(feeds.popular).filter((anime) => (anime.rating ?? 0) >= 8));
-        // Rebuild the sections from the updated local catalogue snapshot, not from
-        // Shikimori's limited section feeds. This lets changed statuses move titles
-        // out of "Сейчас выходит" on the next client refresh.
+        // Shikimori's live ongoing feed is the source of truth for membership.
+        // D1 status alone can be stale; Kodik availability is an independent filter.
+        const currentAiringIds = new Set(feeds.airing.map((anime) => anime.id));
         setSectionFeeds({
-          airing: updatedCatalog
-            .filter((anime) => isEligibleAiringAnime(anime))
+          airing: filterEligibleAiringAnime(updatedCatalog, currentAiringIds)
             .sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? "") || b.year - a.year),
           newReleases: updatedCatalog
             .filter((anime) => isNewRelease(anime))
