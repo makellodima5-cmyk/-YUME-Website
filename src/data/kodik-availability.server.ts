@@ -12,6 +12,7 @@ type Database = { prepare(sql: string): Statement; batch(statements: Statement[]
 type EpisodeValue = string | { link?: string | null };
 type KodikSeason = { episodes?: Record<string, EpisodeValue> | null };
 type KodikResult = {
+  shikimori_id?: string | number;
   link?: string | null;
   seasons?: Record<string, KodikSeason> | null;
   episodes?: Record<string, EpisodeValue> | null;
@@ -53,7 +54,7 @@ function validPlayerLink(value: EpisodeValue | null | undefined): string | null 
 }
 
 /** A valid empty result means "no episodes"; malformed or error payloads throw. */
-export function parseKodikAvailability(payload: unknown): { hasEpisodes: boolean; episodeCount: number } {
+export function parseKodikAvailability(payload: unknown, expectedAnimeId: string): { hasEpisodes: boolean; episodeCount: number } {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
     throw new Error("Kodik returned a malformed response.");
   }
@@ -65,8 +66,15 @@ export function parseKodikAvailability(payload: unknown): { hasEpisodes: boolean
     throw new Error("Kodik response is missing results.");
   }
 
+  const matchingResults = data.results.filter((result) =>
+    result && typeof result === "object" && String(result.shikimori_id ?? "") === expectedAnimeId,
+  );
+  if (data.results.length > 0 && matchingResults.length === 0) {
+    throw new Error("Kodik response does not match the requested Shikimori ID.");
+  }
+
   const validLinks = new Set<string>();
-  for (const result of data.results) {
+  for (const result of matchingResults) {
     if (!result || typeof result !== "object") continue;
     let entries: Array<[string, EpisodeValue]> = [];
     if (result.seasons && typeof result.seasons === "object") {
@@ -124,7 +132,7 @@ async function fetchKodikAvailability(animeId: string, token: string): Promise<{
   } catch {
     throw new Error("Kodik returned invalid JSON.");
   }
-  return parseKodikAvailability(payload);
+  return parseKodikAvailability(payload, animeId);
 }
 
 /**
