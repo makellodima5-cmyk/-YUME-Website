@@ -1226,8 +1226,8 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
             const nextStatus = item.status === "ongoing" ? "Онгоинг" : item.status === "anons" ? "Анонс" : "Вышел";
             const episodes = Math.max(0, Math.floor(Number(item.episodes ?? 0) || 0));
             const nextEpisodeAt = nextStatus === "Онгоинг" && typeof item.nextEpisodeAt === "string" && item.nextEpisodeAt.trim() ? item.nextEpisodeAt : null;
-            statements.push(db.prepare("UPDATE anime_catalog SET status=?, episodes=CASE WHEN ?>0 THEN ? ELSE episodes END, next_episode_at=?, updated_at=CURRENT_TIMESTAMP WHERE id=?")
-              .bind(nextStatus, episodes, episodes, nextEpisodeAt, id));
+            statements.push(db.prepare("UPDATE anime_catalog SET status=?, episodes=?, next_episode_at=?, updated_at=CURRENT_TIMESTAMP WHERE id=?")
+              .bind(nextStatus, episodes, nextEpisodeAt, id));
             updated++;
           }
           if (statements.length) await db.batch(statements);
