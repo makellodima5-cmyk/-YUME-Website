@@ -5,6 +5,7 @@ import {
   parseShikimoriSectionFeeds,
   parseShikimoriResponse,
   retryAfterMilliseconds,
+  seedRequestForCursor,
   validateRequest,
   youtubeVideoId,
 } from "@/data/shikimori";
@@ -16,6 +17,11 @@ describe("Shikimori request validation", () => {
     expect(validateRequest({ page: -2, limit: 0, search: "  Naruto  " })).toMatchObject({
       page: 1, limit: 50, search: "Naruto",
     });
+  });
+
+  it("keeps the upstream request validator bounded while catalog seeding can continue past page 500", () => {
+    expect(seedRequestForCursor(510)).toMatchObject({ page: 501, limit: 50, order: "ranked" });
+    expect(seedRequestForCursor(20)).toMatchObject({ page: 11, limit: 50, order: "ranked" });
   });
 
   it("limits user search text and accepts only numeric comma-separated IDs", () => {
