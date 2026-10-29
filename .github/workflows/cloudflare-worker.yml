@@ -75,8 +75,8 @@ jobs:
           if (rootConfig.assets?.run_worker_first !== true) {
             throw new Error("HTTP-to-HTTPS redirect must run before any static asset is served.");
           }
-          if (!Array.isArray(rootConfig.triggers?.crons) || !rootConfig.triggers.crons.includes("*/5 * * * *") || !rootConfig.triggers.crons.includes("37 7 * * *") || !rootConfig.triggers.crons.includes("41 19 * * *")) {
-            throw new Error("Root Wrangler config does not include all expected five-minute and twice-daily Cron triggers.");
+          if (Array.isArray(rootConfig.triggers?.crons) && rootConfig.triggers.crons.length > 0) {
+            throw new Error("Automatic scheduled Worker jobs must remain disabled.");
           }
           const expectedRateLimits = [
             { name: "KODIK_RATE_LIMITER", namespaceId: "202610271", limit: 30, period: 60 },
@@ -93,29 +93,13 @@ jobs:
               throw new Error(`Root Wrangler config is missing the expected ${expected.name} rate-limit binding.`);
             }
           }
-          if (!Array.isArray(config.triggers?.crons) || !config.triggers.crons.includes("*/5 * * * *") || !config.triggers.crons.includes("37 7 * * *") || !config.triggers.crons.includes("41 19 * * *")) {
-            throw new Error("Generated Nitro Wrangler config does not preserve all expected Cron triggers.");
+          if (Array.isArray(config.triggers?.crons) && config.triggers.crons.length > 0) {
+            throw new Error("Generated Worker config must not enable scheduled automatic jobs.");
           }
-
-          // Verify the deployable Worker artifact itself. Source-only tests can pass
-          // while the actual Nitro entry has no registered scheduled callback.
           const workerEntry = fs.readFileSync(rootConfig.main, "utf8");
-          if (!/callHook\(["']cloudflare:scheduled["']/.test(workerEntry)) {
-            throw new Error("Generated Worker entry has no Cloudflare scheduled-hook dispatch.");
+          if (/callHook\(["']cloudflare:scheduled["']/.test(workerEntry) || workerEntry.includes("cloudflare:scheduled")) {
+            throw new Error("Generated Worker entry must not register a scheduled callback.");
           }
-          if (!workerEntry.includes("[YUME][SCHEDULED] Nitro scheduled hook received.")) {
-            throw new Error("Generated Worker entry has no registered scheduled-hook subscriber.");
-          }
-          if (workerEntry.includes("runScheduledCatalogMetadataRefresh")) {
-            throw new Error("Catalog metadata refresh must not be scheduled; it is manual-only.");
-          }
-          if (workerEntry.includes("runScheduledTrailerUpdate")) {
-            throw new Error("Automatic trailer lookup must remain manual-only.");
-          }
-          if (!workerEntry.includes("runScheduledCatalogStatusRefresh") || !workerEntry.includes("runScheduledEpisodeNotifications")) {
-            throw new Error("Generated Worker entry is missing catalog status refresh or episode notification jobs.");
-          }
-          console.log("Verified generated Worker entry schedules catalog status refresh and episode notifications, without automatic trailer lookup.");
 
           console.log("Verified generated Worker config, root entry, assets, Cron trigger, and YUME_DB binding.");
           NODE
