@@ -14,7 +14,7 @@ export function setCatalogRuntimeEnvironment(env: unknown): void {
 export type CatalogProgress = {
   status: "seeding" | "cooldown" | "ready" | "partial";
   imported: number;
-  target: number;
+  target: number | null;
   retryAfterMs?: number;
 };
 
@@ -56,6 +56,7 @@ type AnimeRow = {
   aired_on: string | null;
   studios_json: string;
   youtube_trailer_id: string | null;
+  kodik_available?: number;
 };
 
 interface D1Statement {
@@ -71,7 +72,6 @@ interface D1Database {
   exec(query: string): Promise<unknown>;
 }
 
-const CATALOG_IMPORT_TARGET = 25_500;
 const LOCK_TTL_MS = 30 * 1000;
 const DEFAULT_RETRY_MS = 5 * 1000;
 const SEED_REQUEST_DELAY_MS = 1250;
@@ -108,6 +108,10 @@ const CREATE_SCHEMA_STATEMENTS = [
   "CREATE INDEX IF NOT EXISTS idx_anime_catalog_position ON anime_catalog(position)",
   "CREATE INDEX IF NOT EXISTS idx_anime_catalog_due_episodes ON anime_catalog(status, datetime(next_episode_at)) WHERE next_episode_at IS NOT NULL",
   "CREATE INDEX IF NOT EXISTS idx_anime_catalog_missing_trailer ON anime_catalog(id) WHERE youtube_trailer_id IS NULL OR youtube_trailer_id = ''",
+  `CREATE TABLE IF NOT EXISTS anime_kodik_availability (anime_id TEXT PRIMARY KEY NOT NULL, has_episodes INTEGER NOT NULL DEFAULT 0 CHECK (has_episodes IN (0,1)), episode_count INTEGER NOT NULL DEFAULT 0, checked_at TEXT, last_attempt_at TEXT, last_error TEXT)`,
+  "CREATE INDEX IF NOT EXISTS idx_anime_kodik_availability_checked ON anime_kodik_availability(checked_at,last_attempt_at)",
+  "CREATE TABLE IF NOT EXISTS anime_kodik_availability_lock (id INTEGER PRIMARY KEY CHECK(id=1), locked_until INTEGER NOT NULL DEFAULT 0)",
+  "INSERT OR IGNORE INTO anime_kodik_availability_lock (id,locked_until) VALUES (1,0)",
   `CREATE TABLE IF NOT EXISTS anime_catalog_screenshots (anime_id TEXT NOT NULL, original_url TEXT NOT NULL, preview_url TEXT NOT NULL, position INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (anime_id, original_url))`,
   "CREATE INDEX IF NOT EXISTS idx_anime_catalog_screenshots_position ON anime_catalog_screenshots(anime_id, position)",
   `CREATE TABLE IF NOT EXISTS anime_catalog_meta (
@@ -260,6 +264,7 @@ function rowToAnime(row: AnimeRow): Anime {
   if (row.next_episode_at) anime.nextEpisodeAt = row.next_episode_at;
   if (row.aired_on) anime.airedOn = row.aired_on;
   if (row.youtube_trailer_id) anime.youtubeTrailerId = row.youtube_trailer_id;
+  anime.kodikAvailable = row.kodik_available === 1;
 
   return anime;
 }
@@ -371,7 +376,7 @@ function putMeta(db: D1Database, key: string, value: string): D1Statement {
 }
 
 async function readRows(db: D1Database): Promise<Anime[]> {
-  const result = await db.prepare("SELECT * FROM anime_catalog ORDER BY position ASC, id ASC").all<AnimeRow>();
+  const result = await db.prepare("SELECT a.*, CASE WHEN k.has_episodes = 1 AND datetime(k.checked_at) >= datetime('now', '-6 hours') THEN 1 ELSE 0 END AS kodik_available FROM anime_catalog a LEFT JOIN anime_kodik_availability k ON k.anime_id = a.id ORDER BY a.position ASC, a.id ASC").all<AnimeRow>();
   return result.results.map(rowToAnime);
 }
 
@@ -389,7 +394,7 @@ function makeProgress(
   return {
     status,
     imported,
-    target: CATALOG_IMPORT_TARGET,
+    target: null,
     ...(retryAfterMs !== undefined ? { retryAfterMs } : {}),
   };
 }
@@ -548,8 +553,7 @@ export async function getPersistentCatalog(
 
       imported = await countRows(db);
       const nextCursor = cursor + 1;
-      const maxRequests = 20 + (500 - 11 + 1);
-      const nextState = nextCursor >= maxRequests ? "ready" : "seeding";
+      const nextState = "seeding";
 
       await db.batch([
         putMeta(db, "catalog_cursor", String(nextCursor)),

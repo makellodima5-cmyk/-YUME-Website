@@ -27,5 +27,6 @@ describe("Cloudflare Worker scheduled entrypoint", () => {
     expect(cronPlugin).toContain('const CATALOG_REFRESH_CRONS = new Set(["37 7 * * *", "41 19 * * *"]);\n');
     expect(cronPlugin).toContain("runScheduledCatalogStatusRefresh(env)");
     expect(cronPlugin).toContain("runScheduledEpisodeNotifications(env)");
+    expect(cronPlugin).toContain("runScheduledKodikAvailabilityRefresh(env)");
   });
 });

@@ -25,6 +25,8 @@ export type Anime = {
   airedOn?: string;
   studios?: string[];
   youtubeTrailerId?: string;
+  /** True only after Kodik confirms at least one safe episode link. */
+  kodikAvailable?: boolean;
 };
 
 export const ANIME: Anime[] = [

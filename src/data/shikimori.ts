@@ -19,7 +19,6 @@ const responseCache = new Map<string, { expiresAt: number; items: Anime[] }>();
 let shikimoriCooldownUntil = 0;
 const SHIKIMORI_429_COOLDOWN_MS = 60 * 1000;
 const SEED_REQUEST_DELAY_MS = 1250;
-const MAX_SEED_REQUESTS = 20 + (500 - 11 + 1);
 
 type ShikimoriRequest = {
   page?: number;
@@ -548,7 +547,6 @@ async function fetchShikimoriSectionFeeds(): Promise<ShikimoriSectionFeeds | nul
 export const getShikimoriSectionFeeds = createServerFn({ method: "GET" })
   .handler(async () => fetchShikimoriSectionFeeds());
 
-const CATALOG_IMPORT_TARGET = MAX_SEED_REQUESTS * 50;
 const CATALOG_CACHE_TTL_MS = 30 * 60 * 1000;
 
 const PRIORITY_SEED_REQUESTS: ShikimoriRequest[] = [
@@ -559,8 +557,12 @@ const PRIORITY_SEED_REQUESTS: ShikimoriRequest[] = [
   ...Array.from({ length: 2 }, (_, index) => ({ page: index + 1, limit: 50, order: "popularity" as const, status: "anons" as const })),
 ];
 
-function seedRequestForCursor(cursor: number): ShikimoriRequest | null {
-  if (cursor < 0 || cursor >= MAX_SEED_REQUESTS) return null;
+export function isSuccessfulEmptySeedPage(items: readonly unknown[], error: string | null | undefined, cursor: number): boolean {
+  return !error && items.length === 0 && cursor >= PRIORITY_SEED_REQUESTS.length;
+}
+
+export function seedRequestForCursor(cursor: number): ShikimoriRequest | null {
+  if (cursor < 0) return null;
   if (cursor < PRIORITY_SEED_REQUESTS.length) return PRIORITY_SEED_REQUESTS[cursor]!;
   return {
     page: cursor - PRIORITY_SEED_REQUESTS.length + 11,
@@ -577,7 +579,7 @@ function makeCatalogProgress(
   return {
     status,
     imported,
-    target: CATALOG_IMPORT_TARGET,
+    target: null,
     ...(retryAfterMs !== undefined ? { retryAfterMs } : {}),
   };
 }
@@ -618,7 +620,7 @@ async function buildShikimoriCatalog(forceRefresh: boolean): Promise<CatalogResu
     return result;
   }
 
-  const page = await fetchShikimoriAnimes(validateRequest(request));
+  const page = await fetchShikimoriAnimes(request);
   if (page.error) {
     const retryAfterMs = page.retryAfterMs ?? 5000;
     fallbackResumeAt = Date.now() + retryAfterMs;
@@ -632,11 +634,21 @@ async function buildShikimoriCatalog(forceRefresh: boolean): Promise<CatalogResu
   for (const anime of page.items) {
     if (!fallbackItems.has(anime.id)) fallbackItems.set(anime.id, anime);
   }
+  if (isSuccessfulEmptySeedPage(page.items, page.error, fallbackCursor)) {
+    const result: CatalogResult = {
+      items: existingItems,
+      error: null,
+      progress: makeCatalogProgress("ready", existingItems.length),
+    };
+    catalogCache = { expiresAt: Date.now() + CATALOG_CACHE_TTL_MS, result };
+    return result;
+  }
+
   fallbackCursor += 1;
   fallbackResumeAt = Date.now() + SEED_REQUEST_DELAY_MS;
 
   const items = Array.from(fallbackItems.values());
-  const status = fallbackCursor >= MAX_SEED_REQUESTS ? "ready" : "seeding";
+  const status = "seeding";
   const error = null;
   const result: CatalogResult = {
     items,
@@ -658,7 +670,10 @@ export const getShikimoriCatalog = createServerFn({ method: "GET" })
         const request = seedRequestForCursor(cursor);
         if (!request) return { items: [], error: null, done: true };
         // Trailer metadata is imported with catalog rows as part of the admin-only seed.
-        return fetchShikimoriAnimes(validateRequest({ ...request, includeVideos: true }));
+        const page = await fetchShikimoriAnimes({ ...request, includeVideos: true });
+        return isSuccessfulEmptySeedPage(page.items, page.error, cursor)
+          ? { ...page, done: true }
+          : page;
       },
       { progressOnly: data.progressOnly },
     );

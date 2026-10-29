@@ -27,7 +27,6 @@ type ShikimoriAnime = {
 type Payload = { data?: { animes?: ShikimoriAnime[] | null }; errors?: { message?: string }[] };
 const API_URL = "https://shikimori.io/api/graphql";
 const SESSION_COOKIE = "__Host-yume-session";
-const MAX_TARGET = 500;
 const PAGE_SIZE = 50;
 const REQUEST_DELAY_MS = 1500;
 const METADATA_REFRESH_BATCH_SIZE = 100;
@@ -36,6 +35,10 @@ const SCREENSHOT_RETRY_LIMIT = 3;
 const SCREENSHOT_REFRESH_BATCH_SIZE = 40;
 const FIELDS = "id malId name english russian kind score status episodes episodesAired airedOn { date year } releasedOn { date year } description poster { mainUrl previewUrl originalUrl } opengraphImageUrl genres { id name russian kind } nextEpisodeAt rating studios { name } videos { url playerUrl name kind }";
 const IMPORT_FIELDS = FIELDS + " screenshots { originalUrl x332Url x166Url }";
+
+export function isValidAdminImportTarget(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 1;
+}
 
 export function normalizeAdminCatalogIds(value: unknown): string[] {
   const rawIds = Array.isArray(value) ? value : [];
@@ -1226,7 +1229,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
       }
       if (body.action === "start") {
         const target = Number(body.target);
-        if (!Number.isInteger(target) || target < 1 || target > MAX_TARGET) return json({error:"invalid_target",max:MAX_TARGET},400);
+        if (!isValidAdminImportTarget(target)) return json({error:"invalid_target",message:"Укажи положительное целое число в безопасном диапазоне."},400);
         const requestedStatus = typeof body.statusFilter === "string" ? body.statusFilter : "";
         const allowedStatusFilters = new Set(["", "ongoing", "anons", "released"]);
         if (!allowedStatusFilters.has(requestedStatus)) return json({error:"invalid_status_filter",message:"Недопустимый статус для массового импорта."},400);
@@ -1254,7 +1257,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
         const resumeAt = Number(await getMeta(db,"admin_import_resume_at") ?? "0");
         if (resumeAt > Date.now()) return json({isAdmin:true,...await snapshot(db),retryAfterMs:resumeAt-Date.now(),error:"Источник временно на паузе. Повтори запрос позже."},503);
         const before = await snapshot(db);
-        if (before.added >= before.target || before.cursor > 500) {
+        if (before.added >= before.target) {
           const finalState = before.added >= before.target ? "completed" : "partial";
           await db.batch([setMeta(db,"admin_import_state",finalState)]);
           await audit(db,"catalog.import.finish",finalState,{added:before.added,target:before.target,skipped:before.skipped,errors:before.errors});
@@ -1359,7 +1362,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
         statements.push(db.prepare("UPDATE anime_catalog_meta SET value = CAST(CAST((SELECT value FROM anime_catalog_meta WHERE key = 'admin_import_baseline_incomplete') AS INTEGER) + (SELECT COUNT(*) FROM admin_catalog_import_items WHERE run_id = ? AND outcome = 'added' AND incomplete = 1) AS TEXT) WHERE key = 'admin_import_incomplete'").bind(runId));
         statements.push(db.prepare("UPDATE anime_catalog_meta SET value = CAST(CAST(value AS INTEGER) + 1 AS TEXT) WHERE key = 'admin_import_cursor'"));
         statements.push(setMeta(db,"admin_import_resume_at",resumeAtValue));
-        statements.push(db.prepare("UPDATE anime_catalog_meta SET value = CASE WHEN CAST((SELECT value FROM anime_catalog_meta WHERE key = 'admin_import_added') AS INTEGER) >= CAST((SELECT value FROM anime_catalog_meta WHERE key = 'admin_import_target') AS INTEGER) THEN 'completed' WHEN CAST((SELECT value FROM anime_catalog_meta WHERE key = 'admin_import_cursor') AS INTEGER) > 500 THEN 'partial' ELSE 'running' END WHERE key = 'admin_import_state'"));
+        statements.push(db.prepare("UPDATE anime_catalog_meta SET value = CASE WHEN CAST((SELECT value FROM anime_catalog_meta WHERE key = 'admin_import_added') AS INTEGER) >= CAST((SELECT value FROM anime_catalog_meta WHERE key = 'admin_import_target') AS INTEGER) THEN 'completed' ELSE 'running' END WHERE key = 'admin_import_state'"));
         if (statements.length) {
           await db.batch(statements);
           await invalidatePersistentCatalogCache();

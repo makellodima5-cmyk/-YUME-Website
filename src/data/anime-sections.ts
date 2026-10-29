@@ -59,10 +59,25 @@ export function isNewRelease(
 }
 
 /**
- * The airing section is a view of the current catalogue status. Shikimori status
- * refresh decides whether a title is still ongoing; missing episode dates or
- * episode-count discrepancies must not hide catalogue records before they are checked.
+ * The airing section is intentionally narrower than the catalogue: Shikimori must
+ * still report an ongoing title and the cached Kodik check must confirm at least
+ * one safe episode link for this exact Shikimori ID. Unknown/error states stay out.
  */
 export function isEligibleAiringAnime(anime: Anime): boolean {
-  return anime.status === "Онгоинг";
+  return anime.status === "Онгоинг" && anime.kodikAvailable === true;
+}
+
+
+/**
+ * Intersect the persistent catalog with the current Shikimori ongoing feed before
+ * applying Kodik availability. A stale D1 status alone must never keep a title
+ * in the homepage's live airing section.
+ */
+export function filterEligibleAiringAnime(
+  catalogItems: readonly Anime[],
+  currentOngoingIds: ReadonlySet<string>,
+): Anime[] {
+  return catalogItems.filter((anime) =>
+    currentOngoingIds.has(anime.id) && isEligibleAiringAnime(anime),
+  );
 }

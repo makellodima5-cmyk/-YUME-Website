@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chunkAdminCatalogIds, isCatalogMetadataIncomplete, mapAdminCatalogScreenshots, mapAniListBannersToCatalogIds, normalizeAdminCatalogIds, normalizeAniListMalId } from "@/data/admin-catalog-import.server";
+import { chunkAdminCatalogIds, isCatalogMetadataIncomplete, mapAdminCatalogScreenshots, mapAniListBannersToCatalogIds, normalizeAdminCatalogIds, isValidAdminImportTarget, normalizeAniListMalId } from "@/data/admin-catalog-import.server";
 
 describe("AniList MAL ID mapping", () => {
   it("normalizes a separate MAL ID and maps AniList banners back to Shikimori catalogue IDs", () => {
@@ -15,6 +15,18 @@ describe("AniList MAL ID mapping", () => {
       { id: "shikimori-43", malId: null },
       { id: "shikimori-44", malId: 901108 },
     ], new Map([["901107", banner]]))).toEqual(new Map([["shikimori-42", banner]]));
+  });
+});
+
+describe("admin catalog import target", () => {
+  it("accepts targets above the old 500-title application cap", () => {
+    expect(isValidAdminImportTarget(501)).toBe(true);
+    expect(isValidAdminImportTarget(100_000)).toBe(true);
+    expect(isValidAdminImportTarget(1)).toBe(true);
+    expect(isValidAdminImportTarget(0)).toBe(false);
+    expect(isValidAdminImportTarget(-1)).toBe(false);
+    expect(isValidAdminImportTarget(1.5)).toBe(false);
+    expect(isValidAdminImportTarget(Number.MAX_SAFE_INTEGER + 1)).toBe(false);
   });
 });
 

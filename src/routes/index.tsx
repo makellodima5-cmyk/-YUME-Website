@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowDownWideNarrow, ChevronDown, ChevronRight, Search, SlidersHorizontal, X, UserRound, Globe, Sun, Moon, Monitor, ShieldCheck, Play, ListChecks, CircleCheck, Clock3, ChartNoAxesCombined, Download, Database, Settings, History, Bell, CheckCheck, Sparkles } from "lucide-react";
 import { COLLECTIONS, type Anime } from "@/data/anime";
 import { getShikimoriCatalog, getShikimoriSectionFeeds, type ShikimoriSectionFeeds } from "@/data/shikimori";
-import { getExactReleaseDate, isEligibleAiringAnime, isNewRelease, isUpcomingAnnouncement } from "@/data/anime-sections";
+import { filterEligibleAiringAnime, getExactReleaseDate, isEligibleAiringAnime, isNewRelease, isUpcomingAnnouncement } from "@/data/anime-sections";
 import { Header, type View } from "@/components/yume/Header";
 import { AuthPage } from "@/components/yume/AuthPage";
 import { AnimeCard } from "@/components/yume/Poster";
@@ -211,9 +211,9 @@ export const Route = createFileRoute("/")({
       .sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? "") || b.year - a.year)
       .slice(0, 50);
 
+    const currentAiringIds = new Set(sourceFeeds?.airing.map((anime) => anime.id) ?? []);
     const sectionFeeds = {
-      airing: refreshedItems
-        .filter((anime) => isEligibleAiringAnime(anime))
+      airing: filterEligibleAiringAnime(refreshedItems, currentAiringIds)
         .sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? "") || b.year - a.year),
       newReleases: refreshedItems
         .filter((anime) => isNewRelease(anime))
@@ -482,7 +482,12 @@ function Index() {
     const refreshSectionFeeds = async () => {
       try {
         const feeds = await getShikimoriSectionFeeds();
-        if (cancelled || !feeds) return;
+        if (cancelled) return;
+        if (!feeds) {
+          // Do not present a stale airing list as current when Shikimori cannot confirm status.
+          setSectionFeeds((current) => current ? { ...current, airing: [] } : current);
+          return;
+        }
         const incoming = allSectionFeedItems(feeds);
         const updatedCatalog = mergeLiveFeedIntoCurrent(
           catalogAnimeRef.current,
@@ -502,12 +507,11 @@ function Index() {
           return Array.from(selected.values());
         };
         setPopularAnime(selectUpdatedFeed(feeds.popular).filter((anime) => (anime.rating ?? 0) >= 8));
-        // Rebuild the sections from the updated local catalogue snapshot, not from
-        // Shikimori's limited section feeds. This lets changed statuses move titles
-        // out of "Сейчас выходит" on the next client refresh.
+        // Shikimori's live ongoing feed is the source of truth for membership.
+        // D1 status alone can be stale; Kodik availability is an independent filter.
+        const currentAiringIds = new Set(feeds.airing.map((anime) => anime.id));
         setSectionFeeds({
-          airing: updatedCatalog
-            .filter((anime) => isEligibleAiringAnime(anime))
+          airing: filterEligibleAiringAnime(updatedCatalog, currentAiringIds)
             .sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? "") || b.year - a.year),
           newReleases: updatedCatalog
             .filter((anime) => isNewRelease(anime))
@@ -524,7 +528,9 @@ function Index() {
             }),
         });
       } catch {
-        // Keep the last successful section snapshot when Shikimori is temporarily unavailable.
+        // Other sections may keep their last snapshot, but airing must not imply a current status
+        // that Shikimori could not confirm on this refresh.
+        if (!cancelled) setSectionFeeds((current) => current ? { ...current, airing: [] } : current);
       }
     };
 
@@ -1211,8 +1217,8 @@ function Index() {
   const runCatalogImport = async () => {
     if (!isAdmin || adminImportRunning || metadataRefreshRunning) return;
     const target = Number(adminImportTarget);
-    if (adminImport.state !== "running" && (!Number.isInteger(target) || target < 1 || target > 500)) {
-      setAdminImportMessage(language === "ru" ? "Укажи целое число от 1 до 500." : "Enter a whole number from 1 to 500.");
+    if (adminImport.state !== "running" && (!Number.isSafeInteger(target) || target < 1)) {
+      setAdminImportMessage(language === "ru" ? "Укажи положительное целое число." : "Enter a positive whole number.");
       return;
     }
     setAdminImportRunning(true);
@@ -1237,7 +1243,7 @@ function Index() {
         if (payload.state !== "running") {
           setAdminImportMessage(payload.message ?? (language === "ru"
             ? (payload.state === "completed" ? "Импорт завершён." : "Импорт остановлен: достигнут предел доступных страниц.")
-            : (payload.state === "completed" ? "Import completed." : "Import stopped: available page limit reached.")));
+            : (payload.state === "completed" ? "Import completed." : "Import stopped: source returned no more records.")));
           return;
         }
         setAdminImportMessage(language === "ru"
@@ -2257,8 +2263,8 @@ function Index() {
                   <div className="my-4 flex items-center gap-3 text-[11px] uppercase tracking-[0.15em] text-muted-foreground"><span className="h-px flex-1 bg-border" /><span>{language === "ru" ? "или импорт по количеству" : "or import by quantity"}</span><span className="h-px flex-1 bg-border" /></div>
                   <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
                     <label className="text-sm">
-                      <span className="mb-1 block text-xs text-muted-foreground">{language === "ru" ? "Количество новых записей (1–500)" : "Number of new records (1–500)"}</span>
-                      <input type="number" min={1} max={500} step={1} value={adminImportTarget} onChange={event => setAdminImportTarget(event.target.value)} disabled={adminImportRunning || adminImport.state === "running"} className="h-10 w-full rounded-xl border border-[#453452] bg-[#050408] px-3 text-[#FFFFFF] focus:border-[#BE65FF] focus:outline-none focus:ring-1 focus:ring-[#BE65FF]" />
+                      <span className="mb-1 block text-xs text-muted-foreground">{language === "ru" ? "Количество новых записей" : "Number of new records"}</span>
+                      <input type="number" min={1} step={1} value={adminImportTarget} onChange={event => setAdminImportTarget(event.target.value)} disabled={adminImportRunning || adminImport.state === "running"} className="h-10 w-full rounded-xl border border-[#453452] bg-[#050408] px-3 text-[#FFFFFF] focus:border-[#BE65FF] focus:outline-none focus:ring-1 focus:ring-[#BE65FF]" />
                     </label>
                     <label className="text-sm">
                       <span className="mb-1 block text-xs text-muted-foreground">{language === "ru" ? "Статус для массового импорта" : "Bulk import status"}</span>
@@ -2269,7 +2275,7 @@ function Index() {
                         <option value="released">{language === "ru" ? "Вышедшее" : "Released"}</option>
                       </select>
                     </label>
-                    <button type="button" onClick={runCatalogImport} disabled={adminImportRunning || metadataRefreshRunning || (adminImport.state !== "running" && (!Number.isInteger(Number(adminImportTarget)) || Number(adminImportTarget)<1 || Number(adminImportTarget)>500))} className="self-end rounded-xl bg-gradient-to-r from-[#AC4EFC] to-[#8736FA] px-4 py-2.5 text-sm font-semibold text-white shadow-[0_0_16px_rgba(155,65,245,0.18)] transition hover:brightness-110 disabled:cursor-wait disabled:opacity-50">
+                    <button type="button" onClick={runCatalogImport} disabled={adminImportRunning || metadataRefreshRunning || (adminImport.state !== "running" && (!Number.isSafeInteger(Number(adminImportTarget)) || Number(adminImportTarget)<1))} className="self-end rounded-xl bg-gradient-to-r from-[#AC4EFC] to-[#8736FA] px-4 py-2.5 text-sm font-semibold text-white shadow-[0_0_16px_rgba(155,65,245,0.18)] transition hover:brightness-110 disabled:cursor-wait disabled:opacity-50">
                       {adminImportRunning ? (language === "ru" ? "Импорт…" : "Importing…") : adminImport.state === "running" ? (language === "ru" ? "Продолжить импорт" : "Resume import") : (language === "ru" ? "Начать импорт" : "Start import")}
                     </button>
                   </div>
