@@ -2,8 +2,8 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowDownWideNarrow, ChevronDown, ChevronRight, Search, SlidersHorizontal, X, UserRound, Globe, Sun, Moon, Monitor, ShieldCheck, Play, ListChecks, CircleCheck, Clock3, ChartNoAxesCombined, Download, Database, Settings, History, Bell, CheckCheck, Sparkles } from "lucide-react";
 import { COLLECTIONS, type Anime } from "@/data/anime";
-import { getShikimoriCatalog, getShikimoriSectionFeeds, type ShikimoriSectionFeeds } from "@/data/shikimori";
-import { filterEligibleAiringAnime, getExactReleaseDate, isEligibleAiringAnime, isNewRelease, isUpcomingAnnouncement } from "@/data/anime-sections";
+import { getShikimoriCatalog } from "@/data/shikimori";
+import { filterEligibleAiringAnime, getExactReleaseDate, isNewRelease, isUpcomingAnnouncement } from "@/data/anime-sections";
 import { Header, type View } from "@/components/yume/Header";
 import { AuthPage } from "@/components/yume/AuthPage";
 import { AnimeCard } from "@/components/yume/Poster";
@@ -23,67 +23,6 @@ import { trackYumePage } from "@/lib/yume-analytics";
 import { setProfileStorageAuthenticated, syncTelegramLibrary } from "@/data/profile-storage";
 import { USER_NOTIFICATIONS } from "@/data/notifications.shared";
 import { runAdminTrailerUpdate, type AdminTrailerStats } from "@/data/admin-trailer-update";
-
-function mergeLiveSectionAnime(stored: Anime, live: Anime): Anime {
-  return {
-    ...stored,
-    // These values can change as episodes air; catalog identity and artwork stay fixed.
-    status: live.status,
-    rating: live.rating ?? stored.rating,
-    episodes: live.episodes > 0 ? live.episodes : stored.episodes,
-    episodesAired: live.episodesAired ?? stored.episodesAired,
-    nextEpisodeAt: live.nextEpisodeAt,
-    popular: live.popular ?? stored.popular,
-    id: stored.id,
-    title: stored.title,
-    englishTitle: stored.englishTitle ?? live.englishTitle,
-    original: stored.original,
-    year: stored.year,
-    genres: stored.genres,
-    description: stored.description,
-    hue: stored.hue,
-    glyph: stored.glyph,
-    isNew: stored.isNew,
-    posterUrl: stored.posterUrl,
-    bannerUrl: stored.bannerUrl,
-    kind: stored.kind,
-    ageRating: stored.ageRating,
-    airedOn: stored.airedOn,
-    studios: stored.studios,
-    youtubeTrailerId: stored.youtubeTrailerId,
-  };
-}
-
-function mergeLiveFeedIntoCurrent(
-  currentItems: Anime[],
-  incomingItems: readonly Anime[],
-  allowedIds: ReadonlySet<string>,
-): Anime[] {
-  const byId = new Map(currentItems.map((item) => [item.id, item]));
-  for (const live of incomingItems) {
-    if (!allowedIds.has(live.id)) continue;
-    const current = byId.get(live.id);
-    byId.set(live.id, current ? mergeLiveSectionAnime(current, live) : live);
-  }
-  return Array.from(byId.values());
-}
-
-function selectLiveCatalogItems(
-  catalogItems: readonly Anime[],
-  incomingItems: readonly Anime[],
-): Anime[] {
-  const catalogById = new Map(catalogItems.map((item) => [item.id, item]));
-  const result = new Map<string, Anime>();
-  for (const live of incomingItems) {
-    const stored = catalogById.get(live.id);
-    if (stored) result.set(live.id, mergeLiveSectionAnime(stored, live));
-  }
-  return Array.from(result.values());
-}
-
-function allSectionFeedItems(feeds: ShikimoriSectionFeeds): Anime[] {
-  return [...feeds.popular, ...feeds.newReleases, ...feeds.announcements, ...feeds.airing];
-}
 
 const NOTIFICATION_STORAGE_KEY = "yume-user-notifications-read-v1";
 const NOTIFICATION_DISMISSED_STORAGE_KEY = "yume-user-notifications-dismissed-v1";
@@ -194,40 +133,19 @@ export const Route = createFileRoute("/")({
         apiError: catalog.error, catalogProgress: catalog.progress,
       };
     }
-    const sourceFeeds = await getShikimoriSectionFeeds();
-    const persistentItems = catalog.items;
-    const catalogIds = persistentItems.map((anime) => anime.id);
-    const allowedIds = new Set(catalogIds);
-    const liveItems = sourceFeeds ? allSectionFeedItems(sourceFeeds) : [];
-    const refreshedItems = mergeLiveFeedIntoCurrent(persistentItems, liveItems, allowedIds);
-    const refreshedById = new Map(refreshedItems.map((anime) => [anime.id, anime]));
-    const popular = sourceFeeds
-      ? selectLiveCatalogItems(refreshedItems, sourceFeeds.popular)
-          .filter((anime) => (anime.rating ?? 0) >= 8)
-      : refreshedItems
-          .filter((anime) => (anime.rating ?? 0) >= 8)
-          .sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1));
-    const seedRecent = [...refreshedItems]
-      .sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? "") || b.year - a.year)
-      .slice(0, 50);
-
-    const currentAiringIds = new Set(sourceFeeds?.airing.map((anime) => anime.id) ?? []);
+    const refreshedItems = catalog.items;
+    const popular = refreshedItems.filter((anime) => (anime.rating ?? 0) >= 8).sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1));
+    const currentAiringIds = new Set(refreshedItems.filter((anime) => anime.status === "Онгоинг").map((anime) => anime.id));
     const sectionFeeds = {
-      airing: filterEligibleAiringAnime(refreshedItems, currentAiringIds)
-        .sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? "") || b.year - a.year),
-      newReleases: refreshedItems
-        .filter((anime) => isNewRelease(anime))
-        .sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? "") || (b.rating ?? -1) - (a.rating ?? -1)),
-      announcements: refreshedItems
-        .filter((anime) => isUpcomingAnnouncement(anime))
-        .sort((a, b) => {
-          const aDate = getExactReleaseDate(a.airedOn);
-          const bDate = getExactReleaseDate(b.airedOn);
-          if (aDate && bDate) return aDate.localeCompare(bDate);
-          if (aDate) return -1;
-          if (bDate) return 1;
-          return a.year - b.year || (b.rating ?? -1) - (a.rating ?? -1);
-        }),
+      airing: filterEligibleAiringAnime(refreshedItems, currentAiringIds).sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? "") || b.year - a.year),
+      newReleases: refreshedItems.filter((anime) => isNewRelease(anime)).sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? "") || (b.rating ?? -1) - (a.rating ?? -1)),
+      announcements: refreshedItems.filter((anime) => anime.status === "Анонс" || isUpcomingAnnouncement(anime)).sort((a, b) => {
+        const aDate = getExactReleaseDate(a.airedOn), bDate = getExactReleaseDate(b.airedOn);
+        if (aDate && bDate) return aDate.localeCompare(bDate);
+        if (aDate) return -1;
+        if (bDate) return 1;
+        return a.year - b.year || (b.rating ?? -1) - (a.rating ?? -1);
+      }),
     };
 
     return {
@@ -476,69 +394,6 @@ function Index() {
   }, [loadedAnime, initialPopularAnime, initialSectionFeeds, initialCatalogProgress, view, catalogMode]);
   useEffect(() => { catalogAnimeRef.current = catalogAnime; }, [catalogAnime]);
 
-  useEffect(() => {
-    if (view === "catalog") return;
-    let cancelled = false;
-    const refreshSectionFeeds = async () => {
-      try {
-        const feeds = await getShikimoriSectionFeeds();
-        if (cancelled) return;
-        if (!feeds) {
-          // A transient Shikimori failure must not erase the last known-good
-          // airing list. Replace it only after a successful feed refresh.
-          return;
-        }
-        const incoming = allSectionFeedItems(feeds);
-        const updatedCatalog = mergeLiveFeedIntoCurrent(
-          catalogAnimeRef.current,
-          incoming,
-          allowedCatalogIds,
-        );
-        catalogAnimeRef.current = updatedCatalog;
-        setCatalogAnime(updatedCatalog);
-        const refreshedById = new Map(updatedCatalog.map((anime) => [anime.id, anime]));
-        const selectUpdatedFeed = (items: Anime[]) => {
-          const selected = new Map<string, Anime>();
-          for (const live of items) {
-            if (!allowedCatalogIds.has(live.id)) continue;
-            const anime = refreshedById.get(live.id);
-            if (anime) selected.set(anime.id, anime);
-          }
-          return Array.from(selected.values());
-        };
-        setPopularAnime(selectUpdatedFeed(feeds.popular).filter((anime) => (anime.rating ?? 0) >= 8));
-        // Shikimori's live ongoing feed is the source of truth for membership.
-        // D1 status alone can be stale; Kodik availability is an independent filter.
-        const currentAiringIds = new Set(feeds.airing.map((anime) => anime.id));
-        setSectionFeeds({
-          airing: filterEligibleAiringAnime(updatedCatalog, currentAiringIds)
-            .sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? "") || b.year - a.year),
-          newReleases: updatedCatalog
-            .filter((anime) => isNewRelease(anime))
-            .sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? "") || (b.rating ?? -1) - (a.rating ?? -1)),
-          announcements: updatedCatalog
-            .filter((anime) => isUpcomingAnnouncement(anime))
-            .sort((a, b) => {
-              const aDate = getExactReleaseDate(a.airedOn);
-              const bDate = getExactReleaseDate(b.airedOn);
-              if (aDate && bDate) return aDate.localeCompare(bDate);
-              if (aDate) return -1;
-              if (bDate) return 1;
-              return a.year - b.year || (b.rating ?? -1) - (a.rating ?? -1);
-            }),
-        });
-      } catch {
-        // Keep the last known-good section data on transient refresh failures.
-        // The next successful Shikimori refresh will replace the list.
-      }
-    };
-
-    const timer = window.setInterval(() => { void refreshSectionFeeds(); }, 5 * 60 * 1000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(timer);
-    };
-  }, [allowedCatalogIds, view]);
   const [catalogLoadState, setCatalogLoadState] = useState<"idle" | "loading" | "loaded" | "error">("idle");
   const [catalogLoadError, setCatalogLoadError] = useState<string | null>(null);
   const catalogLoadStarted = useRef(false);
