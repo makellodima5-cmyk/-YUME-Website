@@ -3,7 +3,7 @@
 The homepage's "Currently airing" section is filtered by two independent facts:
 
 1. The title's current Shikimori status is `Онгоинг`.
-2. A successful Kodik lookup for that exact Shikimori ID confirms at least one valid HTTPS episode link on a trusted Kodik player host.
+2. A successful Kodik lookup contains results whose `shikimori_id` exactly matches that Shikimori ID and confirms at least one valid HTTPS episode link on a trusted Kodik player host. Results for another ID are treated as an API/data mismatch, not as availability.
 
 ## Storage and refresh
 
