@@ -417,37 +417,6 @@ async function catalogRefreshStats(db: Database) {
     savedScreenshotUrls:Number(shots?.savedScreenshotUrls??0), screenshotDone:Number(shots?.screenshotDone??0),
     screenshotRetry:Number(shots?.screenshotRetry??0), screenshotFailed:Number(shots?.screenshotFailed??0) };
 }
-type MetadataBannerCounters = {
-  bannersFound: number;
-  bannersMatched: number;
-  bannersSaved: number;
-  bannersAdded: number;
-  bannerErrors: number;
-  bannersStored: number;
-};
-
-async function metadataBannerCounters(db: Database): Promise<MetadataBannerCounters> {
-  const keys = [
-    "metadata_refresh_banners_found",
-    "metadata_refresh_banners_matched",
-    "metadata_refresh_banners_saved",
-    "metadata_refresh_banners_added",
-    "metadata_refresh_banner_errors",
-    "metadata_refresh_banners_stored",
-  ];
-  const rows = await db.prepare("SELECT key,value FROM anime_catalog_meta WHERE key IN (" + keys.map(() => "?").join(",") + ")")
-    .bind(...keys).all<{key:string;value:string}>();
-  const values = new Map(rows.results.map(row => [row.key, row.value]));
-  return {
-    bannersFound: Number(values.get(keys[0]) ?? 0),
-    bannersMatched: Number(values.get(keys[1]) ?? 0),
-    bannersSaved: Number(values.get(keys[2]) ?? 0),
-    bannersAdded: Number(values.get(keys[3]) ?? 0),
-    bannerErrors: Number(values.get(keys[4]) ?? 0),
-    bannersStored: Number(values.get(keys[5]) ?? 0),
-  };
-}
-
 async function catalogQuality(db: Database, requestedOffset = 0) {
   const offset = Number.isFinite(requestedOffset) ? Math.max(0,Math.min(100000,Math.floor(requestedOffset))) : 0;
   const [rows, aggregate] = await Promise.all([
@@ -872,12 +841,11 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
       // The admin dashboard polls every five seconds. Status polling must not
       // rescan the entire catalogue or recompute aggregate quality counters.
       if (url.searchParams.get("status") === "1") {
-        const [refreshState, metadataCursor, screenshotCursor, bannerCounters] = await Promise.all([
+        const [refreshState, metadataCursor, screenshotCursor] = await Promise.all([
           getMeta(db, "metadata_refresh_state"),
           getMeta(db, "metadata_refresh_cursor"),
           getMeta(db, "metadata_refresh_screenshot_cursor"),
-          metadataBannerCounters(db),
-        ]);
+          ]);
         const phase = refreshState ?? "idle";
         return json({
           isAdmin: true,
@@ -918,7 +886,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
       const metadataOffset = phase === "done" || phase.startsWith("screenshots")
         ? refreshTotal : Math.max(0, Number(metadataCursor ?? "0") || 0);
       const screenshotOffset = phase === "metadata" ? 0 : Math.max(0, Number(screenshotCursor ?? "0") || 0);
-      const bannerCounters = await metadataBannerCounters(db);
+      const bannerCounters = { bannersFound: 0, bannersMatched: 0, bannersSaved: 0, bannersAdded: 0, bannerErrors: 0, bannersStored: 0 };
       return json({
         isAdmin: true,
         ...await snapshot(db),
