@@ -200,14 +200,37 @@ export async function handleTelegramWebhook(request: Request): Promise<Response>
   }
 
   try {
+    if (isStartCommand && !browserLogin) {
+      const sender = message?.from;
+      if (typeof sender?.id !== "number" || !Number.isSafeInteger(sender.id)) {
+        return json({ ok: true, ignored: true });
+      }
+      if (!db || !channelId || !channelUrl) {
+        console.error("[YUME][TELEGRAM_BOT] Missing YUME_DB, TELEGRAM_CHANNEL_ID, or TELEGRAM_CHANNEL_URL.");
+        return json({ ok: false, error: "Channel subscription gate is not configured" }, 503);
+      }
+      const member = await checkChannelMembership(token, channelId, sender.id);
+      const access = await getAccess(db, sender.id);
+      if (!member) {
+        const previouslyHadAccess = access?.ever_had_access === 1;
+        const statusText = previouslyHadAccess ? RETURN_SUBSCRIBE_MESSAGE : FIRST_SUBSCRIBE_MESSAGE;
+        const messageId = await sendOrEditStatus(token, access, chatId, statusText,
+          channelKeyboard(channelUrl, previouslyHadAccess ? "😂 Я больше не уйду" : "😏 Ладно, подписываюсь"));
+        await saveAccess(db, { userId: sender.id, chatId, everHadAccess: previouslyHadAccess,
+          awaitingSubscription: true, messageId, firstName: sender.first_name ?? access?.first_name ?? null });
+        return json({ ok: true, action: "subscription_required" });
+      }
+      const messageId = await sendOrEditStatus(token, access, chatId, greeting, welcomeKeyboard(), "HTML");
+      await saveAccess(db, { userId: sender.id, chatId, everHadAccess: true, awaitingSubscription: false,
+        messageId, firstName: sender.first_name ?? access?.first_name ?? null });
+      return json({ ok: true, action: "welcome_shown" });
+    }
+
     const response = await telegramApi(token, "sendMessage", {
       chat_id: chatId, text: greeting, parse_mode: "HTML",
       reply_markup: browserLogin
         ? { inline_keyboard: [[{ text: "🌸 Открыть YUME", url: SITE_URL }]] }
-        : { inline_keyboard: [
-            [{ text: "🎬 Открыть YUME", web_app: { url: SITE_URL } }],
-            [{ text: "🛠 Не работает плеер?", callback_data: PLAYER_HELP_CALLBACK }],
-          ] },
+        : welcomeKeyboard(),
     });
     if (!response.ok) {
       console.error("[YUME][TELEGRAM_BOT] Telegram sendMessage failed.", {
