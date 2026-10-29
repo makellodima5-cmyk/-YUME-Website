@@ -13,7 +13,7 @@ export function TelegramSubscriptionGate({ children }: { children: ReactNode }) 
 
   const checkSubscription = useCallback(async () => {
     if (!initData) {
-      setStatus("subscribed");
+      setStatus("error");
       return;
     }
     setChecking(true);
@@ -39,14 +39,18 @@ export function TelegramSubscriptionGate({ children }: { children: ReactNode }) 
   }, [initData]);
 
   useEffect(() => {
-    if (!webApp || !initData) {
+    if (!webApp) {
       setStatus("subscribed");
+      return;
+    }
+    if (!initData) {
+      setStatus("error");
       return;
     }
     void checkSubscription();
   }, [webApp, initData, checkSubscription]);
 
-  if (!webApp || !initData || status === "subscribed") return <>{children}</>;
+  if (!webApp || status === "subscribed") return <>{children}</>;
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-background px-5 py-10 text-foreground">
