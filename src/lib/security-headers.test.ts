@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { applySecurityHeaders } from "./security-headers";
 
 describe("applySecurityHeaders", () => {
-  it("adds baseline browser security headers to HTML responses", () => {
+  it("adds baseline browser security headers and an enforcing CSP to HTML responses", () => {
     const response = applySecurityHeaders(
       new Response("<html></html>", { headers: { "Content-Type": "text/html; charset=utf-8" } }),
       "https://example.com/",
@@ -15,6 +15,10 @@ describe("applySecurityHeaders", () => {
     expect(response.headers.get("Referrer-Policy")).toBe("strict-origin-when-cross-origin");
     expect(response.headers.get("Permissions-Policy")).toContain("camera=()");
     expect(response.headers.get("Strict-Transport-Security")).toBe("max-age=31536000");
+    expect(response.headers.get("Content-Security-Policy")).toContain("default-src 'self'");
+    expect(response.headers.get("Content-Security-Policy")).toContain("object-src 'none'");
+    expect(response.headers.get("Content-Security-Policy")).toContain("script-src 'self' 'unsafe-inline'");
+    expect(response.headers.get("Content-Security-Policy")).toContain("frame-src 'self'");
     expect(response.headers.get("Content-Security-Policy-Report-Only")).toContain("default-src 'self'");
     expect(response.headers.get("Content-Security-Policy-Report-Only")).toContain("report-uri /api/csp-report");
     expect(response.headers.get("Content-Security-Policy-Report-Only")).toContain("report-to csp-endpoint");
@@ -32,7 +36,7 @@ describe("applySecurityHeaders", () => {
     expect(response.headers.get("X-Content-Type-Options")).toBe("nosniff");
   });
 
-  it("preserves a route's explicit content security policy", () => {
+  it("preserves a route's explicit enforcing CSP", () => {
     const response = applySecurityHeaders(
       new Response("<html></html>", {
         headers: {
