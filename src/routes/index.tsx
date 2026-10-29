@@ -528,7 +528,9 @@ function Index() {
             }),
         });
       } catch {
-        // Keep the last successful section snapshot when Shikimori is temporarily unavailable.
+        // Other sections may keep their last snapshot, but airing must not imply a current status
+        // that Shikimori could not confirm on this refresh.
+        setSectionFeeds((current) => current ? { ...current, airing: [] } : current);
       }
     };
 
