@@ -5,6 +5,7 @@ import {
   parseShikimoriSectionFeeds,
   parseShikimoriResponse,
   retryAfterMilliseconds,
+  isSuccessfulEmptySeedPage,
   seedRequestForCursor,
   validateRequest,
   youtubeVideoId,
@@ -22,6 +23,9 @@ describe("Shikimori request validation", () => {
   it("keeps the upstream request validator bounded while catalog seeding can continue past page 500", () => {
     expect(seedRequestForCursor(510)).toMatchObject({ page: 501, limit: 50, order: "ranked" });
     expect(seedRequestForCursor(20)).toMatchObject({ page: 11, limit: 50, order: "ranked" });
+    expect(isSuccessfulEmptySeedPage([], null, 20)).toBe(true);
+    expect(isSuccessfulEmptySeedPage([], "Shikimori timeout", 20)).toBe(false);
+    expect(isSuccessfulEmptySeedPage([{ id: "1" }], null, 20)).toBe(false);
   });
 
   it("limits user search text and accepts only numeric comma-separated IDs", () => {
