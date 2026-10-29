@@ -154,7 +154,7 @@ export async function runScheduledKodikAvailabilityRefresh(input: unknown): Prom
       "WHERE a.status='Онгоинг' " +
       "AND (k.checked_at IS NULL OR datetime(k.checked_at) <= datetime('now', '-6 hours')) " +
       "AND (k.last_attempt_at IS NULL OR datetime(k.last_attempt_at) <= datetime('now', '-30 minutes')) " +
-      "ORDER BY COALESCE(k.checked_at,'1970-01-01 00:00:00') ASC, COALESCE(k.last_attempt_at,'1970-01-01 00:00:00') ASC, a.id ASC LIMIT ?",
+      "ORDER BY COALESCE(k.checked_at,'1970-01-01 00:00:00') ASC, COALESCE(k.last_attempt_at,'1970-01-01 00:00:00') ASC, a.position ASC, a.id ASC LIMIT ?",
     ).bind(CHECK_BATCH_SIZE).all<{ id: string }>();
 
     for (const row of due.results) {
