@@ -11,7 +11,6 @@ import { CollectionsGrid, Grid, Hero, Row } from "@/components/yume/Sections";
 import { CatalogFilters, EMPTY_CATALOG_FILTERS, type CatalogFiltersValue } from "@/components/yume/CatalogFilters";
 import { Profile } from "@/components/yume/Profile";
 import { Footer } from "@/components/yume/Footer";
-import { AdvertisingSlot } from "@/components/yume/AdvertisingSlot";
 import { HomeDepthAtmosphere } from "@/components/yume/HomeDepthAtmosphere";
 import "../home-depth.css";
 import { useYumePreferences, displayGenre, type TranslationKey } from "@/data/preferences";
@@ -1832,7 +1831,6 @@ function Index() {
                   {popularCards.length > 0 && <Row title={t("home.popular")} action={<SeeAll onClick={() => setView("popular")} />}>
                     {popularCards.map((a) => <AnimeCard key={a.id} anime={a} onSelect={select} />)}
                   </Row>}
-                  {popularCards.length > 0 && <AdvertisingSlot slot="home-between-popular-new-releases" language={language} />}
                   {newReleaseCards.length > 0 && <Row title={t("home.newReleases")} action={<SeeAll onClick={() => setView("new-releases")} />}>
                     {newReleaseCards.map((a) => <AnimeCard key={a.id} anime={a} onSelect={select} />)}
                   </Row>}
