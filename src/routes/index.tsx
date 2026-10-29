@@ -1237,7 +1237,7 @@ function Index() {
         if (payload.state !== "running") {
           setAdminImportMessage(payload.message ?? (language === "ru"
             ? (payload.state === "completed" ? "Импорт завершён." : "Импорт остановлен: достигнут предел доступных страниц.")
-            : (payload.state === "completed" ? "Import completed." : "Import stopped: available page limit reached.")));
+            : (payload.state === "completed" ? "Import completed." : "Import stopped: source returned no more records.")));
           return;
         }
         setAdminImportMessage(language === "ru"
