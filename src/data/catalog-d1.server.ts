@@ -106,6 +106,7 @@ const CREATE_SCHEMA_STATEMENTS = [
   )`,
   "CREATE INDEX IF NOT EXISTS idx_anime_catalog_title ON anime_catalog(title)",
   "CREATE INDEX IF NOT EXISTS idx_anime_catalog_position ON anime_catalog(position)",
+  "CREATE INDEX IF NOT EXISTS idx_anime_catalog_status_position_id ON anime_catalog(status, position, id)",
   "CREATE INDEX IF NOT EXISTS idx_anime_catalog_due_episodes ON anime_catalog(status, datetime(next_episode_at)) WHERE next_episode_at IS NOT NULL",
   "CREATE INDEX IF NOT EXISTS idx_anime_catalog_missing_trailer ON anime_catalog(id) WHERE youtube_trailer_id IS NULL OR youtube_trailer_id = ''",
   `CREATE TABLE IF NOT EXISTS anime_kodik_availability (anime_id TEXT PRIMARY KEY NOT NULL, has_episodes INTEGER NOT NULL DEFAULT 0 CHECK (has_episodes IN (0,1)), episode_count INTEGER NOT NULL DEFAULT 0, checked_at TEXT, last_attempt_at TEXT, last_error TEXT)`,
