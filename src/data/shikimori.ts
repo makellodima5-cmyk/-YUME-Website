@@ -630,7 +630,7 @@ async function buildShikimoriCatalog(forceRefresh: boolean): Promise<CatalogResu
   for (const anime of page.items) {
     if (!fallbackItems.has(anime.id)) fallbackItems.set(anime.id, anime);
   }
-  if (page.items.length === 0 && fallbackCursor >= PRIORITY_SEED_REQUESTS.length) {
+  if (!page.error && page.items.length === 0 && fallbackCursor >= PRIORITY_SEED_REQUESTS.length) {
     const result: CatalogResult = {
       items: existingItems,
       error: null,
@@ -667,7 +667,7 @@ export const getShikimoriCatalog = createServerFn({ method: "GET" })
         if (!request) return { items: [], error: null, done: true };
         // Trailer metadata is imported with catalog rows as part of the admin-only seed.
         const page = await fetchShikimoriAnimes({ ...request, includeVideos: true });
-        return page.items.length === 0 && cursor >= PRIORITY_SEED_REQUESTS.length
+        return !page.error && page.items.length === 0 && cursor >= PRIORITY_SEED_REQUESTS.length
           ? { ...page, done: true }
           : page;
       },
