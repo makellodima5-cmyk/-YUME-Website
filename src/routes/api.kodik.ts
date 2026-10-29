@@ -110,13 +110,11 @@ async function handleKodik(request: Request): Promise<Response> {
     return json({ error: "Kodik API returned an invalid response." }, 502);
   }
 
-  const matchingResults = payload.results.filter((result) => String(result.shikimori_id ?? "") === animeId);
-  if (payload.results.length > 0 && matchingResults.length === 0) {
-    return json({ error: "Kodik API returned results for a different Shikimori title." }, 502);
-  }
-
+  // Keep the existing Kodik player search/selection behaviour. Kodik's player
+  // endpoint owns its own source mapping; strict ID validation is only used by
+  // the separate availability checker so it cannot hide the playable sources.
   const sources = new Map<string, { id: string; title: string; episodes: Map<number, { number: number; title: string; link: string }> }>();
-  for (const result of matchingResults) {
+  for (const result of payload.results) {
     const translationId = String(result.translation?.id ?? result.id ?? "");
     const translationTitle = (result.translation?.title || result.title || "").trim();
     if (!translationId || !translationTitle) continue;
