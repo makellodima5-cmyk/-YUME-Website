@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowDownWideNarrow, ChevronDown, ChevronRight, Search, SlidersHorizontal, X, UserRound, Globe, Sun, Moon, Monitor, ShieldCheck, Play, ListChecks, CircleCheck, Clock3, ChartNoAxesCombined, Download, Database, Settings, History, Bell, CheckCheck, Sparkles } from "lucide-react";
+import { ArrowDownWideNarrow, ChevronDown, ChevronRight, Search, SlidersHorizontal, X, UserRound, Globe, Sun, Moon, Monitor, ShieldCheck, Play, ListChecks, CircleCheck, Clock3, Download, Database, Settings, History, Bell, CheckCheck, Sparkles } from "lucide-react";
 import { COLLECTIONS, type Anime } from "@/data/anime";
 import { getShikimoriCatalog } from "@/data/shikimori";
 import { getExactReleaseDate, isNewRelease, isUpcomingAnnouncement } from "@/data/anime-sections";
@@ -19,7 +19,6 @@ import { validateCatalogSearch } from "@/data/catalog-search";
 import homeSocialImage from "@/assets/yume-desktop.webp";
 import { absoluteImageUrl, canonicalUrl } from "@/data/seo";
 import { getTelegramWebApp, telegramHapticImpact } from "@/lib/telegram-mini-app";
-import { trackYumePage } from "@/lib/yume-analytics";
 import { setProfileStorageAuthenticated, syncTelegramLibrary } from "@/data/profile-storage";
 import { USER_NOTIFICATIONS } from "@/data/notifications.shared";
 import { runAdminTrailerUpdate, type AdminTrailerStats } from "@/data/admin-trailer-update";
@@ -461,11 +460,6 @@ function Index() {
   const [maintenanceBusy, setMaintenanceBusy] = useState(false);
   const [maintenanceMessage, setMaintenanceMessage] = useState("");
   const [expandedAdminSections, setExpandedAdminSections] = useState({import:false,deletion:false,metadata:false,quality:false,maintenance:false,audit:false,trailers:false,notifications:false});
-  const [analyticsData, setAnalyticsData] = useState<{periods:{hours:{visits:number;visitors:number};week:{visits:number;visitors:number};month:{visits:number;visitors:number};all:{visits:number;visitors:number}};daily:{date:string;visits:number;pageViews:number;visitors:number}[];updatedAt:string}|null>(null);
-  const [analyticsLoading, setAnalyticsLoading] = useState(false);
-  const [analyticsError, setAnalyticsError] = useState("");
-  const [analyticsOpen, setAnalyticsOpen] = useState(false);
-  const [cookieNoticeAcknowledged, setCookieNoticeAcknowledged] = useState(false);
   const [historyItems, setHistoryItems] = useState<{ animeId: string; viewedAt: string; viewCount: number }[]>([]);
   const [historyDeletingIds, setHistoryDeletingIds] = useState<string[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -480,7 +474,6 @@ function Index() {
   useEffect(() => {
     if (view !== "admin") return;
     setExpandedAdminSections({import:false,deletion:false,metadata:false,quality:false,maintenance:false,audit:false,trailers:false,notifications:false});
-    setAnalyticsOpen(false);
   }, [view]);
 
   useEffect(() => {
@@ -618,45 +611,10 @@ function Index() {
   }, [isTelegramMiniApp, telegramAuthReady, telegramConsentRequired, telegramConsentPending]);
 
   useEffect(() => {
-    if (!cookieNoticeAcknowledged || view === "admin" || typeof window === "undefined") return;
-    trackYumePage(window.location.pathname + "#" + String(view));
-  }, [view, cookieNoticeAcknowledged]);
-
-  useEffect(() => {
-    if (!isAdmin) return;
-    let cancelled = false;
-    setAnalyticsLoading(true);
-    setAnalyticsError("");
-    fetch("/api/analytics", {credentials:"same-origin",cache:"no-store"})
-      .then(async response => {
-        const result = await response.json().catch(() => ({})) as {ok?:boolean;analytics?:typeof analyticsData;error?:string};
-        if (!response.ok || !result.analytics) throw new Error(result.error || (language==="ru"?"Не удалось загрузить аналитику.":"Could not load analytics."));
-        if (!cancelled) setAnalyticsData(result.analytics);
-      })
-      .catch(error => {if(!cancelled)setAnalyticsError(error instanceof Error?error.message:"Analytics request failed.");})
-      .finally(()=>{if(!cancelled)setAnalyticsLoading(false);});
-    return () => {cancelled=true;};
-  }, [isAdmin,analyticsOpen,language]);
-
-  useEffect(() => {
     if (isTelegramMiniApp && telegramConsentPending && view !== "privacy-policy") {
       setTelegramConsentRequired(true);
     }
   }, [isTelegramMiniApp, telegramConsentPending, view]);
-
-  useEffect(() => {
-    const syncConsent = () => {
-      try {
-        const consent = JSON.parse(window.localStorage.getItem("yume-cookie-consent-v1") ?? "null") as { necessary?: unknown } | null;
-        setCookieNoticeAcknowledged(consent?.necessary === true);
-      } catch {
-        setCookieNoticeAcknowledged(false);
-      }
-    };
-    syncConsent();
-    window.addEventListener("yume-cookie-consent-updated", syncConsent);
-    return () => window.removeEventListener("yume-cookie-consent-updated", syncConsent);
-  }, []);
 
   const acceptTelegramConsent = () => {
     // Legacy consent prompt must never create an account outside the current registration form.
@@ -986,7 +944,7 @@ function Index() {
       const response = await fetch("/api/admin/catalog-import", { method:"POST", credentials:"same-origin", cache:"no-store", headers:{"Content-Type":"application/json"}, body:JSON.stringify({action:"reset_metadata_refresh"}) });
       const payload = await response.json().catch(() => ({})) as {isAdmin?:boolean;error?:string;message?:string;total?:number;stats?:MetadataCatalogStats};
       if (!response.ok || payload.isAdmin !== true) throw new Error(payload.message ?? payload.error ?? "Could not reset metadata refresh.");
-      setMetadataRefreshProgress({offset:0,total:payload.total??0,updated:0,screenshotsSaved:0,bannersFound:0,bannersMatched:0,bannersSaved:0,bannersAdded:0,bannerErrors:0,bannersStored:payload.stats?.anilistBanners??0,phase:"metadata",metadataOffset:0,screenshotOffset:0,screenshotFailures:payload.stats?.screenshotFailed??0,screenshotRetries:payload.stats?.screenshotRetry??0});
+      setMetadataRefreshProgress({offset:0,total:payload.total??0,updated:0,screenshotsSaved:0,bannersFound:0,bannersMatched:0,bannersSaved:0,bannersAdded:0,bannerErrors:0,bannersStored:0,phase:"metadata",metadataOffset:0,screenshotOffset:0,screenshotFailures:payload.stats?.screenshotFailed??0,screenshotRetries:payload.stats?.screenshotRetry??0});
       setMetadataCatalogStats(payload.stats ?? null);
       setMetadataRefreshMessage(payload.message ?? (language === "ru" ? "Прогресс сброшен." : "Progress reset."));
       await refreshCatalogQuality(0);
@@ -2013,24 +1971,6 @@ function Index() {
                   <span className="mt-1 block text-xl font-bold tabular-nums text-[#36EBA6]">{adminStats ? adminStats.found.toLocaleString(language==="ru"?"ru-RU":"en-US") : "—"}</span>
                 </div>
               </section>
-              <details open={analyticsOpen} onToggle={event=>setAnalyticsOpen(event.currentTarget.open)} className="group mb-3 overflow-hidden rounded-2xl border border-[#57317A] bg-[#0D0A14]" aria-label={language==="ru"?"Посещаемость YUME":"YUME visits analytics"}>
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 hover:bg-[#171020] [&::-webkit-details-marker]:hidden">
-                  <span className="flex min-w-0 items-center gap-2.5"><ChartNoAxesCombined className="h-6 w-6 shrink-0 text-[#BE65FF]"/><span className="min-w-0"><span className="block font-semibold text-[#F8F4FF]">{language==="ru"?"Посещаемость YUME":"YUME visits"}</span><span className="mt-0.5 block text-xs text-[#A89CB8]">{language==="ru"?"24 часа: ":"24 hours: "}{analyticsData?.periods.hours.visits.toLocaleString(language==="ru"?"ru-RU":"en-US") ?? "—"} · {language==="ru"?"7 дней: ":"7 days: "}{analyticsData?.periods.week.visits.toLocaleString(language==="ru"?"ru-RU":"en-US") ?? "—"}</span></span></span>
-                  <ChevronDown className="h-4 w-4 shrink-0 text-[#BE65FF] transition-transform group-open:rotate-180"/>
-                </summary>
-                <div className="border-t border-[#392649] p-3 sm:p-4">
-                  {analyticsLoading && <p className="mb-3 text-xs text-[#A89CB8]" role="status">{language==="ru"?"Загружаем статистику…":"Loading analytics…"}</p>}
-                  {analyticsError && <p className="mb-3 rounded-lg border border-red-900 p-2.5 text-xs text-red-300" role="alert">{analyticsError}</p>}
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                    {([{key:"hours",label:language==="ru"?"За 24 часа":"Last 24 hours"},{key:"week",label:language==="ru"?"За 7 дней":"Last 7 days"},{key:"month",label:language==="ru"?"За 30 дней":"Last 30 days"},{key:"all",label:language==="ru"?"За всё время":"All time"}] as const).map(period=><div key={period.key} className="rounded-xl border border-[#35283F] bg-[#08070D] p-3"><span className="block text-xs text-[#AAA1B8]">{period.label}</span><strong className="mt-1 block text-xl tabular-nums text-[#C46AFF]">{analyticsData?.periods[period.key].visits.toLocaleString(language==="ru"?"ru-RU":"en-US") ?? "—"}</strong><span className="mt-1 block text-[11px] text-[#8D819B]">{language==="ru"?"уникальных: ":"unique: "}{analyticsData?.periods[period.key].visitors.toLocaleString(language==="ru"?"ru-RU":"en-US") ?? "—"}</span></div>)}
-                  </div>
-                  <div className="mt-4">
-                    <div className="mb-2 flex items-center justify-between gap-2"><span className="text-sm font-medium text-[#D9C8E8]">{language==="ru"?"Посещения за 7 дней":"Visits over 7 days"}</span><button type="button" disabled={analyticsLoading} onClick={async()=>{setAnalyticsLoading(true);setAnalyticsError("");try{const response=await fetch("/api/analytics",{credentials:"same-origin",cache:"no-store"});const result=await response.json().catch(()=>({})) as {analytics?:typeof analyticsData;error?:string};if(!response.ok||!result.analytics)throw new Error(result.error||(language==="ru"?"Не удалось обновить статистику.":"Could not refresh analytics."));setAnalyticsData(result.analytics);}catch(error){setAnalyticsError(error instanceof Error?error.message:"Analytics request failed.");}finally{setAnalyticsLoading(false);}}} className="text-xs text-[#C46AFF]">{language==="ru"?"Обновить":"Refresh"}</button></div>
-                    {analyticsData?.daily.length ? <div role="img" aria-label={language==="ru"?"График количества визитов за последние семь дней":"Visits chart for the last seven days"} className="flex h-24 items-end gap-1.5 rounded-lg bg-[#08070D] px-2 pt-3">{analyticsData.daily.map(day=><div key={day.date} className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1"><div title={day.date+": "+day.visits+" "+(language==="ru"?"визитов · ":"visits · ")+day.pageViews+" "+(language==="ru"?"просмотров":"pageviews")} className="w-full max-w-8 rounded-t-md bg-gradient-to-t from-[#8B35D6] to-[#D08AFF]" style={{height:Math.max(4,day.visits/Math.max(1,...analyticsData.daily.map(d=>d.visits))*100)+"%"}}/><span className="text-[9px] text-[#8D819B]">{day.date.slice(5)}</span></div>)}</div> : <p className="rounded-lg bg-[#08070D] p-4 text-xs text-[#8D819B]">{language==="ru"?"Данные появятся после первых посещений с включённой аналитикой.":"Data will appear after the first visits are recorded."}</p>}
-                  </div>
-                  <p className="mt-3 text-[11px] text-[#8D819B]">{language==="ru"?"Посещения считаются по случайному ID браузера после подтверждения уведомления о cookie; IP не сохраняется.":"Visits use a random browser ID after the cookie notice is acknowledged; raw IP addresses are not stored."}</p>
-                </div>
-              </details>
               <section className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-card/50 px-3 py-2.5" aria-label={language === "ru" ? "Состояние операций" : "Operations status"}>
                 <span className="text-sm font-medium">{language === "ru" ? "Состояние операций" : "Operations status"}</span>
                 <span className={`inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-xs font-medium ${(adminRunning || adminImportRunning || metadataRefreshRunning) ? "border-primary/40 bg-primary/10 text-primary" : (adminMessage || adminImportMessage || metadataRefreshMessage) ? "border-amber-500/40 bg-amber-500/10 text-amber-600" : "border-border bg-background/60 text-muted-foreground"}`}>
@@ -2219,8 +2159,8 @@ function Index() {
                         [language === "ru" ? "Анонсы" : "Announced", metadataCatalogStats.announced],
                         [language === "ru" ? "Без трейлера" : "Missing trailer", metadataCatalogStats.missingTrailer],
                         [language === "ru" ? "С трейлером" : "Has trailer", metadataCatalogStats.hasTrailer],
-                        [language === "ru" ? "Баннеры AniList в D1" : "AniList banners in D1", metadataCatalogStats.anilistBanners],
-                        [language === "ru" ? "Без баннера AniList" : "Missing AniList banner", metadataCatalogStats.missingAniListBanners],
+                        [language === "ru" ? "Баннеры AniList в D1" : "AniList banners in D1", 0],
+                        [language === "ru" ? "Без баннера AniList" : "Missing AniList banner", 0],
                         [language === "ru" ? "URL кадров" : "Screenshot URLs", metadataCatalogStats.savedScreenshotUrls],
                         [language === "ru" ? "Кадры проверены" : "Screenshots checked", metadataCatalogStats.screenshotDone],
                         [language === "ru" ? "Кадры: повторы" : "Screenshot retries", metadataCatalogStats.screenshotRetry],
