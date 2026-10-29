@@ -160,14 +160,19 @@ export async function handleTelegramWebhook(request: Request): Promise<Response>
     }
     try {
       const answer = await telegramApi(token, "answerCallbackQuery", { callback_query_id: callback.id });
-      if (!answer.ok) console.error("[YUME][TELEGRAM_BOT] Telegram answerCallbackQuery failed.", { status: answer.status });
+      if (!answer.ok) {
+        const responseText = (await answer.text()).slice(0, 500);
+        console.warn("[YUME][TELEGRAM_BOT] Telegram answerCallbackQuery failed; continuing webhook processing.", {
+          status: answer.status, response: responseText,
+        });
+      }
       const callbackUserId = callback.from?.id;
       if (typeof callbackUserId !== "number" || !Number.isSafeInteger(callbackUserId)) return json({ ok: true, ignored: true });
       const db = subscriptionDb(env);
       const state = await getSubscriptionState(db, callbackUserId);
       const subscribed = await isChannelMember(token, env, callbackUserId);
       if (subscribed === null) {
-        await telegramApi(token, "answerCallbackQuery", { callback_query_id: callback.id, text: "Не удалось проверить подписку. Попробуй ещё раз.", show_alert: true });
+        // The callback query has already been answered above. Telegram only allows one answer per callback.
         return json({ ok: true, action: "subscription_check_failed" });
       }
       if (!subscribed) {
@@ -176,7 +181,15 @@ export async function handleTelegramWebhook(request: Request): Promise<Response>
           chat_id: callback.message.chat.id, message_id: callback.message.message_id,
           text: gateText, reply_markup: gateKeyboard(),
         });
-        if (!gateResponse.ok) return json({ ok: false, error: "Could not update subscription gate" }, 502);
+        if (!gateResponse.ok) {
+          const responseText = (await gateResponse.text()).slice(0, 500);
+          if (!responseText.toLowerCase().includes("message is not modified")) {
+            console.error("[YUME][TELEGRAM_BOT] Telegram subscription gate edit failed.", {
+              status: gateResponse.status, response: responseText,
+            });
+            return json({ ok: false, error: "Could not update subscription gate" }, gateResponse.status >= 500 ? 502 : 200);
+          }
+        }
         await saveSubscriptionState(db, callbackUserId, callback.message.chat.id, callback.message.message_id, Boolean(state?.had_access), Boolean(state?.had_access));
         return json({ ok: true, action: "subscription_required" });
       }
@@ -186,7 +199,15 @@ export async function handleTelegramWebhook(request: Request): Promise<Response>
           text: "🌙 Подписка подтверждена! Добро пожаловать в YUME.\n\nНажимай на кнопку ниже — и давай начнём ✨",
           reply_markup: welcomeKeyboard(),
         });
-        if (!response.ok) return json({ ok: false, error: "Could not update welcome message" }, 502);
+        if (!response.ok) {
+          const responseText = (await response.text()).slice(0, 500);
+          if (!responseText.toLowerCase().includes("message is not modified")) {
+            console.error("[YUME][TELEGRAM_BOT] Telegram welcome message edit failed.", {
+              status: response.status, response: responseText,
+            });
+            return json({ ok: false, error: "Could not update welcome message" }, response.status >= 500 ? 502 : 200);
+          }
+        }
         await saveSubscriptionState(db, callbackUserId, callback.message.chat.id, callback.message.message_id, true, false);
         return json({ ok: true, action: "subscription_confirmed" });
       }
@@ -198,10 +219,13 @@ export async function handleTelegramWebhook(request: Request): Promise<Response>
         reply_markup: { inline_keyboard: [[{ text: "🌐 Открыть YUME в браузере", url: SITE_URL }]] },
       });
       if (!response.ok) {
-        console.error("[YUME][TELEGRAM_BOT] Telegram editMessageText failed.", {
-          status: response.status, response: (await response.text()).slice(0, 500),
-        });
-        return json({ ok: false, error: "Could not update help message" }, 502);
+        const responseText = (await response.text()).slice(0, 500);
+        if (!responseText.toLowerCase().includes("message is not modified")) {
+          console.error("[YUME][TELEGRAM_BOT] Telegram editMessageText failed.", {
+            status: response.status, response: responseText,
+          });
+          return json({ ok: false, error: "Could not update help message" }, response.status >= 500 ? 502 : 200);
+        }
       }
       return json({ ok: true, action: "player_help_shown" });
     } catch (error) {
@@ -231,7 +255,15 @@ export async function handleTelegramWebhook(request: Request): Promise<Response>
         chat_id: Number(state.chat_id), message_id: state.message_id,
         text: RESTORED_MESSAGE, reply_markup: welcomeKeyboard(),
       });
-      if (!response.ok) return json({ ok: false, error: "Could not update restored access message" }, 502);
+      if (!response.ok) {
+        const responseText = (await response.text()).slice(0, 500);
+        if (!responseText.toLowerCase().includes("message is not modified")) {
+          console.error("[YUME][TELEGRAM_BOT] Telegram restored-access message edit failed.", {
+            status: response.status, response: responseText,
+          });
+          return json({ ok: false, error: "Could not update restored access message" }, response.status >= 500 ? 502 : 200);
+        }
+      }
       await saveSubscriptionState(db, userId, Number(state.chat_id), state.message_id, true, false);
       return json({ ok: true, action: "subscription_restored" });
     } catch (error) {
