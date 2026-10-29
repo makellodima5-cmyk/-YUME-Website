@@ -49,13 +49,13 @@ describe("anime section classification", () => {
   });
 
   describe("airing section", () => {
-    it("requires both ongoing status and confirmed Kodik episode availability", () => {
+    it("requires confirmed Kodik episode availability; current Shikimori feed determines ongoing status", () => {
       const base = { ...ANIME[0]!, id: "42" };
       expect(isEligibleAiringAnime({ ...base, status: "Онгоинг", kodikAvailable: true })).toBe(true);
       expect(isEligibleAiringAnime({ ...base, status: "Онгоинг", kodikAvailable: false })).toBe(false);
       expect(isEligibleAiringAnime({ ...base, status: "Онгоинг", kodikAvailable: undefined })).toBe(false);
-      expect(isEligibleAiringAnime({ ...base, status: "Вышел", kodikAvailable: true })).toBe(false);
-      expect(isEligibleAiringAnime({ ...base, status: "Анонс", kodikAvailable: true })).toBe(false);
+      expect(isEligibleAiringAnime({ ...base, status: "Вышел", kodikAvailable: true })).toBe(true);
+      expect(isEligibleAiringAnime({ ...base, status: "Анонс", kodikAvailable: true })).toBe(true);
     });
 
     it("does not retain a stale D1 ongoing status when the title is absent from the current Shikimori ongoing feed", () => {

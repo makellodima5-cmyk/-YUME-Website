@@ -64,7 +64,10 @@ export function isNewRelease(
  * one safe episode link for this exact Shikimori ID. Unknown/error states stay out.
  */
 export function isEligibleAiringAnime(anime: Anime): boolean {
-  return anime.status === "Онгоинг" && anime.kodikAvailable === true;
+  // Current Shikimori feed membership is checked separately by
+  // filterEligibleAiringAnime. Do not require a second, potentially stale
+  // status field from the persistent catalogue.
+  return anime.kodikAvailable === true;
 }
 
 

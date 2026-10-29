@@ -484,8 +484,8 @@ function Index() {
         const feeds = await getShikimoriSectionFeeds();
         if (cancelled) return;
         if (!feeds) {
-          // Do not present a stale airing list as current when Shikimori cannot confirm status.
-          setSectionFeeds((current) => current ? { ...current, airing: [] } : current);
+          // A transient Shikimori failure must not erase the last known-good
+          // airing list. Replace it only after a successful feed refresh.
           return;
         }
         const incoming = allSectionFeedItems(feeds);
@@ -528,9 +528,8 @@ function Index() {
             }),
         });
       } catch {
-        // Other sections may keep their last snapshot, but airing must not imply a current status
-        // that Shikimori could not confirm on this refresh.
-        if (!cancelled) setSectionFeeds((current) => current ? { ...current, airing: [] } : current);
+        // Keep the last known-good section data on transient refresh failures.
+        // The next successful Shikimori refresh will replace the list.
       }
     };
 
