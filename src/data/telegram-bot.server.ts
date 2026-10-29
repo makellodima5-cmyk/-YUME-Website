@@ -4,7 +4,6 @@ import { completeTelegramBrowserAuth, confirmTelegramBrowserAuth } from "@/data/
 type TelegramEnvironment = Record<string, unknown> & {
   TELEGRAM_BOT_TOKEN?: string;
   TELEGRAM_WEBHOOK_SECRET?: string;
-  TELEGRAM_ALLOWED_USERNAMES?: string;
 };
 type TelegramUser = {
   id?: number;
@@ -77,10 +76,8 @@ export async function handleTelegramWebhook(request: Request): Promise<Response>
   const env = environment();
   const token = typeof env.TELEGRAM_BOT_TOKEN === "string" ? env.TELEGRAM_BOT_TOKEN.trim() : "";
   const secret = typeof env.TELEGRAM_WEBHOOK_SECRET === "string" ? env.TELEGRAM_WEBHOOK_SECRET.trim() : "";
-  const allowedUsernames = (typeof env.TELEGRAM_ALLOWED_USERNAMES === "string" ? env.TELEGRAM_ALLOWED_USERNAMES : "")
-    .split(",").map((username) => username.trim().replace(/^@/, "").toLowerCase()).filter(Boolean);
-  if (!token || !secret || allowedUsernames.length === 0) {
-    console.error("[YUME][TELEGRAM_BOT] Missing TELEGRAM_BOT_TOKEN, TELEGRAM_WEBHOOK_SECRET, or TELEGRAM_ALLOWED_USERNAMES.");
+  if (!token || !secret) {
+    console.error("[YUME][TELEGRAM_BOT] Missing TELEGRAM_BOT_TOKEN or TELEGRAM_WEBHOOK_SECRET.");
     return json({ ok: false, error: "Webhook is not configured" }, 503);
   }
   if (request.headers.get("X-Telegram-Bot-Api-Secret-Token") !== secret) {
@@ -101,8 +98,6 @@ export async function handleTelegramWebhook(request: Request): Promise<Response>
 
   const callback = update.callback_query;
   if (callback) {
-    const username = callback.from?.username?.trim().replace(/^@/, "").toLowerCase() ?? "";
-    if (!username || !allowedUsernames.includes(username)) return json({ ok: true, ignored: true });
     if (callback.data !== PLAYER_HELP_CALLBACK || typeof callback.id !== "string" ||
       typeof callback.message?.message_id !== "number" || !Number.isSafeInteger(callback.message.message_id) ||
       typeof callback.message.chat?.id !== "number" || !Number.isSafeInteger(callback.message.chat.id)) {
@@ -134,10 +129,6 @@ export async function handleTelegramWebhook(request: Request): Promise<Response>
   }
 
   const message = update.message;
-  const senderUsername = message?.from?.username?.trim().replace(/^@/, "").toLowerCase() ?? "";
-  // Keep the existing fail-closed username allowlist for every bot action.
-  if (!senderUsername || !allowedUsernames.includes(senderUsername)) return json({ ok: true, ignored: true });
-
   const text = message?.text?.trim() ?? "";
   const chatId = message?.chat?.id;
   const isStartCommand = /^\/start(?:@\w+)?(?:\s|$)/.test(text);
