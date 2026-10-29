@@ -283,13 +283,12 @@ export async function getPersistentAnimeDetails(id: string): Promise<{ anime: An
     };
   }
 
-  const row = await db.prepare("SELECT * FROM anime_catalog WHERE id = ?").bind(id).first<AnimeRow>();
-  if (!row) return { anime: null, relatedAnime: [] };
-
-  // A cold direct-title visit used to execute a correlated JSON genre scan for
-  // each catalog row, then discard most data. Load and cache one ordered snapshot
-  // instead so subsequent title visits can reuse it for related titles as well.
+  // Related titles require the ordered catalog snapshot anyway, so avoid a
+  // separate point lookup before loading the same rows.
   const items = await readRows(db);
+  const anime = items.find((item) => item.id === id) ?? null;
+  if (!anime) return { anime: null, relatedAnime: [] };
+
   const state = await getMeta(db, "catalog_state");
   const catalogResult: CatalogResult = {
     items,
@@ -298,7 +297,6 @@ export async function getPersistentAnimeDetails(id: string): Promise<{ anime: An
   };
   await writeCachedCatalog(db, catalogResult);
 
-  const anime = items.find((item) => item.id === id) ?? rowToAnime(row);
   return {
     anime,
     relatedAnime: selectRelatedAnime(anime, items, 6),
@@ -426,11 +424,12 @@ export async function getPersistentCatalog(
     await ensureSchema(db);
 
     const state = await getMeta(db, "catalog_state");
-    let imported = await countRows(db);
 
     if (state === "ready" || state === "partial") {
+      const items = await readRows(db);
+      const imported = items.length;
       const result: CatalogResult = {
-        items: await readRows(db),
+        items,
         error: state === "partial"
           ? "Каталог загружен частично: " + imported + " записей."
           : null,
@@ -439,6 +438,10 @@ export async function getPersistentCatalog(
       if (!options.allowImport) await writeCachedCatalog(db, result);
       return { ...result, items: options.progressOnly ? [] : result.items };
     }
+
+    // A ready catalog's row count comes from readRows above. Only query COUNT(*)
+    // while seeding or recovering legacy rows, when the count is needed separately.
+    let imported = await countRows(db);
 
     // Preserve manually inserted catalog rows from earlier deployments.
     if (!state && imported > 0) {
