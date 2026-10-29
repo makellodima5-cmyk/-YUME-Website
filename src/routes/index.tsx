@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowDownWideNarrow, ChevronDown, ChevronRight, Search, SlidersHorizontal, X, UserRound, Globe, Sun, Moon, Monitor, ShieldCheck, Play, ListChecks, CircleCheck, Clock3, ChartNoAxesCombined, Download, Database, Settings, History, Bell, CheckCheck, Sparkles } from "lucide-react";
 import { COLLECTIONS, type Anime } from "@/data/anime";
 import { getShikimoriCatalog } from "@/data/shikimori";
-import { filterEligibleAiringAnime, getExactReleaseDate, isNewRelease, isUpcomingAnnouncement } from "@/data/anime-sections";
+import { getExactReleaseDate, isNewRelease } from "@/data/anime-sections";
 import { Header, type View } from "@/components/yume/Header";
 import { AuthPage } from "@/components/yume/AuthPage";
 import { AnimeCard } from "@/components/yume/Poster";
@@ -135,11 +135,10 @@ export const Route = createFileRoute("/")({
     }
     const refreshedItems = catalog.items;
     const popular = refreshedItems.filter((anime) => (anime.rating ?? 0) >= 8).sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1));
-    const currentAiringIds = new Set(refreshedItems.filter((anime) => anime.status === "Онгоинг").map((anime) => anime.id));
     const sectionFeeds = {
-      airing: filterEligibleAiringAnime(refreshedItems, currentAiringIds).sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? "") || b.year - a.year),
+      airing: refreshedItems.filter((anime) => anime.status === "Онгоинг").sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? "") || b.year - a.year),
       newReleases: refreshedItems.filter((anime) => isNewRelease(anime)).sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? "") || (b.rating ?? -1) - (a.rating ?? -1)),
-      announcements: refreshedItems.filter((anime) => anime.status === "Анонс" || isUpcomingAnnouncement(anime)).sort((a, b) => {
+      announcements: refreshedItems.filter((anime) => anime.status === "Анонс").sort((a, b) => {
         const aDate = getExactReleaseDate(a.airedOn), bDate = getExactReleaseDate(b.airedOn);
         if (aDate && bDate) return aDate.localeCompare(bDate);
         if (aDate) return -1;
