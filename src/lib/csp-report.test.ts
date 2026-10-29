@@ -10,14 +10,17 @@ function reportRequest(
   contentType = "application/csp-report",
   method = "POST",
 ): Request {
-  return new Request("https://yume.example/api/csp-report", {
+  const init: RequestInit = {
     method,
     headers: {
       "Content-Type": contentType,
       "CF-Connecting-IP": "203.0.113.10",
     },
-    body: typeof body === "string" ? body : JSON.stringify(body),
-  });
+  };
+  if (method !== "GET" && method !== "HEAD") {
+    init.body = typeof body === "string" ? body : JSON.stringify(body);
+  }
+  return new Request("https://yume.example/api/csp-report", init);
 }
 
 describe("handleCspReport", () => {
