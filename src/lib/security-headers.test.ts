@@ -16,6 +16,9 @@ describe("applySecurityHeaders", () => {
     expect(response.headers.get("Permissions-Policy")).toContain("camera=()");
     expect(response.headers.get("Strict-Transport-Security")).toBe("max-age=31536000");
     expect(response.headers.get("Content-Security-Policy-Report-Only")).toContain("default-src 'self'");
+    expect(response.headers.get("Content-Security-Policy-Report-Only")).toContain("report-uri /api/csp-report");
+    expect(response.headers.get("Content-Security-Policy-Report-Only")).toContain("report-to csp-endpoint");
+    expect(response.headers.get("Reporting-Endpoints")).toBe('csp-endpoint="/api/csp-report"');
   });
 
   it("does not add a document CSP to JSON responses", () => {
