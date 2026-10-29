@@ -320,6 +320,7 @@ export async function handleTelegramWebhook(request: Request): Promise<Response>
     const state = await getSubscriptionState(subscriptionDbInstance, telegramUserId);
     const subscribed = await isChannelMember(token, env, telegramUserId);
     if (subscribed === null) {
+      subscriptionGate = "error";
       greeting = "Не удалось проверить подписку прямо сейчас. Попробуй ещё раз через минуту, отправив /start.";
     } else if (!subscribed) {
       subscriptionGate = state?.had_access ? "return" : "first";
