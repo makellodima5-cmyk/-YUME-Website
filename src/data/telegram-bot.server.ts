@@ -4,6 +4,8 @@ import { completeTelegramBrowserAuth, confirmTelegramBrowserAuth } from "@/data/
 type TelegramEnvironment = Record<string, unknown> & {
   TELEGRAM_BOT_TOKEN?: string;
   TELEGRAM_WEBHOOK_SECRET?: string;
+  TELEGRAM_CHANNEL_ID?: string;
+  YUME_DB?: unknown;
 };
 type TelegramUser = {
   id?: number;
@@ -14,6 +16,7 @@ type TelegramUser = {
 };
 type TelegramUpdate = {
   message?: { text?: string; chat?: { id?: number }; from?: TelegramUser };
+  chat_member?: { chat?: { id?: number }; from?: TelegramUser; old_chat_member?: { status?: string }; new_chat_member?: { status?: string; user?: TelegramUser } };
   callback_query?: {
     id?: string;
     data?: string;
@@ -25,6 +28,11 @@ type RuntimeGlobal = typeof globalThis & { __YUME_RUNTIME_ENV__?: unknown };
 
 const SITE_URL = "https://yume-website.yumesupport833.workers.dev";
 const PLAYER_HELP_CALLBACK = "yume_player_help";
+const CHECK_SUBSCRIPTION_CALLBACK = "yume_check_subscription";
+const CHANNEL_URL = "https://t.me/yumeanime_news";
+const FIRST_GATE_MESSAGE = "👀 Кажется, ты на шаг от входа в YUME!\n\nОсталось только подписаться на наш канал. Не переживай, это не квест на 100 серий 😏 Зато будешь в курсе новостей и обновлений проекта.\n\nПодписывайся и заходи! 💜";
+const RETURN_GATE_MESSAGE = "👀 Опа, кажется, ты немного поторопился с выходом из нашего канала!\n\nБез подписки доступ к YUME закрывается 😢 Но не переживай, никто не отбирает у тебя любимое аниме навсегда.\n\nВозвращайся в канал, подписывайся, и мы снова откроем тебе двери! 💜\n\nА то как же мы без тебя? 😏";
+const RESTORED_MESSAGE = "👀 О, явился! Решил, что без YUME жизнь слишком скучная?\n\n🔓 Доступ восстановлен! Возвращайся к аниме, пока мы не добавили тебе арку возвращения 🍿💜";
 const PLAYER_HELP_MESSAGE = `<b>🛠 Не работает плеер?</b>
 
 Если у тебя не открывается плеер или мини-приложение, попробуй следующие шаги:
@@ -68,6 +76,53 @@ async function telegramApi(token: string, method: string, payload: Record<string
     signal: AbortSignal.timeout(5_000),
     body: JSON.stringify(payload),
   });
+}
+
+type SubscriptionState = { telegram_user_id: string; chat_id: string; message_id: number | null; had_access: number; awaiting_resubscribe: number };
+type TelegramDb = { prepare(sql: string): { bind(...values: unknown[]): { first<T = Record<string, unknown>>(): Promise<T | null>; run(): Promise<unknown> } } };
+
+function subscriptionDb(env: TelegramEnvironment): TelegramDb | null {
+  return env.YUME_DB && typeof env.YUME_DB === "object" ? env.YUME_DB as TelegramDb : null;
+}
+
+async function getSubscriptionState(db: TelegramDb | null, userId: number): Promise<SubscriptionState | null> {
+  if (!db) return null;
+  await db.prepare("CREATE TABLE IF NOT EXISTS yume_telegram_subscription_state (telegram_user_id TEXT PRIMARY KEY, chat_id TEXT NOT NULL, message_id INTEGER, had_access INTEGER NOT NULL DEFAULT 0, awaiting_resubscribe INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)").bind().run();
+  return db.prepare("SELECT telegram_user_id, chat_id, message_id, had_access, awaiting_resubscribe FROM yume_telegram_subscription_state WHERE telegram_user_id = ?").bind(String(userId)).first<SubscriptionState>();
+}
+
+async function saveSubscriptionState(db: TelegramDb | null, userId: number, chatId: number, messageId: number | null, hadAccess: boolean, awaiting: boolean): Promise<void> {
+  if (!db) return;
+  await db.prepare("CREATE TABLE IF NOT EXISTS yume_telegram_subscription_state (telegram_user_id TEXT PRIMARY KEY, chat_id TEXT NOT NULL, message_id INTEGER, had_access INTEGER NOT NULL DEFAULT 0, awaiting_resubscribe INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)").bind().run();
+  await db.prepare("INSERT INTO yume_telegram_subscription_state (telegram_user_id, chat_id, message_id, had_access, awaiting_resubscribe, updated_at) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP) ON CONFLICT(telegram_user_id) DO UPDATE SET chat_id = excluded.chat_id, message_id = excluded.message_id, had_access = excluded.had_access, awaiting_resubscribe = excluded.awaiting_resubscribe, updated_at = CURRENT_TIMESTAMP")
+    .bind(String(userId), String(chatId), messageId, hadAccess ? 1 : 0, awaiting ? 1 : 0).run();
+}
+
+async function isChannelMember(token: string, env: TelegramEnvironment, userId: number): Promise<boolean | null> {
+  const channelId = typeof env.TELEGRAM_CHANNEL_ID === "string" && env.TELEGRAM_CHANNEL_ID.trim() ? env.TELEGRAM_CHANNEL_ID.trim() : "@yumeanime_news";
+  try {
+    const response = await telegramApi(token, "getChatMember", { chat_id: channelId, user_id: userId });
+    const payload = await response.json() as { ok?: boolean; result?: { status?: string; is_member?: boolean } };
+    if (!response.ok || payload.ok !== true || !payload.result?.status) return null;
+    return ["creator", "administrator", "member"].includes(payload.result.status) ||
+      (payload.result.status === "restricted" && payload.result.is_member === true);
+  } catch {
+    return null;
+  }
+}
+
+function gateKeyboard(): Record<string, unknown> {
+  return { inline_keyboard: [
+    [{ text: "😏 Ладно, подписываюсь", url: CHANNEL_URL }],
+    [{ text: "🔎 Проверить подписку", callback_data: CHECK_SUBSCRIPTION_CALLBACK }],
+  ] };
+}
+
+function welcomeKeyboard(): Record<string, unknown> {
+  return { inline_keyboard: [
+    [{ text: "🎬 Открыть YUME", web_app: { url: SITE_URL } }],
+    [{ text: "🛠 Не работает плеер?", callback_data: PLAYER_HELP_CALLBACK }],
+  ] };
 }
 
 export async function handleTelegramWebhook(request: Request): Promise<Response> {
