@@ -499,10 +499,6 @@ async function runCatalogMetadataRefreshStep(db: Database): Promise<Response> {
         setMeta(db, "metadata_refresh_state", "metadata"),
         setMeta(db, "metadata_refresh_cursor", "0"),
         setMeta(db, "metadata_refresh_screenshot_cursor", "0"),
-        setMeta(db, "metadata_refresh_banners_found", "0"),
-        setMeta(db, "metadata_refresh_banners_matched", "0"),
-        setMeta(db, "metadata_refresh_banners_saved", "0"),
-        setMeta(db, "metadata_refresh_banners_added", "0"),
         setMeta(db, "metadata_refresh_banner_errors", "0"),
         db.prepare("UPDATE anime_catalog_screenshot_status SET status='retry',attempts=0,last_error=NULL,updated_at=CURRENT_TIMESTAMP WHERE status='failed'"),
       ]);
@@ -547,7 +543,6 @@ async function runCatalogMetadataRefreshStep(db: Database): Promise<Response> {
       const ids = catalogPage.results.filter(isCatalogMetadataIncomplete).map(row => row.id);
       const source = ids.length ? await fetchByIds(ids) : [];
       const sourceById = new Map(source.map(item => [String(item.id), item]));
-      const bannerCounters = { bannersFound: 0, bannersMatched: 0, bannersSaved: 0, bannersAdded: 0, bannerErrors: 0, bannersStored: 0 };
 
       // Shikimori remains authoritative for metadata other than banner_url.
       // Fully populated rows are deliberately skipped by the metadata backfill.
@@ -577,26 +572,18 @@ async function runCatalogMetadataRefreshStep(db: Database): Promise<Response> {
       await db.batch([
         setMeta(db, "metadata_refresh_cursor", String(nextOffset)),
         setMeta(db, "metadata_refresh_state", nextState),
-        setMeta(db, "metadata_refresh_banners_found", String(bannerCounters.bannersFound)),
-        setMeta(db, "metadata_refresh_banners_matched", String(bannerCounters.bannersMatched)),
-        setMeta(db, "metadata_refresh_banners_saved", String(bannerCounters.bannersSaved)),
-        setMeta(db, "metadata_refresh_banners_added", String(bannerCounters.bannersAdded)),
         setMeta(db, "metadata_refresh_banner_errors", String(bannerCounters.bannerErrors)),
-        setMeta(db, "metadata_refresh_banners_stored", String(bannerCounters.bannersStored)),
         ...(nextState === "screenshots" ? [setMeta(db, "metadata_refresh_screenshot_cursor", "0")] : []),
       ]);
       if (updated > 0) await invalidatePersistentCatalogCache();
       await audit(db, "catalog.metadata.backfill", missingSourceIds.length ? "partial" : "success", {
         phase: "metadata", offset: cursor, processed: ids.length, titlesChanged: updated,
-        ...bannerCounters, total,
+        total,
         missingSourceIds: missingSourceIds.slice(0, 100),
       });
       const shots = await screenshotProgress(db);
       return json({ isAdmin: true, phase: nextState, phaseChanged: nextState !== "metadata", processed: pageIds.length, offset: nextOffset, nextOffset, metadataOffset: nextOffset, screenshotOffset: 0, total, updated,
-        ...bannerCounters,
-        bannersFoundTotal: bannerCounters.bannersFound, bannersMatchedTotal: bannerCounters.bannersMatched,
-        bannersSavedTotal: bannerCounters.bannersSaved, bannersAddedTotal: bannerCounters.bannersAdded,
-        bannerErrorsTotal: bannerCounters.bannerErrors, bannersStored: bannerCounters.bannersStored,
+
         screenshotsSaved: 0, screenshotFailures: shots.failed, screenshotRetries: shots.retry, done: false });
     }
 
@@ -886,7 +873,6 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
       const metadataOffset = phase === "done" || phase.startsWith("screenshots")
         ? refreshTotal : Math.max(0, Number(metadataCursor ?? "0") || 0);
       const screenshotOffset = phase === "metadata" ? 0 : Math.max(0, Number(screenshotCursor ?? "0") || 0);
-      const bannerCounters = { bannersFound: 0, bannersMatched: 0, bannersSaved: 0, bannersAdded: 0, bannerErrors: 0, bannersStored: 0 };
       return json({
         isAdmin: true,
         ...await snapshot(db),
@@ -894,12 +880,6 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
           autoEnabled: false, phase, metadataOffset, screenshotOffset, total: refreshTotal,
           stats: refreshStats, screenshotFailures: shots.failed, screenshotRetries: shots.retry,
           done: phase === "done",
-          bannersFoundTotal: bannerCounters.bannersFound,
-          bannersMatchedTotal: bannerCounters.bannersMatched,
-          bannersSavedTotal: bannerCounters.bannersSaved,
-          bannersAddedTotal: bannerCounters.bannersAdded,
-          bannerErrorsTotal: bannerCounters.bannerErrors,
-          bannersStored: 0,
           lastTickAt: await getMeta(db, "metadata_refresh_last_tick_at"),
           lastSuccessAt: await getMeta(db, "metadata_refresh_last_success_at"),
           lastError: await getMeta(db, "metadata_refresh_last_error"),
@@ -1041,10 +1021,6 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
           setMeta(db, "metadata_refresh_screenshot_cursor", "0"),
           setMeta(db, "metadata_refresh_auto_enabled", "0"),
           setMeta(db, "metadata_refresh_last_error", ""),
-          setMeta(db, "metadata_refresh_banners_found", "0"),
-          setMeta(db, "metadata_refresh_banners_matched", "0"),
-          setMeta(db, "metadata_refresh_banners_saved", "0"),
-          setMeta(db, "metadata_refresh_banners_added", "0"),
           setMeta(db, "metadata_refresh_banner_errors", "0"),
           db.prepare("UPDATE anime_catalog_screenshot_status SET status='retry',attempts=0,last_error=NULL,updated_at=CURRENT_TIMESTAMP WHERE anime_id IN (SELECT a.id FROM anime_catalog a WHERE NOT EXISTS (SELECT 1 FROM anime_catalog_screenshots s WHERE s.anime_id=a.id AND s.original_url NOT LIKE '%example.com%' AND s.preview_url NOT LIKE '%example.com%'))"),
           db.prepare("INSERT INTO anime_catalog_screenshot_status (anime_id,status,attempts,last_error,updated_at) SELECT a.id,'retry',0,NULL,CURRENT_TIMESTAMP FROM anime_catalog a WHERE NOT EXISTS (SELECT 1 FROM anime_catalog_screenshots s WHERE s.anime_id=a.id AND s.original_url NOT LIKE '%example.com%' AND s.preview_url NOT LIKE '%example.com%') ON CONFLICT(anime_id) DO UPDATE SET status='retry',attempts=0,last_error=NULL,updated_at=CURRENT_TIMESTAMP"),
