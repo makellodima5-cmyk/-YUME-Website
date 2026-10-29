@@ -66,3 +66,18 @@ export function isNewRelease(
 export function isEligibleAiringAnime(anime: Anime): boolean {
   return anime.status === "Онгоинг" && anime.kodikAvailable === true;
 }
+
+
+/**
+ * Intersect the persistent catalog with the current Shikimori ongoing feed before
+ * applying Kodik availability. A stale D1 status alone must never keep a title
+ * in the homepage's live airing section.
+ */
+export function filterEligibleAiringAnime(
+  catalogItems: readonly Anime[],
+  currentOngoingIds: ReadonlySet<string>,
+): Anime[] {
+  return catalogItems.filter((anime) =>
+    currentOngoingIds.has(anime.id) && isEligibleAiringAnime(anime),
+  );
+}
