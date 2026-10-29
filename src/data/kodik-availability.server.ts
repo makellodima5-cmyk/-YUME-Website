@@ -19,8 +19,6 @@ type KodikResult = {
 type KodikPayload = { results?: KodikResult[]; error?: string };
 const KODIK_API_URL = "https://kodik-api.com/search";
 const CHECK_BATCH_SIZE = 20;
-const CHECK_STALE_AFTER_MS = 6 * 60 * 60 * 1000;
-const RETRY_AFTER_ERROR_MS = 30 * 60 * 1000;
 const LOCK_TTL_MS = 4 * 60 * 1000;
 const PLAYER_HOSTS = ["kodik.info", "kodik.biz", "kodik.cc", "kodik.online", "kodikplayer.com", "kodikres.com"] as const;
 
