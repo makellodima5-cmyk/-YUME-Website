@@ -500,14 +500,16 @@ async function fetchShikimoriSectionFeeds(): Promise<ShikimoriSectionFeeds | nul
   if (sectionFeedCache && sectionFeedCache.expiresAt > now) return sectionFeedCache.feeds;
   if (sectionFeedRequest) return sectionFeedRequest;
 
-  const sharedFeeds = await readShikimoriSharedCache<ShikimoriSectionFeeds>("section-feeds");
-  if (sharedFeeds) {
-    sectionFeedCache = { expiresAt: Date.now() + SECTION_FEED_CACHE_TTL_MS, feeds: sharedFeeds };
-    return sharedFeeds;
-  }
-  if (now < shikimoriCooldownUntil) return null;
-
+  // Set the in-flight promise before awaiting KV so concurrent requests in this
+  // isolate share the same cache lookup and upstream refresh.
   sectionFeedRequest = (async () => {
+    const sharedFeeds = await readShikimoriSharedCache<ShikimoriSectionFeeds>("section-feeds");
+    if (sharedFeeds) {
+      sectionFeedCache = { expiresAt: Date.now() + SECTION_FEED_CACHE_TTL_MS, feeds: sharedFeeds };
+      return sharedFeeds;
+    }
+    if (Date.now() < shikimoriCooldownUntil) return null;
+
     const fields = SECTION_ANIME_FIELDS;
     const query = [
       "query {",
