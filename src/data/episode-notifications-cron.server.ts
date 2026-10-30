@@ -7,38 +7,10 @@ type AnimeRow = { id:string; title:string; episodes:number; episodes_aired:numbe
 type ShikimoriAnime = { id:string; status?:string|null; episodes?:number|null; episodesAired?:number|null; nextEpisodeAt?:string|null; russian?:string|null; name?:string|null };
 function env():Env { try { return cloudflareEnv as unknown as Env; } catch { const e=(globalThis as typeof globalThis & {__YUME_RUNTIME_ENV__?:unknown}).__YUME_RUNTIME_ENV__; return e&&typeof e==="object"?e as Env:{}; } }
 const API="https://shikimori.io/api/graphql";
-const episodeNotificationSchemaPromises = new WeakMap<object, Promise<void>>();
-
-function ensureEpisodeNotificationSchema(db: DB): Promise<void> {
- const key = db as object;
- const cached = episodeNotificationSchemaPromises.get(key);
- if (cached) return cached;
- const pending = db.batch([
-  db.prepare("CREATE TABLE IF NOT EXISTS yume_notifications (id TEXT PRIMARY KEY NOT NULL,title TEXT NOT NULL,body TEXT NOT NULL,type TEXT NOT NULL DEFAULT 'info',target_url TEXT,created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,created_by TEXT,active INTEGER NOT NULL DEFAULT 1)"),
-  db.prepare("CREATE TABLE IF NOT EXISTS yume_notification_reads_v2 (user_id TEXT NOT NULL REFERENCES yume_users(id) ON DELETE CASCADE,notification_id TEXT NOT NULL REFERENCES yume_notifications(id) ON DELETE CASCADE,read_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,dismissed_at TEXT,PRIMARY KEY(user_id,notification_id))"),
-  db.prepare("CREATE TABLE IF NOT EXISTS yume_notification_targets (notification_id TEXT NOT NULL REFERENCES yume_notifications(id) ON DELETE CASCADE,user_id TEXT NOT NULL REFERENCES yume_users(id) ON DELETE CASCADE,PRIMARY KEY(notification_id,user_id))"),
-  db.prepare("CREATE TABLE IF NOT EXISTS yume_anime_subscriptions (user_id TEXT NOT NULL REFERENCES yume_users(id) ON DELETE CASCADE,anime_id TEXT NOT NULL,created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,active INTEGER NOT NULL DEFAULT 1,PRIMARY KEY(user_id,anime_id))"),
-  db.prepare("CREATE TABLE IF NOT EXISTS yume_episode_notification_state (anime_id TEXT PRIMARY KEY NOT NULL, last_episodes_aired INTEGER NOT NULL DEFAULT 0, last_checked_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)"),
-  db.prepare("CREATE INDEX IF NOT EXISTS idx_anime_catalog_due_episodes ON anime_catalog(status, datetime(next_episode_at)) WHERE next_episode_at IS NOT NULL")
- ]).then(() => undefined).catch((error) => {
-  episodeNotificationSchemaPromises.delete(key);
-  throw error;
- });
- episodeNotificationSchemaPromises.set(key, pending);
- return pending;
-}
-
-function storedStatus(value: string | null | undefined, fallback: string): string {
- if (value === "ongoing") return "Онгоинг";
- if (value === "anons") return "Анонс";
- if (value === "released") return "Вышел";
- return fallback;
-}
 
 export async function runScheduledEpisodeNotifications(input:unknown):Promise<void>{
  const e=(input&&typeof input==="object"?input:env()) as Env, db=e.YUME_DB as DB|undefined;
  if(!db||typeof db.prepare!=="function") throw new Error("Episode notification cron has no YUME_DB binding");
- await ensureEpisodeNotificationSchema(db);
  const due=await db.prepare("SELECT id,title,episodes,episodes_aired,status,next_episode_at FROM anime_catalog WHERE status='Онгоинг' AND next_episode_at IS NOT NULL AND datetime(next_episode_at)<=datetime('now') AND episodes_aired<episodes ORDER BY datetime(next_episode_at) ASC LIMIT 40").all<AnimeRow>();
  if(!due.results.length)return;
  const query="query EpisodeNotice($ids: [ID!]!) { animes(ids: $ids) { id name russian status episodes episodesAired nextEpisodeAt } }";
