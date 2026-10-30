@@ -312,7 +312,9 @@ export async function refreshPersistentAnimeIdentity(anime: Pick<Anime, "id" | "
   const db = database();
   if (!db) return;
   await ensureSchema(db);
-  await db.prepare(`
+  const rating = anime.rating ?? null;
+  const posterUrl = anime.posterUrl ?? null;
+  const result = await db.prepare(`
     UPDATE anime_catalog
     SET
       rating = COALESCE(?, rating),
@@ -320,8 +322,23 @@ export async function refreshPersistentAnimeIdentity(anime: Pick<Anime, "id" | "
       poster_url = CASE WHEN poster_url IS NULL OR TRIM(poster_url) = '' THEN COALESCE(?, poster_url) ELSE poster_url END,
       updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
-  `).bind(anime.rating ?? null, anime.rating ?? null, anime.rating ?? null, anime.posterUrl ?? null, anime.id).run();
-  await invalidatePersistentCatalogCache();
+      AND (
+        (? IS NOT NULL AND rating IS NOT ?)
+        OR (? IS NOT NULL AND popular <> CASE WHEN ? >= 8.5 THEN 1 ELSE 0 END)
+        OR (? IS NOT NULL AND (poster_url IS NULL OR TRIM(poster_url) = ''))
+      )
+  `).bind(
+    rating, rating, rating, posterUrl, anime.id,
+    rating, rating,
+    rating, rating,
+    posterUrl,
+  ).run();
+
+  // A detail-page refresh should not evict the whole catalog snapshot unless
+  // one of the durable identity fields actually changed in D1.
+  if ((result.meta?.changes ?? 0) > 0) {
+    await invalidatePersistentCatalogCache();
+  }
 }
 
 function rowValues(item: Anime, position: number): unknown[] {
