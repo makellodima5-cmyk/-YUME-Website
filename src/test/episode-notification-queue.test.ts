@@ -41,7 +41,7 @@ describe("episode notification Queue", () => {
         return {
           bind() { return this; },
           async run() { return {}; },
-          async all() { return { results: [] }; },
+          async all() { return { results: [{ user_id: "user-1" }] }; },
         };
       },
       async batch() { return []; },
@@ -58,7 +58,8 @@ describe("episode notification Queue", () => {
 
     expect(acknowledged).toBe(true);
     expect(retried).toBe(false);
-    expect(statements[0]).toContain("INSERT OR IGNORE INTO yume_notifications");
+    expect(statements.some((sql) => sql.includes("INSERT OR IGNORE INTO yume_notifications"))).toBe(true);
+    expect(statements.some((sql) => sql.includes("SELECT user_id FROM yume_anime_subscriptions"))).toBe(true);
   });
 
   it("retries a failed database operation instead of acknowledging it", async () => {
