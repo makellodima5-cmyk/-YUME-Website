@@ -568,8 +568,10 @@ export async function getPersistentCatalog(
         db.prepare(INSERT_ANIME).bind(...rowValues(item, cursor * 50 + index)),
       );
       if (statements.length) {
-        await db.batch(statements);
-        await invalidatePersistentCatalogCache();
+        const insertResults = await db.batch(statements);
+        if (insertResults.some((result) => (result.meta?.changes ?? 0) > 0)) {
+          await invalidatePersistentCatalogCache();
+        }
       }
 
       imported = await countRows(db);
