@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { readShikimoriSharedCache, writeShikimoriSharedCache } from "@/data/shikimori-kv-cache.server";
 import type { Anime } from "@/data/anime";
 import { isNewRelease } from "@/data/anime-sections";
 import { getPersistentAnimeDetails, getPersistentCatalog, getPersistentAnimeScreenshots, savePersistentAnimeScreenshots, refreshPersistentAnimeIdentity, type CatalogResult, type CatalogSeedPageResult } from "@/data/catalog-d1.server";
@@ -19,6 +20,11 @@ const responseCache = new Map<string, { expiresAt: number; items: Anime[] }>();
 let shikimoriCooldownUntil = 0;
 const SHIKIMORI_429_COOLDOWN_MS = 60 * 1000;
 const SEED_REQUEST_DELAY_MS = 1250;
+
+async function hashShikimoriCacheKey(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
 
 type ShikimoriRequest = {
   page?: number;
@@ -370,6 +376,12 @@ async function fetchShikimoriAnimes(data: ShikimoriRequest) {
     return { items: cached.items, error: null as string | null };
   }
 
+  const sharedCached = await readShikimoriSharedCache<Anime[]>("graphql:" + await hashShikimoriCacheKey(key));
+  if (sharedCached) {
+    responseCache.set(key, { expiresAt: Date.now() + CACHE_TTL_MS, items: sharedCached });
+    return { items: sharedCached, error: null as string | null };
+  }
+
   if (Date.now() < shikimoriCooldownUntil) {
     return {
       items: [] as Anime[],
@@ -423,6 +435,7 @@ async function fetchShikimoriAnimes(data: ShikimoriRequest) {
     if (parsed.error) throw new Error(parsed.error);
     const items = parsed.items;
     responseCache.set(key, { expiresAt: Date.now() + CACHE_TTL_MS, items });
+    await writeShikimoriSharedCache("graphql:" + await hashShikimoriCacheKey(key), items, CACHE_TTL_MS);
     if (responseCache.size > 160) {
       const now = Date.now();
       for (const [cacheKey, entry] of responseCache) {
@@ -486,6 +499,12 @@ async function fetchShikimoriSectionFeeds(): Promise<ShikimoriSectionFeeds | nul
   const now = Date.now();
   if (sectionFeedCache && sectionFeedCache.expiresAt > now) return sectionFeedCache.feeds;
   if (sectionFeedRequest) return sectionFeedRequest;
+
+  const sharedFeeds = await readShikimoriSharedCache<ShikimoriSectionFeeds>("section-feeds");
+  if (sharedFeeds) {
+    sectionFeedCache = { expiresAt: Date.now() + SECTION_FEED_CACHE_TTL_MS, feeds: sharedFeeds };
+    return sharedFeeds;
+  }
   if (now < shikimoriCooldownUntil) return null;
 
   sectionFeedRequest = (async () => {
@@ -530,6 +549,7 @@ async function fetchShikimoriSectionFeeds(): Promise<ShikimoriSectionFeeds | nul
         return null;
       }
       sectionFeedCache = { expiresAt: Date.now() + SECTION_FEED_CACHE_TTL_MS, feeds };
+      await writeShikimoriSharedCache("section-feeds", feeds, SECTION_FEED_CACHE_TTL_MS);
       return feeds;
     } catch (error) {
       console.error("[YUME] Failed to refresh live section feeds:", error instanceof Error ? error.message : "Unknown Shikimori error");
@@ -784,6 +804,11 @@ export const getShikimoriAnimeScreenshots = createServerFn({ method: "GET" })
       if (persisted?.length) return { items: persisted };
       const cached = screenshotCache.get(data.animeId);
       if (cached && cached.expiresAt > Date.now() && cached.items.length) return { items: cached.items };
+      const sharedScreenshots = await readShikimoriSharedCache<ShikimoriScreenshot[]>("screenshots:" + data.animeId);
+      if (sharedScreenshots?.length) {
+        screenshotCache.set(data.animeId, { expiresAt: Date.now() + SCREENSHOT_CACHE_TTL_MS, items: sharedScreenshots });
+        return { items: sharedScreenshots };
+      }
       const details = await getPersistentAnimeDetails(data.animeId);
       const airedOn = details?.anime?.airedOn;
       const futureRelease = typeof airedOn === "string" && /^\\d{4}-\\d{2}-\\d{2}/.test(airedOn)
@@ -797,7 +822,10 @@ export const getShikimoriAnimeScreenshots = createServerFn({ method: "GET" })
       const items = normalizeShikimoriScreenshots(await response.json());
       if (items.length) {
         screenshotCache.set(data.animeId, { expiresAt: Date.now() + SCREENSHOT_CACHE_TTL_MS, items });
-        await savePersistentAnimeScreenshots(data.animeId, items);
+        await Promise.all([
+          savePersistentAnimeScreenshots(data.animeId, items),
+          writeShikimoriSharedCache("screenshots:" + data.animeId, items, SCREENSHOT_CACHE_TTL_MS),
+        ]);
       }
       return { items };
     } catch (error) {
