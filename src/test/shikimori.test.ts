@@ -1,4 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { env } from "cloudflare:workers";
+import {
+  readShikimoriSharedCache,
+  writeShikimoriSharedCache,
+} from "@/data/shikimori-kv-cache.server";
 import {
   mapAnime,
   normalizeShikimoriScreenshots,
@@ -10,6 +15,35 @@ import {
   validateRequest,
   youtubeVideoId,
 } from "@/data/shikimori";
+
+describe("shared Shikimori Workers KV cache", () => {
+  it("shares public cache entries across isolates and applies the configured TTL", async () => {
+    const values = new Map<string, unknown>();
+    const putOptions: Array<{ expirationTtl: number }> = [];
+    const namespace = {
+      get: async (key: string) => values.get(key) ?? null,
+      put: async (key: string, value: string, options: { expirationTtl: number }) => {
+        values.set(key, JSON.parse(value));
+        putOptions.push(options);
+      },
+    };
+    const bindings = env as unknown as Record<string, unknown>;
+    const previous = bindings.YUME_SHIKIMORI_CACHE;
+    bindings.YUME_SHIKIMORI_CACHE = namespace;
+
+    try {
+      await writeShikimoriSharedCache("test:public", { animeId: "42" }, 120_000);
+      expect(putOptions).toEqual([{ expirationTtl: 120 }]);
+      expect(await readShikimoriSharedCache("test:public")).toEqual({ animeId: "42" });
+
+      values.set("yume:shikimori:v1:test:expired", { expiresAt: 0, value: { stale: true } });
+      expect(await readShikimoriSharedCache("test:expired")).toBeNull();
+    } finally {
+      if (previous === undefined) delete bindings.YUME_SHIKIMORI_CACHE;
+      else bindings.YUME_SHIKIMORI_CACHE = previous;
+    }
+  });
+});
 
 describe("Shikimori request validation", () => {
   it("clamps page and limit and falls back from unsupported query options", () => {
