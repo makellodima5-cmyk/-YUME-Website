@@ -90,7 +90,8 @@ jobs:
           );
           const queueConsumer = (rootConfig.queues?.consumers ?? []).find(
             (item) => item.queue === "yume-web-tasks"
-              && item.max_batch_size === 10
+              && item.max_batch_size === 2
+              && item.max_concurrency === 1
               && item.max_retries === 5
               && item.dead_letter_queue === "yume-web-tasks-dlq",
           );
