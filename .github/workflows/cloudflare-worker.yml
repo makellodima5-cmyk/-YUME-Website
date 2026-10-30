@@ -85,6 +85,18 @@ jobs:
           if (Array.isArray(rootConfig.triggers?.crons) && rootConfig.triggers.crons.length > 0) {
             throw new Error("Automatic scheduled Worker jobs must remain disabled.");
           }
+          const queueProducer = (rootConfig.queues?.producers ?? []).find(
+            (item) => item.binding === "YUME_WEB_TASKS" && item.queue === "yume-web-tasks",
+          );
+          const queueConsumer = (rootConfig.queues?.consumers ?? []).find(
+            (item) => item.queue === "yume-web-tasks"
+              && item.max_batch_size === 10
+              && item.max_retries === 5
+              && item.dead_letter_queue === "yume-web-tasks-dlq",
+          );
+          if (!queueProducer || !queueConsumer) {
+            throw new Error("Root Wrangler config is missing the YUME_WEB_TASKS producer or bounded Queue consumer/DLQ configuration.");
+          }
           const rootKvBinding = (rootConfig.kv_namespaces ?? []).find(
             (item) => item.binding === "YUME_SHIKIMORI_CACHE"
               && item.id === "598c5207a7054b3eb45e2efe8214f5d7",
@@ -118,7 +130,10 @@ jobs:
             }
           }
 
-          console.log("Verified generated Worker config, root entry, assets, Cron trigger, YUME_DB and YUME_SHIKIMORI_CACHE bindings.");
+          if (!workerEntry.includes("handleEpisodeNotificationQueue") && !workerEntry.includes("episode-notification-queue")) {
+            throw new Error("Generated Worker entry does not include the episode notification Queue consumer.");
+          }
+          console.log("Verified generated Worker config, root entry, assets, Cron trigger, D1, KV and Queue bindings.");
           NODE
 
       - name: Validate Wrangler deploy artifact
