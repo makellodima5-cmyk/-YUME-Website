@@ -60,8 +60,9 @@
     "consumers": [
       {
         "queue": "yume-web-tasks",
-        "max_batch_size": 10,
+        "max_batch_size": 2,
         "max_batch_timeout": 5,
+        "max_concurrency": 1,
         "max_retries": 5,
         "retry_delay": 30,
         "dead_letter_queue": "yume-web-tasks-dlq"
