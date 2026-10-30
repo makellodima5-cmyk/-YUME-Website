@@ -68,7 +68,7 @@ describe("episode notification Queue", () => {
         return {
           bind() { return this; },
           async run() { throw new Error("temporary D1 failure"); },
-          async all() { return { results: [] }; },
+          async all() { return { results: [{ user_id: "user-1" }] }; },
         };
       },
       async batch() { return []; },
