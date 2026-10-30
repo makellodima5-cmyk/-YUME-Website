@@ -1,6 +1,7 @@
 import { env as cloudflareEnv } from "cloudflare:workers";
+import { enqueueEpisodeNotification } from "@/data/episode-notification-queue.server";
 
-type Env = Record<string, unknown> & { YUME_DB?: unknown };
+type Env = Record<string, unknown> & { YUME_DB?: unknown; YUME_WEB_TASKS?: { send(message: unknown, options?: { contentType?: "json" }): Promise<void> } };
 type Statement = { bind(...values: unknown[]): Statement; first<T = Record<string, unknown>>(): Promise<T | null>; all<T = Record<string, unknown>>(): Promise<{results:T[]}>; run(): Promise<unknown> };
 type DB = { prepare(sql:string): Statement; batch(statements:Statement[]): Promise<unknown[]> };
 type AnimeRow = { id:string; title:string; episodes:number; episodes_aired:number; status:string; next_episode_at:string|null };
@@ -26,14 +27,7 @@ export async function runScheduledEpisodeNotifications(input:unknown):Promise<vo
   const previous=await db.prepare("SELECT last_episodes_aired FROM yume_episode_notification_state WHERE anime_id=?").bind(old.id).first<{last_episodes_aired:number}>();
   const baseline=previous?.last_episodes_aired??old.episodes_aired;
   if(aired>baseline){
-   const subs=await db.prepare("SELECT user_id FROM yume_anime_subscriptions WHERE anime_id=? AND active=1").bind(old.id).all<{user_id:string}>();
-   if(subs.results.length){
-    const id="episode-"+old.id+"-"+aired;
-    const title=(anime.russian||anime.name||old.title)+" · "+( "Серия "+aired);
-    const body="Вышла новая серия аниме «"+(anime.russian||anime.name||old.title)+"».";
-    await db.prepare("INSERT OR IGNORE INTO yume_notifications(id,title,body,type,target_url) VALUES(?,?,?,'episode',?)").bind(id,title,body,"/anime/"+old.id).run();
-    await db.batch(subs.results.map(s=>db.prepare("INSERT OR IGNORE INTO yume_notification_targets(notification_id,user_id) VALUES(?,?)").bind(id,s.user_id)));
-   }
+   await enqueueEpisodeNotification(e,old.id,aired,anime.russian||anime.name||old.title);
   }
   await db.prepare("INSERT INTO yume_episode_notification_state(anime_id,last_episodes_aired,last_checked_at) VALUES(?,?,CURRENT_TIMESTAMP) ON CONFLICT(anime_id) DO UPDATE SET last_episodes_aired=excluded.last_episodes_aired,last_checked_at=CURRENT_TIMESTAMP").bind(old.id,aired).run();
   if(status!=="Онгоинг"||(total>0&&aired>=total))await db.prepare("UPDATE yume_anime_subscriptions SET active=0 WHERE anime_id=?").bind(old.id).run();
