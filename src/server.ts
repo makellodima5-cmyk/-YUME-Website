@@ -9,6 +9,7 @@ import { env as cloudflareEnv } from "cloudflare:workers";
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
 import { setCatalogRuntimeEnvironment } from "./data/catalog-d1.server";
+import { handleEpisodeNotificationQueue } from "./data/episode-notification-queue.server";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -238,3 +239,15 @@ export default {
     }
   },
 };
+
+type WorkerQueueMessage = {
+  body: unknown;
+  ack(): void;
+  retry(options?: { delaySeconds?: number }): void;
+};
+type WorkerQueueBatch = { messages: WorkerQueueMessage[] };
+
+// Named Cloudflare Queue handler, isolated from the HTTP request path.
+export async function queue(batch: WorkerQueueBatch, env: unknown): Promise<void> {
+  await handleEpisodeNotificationQueue(batch, env);
+}
