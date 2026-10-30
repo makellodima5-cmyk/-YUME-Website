@@ -104,45 +104,6 @@ async function authorize(request: Request, env: Environment, db: Database): Prom
     .bind(await sessionTokenHash(token, secret)).first<{ telegram_user_id: string | null; expires_at: number }>();
   return Boolean(session && session.expires_at > Date.now() && session.telegram_user_id === adminId);
 }
-const adminImportSchemaPromises = new WeakMap<object, Promise<void>>();
-
-function ensureSchema(db: Database): Promise<void> {
-  const key = db as object;
-  const existing = adminImportSchemaPromises.get(key);
-  if (existing) return existing;
-  const pending = (async () => {
-    await db.batch([
-    db.prepare("CREATE TABLE IF NOT EXISTS anime_catalog (id TEXT PRIMARY KEY NOT NULL, title TEXT NOT NULL, english_title TEXT, original_title TEXT NOT NULL, year INTEGER NOT NULL DEFAULT 0, episodes INTEGER NOT NULL DEFAULT 0, rating REAL, genres_json TEXT NOT NULL DEFAULT '[]', status TEXT NOT NULL DEFAULT 'Неизвестно', description TEXT NOT NULL DEFAULT '', hue INTEGER NOT NULL DEFAULT 280, glyph TEXT NOT NULL DEFAULT 'Y', is_new INTEGER NOT NULL DEFAULT 0, popular INTEGER NOT NULL DEFAULT 0, poster_url TEXT, banner_url TEXT, kind TEXT, age_rating TEXT, next_episode_at TEXT, episodes_aired INTEGER NOT NULL DEFAULT 0, aired_on TEXT, studios_json TEXT NOT NULL DEFAULT '[]', youtube_trailer_id TEXT, position INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)"),
-    db.prepare("CREATE TABLE IF NOT EXISTS anime_catalog_meta (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL)"),
-    db.prepare("CREATE TABLE IF NOT EXISTS admin_catalog_exclusions (anime_id TEXT PRIMARY KEY NOT NULL, title TEXT NOT NULL, deleted_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)"),
-    db.prepare("CREATE TABLE IF NOT EXISTS anime_catalog_screenshots (anime_id TEXT NOT NULL, original_url TEXT NOT NULL, preview_url TEXT NOT NULL, position INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (anime_id, original_url))"),
-    db.prepare("CREATE TABLE IF NOT EXISTS anime_catalog_screenshot_status (anime_id TEXT PRIMARY KEY NOT NULL, status TEXT NOT NULL CHECK (status IN ('done','retry','failed')), attempts INTEGER NOT NULL DEFAULT 0, last_error TEXT, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)"),
-    db.prepare("CREATE INDEX IF NOT EXISTS idx_anime_catalog_screenshot_status_state ON anime_catalog_screenshot_status(status, attempts, updated_at)"),
-    db.prepare("CREATE INDEX IF NOT EXISTS idx_anime_catalog_screenshots_position ON anime_catalog_screenshots(anime_id, position)"),
-    db.prepare("CREATE INDEX IF NOT EXISTS idx_anime_catalog_position_id ON anime_catalog(position,id)"),
-    db.prepare("CREATE INDEX IF NOT EXISTS idx_anime_catalog_missing_trailer ON anime_catalog(id) WHERE youtube_trailer_id IS NULL OR youtube_trailer_id = ''"),
-    db.prepare("CREATE TABLE IF NOT EXISTS yume_admin_audit_log (id INTEGER PRIMARY KEY AUTOINCREMENT, action TEXT NOT NULL, status TEXT NOT NULL, details TEXT NOT NULL DEFAULT '{}', actor_telegram_id TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)"),
-    db.prepare("CREATE TABLE IF NOT EXISTS admin_catalog_import_lock (id INTEGER PRIMARY KEY CHECK (id = 1), token TEXT NOT NULL DEFAULT '', expires_at INTEGER NOT NULL DEFAULT 0)"),
-    db.prepare("CREATE TABLE IF NOT EXISTS admin_catalog_import_items (run_id TEXT NOT NULL, anime_id TEXT NOT NULL, outcome TEXT NOT NULL CHECK (outcome IN ('added','skipped')), incomplete INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (run_id,anime_id))"),
-    db.prepare("INSERT OR IGNORE INTO admin_catalog_import_lock (id,token,expires_at) VALUES (1,'',0)"),
-    db.prepare("INSERT OR IGNORE INTO anime_catalog_meta (key,value) VALUES ('admin_import_state','idle')"),
-    db.prepare("INSERT OR IGNORE INTO anime_catalog_meta (key,value) VALUES ('admin_import_block_18_plus','1')"),
-    db.prepare("INSERT OR IGNORE INTO anime_catalog_meta (key,value) VALUES ('admin_import_cursor','1')"),
-    db.prepare("INSERT OR IGNORE INTO anime_catalog_meta (key,value) VALUES ('admin_import_target','0')"),
-    db.prepare("INSERT OR IGNORE INTO anime_catalog_meta (key,value) VALUES ('admin_import_added','0')"),
-    db.prepare("INSERT OR IGNORE INTO anime_catalog_meta (key,value) VALUES ('admin_import_skipped','0')"),
-    db.prepare("INSERT OR IGNORE INTO anime_catalog_meta (key,value) VALUES ('admin_import_incomplete','0')"),
-    db.prepare("INSERT OR IGNORE INTO anime_catalog_meta (key,value) VALUES ('admin_import_errors','0')"),
-    db.prepare("INSERT OR IGNORE INTO anime_catalog_meta (key,value) VALUES ('admin_import_resume_at','0')"),
-    db.prepare("INSERT OR IGNORE INTO anime_catalog_meta (key,value) VALUES ('metadata_refresh_auto_enabled','0')"),
-    ]);
-  })().catch((error) => {
-    adminImportSchemaPromises.delete(key);
-    throw error;
-  });
-  adminImportSchemaPromises.set(key, pending);
-  return pending;
-}
 async function getMeta(db: Database, key: string): Promise<string | null> {
   const row = await db.prepare("SELECT value FROM anime_catalog_meta WHERE key = ?").bind(key).first<{value:string}>();
   return row?.value ?? null;
@@ -695,7 +656,6 @@ export async function runScheduledCatalogMetadataRefresh(env: unknown): Promise<
   }
 
   try {
-    await ensureSchema(db);
     if (await getMeta(db, "metadata_refresh_auto_enabled") !== "1") return;
 
     // A separate TTL lets the Cron slice safely perform several shared steps.
@@ -814,7 +774,6 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
   let requestedAction: unknown = null;
   try {
     if (!await authorize(request,env,db)) return json({isAdmin:false,error:"admin_required"},403);
-    await ensureSchema(db);
     if (request.method === "GET") {
       const url = new URL(request.url);
       // The admin dashboard polls every five seconds. Status polling must not
