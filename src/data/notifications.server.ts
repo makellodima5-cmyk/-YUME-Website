@@ -68,6 +68,19 @@ function sameOrigin(request: Request): boolean {
   return request.headers.get("sec-fetch-site") === "same-origin";
 }
 
+async function readNotificationState(db: Database, userId: string): Promise<{ readIds: string[]; dismissedIds: string[] }> {
+  const [reads, dismissals] = await Promise.all([
+    db.prepare("SELECT notification_id FROM yume_notification_reads WHERE user_id = ?")
+      .bind(userId).all<{ notification_id: string }>(),
+    db.prepare("SELECT notification_id FROM yume_notification_dismissals WHERE user_id = ?")
+      .bind(userId).all<{ notification_id: string }>(),
+  ]);
+  return {
+    readIds: reads.results.map((row) => row.notification_id),
+    dismissedIds: dismissals.results.map((row) => row.notification_id),
+  };
+}
+
 async function authenticatedUserId(request: Request, db: Database, env: Environment): Promise<string | null> {
   const token = cookieValue(request, SESSION_COOKIE);
   const secret = typeof env.YUME_AUTH_SESSION_SECRET === "string" && env.YUME_AUTH_SESSION_SECRET.trim().length >= 32
@@ -76,7 +89,7 @@ async function authenticatedUserId(request: Request, db: Database, env: Environm
   if (!token || !secret) return null;
   const tokenHash = await sessionTokenHash(token, secret);
   const session = await db.prepare(
-    "SELECT s.user_id, s.expires_at FROM yume_sessions s JOIN yume_users u ON u.id = s.user_id WHERE s.token_hash = ? AND u.provider = 'telegram'",
+    "SELECT s.user_id, s.expires_at FROM yume_sessions s JOIN yume_users u ON u.id = s.user_id WHERE s.token_hash = ?",
   ).bind(tokenHash).first<SessionRow>();
   if (!session || session.expires_at <= Date.now()) {
     if (session) await db.prepare("DELETE FROM yume_sessions WHERE token_hash = ?").bind(tokenHash).run();

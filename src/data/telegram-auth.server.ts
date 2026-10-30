@@ -207,7 +207,7 @@ async function authenticatedTelegramUserId(request: Request, db: TelegramDatabas
   if (!token) return null;
   const tokenHash = await sessionTokenHash(token, secret);
   const session = await db.prepare(
-    "SELECT s.user_id, s.expires_at FROM yume_sessions s JOIN yume_users u ON u.id = s.user_id WHERE s.token_hash = ? AND u.provider = 'telegram'",
+    "SELECT s.user_id, s.expires_at FROM yume_sessions s JOIN yume_users u ON u.id = s.user_id WHERE s.token_hash = ?",
   ).bind(tokenHash).first<AuthenticatedSessionRow>();
   if (!session || session.expires_at <= Date.now()) {
     if (session) await db.prepare("DELETE FROM yume_sessions WHERE token_hash = ?").bind(tokenHash).run();
