@@ -27,7 +27,8 @@ export async function runScheduledEpisodeNotifications(input:unknown):Promise<vo
   const previous=await db.prepare("SELECT last_episodes_aired FROM yume_episode_notification_state WHERE anime_id=?").bind(old.id).first<{last_episodes_aired:number}>();
   const baseline=previous?.last_episodes_aired??old.episodes_aired;
   if(aired>baseline){
-   await enqueueEpisodeNotification(e,old.id,aired,anime.russian||anime.name||old.title);
+   const hasSubscribers=await db.prepare("SELECT 1 AS found FROM yume_anime_subscriptions WHERE anime_id=? AND active=1 LIMIT 1").bind(old.id).first<{found:number}>();
+   if(hasSubscribers) await enqueueEpisodeNotification(e,old.id,aired,anime.russian||anime.name||old.title);
   }
   await db.prepare("INSERT INTO yume_episode_notification_state(anime_id,last_episodes_aired,last_checked_at) VALUES(?,?,CURRENT_TIMESTAMP) ON CONFLICT(anime_id) DO UPDATE SET last_episodes_aired=excluded.last_episodes_aired,last_checked_at=CURRENT_TIMESTAMP").bind(old.id,aired).run();
   if(status!=="Онгоинг"||(total>0&&aired>=total))await db.prepare("UPDATE yume_anime_subscriptions SET active=0 WHERE anime_id=?").bind(old.id).run();
