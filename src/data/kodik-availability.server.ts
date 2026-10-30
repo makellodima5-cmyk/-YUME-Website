@@ -98,47 +98,7 @@ export function parseKodikAvailability(payload: unknown, expectedAnimeId: string
   return { hasEpisodes: validLinks.size > 0, episodeCount: validLinks.size };
 }
 
-async function ensureSchema(db: Database): Promise<void> {
-  await db.batch([
-    db.prepare(`CREATE TABLE IF NOT EXISTS anime_kodik_availability (
-      anime_id TEXT PRIMARY KEY NOT NULL,
-      has_episodes INTEGER NOT NULL DEFAULT 0 CHECK (has_episodes IN (0,1)),
-      episode_count INTEGER NOT NULL DEFAULT 0,
-      checked_at TEXT,
-      last_attempt_at TEXT,
-      last_error TEXT
-    )`),
-    db.prepare("CREATE INDEX IF NOT EXISTS idx_anime_kodik_availability_checked ON anime_kodik_availability(checked_at,last_attempt_at)"),
-    db.prepare("CREATE TABLE IF NOT EXISTS anime_kodik_availability_lock (id INTEGER PRIMARY KEY CHECK(id=1), locked_until INTEGER NOT NULL DEFAULT 0)"),
-    db.prepare("INSERT OR IGNORE INTO anime_kodik_availability_lock (id,locked_until) VALUES (1,0)"),
-  ]);
-}
 
-async function fetchKodikAvailability(animeId: string, token: string): Promise<{ hasEpisodes: boolean; episodeCount: number }> {
-  const url = new URL(KODIK_API_URL);
-  url.searchParams.set("token", token);
-  url.searchParams.set("shikimori_id", animeId);
-  url.searchParams.set("with_episodes_data", "true");
-  url.searchParams.set("limit", "100");
-  const response = await fetch(url, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(10000) });
-  if (!response.ok) {
-    throw new Error(response.status === 401 || response.status === 403
-      ? "Kodik rejected the configured token."
-      : "Kodik returned HTTP " + response.status + ".");
-  }
-  let payload: unknown;
-  try {
-    payload = await response.json();
-  } catch {
-    throw new Error("Kodik returned invalid JSON.");
-  }
-  return parseKodikAvailability(payload, animeId);
-}
-
-/**
- * Check a small round-robin slice per Cron tick. Only successful API responses
- * update has_episodes; failures retain the last known value and are retried later.
- */
 export async function runScheduledKodikAvailabilityRefresh(input: unknown): Promise<void> {
   const env = input && typeof input === "object" ? input as Environment : environment();
   setCatalogRuntimeEnvironment(env);
@@ -149,8 +109,6 @@ export async function runScheduledKodikAvailabilityRefresh(input: unknown): Prom
     console.warn("[YUME][KODIK_AVAILABILITY] Skipping refresh: KODIK_API_TOKEN is not configured.");
     return;
   }
-
-  await ensureSchema(db);
   const now = Date.now();
   const lock = await db.prepare("UPDATE anime_kodik_availability_lock SET locked_until=? WHERE id=1 AND locked_until<?")
     .bind(now + LOCK_TTL_MS, now).run();

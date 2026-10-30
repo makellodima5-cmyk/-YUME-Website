@@ -52,5 +52,12 @@
       "database_name": "yume_db",
       "database_id": "29aea579-e316-413f-922b-44c17b12f45a"
     }
+  ],
+  "queues": { "producers": [ { "binding": "YUME_WEB_TASKS", "queue": "yume-web-tasks" } ] },
+  "kv_namespaces": [
+    {
+      "binding": "YUME_SHIKIMORI_CACHE",
+      "id": "598c5207a7054b3eb45e2efe8214f5d7"
+    }
   ]
 }

@@ -30,12 +30,12 @@ export async function handleAdminNotifications(request: Request) {
       if (typeof targetUrl !== "string" || !targetUrl.startsWith("/") || targetUrl.startsWith("//") || targetUrl.length > 500) return json({ error: "invalid_target_url" }, 400);
       target = targetUrl;
     }
-    await db.batch([
-      db.prepare("CREATE TABLE IF NOT EXISTS yume_notifications (id TEXT PRIMARY KEY NOT NULL, title TEXT NOT NULL, body TEXT NOT NULL, type TEXT NOT NULL DEFAULT 'info', target_url TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, created_by TEXT, active INTEGER NOT NULL DEFAULT 1)"),
-      db.prepare("CREATE TABLE IF NOT EXISTS yume_notification_reads_v2 (user_id TEXT NOT NULL REFERENCES yume_users(id) ON DELETE CASCADE, notification_id TEXT NOT NULL REFERENCES yume_notifications(id) ON DELETE CASCADE, read_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, dismissed_at TEXT, PRIMARY KEY(user_id,notification_id))")
-    ]);
     const id = crypto.randomUUID();
-    await db.prepare("INSERT INTO yume_notifications(id,title,body,target_url,created_by) VALUES(?,?,?,?,?)").bind(id, title.trim(), body.trim(), target, session.id).run();
+    await db.batch([
+      db.prepare("INSERT INTO yume_notifications(id,title,body,target_url,created_by,active) VALUES(?,?,?,?,?,0)").bind(id, title.trim(), body.trim(), target, session.id),
+      db.prepare("INSERT OR IGNORE INTO yume_notification_targets(notification_id,user_id) SELECT ?,id FROM yume_users").bind(id),
+      db.prepare("UPDATE yume_notifications SET active=1 WHERE id=? AND active=0").bind(id),
+    ]);
     return json({ ok: true, notification: { id, title: title.trim(), body: body.trim(), targetUrl: target } }, 201);
   } catch (error) { console.error("[YUME][ADMIN_NOTIFICATIONS]", error); return json({ error: "notification_publish_failed" }, 503); }
 }

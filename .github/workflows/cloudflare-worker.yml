@@ -43,7 +43,7 @@ jobs:
       - name: Build Cloudflare Worker
         run: bun run build
 
-      - name: Verify generated Worker configuration, entry, Cron hook and D1 binding
+      - name: Verify generated Worker configuration, entry, Cron hook, D1, KV and Queue bindings
         run: |
           node --input-type=module <<'NODE'
           import fs from "node:fs";
@@ -65,6 +65,13 @@ jobs:
           if (!binding) {
             throw new Error("Generated Worker config does not contain the expected YUME_DB binding.");
           }
+          const kvBinding = (config.kv_namespaces ?? []).find(
+            (item) => item.binding === "YUME_SHIKIMORI_CACHE"
+              && item.id === "598c5207a7054b3eb45e2efe8214f5d7",
+          );
+          if (!kvBinding) {
+            throw new Error("Generated Worker config does not contain the expected YUME_SHIKIMORI_CACHE binding.");
+          }
           const rootConfig = JSON.parse(fs.readFileSync("wrangler.jsonc", "utf8"));
           if (rootConfig.main !== ".output/server/index.mjs" || !fs.existsSync(rootConfig.main)) {
             throw new Error("Root Wrangler config must target the built Nitro Worker entry.");
@@ -77,6 +84,45 @@ jobs:
           }
           if (Array.isArray(rootConfig.triggers?.crons) && rootConfig.triggers.crons.length > 0) {
             throw new Error("Automatic scheduled Worker jobs must remain disabled.");
+          }
+          const queueProducer = (rootConfig.queues?.producers ?? []).find(
+            (item) => item.binding === "YUME_WEB_TASKS" && item.queue === "yume-web-tasks",
+          );
+          if (!queueProducer) {
+            throw new Error("Site Worker config is missing the YUME_WEB_TASKS Queue producer.");
+          }
+          const queueConfig = JSON.parse(fs.readFileSync("wrangler.queue.jsonc", "utf8"));
+          const queueConsumer = (queueConfig.queues?.consumers ?? []).find(
+            (item) => item.queue === "yume-web-tasks"
+              && item.max_batch_size === 2
+              && item.max_concurrency === 1
+              && item.max_retries === 5
+              && item.dead_letter_queue === "yume-web-tasks-dlq",
+          );
+          const cleanupCron = queueConfig.triggers?.crons ?? [];
+          if (cleanupCron.length !== 1 || cleanupCron[0] !== "0 3 * * *") {
+            throw new Error("Queue consumer Worker must run the daily notification cleanup cron.");
+          }
+          const queueDatabase = (queueConfig.d1_databases ?? []).find(
+            (item) => item.binding === "YUME_DB"
+              && item.database_id === "29aea579-e316-413f-922b-44c17b12f45a",
+          );
+          if (!queueConsumer || !queueDatabase || queueConfig.main !== "src/queue-worker.ts") {
+            throw new Error("Queue consumer Worker config is missing its bounded consumer, DLQ, D1 binding or entrypoint.");
+          }
+          const queueEntry = fs.readFileSync(queueConfig.main, "utf8");
+          if (!queueEntry.includes("handleEpisodeNotificationQueue")) {
+            throw new Error("Dedicated Queue Worker entry does not invoke the episode notification consumer.");
+          }
+          if (!queueEntry.includes("runScheduledNotificationCleanup")) {
+            throw new Error("Dedicated Queue Worker entry does not invoke scheduled notification cleanup.");
+          }
+          const rootKvBinding = (rootConfig.kv_namespaces ?? []).find(
+            (item) => item.binding === "YUME_SHIKIMORI_CACHE"
+              && item.id === "598c5207a7054b3eb45e2efe8214f5d7",
+          );
+          if (!rootKvBinding) {
+            throw new Error("Root Wrangler config is missing the expected YUME_SHIKIMORI_CACHE binding.");
           }
           const expectedRateLimits = [
             { name: "KODIK_RATE_LIMITER", namespaceId: "202610271", limit: 30, period: 60 },
@@ -104,11 +150,14 @@ jobs:
             }
           }
 
-          console.log("Verified generated Worker config, root entry, assets, Cron trigger, and YUME_DB binding.");
+          console.log("Verified site and dedicated Queue Worker configs, entries, assets, Cron trigger, D1 and KV bindings.");
           NODE
 
-      - name: Validate Wrangler deploy artifact
+      - name: Validate site Worker deploy artifact
         run: bunx wrangler@4 deploy --dry-run --config wrangler.jsonc
+
+      - name: Validate Queue consumer Worker deploy artifact
+        run: bunx wrangler@4 deploy --dry-run --config wrangler.queue.jsonc
 
       # Only deploy from main after all tests/build/artifact checks have passed.
       # Production credentials remain repository secrets and are never written to logs.

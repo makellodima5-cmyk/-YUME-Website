@@ -1,5 +1,6 @@
 import { env as cloudflareEnv } from "cloudflare:workers";
 import { USER_NOTIFICATIONS } from "@/data/notifications.shared";
+import { cleanupFullyDismissedNotification } from "@/data/notification-cleanup.server";
 
 type Environment = Record<string, unknown> & { YUME_DB?: unknown; YUME_AUTH_SESSION_SECRET?: string };
 type Statement = {
@@ -84,40 +85,6 @@ async function authenticatedUserId(request: Request, db: Database, env: Environm
   return session.user_id;
 }
 
-const notificationSchemaPromises = new WeakMap<object, Promise<void>>();
-
-function ensureSchema(db: Database): Promise<void> {
-  const key = db as object;
-  const cached = notificationSchemaPromises.get(key);
-  if (cached) return cached;
-  const pending = db.batch([
-    db.prepare("CREATE TABLE IF NOT EXISTS yume_notification_reads (user_id TEXT NOT NULL REFERENCES yume_users(id) ON DELETE CASCADE, notification_id TEXT NOT NULL, read_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (user_id, notification_id))"),
-    db.prepare("CREATE TABLE IF NOT EXISTS yume_notification_dismissals (user_id TEXT NOT NULL REFERENCES yume_users(id) ON DELETE CASCADE, notification_id TEXT NOT NULL, dismissed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (user_id, notification_id))"),
-    db.prepare("CREATE TABLE IF NOT EXISTS yume_notifications (id TEXT PRIMARY KEY NOT NULL, title TEXT NOT NULL, body TEXT NOT NULL, type TEXT NOT NULL DEFAULT 'info', target_url TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, created_by TEXT, active INTEGER NOT NULL DEFAULT 1)"),
-    db.prepare("CREATE TABLE IF NOT EXISTS yume_notification_reads_v2 (user_id TEXT NOT NULL REFERENCES yume_users(id) ON DELETE CASCADE, notification_id TEXT NOT NULL REFERENCES yume_notifications(id) ON DELETE CASCADE, read_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, dismissed_at TEXT, PRIMARY KEY(user_id,notification_id))"),
-    db.prepare("CREATE TABLE IF NOT EXISTS yume_notification_targets (notification_id TEXT NOT NULL REFERENCES yume_notifications(id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES yume_users(id) ON DELETE CASCADE, PRIMARY KEY(notification_id,user_id))"),
-    // Composite primary keys already index each table by user_id; the separate user-only indexes are redundant.
-    db.prepare("DROP INDEX IF EXISTS idx_yume_notification_reads_user"),
-    db.prepare("DROP INDEX IF EXISTS idx_yume_notification_dismissals_user"),
-  ]).then(() => undefined).catch((error) => {
-    notificationSchemaPromises.delete(key);
-    throw error;
-  });
-  notificationSchemaPromises.set(key, pending);
-  return pending;
-}
-
-async function readNotificationState(db: Database, userId: string): Promise<{ readIds: string[]; dismissedIds: string[] }> {
-  const rows = await db.prepare(
-    "SELECT notification_id, 'read' AS state FROM yume_notification_reads WHERE user_id = ? UNION ALL SELECT notification_id, 'dismissed' AS state FROM yume_notification_dismissals WHERE user_id = ?",
-  ).bind(userId, userId).all<{ notification_id: string; state: "read" | "dismissed" }>();
-  const readIds: string[] = [];
-  const dismissedIds: string[] = [];
-  for (const row of rows.results) {
-    (row.state === "read" ? readIds : dismissedIds).push(row.notification_id);
-  }
-  return { readIds, dismissedIds };
-}
 
 export async function handleNotifications(request: Request): Promise<Response> {
   if (request.method !== "GET" && request.method !== "POST") {
@@ -131,7 +98,6 @@ export async function handleNotifications(request: Request): Promise<Response> {
   if (!db) return json({ error: "database_unavailable" }, 503);
 
   try {
-    await ensureSchema(db);
     const userId = await authenticatedUserId(request, db, environment());
 
     if (request.method === "GET") {
@@ -160,8 +126,12 @@ export async function handleNotifications(request: Request): Promise<Response> {
       const isDynamic = !isStatic && Boolean(await db.prepare("SELECT id FROM yume_notifications WHERE id=? AND active=1").bind(notificationId).first<{id:string}>());
       if (!isStatic && !isDynamic) return json({ error: "invalid_notification" }, 400);
       if (isDynamic) {
-        await db.prepare("INSERT INTO yume_notification_reads_v2(user_id,notification_id,read_at) VALUES(?,?,CURRENT_TIMESTAMP) ON CONFLICT(user_id,notification_id) DO UPDATE SET read_at=CURRENT_TIMESTAMP").bind(userId,notificationId).run();
-        if (body.action === "dismiss-one") await db.prepare("UPDATE yume_notification_reads_v2 SET dismissed_at=CURRENT_TIMESTAMP WHERE user_id=? AND notification_id=?").bind(userId,notificationId).run();
+        if (body.action === "read-one") {
+          await db.prepare("INSERT OR IGNORE INTO yume_notification_reads_v2(user_id,notification_id,read_at) VALUES(?,?,CURRENT_TIMESTAMP)").bind(userId,notificationId).run();
+        } else {
+          await db.prepare("INSERT INTO yume_notification_reads_v2(user_id,notification_id,read_at,dismissed_at) VALUES(?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) ON CONFLICT(user_id,notification_id) DO UPDATE SET dismissed_at=CURRENT_TIMESTAMP WHERE yume_notification_reads_v2.dismissed_at IS NULL").bind(userId,notificationId).run();
+          await cleanupFullyDismissedNotification(db, notificationId);
+        }
         return json({ ok:true, authenticated:true, ...(body.action === "read-one" ? {readId:notificationId} : {dismissedId:notificationId}) });
       }
       if (body.action === "read-one") {
