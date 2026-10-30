@@ -43,7 +43,7 @@ jobs:
       - name: Build Cloudflare Worker
         run: bun run build
 
-      - name: Verify generated Worker configuration, entry, Cron hook and D1 binding
+      - name: Verify generated Worker configuration, entry, Cron hook, D1 and KV bindings
         run: |
           node --input-type=module <<'NODE'
           import fs from "node:fs";
@@ -65,6 +65,13 @@ jobs:
           if (!binding) {
             throw new Error("Generated Worker config does not contain the expected YUME_DB binding.");
           }
+          const kvBinding = (config.kv_namespaces ?? []).find(
+            (item) => item.binding === "YUME_SHIKIMORI_CACHE"
+              && item.id === "598c5207a7054b3eb45e2efe8214f5d7",
+          );
+          if (!kvBinding) {
+            throw new Error("Generated Worker config does not contain the expected YUME_SHIKIMORI_CACHE binding.");
+          }
           const rootConfig = JSON.parse(fs.readFileSync("wrangler.jsonc", "utf8"));
           if (rootConfig.main !== ".output/server/index.mjs" || !fs.existsSync(rootConfig.main)) {
             throw new Error("Root Wrangler config must target the built Nitro Worker entry.");
@@ -77,6 +84,13 @@ jobs:
           }
           if (Array.isArray(rootConfig.triggers?.crons) && rootConfig.triggers.crons.length > 0) {
             throw new Error("Automatic scheduled Worker jobs must remain disabled.");
+          }
+          const rootKvBinding = (rootConfig.kv_namespaces ?? []).find(
+            (item) => item.binding === "YUME_SHIKIMORI_CACHE"
+              && item.id === "598c5207a7054b3eb45e2efe8214f5d7",
+          );
+          if (!rootKvBinding) {
+            throw new Error("Root Wrangler config is missing the expected YUME_SHIKIMORI_CACHE binding.");
           }
           const expectedRateLimits = [
             { name: "KODIK_RATE_LIMITER", namespaceId: "202610271", limit: 30, period: 60 },
@@ -104,7 +118,7 @@ jobs:
             }
           }
 
-          console.log("Verified generated Worker config, root entry, assets, Cron trigger, and YUME_DB binding.");
+          console.log("Verified generated Worker config, root entry, assets, Cron trigger, YUME_DB and YUME_SHIKIMORI_CACHE bindings.");
           NODE
 
       - name: Validate Wrangler deploy artifact
