@@ -99,6 +99,10 @@ jobs:
               && item.max_retries === 5
               && item.dead_letter_queue === "yume-web-tasks-dlq",
           );
+          const cleanupCron = queueConfig.triggers?.crons ?? [];
+          if (cleanupCron.length !== 1 || cleanupCron[0] !== "0 3 * * *") {
+            throw new Error("Queue consumer Worker must run the daily notification cleanup cron.");
+          }
           const queueDatabase = (queueConfig.d1_databases ?? []).find(
             (item) => item.binding === "YUME_DB"
               && item.database_id === "29aea579-e316-413f-922b-44c17b12f45a",
@@ -109,6 +113,9 @@ jobs:
           const queueEntry = fs.readFileSync(queueConfig.main, "utf8");
           if (!queueEntry.includes("handleEpisodeNotificationQueue")) {
             throw new Error("Dedicated Queue Worker entry does not invoke the episode notification consumer.");
+          }
+          if (!queueEntry.includes("runScheduledNotificationCleanup")) {
+            throw new Error("Dedicated Queue Worker entry does not invoke scheduled notification cleanup.");
           }
           const rootKvBinding = (rootConfig.kv_namespaces ?? []).find(
             (item) => item.binding === "YUME_SHIKIMORI_CACHE"

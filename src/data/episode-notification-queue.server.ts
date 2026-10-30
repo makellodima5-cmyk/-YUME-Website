@@ -83,7 +83,7 @@ async function processEpisodeNotificationJob(db: Database, job: EpisodeNotificat
   const title = `${job.animeTitle} · Серия ${job.episodeNumber}`;
   const body = `Вышла новая серия аниме «${job.animeTitle}».`;
   await db.prepare(
-    "INSERT OR IGNORE INTO yume_notifications(id,title,body,type,target_url) VALUES(?,?,?,'episode',?)",
+    "INSERT OR IGNORE INTO yume_notifications(id,title,body,type,target_url,active) VALUES(?,?,?,'episode',?,0)",
   ).bind(job.notificationId, title, body, `/anime/${job.animeId}`).run();
 
   while (page.results.length) {
@@ -95,6 +95,7 @@ async function processEpisodeNotificationJob(db: Database, job: EpisodeNotificat
     if (page.results.length < SUBSCRIBER_PAGE_SIZE) break;
     page = await querySubscribers(cursor);
   }
+  await db.prepare("UPDATE yume_notifications SET active=1 WHERE id=? AND active=0").bind(job.notificationId).run();
 }
 
 export async function handleEpisodeNotificationQueue(batch: QueueBatch, input: unknown): Promise<void> {

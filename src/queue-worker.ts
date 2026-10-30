@@ -1,4 +1,5 @@
 import { handleEpisodeNotificationQueue } from "./data/episode-notification-queue.server";
+import { runScheduledNotificationCleanup } from "./data/notification-cleanup.server";
 
 type QueueMessage = {
   body: unknown;
@@ -11,5 +12,9 @@ type QueueBatch = { messages: QueueMessage[] };
 export default {
   async queue(batch: QueueBatch, env: unknown): Promise<void> {
     await handleEpisodeNotificationQueue(batch, env);
+  },
+
+  async scheduled(_controller: unknown, env: unknown): Promise<void> {
+    await runScheduledNotificationCleanup(env);
   },
 };

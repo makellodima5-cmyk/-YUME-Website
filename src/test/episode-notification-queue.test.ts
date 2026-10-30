@@ -58,7 +58,8 @@ describe("episode notification Queue", () => {
 
     expect(acknowledged).toBe(true);
     expect(retried).toBe(false);
-    expect(statements.some((sql) => sql.includes("INSERT OR IGNORE INTO yume_notifications"))).toBe(true);
+    expect(statements.some((sql) => sql.includes("INSERT OR IGNORE INTO yume_notifications") && sql.includes("active) VALUES") && sql.endsWith(",0)"))).toBe(true);
+    expect(statements.some((sql) => sql.includes("UPDATE yume_notifications SET active=1"))).toBe(true);
     expect(statements.some((sql) => sql.includes("SELECT user_id FROM yume_anime_subscriptions"))).toBe(true);
   });
 

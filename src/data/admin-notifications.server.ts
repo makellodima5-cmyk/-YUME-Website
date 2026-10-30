@@ -31,7 +31,11 @@ export async function handleAdminNotifications(request: Request) {
       target = targetUrl;
     }
     const id = crypto.randomUUID();
-    await db.prepare("INSERT INTO yume_notifications(id,title,body,target_url,created_by) VALUES(?,?,?,?,?)").bind(id, title.trim(), body.trim(), target, session.id).run();
+    await db.batch([
+      db.prepare("INSERT INTO yume_notifications(id,title,body,target_url,created_by,active) VALUES(?,?,?,?,?,0)").bind(id, title.trim(), body.trim(), target, session.id),
+      db.prepare("INSERT OR IGNORE INTO yume_notification_targets(notification_id,user_id) SELECT ?,id FROM yume_users").bind(id),
+      db.prepare("UPDATE yume_notifications SET active=1 WHERE id=? AND active=0").bind(id),
+    ]);
     return json({ ok: true, notification: { id, title: title.trim(), body: body.trim(), targetUrl: target } }, 201);
   } catch (error) { console.error("[YUME][ADMIN_NOTIFICATIONS]", error); return json({ error: "notification_publish_failed" }, 503); }
 }

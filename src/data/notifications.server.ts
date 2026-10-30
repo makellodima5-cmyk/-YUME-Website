@@ -1,5 +1,6 @@
 import { env as cloudflareEnv } from "cloudflare:workers";
 import { USER_NOTIFICATIONS } from "@/data/notifications.shared";
+import { cleanupFullyDismissedNotification } from "@/data/notification-cleanup.server";
 
 type Environment = Record<string, unknown> & { YUME_DB?: unknown; YUME_AUTH_SESSION_SECRET?: string };
 type Statement = {
@@ -129,6 +130,7 @@ export async function handleNotifications(request: Request): Promise<Response> {
           await db.prepare("INSERT OR IGNORE INTO yume_notification_reads_v2(user_id,notification_id,read_at) VALUES(?,?,CURRENT_TIMESTAMP)").bind(userId,notificationId).run();
         } else {
           await db.prepare("INSERT INTO yume_notification_reads_v2(user_id,notification_id,read_at,dismissed_at) VALUES(?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) ON CONFLICT(user_id,notification_id) DO UPDATE SET dismissed_at=CURRENT_TIMESTAMP WHERE yume_notification_reads_v2.dismissed_at IS NULL").bind(userId,notificationId).run();
+          await cleanupFullyDismissedNotification(db, notificationId);
         }
         return json({ ok:true, authenticated:true, ...(body.action === "read-one" ? {readId:notificationId} : {dismissedId:notificationId}) });
       }
