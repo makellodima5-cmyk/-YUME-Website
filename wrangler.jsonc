@@ -53,6 +53,21 @@
       "database_id": "29aea579-e316-413f-922b-44c17b12f45a"
     }
   ],
+  "queues": {
+    "producers": [
+      { "binding": "YUME_WEB_TASKS", "queue": "yume-web-tasks" }
+    ],
+    "consumers": [
+      {
+        "queue": "yume-web-tasks",
+        "max_batch_size": 10,
+        "max_batch_timeout": 5,
+        "max_retries": 5,
+        "retry_delay": 30,
+        "dead_letter_queue": "yume-web-tasks-dlq"
+      }
+    ]
+  },
   "kv_namespaces": [
     {
       "binding": "YUME_SHIKIMORI_CACHE",
