@@ -104,7 +104,9 @@ function ensureSchema(db: TelegramDatabase): Promise<void> {
   const key = db as object;
   const cached = telegramSchemaPromises.get(key);
   if (cached) return cached;
-  const pending = initializeTelegramSchema(db).catch((error) => {
+  // Terms-consent columns are retained as a compatibility bridge for databases
+  // created before the versioned schema migration was introduced.
+  const pending = ensureTermsConsentColumns(db).catch((error) => {
     telegramSchemaPromises.delete(key);
     throw error;
   });
@@ -123,44 +125,6 @@ async function ensureTermsConsentColumns(db: TelegramDatabase): Promise<void> {
   }
 }
 
-async function initializeTelegramSchema(db: TelegramDatabase): Promise<void> {
-  const existing = await db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'yume_users'").first<{ sql: string }>();
-  // The nullable date field is a temporary compatibility bridge for older migration history.
-  // Migration 0005 removes it from the final schema.
-  const createTelegramUsersTable = "CREATE TABLE IF NOT EXISTS yume_users (id TEXT PRIMARY KEY NOT NULL, provider TEXT NOT NULL CHECK (provider = 'telegram'), provider_user_id TEXT NOT NULL, telegram_user_id TEXT UNIQUE, telegram_first_name TEXT, telegram_last_name TEXT, telegram_username TEXT, telegram_language_code TEXT, birth_date TEXT, privacy_consent_at TEXT NOT NULL, privacy_policy_version TEXT NOT NULL, terms_agreed_at TEXT, terms_version TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, UNIQUE (provider, provider_user_id))";
-  if (!existing) {
-    await db.batch([
-      db.prepare(createTelegramUsersTable),
-      db.prepare("CREATE TABLE IF NOT EXISTS yume_sessions (token_hash TEXT PRIMARY KEY NOT NULL, user_id TEXT NOT NULL REFERENCES yume_users(id) ON DELETE CASCADE, expires_at INTEGER NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)"),
-      db.prepare("CREATE INDEX IF NOT EXISTS idx_yume_sessions_expiry ON yume_sessions(expires_at)"),
-    ]);
-    await ensureTermsConsentColumns(db);
-    return;
-  }
-
-  if (!existing.sql.includes("telegram_user_id")) {
-    // Convert the old identity table to Telegram-only; legacy-provider accounts/sessions are not carried over.
-    await db.batch([
-      db.prepare("CREATE TABLE yume_users_new (id TEXT PRIMARY KEY NOT NULL, provider TEXT NOT NULL CHECK (provider = 'telegram'), provider_user_id TEXT NOT NULL, telegram_user_id TEXT UNIQUE, telegram_first_name TEXT, telegram_last_name TEXT, telegram_username TEXT, telegram_language_code TEXT, birth_date TEXT, privacy_consent_at TEXT NOT NULL, privacy_policy_version TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, UNIQUE (provider, provider_user_id))"),
-      db.prepare("INSERT INTO yume_users_new (id, provider, provider_user_id, birth_date, privacy_consent_at, privacy_policy_version, created_at) SELECT id, provider, provider_user_id, birth_date, privacy_consent_at, privacy_policy_version, created_at FROM yume_users WHERE provider = 'telegram'"),
-      db.prepare("CREATE TABLE yume_sessions_new (token_hash TEXT PRIMARY KEY NOT NULL, user_id TEXT NOT NULL REFERENCES yume_users_new(id) ON DELETE CASCADE, expires_at INTEGER NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)"),
-      db.prepare("INSERT INTO yume_sessions_new (token_hash, user_id, expires_at, created_at) SELECT s.token_hash, s.user_id, s.expires_at, s.created_at FROM yume_sessions s JOIN yume_users_new u ON u.id = s.user_id"),
-      db.prepare("DROP TABLE yume_sessions"),
-      db.prepare("DROP TABLE yume_users"),
-      db.prepare("ALTER TABLE yume_users_new RENAME TO yume_users"),
-      db.prepare("ALTER TABLE yume_sessions_new RENAME TO yume_sessions"),
-      db.prepare("CREATE INDEX IF NOT EXISTS idx_yume_sessions_expiry ON yume_sessions(expires_at)"),
-    ]);
-    await ensureTermsConsentColumns(db);
-    return;
-  }
-
-  await db.batch([
-    db.prepare("CREATE TABLE IF NOT EXISTS yume_sessions (token_hash TEXT PRIMARY KEY NOT NULL, user_id TEXT NOT NULL REFERENCES yume_users(id) ON DELETE CASCADE, expires_at INTEGER NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)"),
-    db.prepare("CREATE INDEX IF NOT EXISTS idx_yume_sessions_expiry ON yume_sessions(expires_at)"),
-  ]);
-  await ensureTermsConsentColumns(db);
-}
 
 async function createSession(db: TelegramDatabase, userId: string, secret: string): Promise<string> {
   const token = randomToken();
@@ -209,22 +173,6 @@ async function upsertTelegramUser(
 
 const MAX_LIBRARY_BODY_CHARS = 64_000;
 
-const savedAnimeSchemaPromises = new WeakMap<object, Promise<void>>();
-
-function ensureSavedAnimeSchema(db: TelegramDatabase): Promise<void> {
-  const key = db as object;
-  const cached = savedAnimeSchemaPromises.get(key);
-  if (cached) return cached;
-  const pending = db.batch([
-    db.prepare("CREATE TABLE IF NOT EXISTS yume_saved_anime (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT NOT NULL REFERENCES yume_users(id) ON DELETE CASCADE, list_type TEXT NOT NULL CHECK (list_type IN ('favorite', 'watchlist')), anime_id TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, UNIQUE (user_id, list_type, anime_id))"),
-    db.prepare("CREATE INDEX IF NOT EXISTS idx_yume_saved_anime_user_list ON yume_saved_anime (user_id, list_type, created_at)"),
-  ]).then(() => undefined).catch((error) => {
-    savedAnimeSchemaPromises.delete(key);
-    throw error;
-  });
-  savedAnimeSchemaPromises.set(key, pending);
-  return pending;
-}
 
 type SavedListType = "favorite" | "watchlist";
 
@@ -319,7 +267,6 @@ export async function handleTelegramLibrary(request: Request): Promise<Response>
 
   try {
     await ensureSchema(db);
-    await ensureSavedAnimeSchema(db);
     const secret = sessionSecret(env);
     if (!secret) return jsonResponse({ error: "telegram_auth_not_configured" }, 503);
     const userId = await authenticatedTelegramUserId(request, db, secret);
@@ -399,10 +346,6 @@ async function ensureBrowserAuthSchema(db: TelegramDatabase): Promise<void> {
   const cached = browserAuthSchemaPromises.get(key);
   if (cached) return cached;
   const pending = (async () => {
-    await db.batch([
-      db.prepare("CREATE TABLE IF NOT EXISTS yume_browser_auth (token_hash TEXT PRIMARY KEY NOT NULL, flow TEXT NOT NULL CHECK (flow IN ('login','register')), privacy_consent INTEGER NOT NULL DEFAULT 0 CHECK (privacy_consent IN (0,1)), terms_consent INTEGER NOT NULL DEFAULT 0 CHECK (terms_consent IN (0,1)), confirmation_code_hash TEXT, telegram_user_id TEXT, status TEXT NOT NULL CHECK (status IN ('pending','ready','consuming','consumed','error')), user_id TEXT REFERENCES yume_users(id) ON DELETE CASCADE, error_code TEXT, expires_at INTEGER NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)"),
-      db.prepare("CREATE INDEX IF NOT EXISTS idx_yume_browser_auth_expiry ON yume_browser_auth(expires_at)"),
-    ]);
     const columnsResult = await db.prepare("PRAGMA table_info(yume_browser_auth)").all<{ name: string }>();
     const columns = new Set(columnsResult.results.map((column) => column.name));
     if (!columns.has("terms_consent")) {
@@ -414,7 +357,6 @@ async function ensureBrowserAuthSchema(db: TelegramDatabase): Promise<void> {
     if (!columns.has("telegram_user_id")) {
       await db.prepare("ALTER TABLE yume_browser_auth ADD COLUMN telegram_user_id TEXT").run();
     }
-    await db.prepare("CREATE INDEX IF NOT EXISTS idx_yume_browser_auth_confirmation ON yume_browser_auth(confirmation_code_hash, telegram_user_id, status)").run();
   })().catch((error) => {
     browserAuthSchemaPromises.delete(key);
     throw error;
@@ -620,22 +562,6 @@ export async function handleTelegramBrowserAuth(request: Request): Promise<Respo
 }
 
 
-const viewHistorySchemaPromises = new WeakMap<object, Promise<void>>();
-
-async function ensureViewHistorySchema(db: TelegramDatabase): Promise<void> {
-  const key = db as object;
-  const cached = viewHistorySchemaPromises.get(key);
-  if (cached) return cached;
-  const pending = db.batch([
-    db.prepare("CREATE TABLE IF NOT EXISTS yume_view_history (user_id TEXT NOT NULL REFERENCES yume_users(id) ON DELETE CASCADE, anime_id TEXT NOT NULL, viewed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, view_count INTEGER NOT NULL DEFAULT 1, PRIMARY KEY (user_id, anime_id))"),
-    db.prepare("CREATE INDEX IF NOT EXISTS idx_yume_view_history_user_viewed ON yume_view_history(user_id, viewed_at)"),
-  ]).then(() => undefined).catch((error) => {
-    viewHistorySchemaPromises.delete(key);
-    throw error;
-  });
-  viewHistorySchemaPromises.set(key, pending);
-  return pending;
-}
 
 /** Saves recently opened anime only for a verified, signed-in Telegram account. */
 export async function handleTelegramHistory(request: Request): Promise<Response> {
@@ -648,7 +574,6 @@ export async function handleTelegramHistory(request: Request): Promise<Response>
 
   try {
     await ensureSchema(db);
-    await ensureViewHistorySchema(db);
     const userId = await authenticatedTelegramUserId(request, db, secret);
     if (!userId) return jsonResponse({ error: "authentication_required" }, 401);
     if (request.method === "GET") {
@@ -701,12 +626,6 @@ export async function handleTelegramAccountDelete(request: Request): Promise<Res
   try {
     await ensureSchema(db);
     await ensureBrowserAuthSchema(db);
-    await ensureSavedAnimeSchema(db);
-    await ensureViewHistorySchema(db);
-    await db.batch([
-      db.prepare("CREATE TABLE IF NOT EXISTS yume_notification_reads (user_id TEXT NOT NULL REFERENCES yume_users(id) ON DELETE CASCADE, notification_id TEXT NOT NULL, read_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (user_id, notification_id))"),
-      db.prepare("CREATE TABLE IF NOT EXISTS yume_notification_dismissals (user_id TEXT NOT NULL REFERENCES yume_users(id) ON DELETE CASCADE, notification_id TEXT NOT NULL, dismissed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (user_id, notification_id))"),
-    ]);
     const tokenHash = await sessionTokenHash(token, secret);
     const session = await db.prepare("SELECT user_id, expires_at FROM yume_sessions WHERE token_hash = ?")
       .bind(tokenHash).first<AuthenticatedSessionRow>();
