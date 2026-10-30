@@ -238,6 +238,10 @@ export default {
       }), request.url);
     }
   },
+
+  async queue(batch: WorkerQueueBatch, env: unknown): Promise<void> {
+    await handleEpisodeNotificationQueue(batch, env);
+  },
 };
 
 type WorkerQueueMessage = {
@@ -246,8 +250,3 @@ type WorkerQueueMessage = {
   retry(options?: { delaySeconds?: number }): void;
 };
 type WorkerQueueBatch = { messages: WorkerQueueMessage[] };
-
-// Named Cloudflare Queue handler, isolated from the HTTP request path.
-export async function queue(batch: WorkerQueueBatch, env: unknown): Promise<void> {
-  await handleEpisodeNotificationQueue(batch, env);
-}
