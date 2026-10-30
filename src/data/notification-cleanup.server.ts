@@ -72,7 +72,7 @@ export async function cleanupExpiredNotifications(db: Database): Promise<number>
   for (let batchNumber = 0; batchNumber < MAX_EXPIRY_BATCHES; batchNumber += 1) {
     const stale = await db.prepare(
       "SELECT id FROM yume_notifications " +
-      "WHERE datetime(created_at) <= datetime('now', '-30 days') " +
+      "WHERE created_at <= datetime('now', '-30 days') " +
       "ORDER BY created_at ASC LIMIT ?",
     ).bind(EXPIRY_PAGE_SIZE).all<{ id: string }>();
 
@@ -88,7 +88,7 @@ export async function cleanupExpiredNotifications(db: Database): Promise<number>
       db.prepare("DELETE FROM yume_notification_targets WHERE notification_id IN (" + placeholders + ")").bind(...values),
       db.prepare(
         "DELETE FROM yume_notifications WHERE id IN (" + placeholders + ") " +
-        "AND datetime(created_at) <= datetime('now', '-30 days')",
+        "AND created_at <= datetime('now', '-30 days')",
       ).bind(...values),
     ]);
 
