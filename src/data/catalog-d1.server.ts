@@ -76,52 +76,6 @@ const LOCK_TTL_MS = 30 * 1000;
 const DEFAULT_RETRY_MS = 5 * 1000;
 const SEED_REQUEST_DELAY_MS = 1250;
 const NEUTRAL_ERROR = "Каталог временно недоступен.";
-const CREATE_SCHEMA_STATEMENTS = [
-  `CREATE TABLE IF NOT EXISTS anime_catalog (
-    id TEXT PRIMARY KEY NOT NULL,
-    title TEXT NOT NULL,
-    english_title TEXT,
-    original_title TEXT NOT NULL,
-    year INTEGER NOT NULL DEFAULT 0,
-    episodes INTEGER NOT NULL DEFAULT 0,
-    rating REAL,
-    genres_json TEXT NOT NULL DEFAULT '[]',
-    status TEXT NOT NULL DEFAULT 'Неизвестно',
-    description TEXT NOT NULL DEFAULT '',
-    hue INTEGER NOT NULL DEFAULT 280,
-    glyph TEXT NOT NULL DEFAULT 'Y',
-    is_new INTEGER NOT NULL DEFAULT 0,
-    popular INTEGER NOT NULL DEFAULT 0,
-    poster_url TEXT,
-    banner_url TEXT,
-    kind TEXT,
-    age_rating TEXT,
-    next_episode_at TEXT,
-    episodes_aired INTEGER NOT NULL DEFAULT 0,
-    aired_on TEXT,
-    studios_json TEXT NOT NULL DEFAULT '[]',
-    youtube_trailer_id TEXT,
-    position INTEGER NOT NULL DEFAULT 0,
-    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-  )`,
-  "CREATE INDEX IF NOT EXISTS idx_anime_catalog_title ON anime_catalog(title)",
-  "CREATE INDEX IF NOT EXISTS idx_anime_catalog_position ON anime_catalog(position)",
-  "CREATE INDEX IF NOT EXISTS idx_anime_catalog_status_position_id ON anime_catalog(status, position, id)",
-  "CREATE INDEX IF NOT EXISTS idx_anime_catalog_due_episodes ON anime_catalog(status, datetime(next_episode_at)) WHERE next_episode_at IS NOT NULL",
-  "CREATE INDEX IF NOT EXISTS idx_anime_catalog_missing_trailer ON anime_catalog(id) WHERE youtube_trailer_id IS NULL OR youtube_trailer_id = ''",
-  `CREATE TABLE IF NOT EXISTS anime_kodik_availability (anime_id TEXT PRIMARY KEY NOT NULL, has_episodes INTEGER NOT NULL DEFAULT 0 CHECK (has_episodes IN (0,1)), episode_count INTEGER NOT NULL DEFAULT 0, checked_at TEXT, last_attempt_at TEXT, last_error TEXT)`,
-  "CREATE INDEX IF NOT EXISTS idx_anime_kodik_availability_checked ON anime_kodik_availability(checked_at,last_attempt_at)",
-  "CREATE TABLE IF NOT EXISTS anime_kodik_availability_lock (id INTEGER PRIMARY KEY CHECK(id=1), locked_until INTEGER NOT NULL DEFAULT 0)",
-  "INSERT OR IGNORE INTO anime_kodik_availability_lock (id,locked_until) VALUES (1,0)",
-  `CREATE TABLE IF NOT EXISTS anime_catalog_screenshots (anime_id TEXT NOT NULL, original_url TEXT NOT NULL, preview_url TEXT NOT NULL, position INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (anime_id, original_url))`,
-  "CREATE INDEX IF NOT EXISTS idx_anime_catalog_screenshots_position ON anime_catalog_screenshots(anime_id, position)",
-  `CREATE TABLE IF NOT EXISTS anime_catalog_meta (
-    key TEXT PRIMARY KEY NOT NULL,
-    value TEXT NOT NULL
-  )`,
-] as const;
-
-let schemaReady = false;
 let missingBindingWarningLogged = false;
 const CATALOG_READ_CACHE_TTL_MS = 300_000;
 const CATALOG_EDGE_CACHE_KEY = "https://yume-catalog-cache.internal/v1/snapshot";
@@ -204,16 +158,6 @@ function database(): D1Database | null {
   return binding && typeof binding === "object" ? (binding as D1Database) : null;
 }
 
-async function ensureSchema(db: D1Database): Promise<void> {
-  if (schemaReady) return;
-
-  // D1's exec path was rejecting the combined schema script as an incomplete
-  // CREATE TABLE statement in production. Prepare each DDL statement separately
-  // so no parser can split a table definition across individual lines.
-  await db.batch(CREATE_SCHEMA_STATEMENTS.map((statement) => db.prepare(statement)));
-  schemaReady = true;
-}
-
 function parseJsonArray(value: string | null | undefined): string[] {
   if (!value) return [];
   try {
@@ -273,8 +217,6 @@ function rowToAnime(row: AnimeRow): Anime {
 export async function getPersistentAnimeDetails(id: string): Promise<{ anime: Anime | null; relatedAnime: Anime[] } | null> {
   const db = database();
   if (!db) return null;
-
-  await ensureSchema(db);
   const cached = await readCachedCatalog(db);
   if (cached) {
     const anime = cached.items.find((item) => item.id === id) ?? null;
@@ -311,7 +253,6 @@ export async function getPersistentAnimeDetails(id: string): Promise<{ anime: An
 export async function refreshPersistentAnimeIdentity(anime: Pick<Anime, "id" | "rating" | "posterUrl">): Promise<void> {
   const db = database();
   if (!db) return;
-  await ensureSchema(db);
   const rating = anime.rating ?? null;
   const posterUrl = anime.posterUrl ?? null;
   const result = await db.prepare(`
@@ -439,7 +380,6 @@ export async function getPersistentCatalog(
   }
 
   try {
-    await ensureSchema(db);
 
     const state = await getMeta(db, "catalog_state");
 
@@ -625,7 +565,6 @@ export type PersistentAnimeScreenshot = { originalUrl: string; previewUrl: strin
 export async function getPersistentAnimeScreenshots(animeId: string): Promise<PersistentAnimeScreenshot[] | null> {
   const db = database();
   if (!db) return null;
-  await ensureSchema(db);
   const result = await db.prepare("SELECT original_url, preview_url FROM anime_catalog_screenshots WHERE anime_id = ? AND original_url NOT LIKE '%example.com%' AND preview_url NOT LIKE '%example.com%' ORDER BY position ASC, original_url ASC LIMIT 24").bind(animeId).all<{ original_url: string; preview_url: string }>();
   return result.results.map((row) => ({ originalUrl: row.original_url, previewUrl: row.preview_url }));
 }
@@ -633,7 +572,6 @@ export async function getPersistentAnimeScreenshots(animeId: string): Promise<Pe
 export async function savePersistentAnimeScreenshots(animeId: string, items: PersistentAnimeScreenshot[]): Promise<void> {
   const db = database();
   if (!db || !items.length) return;
-  await ensureSchema(db);
   const validItems = items.filter((item) => {
     try {
       const original = new URL(item.originalUrl), preview = new URL(item.previewUrl);
