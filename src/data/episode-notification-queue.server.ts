@@ -71,25 +71,29 @@ export async function enqueueEpisodeNotification(
 }
 
 async function processEpisodeNotificationJob(db: Database, job: EpisodeNotificationJob): Promise<void> {
+  const querySubscribers = (cursor: string) => db.prepare(
+    "SELECT user_id FROM yume_anime_subscriptions WHERE anime_id=? AND active=1 AND user_id>? ORDER BY user_id LIMIT ?",
+  ).bind(job.animeId, cursor, SUBSCRIBER_PAGE_SIZE).all<{ user_id: string }>();
+
+  let cursor = "";
+  let page = await querySubscribers(cursor);
+  // Preserve the previous behavior: do not create a public notification if nobody subscribes.
+  if (!page.results.length) return;
+
   const title = `${job.animeTitle} · Серия ${job.episodeNumber}`;
   const body = `Вышла новая серия аниме «${job.animeTitle}».`;
   await db.prepare(
     "INSERT OR IGNORE INTO yume_notifications(id,title,body,type,target_url) VALUES(?,?,?,'episode',?)",
   ).bind(job.notificationId, title, body, `/anime/${job.animeId}`).run();
 
-  let cursor = "";
-  while (true) {
-    const page = await db.prepare(
-      "SELECT user_id FROM yume_anime_subscriptions WHERE anime_id=? AND active=1 AND user_id>? ORDER BY user_id LIMIT ?",
-    ).bind(job.animeId, cursor, SUBSCRIBER_PAGE_SIZE).all<{ user_id: string }>();
-    if (!page.results.length) break;
-
+  while (page.results.length) {
     await db.batch(page.results.map(({ user_id }) => db.prepare(
       "INSERT OR IGNORE INTO yume_notification_targets(notification_id,user_id) VALUES(?,?)",
     ).bind(job.notificationId, user_id)));
 
     cursor = page.results[page.results.length - 1].user_id;
     if (page.results.length < SUBSCRIBER_PAGE_SIZE) break;
+    page = await querySubscribers(cursor);
   }
 }
 
