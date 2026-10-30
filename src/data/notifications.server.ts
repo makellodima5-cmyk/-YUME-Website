@@ -160,8 +160,11 @@ export async function handleNotifications(request: Request): Promise<Response> {
       const isDynamic = !isStatic && Boolean(await db.prepare("SELECT id FROM yume_notifications WHERE id=? AND active=1").bind(notificationId).first<{id:string}>());
       if (!isStatic && !isDynamic) return json({ error: "invalid_notification" }, 400);
       if (isDynamic) {
-        await db.prepare("INSERT INTO yume_notification_reads_v2(user_id,notification_id,read_at) VALUES(?,?,CURRENT_TIMESTAMP) ON CONFLICT(user_id,notification_id) DO UPDATE SET read_at=CURRENT_TIMESTAMP").bind(userId,notificationId).run();
-        if (body.action === "dismiss-one") await db.prepare("UPDATE yume_notification_reads_v2 SET dismissed_at=CURRENT_TIMESTAMP WHERE user_id=? AND notification_id=?").bind(userId,notificationId).run();
+        if (body.action === "read-one") {
+          await db.prepare("INSERT OR IGNORE INTO yume_notification_reads_v2(user_id,notification_id,read_at) VALUES(?,?,CURRENT_TIMESTAMP)").bind(userId,notificationId).run();
+        } else {
+          await db.prepare("INSERT INTO yume_notification_reads_v2(user_id,notification_id,read_at,dismissed_at) VALUES(?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) ON CONFLICT(user_id,notification_id) DO UPDATE SET dismissed_at=CURRENT_TIMESTAMP WHERE yume_notification_reads_v2.dismissed_at IS NULL").bind(userId,notificationId).run();
+        }
         return json({ ok:true, authenticated:true, ...(body.action === "read-one" ? {readId:notificationId} : {dismissedId:notificationId}) });
       }
       if (body.action === "read-one") {
