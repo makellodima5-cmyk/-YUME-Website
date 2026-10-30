@@ -4,10 +4,11 @@ import { resolve } from "node:path";
 
 describe("automatic Worker maintenance", () => {
   it("keeps all scheduled refresh jobs disabled and exposes manual section refresh", async () => {
-    const [viteConfig, catalogImporter, wranglerConfig, workflow, homeRoute, queueConsumer] = await Promise.all([
+    const [viteConfig, catalogImporter, wranglerConfig, queueConfig, workflow, homeRoute, queueConsumer] = await Promise.all([
       readFile(resolve(process.cwd(), "vite.config.ts"), "utf8"),
       readFile(resolve(process.cwd(), "src/data/admin-catalog-import.server.ts"), "utf8"),
       readFile(resolve(process.cwd(), "wrangler.jsonc"), "utf8"),
+      readFile(resolve(process.cwd(), "wrangler.queue.jsonc"), "utf8"),
       readFile(resolve(process.cwd(), ".github/workflows/cloudflare-worker.yml"), "utf8"),
       readFile(resolve(process.cwd(), "src/routes/index.tsx"), "utf8"),
       readFile(resolve(process.cwd(), "src/data/episode-notification-queue.server.ts"), "utf8"),
@@ -16,7 +17,10 @@ describe("automatic Worker maintenance", () => {
     expect(viteConfig).not.toContain("catalog-refresh.ts");
     expect(wranglerConfig).not.toContain('"crons"');
     expect(wranglerConfig).toContain('"yume-web-tasks"');
-    expect(wranglerConfig).toContain('"yume-web-tasks-dlq"');
+    expect(wranglerConfig).toContain('"YUME_WEB_TASKS"');
+    expect(queueConfig).toContain('"yume-web-tasks-dlq"');
+    expect(queueConfig).toContain('"max_concurrency": 1');
+    expect(queueConfig).toContain('"src/queue-worker.ts"');
     expect(queueConsumer).toContain("INSERT OR IGNORE INTO yume_notification_targets");
     expect(queueConsumer).toContain("message.retry({ delaySeconds: RETRY_DELAY_SECONDS })");
     expect(workflow).toContain("Automatic scheduled Worker jobs must remain disabled.");
