@@ -887,8 +887,8 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
                         "Пользователь может ограничить или удалить cookie-файлы в настройках браузера. Это может повлиять на доступность отдельных функций или сохранение настроек.",
                         "Выбор пользователя можно изменить позднее, открыв настройки cookie на странице Политики конфиденциальности."
                       ] : [
-                        "The site may use cookies, browser local storage, and similar technologies to support core features, save preferences, and maintain security.",
-                        "Strictly necessary technologies may be used to provide features requested by the user. Analytics, advertising, and other optional technologies are used only if actually implemented and in line with user choices and applicable requirements.",
+                        "YUME uses cookies and similar technologies to remember the user’s choice and support essential site features.",
+                        "A notice is shown on the first visit. If the user accepts, YUME may use all cookies provided by the site. If the user selects “Reject all”, optional cookies and similar technologies are not enabled. Remembering the choice and providing features requested by the user may still require strictly necessary technical data.",
                         "Users can restrict or delete cookies in browser settings. This may affect some features or saved preferences.",
                         "Users can change their choice later by opening cookie settings on the Privacy Policy page."
                       ]
