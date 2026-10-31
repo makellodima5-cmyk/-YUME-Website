@@ -14,7 +14,7 @@ import { Footer } from "@/components/yume/Footer";
 import { HomeDepthAtmosphere } from "@/components/yume/HomeDepthAtmosphere";
 import "../home-depth.css";
 import { useYumePreferences, displayGenre, type TranslationKey } from "@/data/preferences";
-import { filterAndSortCatalog, getCatalogPageCount, paginateCatalog } from "@/data/catalog-utils";
+import { filterAndSortCatalog, getCatalogPageCount, matchesCollectionGenres, paginateCatalog } from "@/data/catalog-utils";
 import { validateCatalogSearch } from "@/data/catalog-search";
 import homeSocialImage from "@/assets/yume-desktop.webp";
 import { absoluteImageUrl, canonicalUrl } from "@/data/seo";
@@ -1512,7 +1512,7 @@ function Index() {
   };
   const activeCollection = COLLECTIONS.find((c) => c.id === collection);
   const activeCollectionAnime = activeCollection
-    ? ANIME.filter((anime) => activeCollection.genres.some((genre) => anime.genres.includes(genre)))
+    ? ANIME.filter((anime) => matchesCollectionGenres(anime.genres, activeCollection.genres))
         .sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1))
     : [];
   const newReleaseAnime = (sectionFeeds?.newReleases ?? ANIME

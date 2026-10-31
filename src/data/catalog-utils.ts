@@ -5,6 +5,16 @@ import { getSearchMatchScore, normalizeSearchText } from "@/data/search-text";
 
 export type CatalogSort = "rating" | "newest" | "oldest" | "title";
 
+function normalizeCollectionGenre(genre: string): string {
+  return genre.normalize("NFKC").trim().replace(/\s+/g, " ").toLocaleLowerCase("ru-RU");
+}
+
+/** Match collection tags without depending on source capitalization or stray whitespace. */
+export function matchesCollectionGenres(animeGenres: string[], collectionGenres: string[]): boolean {
+  const available = new Set(animeGenres.map(normalizeCollectionGenre).filter(Boolean));
+  return collectionGenres.some((genre) => available.has(normalizeCollectionGenre(genre)));
+}
+
 export function filterAndSortCatalog(
   animeItems: Anime[],
   query: string,

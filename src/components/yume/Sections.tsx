@@ -3,6 +3,7 @@ import { Play, Search, Shuffle, SlidersHorizontal, X } from "lucide-react";
 import heroArtwork from "@/assets/yume-desktop.webp";
 import mobileHeroArtwork from "@/assets/yume-mobile.webp";
 import { type Anime, CONTINUE, COLLECTIONS, byId } from "@/data/anime";
+import { matchesCollectionGenres } from "@/data/catalog-utils";
 import { AnimeCard, PosterArt } from "./Poster";
 import { CatalogFilters, type CatalogFiltersValue } from "./CatalogFilters";
 import { useYumePreferences, displayAnimeTitle, type TranslationKey } from "@/data/preferences";
@@ -154,7 +155,7 @@ export function CollectionsGrid({ onOpen, animeList }: { onOpen: (id: string) =>
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {COLLECTIONS.map((c) => {
         const matches = animeList
-          .filter((anime) => c.genres.some((genre) => anime.genres.includes(genre)))
+          .filter((anime) => matchesCollectionGenres(anime.genres, c.genres))
           .sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1));
         const posters = matches.slice(0, 4);
         return (
