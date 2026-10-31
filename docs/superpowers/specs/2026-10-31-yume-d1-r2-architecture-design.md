@@ -141,37 +141,49 @@ Because the user will run SQL manually in the D1 Console, Stage 3 must provide a
 
 ## 7. Proposed R2 architecture
 
-### Recommended: private reader + private queue publisher
+### Recommended: private reader + private publish dispatcher + private queue publisher
 
 **Public Yume Worker**
-- Has D1, existing KV/rate-limit/Queue resources, and a Service Binding to the catalogue reader.
-- Does not have an R2 bucket binding or any R2 write credentials.
-- Uses the reader's fixed GET endpoint for the current catalogue snapshot.
-- Enqueues a catalogue-publication job only after an authenticated admin operation has committed its D1 changes.
+- Keeps the current D1, KV and rate-limit bindings needed by the site.
+- Has no R2 bucket binding, no R2 API credentials and no direct Queue producer binding for catalogue publication.
+- Has Service Bindings to the private catalogue reader and the private publish dispatcher.
+- Calls the reader's fixed GET endpoint for the public snapshot.
+- Calls the dispatcher only from server-side code after the existing Telegram admin authorization has succeeded and the D1 catalogue transaction/batch has committed. The call carries a short-lived HMAC-signed internal request, not an object body or caller-selected key.
+- Public detail-page requests must not persist identity changes to D1 or schedule catalogue publication.
 
 **Catalogue Reader Worker**
 - Is not exposed on `workers.dev`, has no public route, and is invoked only through a Service Binding.
-- Uses a bucket-scoped R2 `Object Read only` S3 API token stored as Cloudflare secrets.
-- Fetches only the fixed catalogue object key (for example `catalog/v1/catalog.json`); no listing operation is needed.
-- Returns a typed JSON response with a public cache policy.
-- Enables Cloudflare Workers Cache. Workers Cache is supported for service-binding fetches and workers.dev Workers, and is tiered; the response can be cached without requiring a custom domain.
+- Uses a bucket-scoped R2 `Object Read only` S3 API token stored as Cloudflare secrets. This token is supported by the S3-compatible API, not the R2 Workers binding or Cloudflare REST API.
+- Fetches only the fixed catalogue object key (for example `catalog/v1/catalog.json`); it does not list objects and accepts only GET/HEAD for that key.
+- Returns typed JSON with an ETag and `Cache-Tag: yume-catalog-v1`.
+- Enables Cloudflare Workers Cache. Workers Cache supports service-binding fetches and workers.dev Workers; it is private to the Reader Worker and controlled with `cache.enabled` and response cache headers. A custom domain is not required.
+- Exposes only an internal cache-purge handler, reachable through Service Binding and authenticated with a separate internal signature. After a successful R2 publication, the publisher calls that handler to run `ctx.cache.purge({ tags: ["yume-catalog-v1"] })`. This prevents a successful update from being hidden behind a still-fresh cache entry.
 - Keeps the R2 bucket private. No Public Development URL, CORS or custom domain is needed.
+
+**Catalogue Publish Dispatcher Worker**
+- Is not exposed on `workers.dev` and has `workers_dev: false` and `preview_urls: false`.
+- Has no R2 binding and no D1 binding. Its only data capability is a Queue producer for the dedicated catalogue-publisher queue.
+- Accepts only a fixed internal POST operation over Service Binding, validates the HMAC signature, timestamp/replay window, request size, and a minimal revision payload, then enqueues a normalized publication message. It never accepts arbitrary object keys or serialized catalogue content.
+- Uses a dedicated secret shared only with the trusted server-side callers and the dispatcher. It does not accept public HTTP traffic.
 
 **Catalogue Publisher Worker**
 - Is a dedicated Queue consumer with no public HTTP endpoint, `workers_dev: false` and `preview_urls: false`.
-- Has the D1 binding needed to build the snapshot and the only R2 write-capable binding.
-- Receives catalogue-publish messages only from the Yume Worker (and any explicitly configured internal maintenance producer).
-- Uses a fixed object key and writes the complete JSON snapshot in one R2 object replacement.
-- Uses a monotonically increasing catalogue revision, a single consumer/concurrency limit of one, and object metadata to skip already-published revisions and prevent older/duplicate jobs from overwriting newer snapshots.
+- Has the D1 binding needed to build the snapshot and the only R2 write-capable binding in the application.
+- Receives messages only from the private dispatcher queue (and a separately authenticated internal maintenance caller, if required).
+- Reads the latest committed catalogue from D1, writes the complete JSON snapshot to one fixed object key in one R2 object replacement, and never trusts stale rows carried in a message.
+- Uses a monotonically increasing catalogue revision, one consumer with concurrency limit one, and object metadata to skip already-published revisions and prevent older/duplicate jobs from overwriting newer snapshots.
+- Rechecks the D1 revision after building the snapshot. If it changed during the build, it rebuilds rather than publishing a stale snapshot.
 - Records publish state/error in D1 so the admin UI distinguishes saved-to-D1, queued, published and failed states.
+- After a successful PutObject, requests the private Reader cache purge through Service Binding.
 
-This keeps the write capability out of the public Worker entirely. A visitor can request the public catalogue reader but the reader's credential is read-only; a visitor cannot send directly to the private publisher Queue. The publisher is the only service with write access to R2.
+This puts every R2 write capability in the isolated Publisher Worker. The public Worker has no R2 write credentials or direct Queue producer, the Reader has only a bucket-scoped read-only S3 token, and the dispatcher can only enqueue a constrained internal event. Ordinary visitors can cause a cache miss/read when requesting the public catalogue, but they have no route or credential that can reach an R2 write operation. The backend admin gate and the dispatcher's independent internal-signature check are both required before publication is queued.
 
 ### Alternatives considered
 
 1. **Attach a normal R2 binding to the public Yume Worker.** Rejected. Cloudflare describes an R2 Worker binding as a capability to read and write objects; the binding API exposes `put` and `delete`. Hiding write buttons or checking routes is weaker than removing the capability from the public Worker.
 2. **Expose the bucket via `r2.dev` and keep the writer separate.** Technically simpler, but the development URL exposes bucket contents publicly, is rate-limited and is not intended for production. It is not the preferred long-term design, and the user has not purchased a domain.
 3. **Private reader with bucket-scoped Object Read only credentials plus a separate publisher.** Recommended. It avoids public bucket access and avoids placing write credentials in the public Worker. The additional reader/publisher Workers and S3 signing dependency add operational complexity, but the permissions boundary is much clearer.
+
 
 ## 8. Snapshot correctness and publishing lifecycle
 
@@ -183,6 +195,7 @@ This keeps the write capability out of the public Worker entirely. A visitor can
 - Publisher messages are idempotent. The publisher always reads the latest committed D1 state instead of trusting stale catalogue data embedded in the queue message.
 - Before writing, publisher compares the current D1 revision with the R2 object's published revision. If the source revision changed while it was building the snapshot, it rebuilds rather than publishing a stale snapshot.
 - A single `PutObject` replaces the JSON object as a whole. R2 documents strong consistency after a write resolves.
+- The Reader's Workers Cache entry is tagged with `yume-catalog-v1`. The Publisher purges this tag through the Reader's private Service Binding only after the R2 write succeeds. If cache purge fails, the publication state records that separately and the short TTL remains the fallback.
 - If publication fails, the previous snapshot remains available; D1 changes are not reported as published. Queue retries/DLQ and a D1 publication-state record make the failure visible in admin.
 - Scheduled episode updates and any enabled Kodik availability refresh that affect snapshot fields must enqueue publication too.
 
