@@ -25,19 +25,19 @@ describe("registration consent UI", () => {
       />,
     );
 
-    const privacy = screen.getByRole("checkbox", { name: "Accept the Personal Data Processing Policy" }) as HTMLInputElement;
-    const terms = screen.getByRole("checkbox", { name: "Accept the User Agreement" }) as HTMLInputElement;
+    const privacy = screen.getByRole("checkbox", { name: "Accept the Privacy Policy" }) as HTMLInputElement;
+    const terms = screen.getByRole("checkbox", { name: "Accept the Site Terms of Use" }) as HTMLInputElement;
     const submit = screen.getByRole("button", { name: "Continue with Telegram" }) as HTMLButtonElement;
 
     expect(privacy.checked).toBe(false);
     expect(terms.checked).toBe(false);
     expect(submit.disabled).toBe(true);
 
-    fireEvent.click(screen.getByRole("button", { name: "Personal Data Processing Policy" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "Privacy Policy" })[0]!);
     expect(onPrivacy).toHaveBeenCalledTimes(1);
     expect(privacy.checked).toBe(false);
 
-    fireEvent.click(screen.getByRole("button", { name: "User Agreement" }));
+    fireEvent.click(screen.getByRole("button", { name: "Site Terms of Use" }));
     expect(onRules).toHaveBeenCalledTimes(1);
     expect(terms.checked).toBe(false);
 

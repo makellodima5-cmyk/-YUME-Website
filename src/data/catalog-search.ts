@@ -60,7 +60,7 @@ export function validateCatalogSearch(search: Record<string, unknown>): CatalogS
   const rating = parseSearchNumber(search.rating);
   const validSections: View[] = [
     "home", "admin", "catalog", "collections", "profile", "popular", "new-releases",
-    "announcements", "airing", "favorites", "watchlist", "history", "privacy", "privacy-policy", "notifications",
+    "announcements", "airing", "favorites", "watchlist", "history", "privacy", "privacy-policy", "rules", "rights", "notifications",
   ];
 
   return {
