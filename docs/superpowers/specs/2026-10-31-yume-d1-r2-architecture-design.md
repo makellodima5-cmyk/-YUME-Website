@@ -10,7 +10,7 @@
 
 The catalogue's current, queryable state lives in the private R2 bucket \`yume-catalog\`. Every current-catalogue read, including public pages and admin operations, is served from R2. D1 is not the source of the current catalogue and is not used as a mutable catalogue mirror.
 
-D1 continues to receive catalogue changes, but through an **append-only write journal**. A journal insert records the operation and the changed payload. Application code does not SELECT, UPDATE, DELETE, UPSERT, or conflict-check current catalogue rows in D1. The journal has no uniqueness constraint or secondary index that would require application-level conflict lookup. Repeated journal events are acceptable at the persistence layer; the coordinator's durable operation ID and replay state govern the actual catalogue mutation.
+D1 continues to receive catalogue changes, but through an **append-only write journal**. A journal insert records the operation summary, affected Shikimori IDs, metadata keys, payload byte count and SHA-256 digest. The full catalogue payload stays in the Durable Object's pending operation and the immutable R2 revision; D1 is not a recovery source. Application code does not SELECT, UPDATE, DELETE, UPSERT, or conflict-check current catalogue rows in D1. The journal has no uniqueness constraint or secondary index that would require application-level conflict lookup. The journal payload is deliberately compact and does not duplicate large descriptions, posters or screenshot arrays. Repeated journal events are acceptable at the persistence layer; the coordinator's durable operation ID and replay state govern the actual catalogue mutation.
 
 This distinction is essential. A design that reads from R2 but still uses D1 \`UPDATE ... WHERE id\`, \`DELETE ... WHERE id\`, or \`INSERT ... ON CONFLICT DO UPDATE\` is not a zero-catalogue-read design. D1 reports rows read and rows written per statement, including rows reached through indexes. A mutable row store therefore cannot be promised to have exactly zero billable reads just because the application removed its explicit SELECT statements. The write-only journal is the selected design for the strictest interpretation of the goal. Actual D1 metrics for plain journal INSERTs still have to be measured in Stage 2/3 before claiming a numerical zero.
 
@@ -49,9 +49,9 @@ The current catalogue is not duplicated as a mutable 26-table relational structu
 
 3. **Private Catalogue Coordinator Durable Object**
    - There is one logical singleton object for the Yume catalogue. All catalogue mutations go through it: admin import, single-title import, bulk import, delete, exclusions, metadata repair, screenshot enrichment, trailer changes, episode updates and Kodik availability changes.
-   - It owns the durable operation journal, operation IDs, revision sequencing, retry state and the R2 write capability.
+   - It owns the durable pending-operation log, operation IDs, revision sequencing, retry state and the R2 write capability.
    - It has the R2 bucket binding and the D1 binding used solely to append the catalogue journal. These bindings exist in the separate coordinator Worker script, not in the public Yume Worker.
-   - It serialises mutation commands through a durable command sequence and a persisted active-operation lease in its SQLite storage. Durable Objects are single-threaded, but external I/O awaits can interleave requests; therefore Stage 2 must claim exactly one operation in a storage transaction and allow only one drain loop to publish at a time.
+   - It serialises mutation commands with a monotonic sequence allocated in a SQLite storage transaction. The DO processes pending operations in sequence order under `blockConcurrencyWhile`; external I/O awaits cannot cause a later command to overtake an earlier pending command.
    - It persists accepted commands before performing external side effects and uses its Durable Object storage and Alarm API to resume incomplete work after failures or restarts.
    - If an alarm attempt fails repeatedly, the handler records the attempt and schedules a new alarm explicitly. Do not assume Cloudflare's bounded automatic alarm retries are an unlimited retry service.
    - It writes immutable revision objects, then atomically advances a small current-revision pointer using R2 conditional write / ETag matching. A failed condition means another write won; the coordinator reloads current state and reapplies the operation rather than overwriting a newer revision.
@@ -84,13 +84,13 @@ The coordinator follows this logical protocol:
 1. Validate the action and persist an operation ID plus its full bounded payload in Durable Object storage.
 2. Load the current committed R2 pointer and revision.
 3. Apply the command to that latest state in memory, with idempotency checks against the coordinator's operation journal.
-4. Append the D1 write-journal record. The record is an immutable audit of the intended committed catalogue change, not the runtime source of truth.
+4. Append the D1 write-journal record. The record is a compact immutable audit summary with a payload digest, not a full data copy or runtime source of truth.
 5. Write the next immutable R2 revision.
 6. Advance \`current.json\` with an atomic ETag conditional write. If the ETag no longer matches, discard the candidate revision as uncommitted, load the latest pointer and reapply the command.
 7. Mark the operation committed in Durable Object storage, schedule cache refresh/invalidation, and return the committed revision.
 8. If a process fails at any intermediate step, the Durable Object Alarm resumes from the persisted operation status. Repeated D1 journal inserts may exist after an ambiguous response; they are harmless audit duplicates and must not cause repeated state mutation in R2.
 
-The object pointer is the commit boundary visible to readers. R2 is strongly consistent, and conditional writes are evaluated atomically at commit time. Competing writers cannot silently overwrite a newer pointer when they use the ETag precondition. Keep old revision objects for a bounded rollback window; cleanup is a separate, safe maintenance operation.
+The object pointer is the commit boundary visible to readers. R2 is strongly consistent, and conditional writes are evaluated atomically at commit time. Competing writers cannot silently overwrite a newer pointer when they use the ETag precondition. Keep the latest ten committed revision objects for the rollback window. The coordinator removes the revision that falls outside this window after a successful journal append; cleanup failure is logged and never reverses a committed pointer. Keep the latest 1,000 committed operation IDs in Durable Object storage for bounded idempotent retry protection.
 
 ### 2.4 Why a Queue is not the mutation lock
 

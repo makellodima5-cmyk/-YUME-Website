@@ -130,13 +130,11 @@ function subscriptionDb(env: TelegramEnvironment): TelegramDb | null {
 
 async function getSubscriptionState(db: TelegramDb | null, userId: number): Promise<SubscriptionState | null> {
   if (!db) return null;
-  await db.prepare("CREATE TABLE IF NOT EXISTS yume_telegram_subscription_state (telegram_user_id TEXT PRIMARY KEY, chat_id TEXT NOT NULL, message_id INTEGER, had_access INTEGER NOT NULL DEFAULT 0, awaiting_resubscribe INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)").bind().run();
   return db.prepare("SELECT telegram_user_id, chat_id, message_id, had_access, awaiting_resubscribe FROM yume_telegram_subscription_state WHERE telegram_user_id = ?").bind(String(userId)).first<SubscriptionState>();
 }
 
 async function saveSubscriptionState(db: TelegramDb | null, userId: number, chatId: number, messageId: number | null, hadAccess: boolean, awaiting: boolean): Promise<void> {
   if (!db) return;
-  await db.prepare("CREATE TABLE IF NOT EXISTS yume_telegram_subscription_state (telegram_user_id TEXT PRIMARY KEY, chat_id TEXT NOT NULL, message_id INTEGER, had_access INTEGER NOT NULL DEFAULT 0, awaiting_resubscribe INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)").bind().run();
   await db.prepare("INSERT INTO yume_telegram_subscription_state (telegram_user_id, chat_id, message_id, had_access, awaiting_resubscribe, updated_at) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP) ON CONFLICT(telegram_user_id) DO UPDATE SET chat_id = excluded.chat_id, message_id = excluded.message_id, had_access = excluded.had_access, awaiting_resubscribe = excluded.awaiting_resubscribe, updated_at = CURRENT_TIMESTAMP")
     .bind(String(userId), String(chatId), messageId, hadAccess ? 1 : 0, awaiting ? 1 : 0).run();
 }

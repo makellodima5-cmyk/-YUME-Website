@@ -8,7 +8,6 @@ import { env as cloudflareEnv } from "cloudflare:workers";
 
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
-import { setCatalogRuntimeEnvironment } from "./data/catalog-d1.server";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -222,7 +221,6 @@ export default {
       return applySecurityHeaders(response, request.url);
     }
 
-    setCatalogRuntimeEnvironment(env);
     const supportRedirect = getSupportRedirect(request, env);
     if (supportRedirect) return applySecurityHeaders(supportRedirect, request.url);
     try {

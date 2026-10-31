@@ -1,0 +1,44 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "yume-catalog-coordinator",
+  "main": "src/workers/catalog-coordinator.ts",
+  "compatibility_date": "2026-10-20",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "workers_dev": false,
+  "preview_urls": false,
+  "observability": {
+    "enabled": true
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "CATALOG_COORDINATOR",
+        "class_name": "CatalogCoordinator"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1-catalog-coordinator",
+      "new_sqlite_classes": [
+        "CatalogCoordinator"
+      ]
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "CATALOG_BUCKET",
+      "bucket_name": "yume-catalog"
+    }
+  ],
+  "d1_databases": [
+    {
+      "binding": "YUME_DB",
+      "database_name": "yumedb",
+      "database_id": "c2f0f25d-e29b-47e2-ad11-b726f7a3e9a2",
+      "migrations_dir": "migrations-clean"
+    }
+  ]
+}

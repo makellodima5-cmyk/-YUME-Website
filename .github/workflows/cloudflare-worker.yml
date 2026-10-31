@@ -59,8 +59,8 @@ jobs:
           }
           const binding = (config.d1_databases ?? []).find(
             (item) => item.binding === "YUME_DB"
-              && item.database_name === "yume_db"
-              && item.database_id === "29aea579-e316-413f-922b-44c17b12f45a",
+              && item.database_name === "yumedb"
+              && item.database_id === "c2f0f25d-e29b-47e2-ad11-b726f7a3e9a2",
           );
           if (!binding) {
             throw new Error("Generated Worker config does not contain the expected YUME_DB binding.");
@@ -73,6 +73,32 @@ jobs:
             throw new Error("Generated Worker config does not contain the expected YUME_SHIKIMORI_CACHE binding.");
           }
           const rootConfig = JSON.parse(fs.readFileSync("wrangler.jsonc", "utf8"));
+          const queueConfig = JSON.parse(fs.readFileSync("wrangler.queue.jsonc", "utf8"));
+          const readerConfig = JSON.parse(fs.readFileSync("wrangler.catalog-reader.jsonc", "utf8"));
+          const coordinatorConfig = JSON.parse(fs.readFileSync("wrangler.catalog-coordinator.jsonc", "utf8"));
+          for (const config of [rootConfig, queueConfig, coordinatorConfig]) {
+            const database = (config.d1_databases ?? []).find((item) => item.database_name === "yumedb");
+            if (!database || database.migrations_dir !== "migrations-clean") {
+              throw new Error("All Yume D1 bindings must point to yumedb and use migrations-clean.");
+            }
+          }
+          if ((rootConfig.r2_buckets ?? []).length !== 0) {
+            throw new Error("Public site Worker must not have a direct R2 binding.");
+          }
+          const readerService = (rootConfig.services ?? []).find((item) => item.binding === "YUME_CATALOG_READER" && item.service === "yume-catalog-reader");
+          const coordinatorService = (rootConfig.services ?? []).find((item) => item.binding === "YUME_CATALOG_COORDINATOR" && item.service === "yume-catalog-coordinator");
+          if (!readerService || !coordinatorService) {
+            throw new Error("Site Worker must use isolated catalogue Reader and Coordinator Service Bindings.");
+          }
+          if ((readerConfig.r2_buckets ?? []).length !== 0 || readerConfig.workers_dev !== false) {
+            throw new Error("Catalogue Reader must use scoped S3 credentials and must not expose a public R2 binding or workers.dev URL.");
+          }
+          const coordinatorBucket = (coordinatorConfig.r2_buckets ?? []).find((item) => item.binding === "CATALOG_BUCKET" && item.bucket_name === "yume-catalog");
+          const coordinatorDatabase = (coordinatorConfig.d1_databases ?? []).find((item) => item.binding === "YUME_DB" && item.database_id === "c2f0f25d-e29b-47e2-ad11-b726f7a3e9a2");
+          const coordinatorClass = (coordinatorConfig.durable_objects?.bindings ?? []).find((item) => item.name === "CATALOG_COORDINATOR" && item.class_name === "CatalogCoordinator");
+          if (!coordinatorBucket || !coordinatorDatabase || !coordinatorClass) {
+            throw new Error("Isolated coordinator Worker must own the R2 write binding, clean D1 journal binding and Durable Object.");
+          }
           if (rootConfig.main !== ".output/server/index.mjs" || !fs.existsSync(rootConfig.main)) {
             throw new Error("Root Wrangler config must target the built Nitro Worker entry.");
           }
@@ -91,7 +117,6 @@ jobs:
           if (!queueProducer) {
             throw new Error("Site Worker config is missing the YUME_WEB_TASKS Queue producer.");
           }
-          const queueConfig = JSON.parse(fs.readFileSync("wrangler.queue.jsonc", "utf8"));
           const queueConsumer = (queueConfig.queues?.consumers ?? []).find(
             (item) => item.queue === "yume-web-tasks"
               && item.max_batch_size === 2
@@ -105,7 +130,7 @@ jobs:
           }
           const queueDatabase = (queueConfig.d1_databases ?? []).find(
             (item) => item.binding === "YUME_DB"
-              && item.database_id === "29aea579-e316-413f-922b-44c17b12f45a",
+              && item.database_id === "c2f0f25d-e29b-47e2-ad11-b726f7a3e9a2",
           );
           if (!queueConsumer || !queueDatabase || queueConfig.main !== "src/queue-worker.ts") {
             throw new Error("Queue consumer Worker config is missing its bounded consumer, DLQ, D1 binding or entrypoint.");
@@ -159,11 +184,23 @@ jobs:
           console.log("Verified site and dedicated Queue Worker configs, entries, assets, Cron trigger, D1 and KV bindings.");
           NODE
 
+      - name: Apply and validate clean D1 migration against local SQLite
+        run: bunx wrangler@4 d1 migrations apply yumedb --local --config wrangler.jsonc
+
+      - name: Verify clean D1 migration history
+        run: bunx wrangler@4 d1 migrations list yumedb --local --config wrangler.jsonc
+
       - name: Validate site Worker deploy artifact
         run: bunx wrangler@4 deploy --dry-run --config wrangler.jsonc
 
       - name: Validate Queue consumer Worker deploy artifact
         run: bunx wrangler@4 deploy --dry-run --config wrangler.queue.jsonc
+
+      - name: Validate private catalogue Reader Worker deploy artifact
+        run: bunx wrangler@4 deploy --dry-run --config wrangler.catalog-reader.jsonc
+
+      - name: Validate isolated catalogue Coordinator Worker deploy artifact
+        run: bunx wrangler@4 deploy --dry-run --config wrangler.catalog-coordinator.jsonc
 
       # Production deployments are owned by Cloudflare Workers Builds.
       # Keep GitHub Actions as validation-only to avoid two competing deploy pipelines.

@@ -1,14 +1,8 @@
 import { env as cloudflareEnv } from "cloudflare:workers";
-import { invalidatePersistentCatalogCache, setCatalogRuntimeEnvironment } from "./catalog-d1.server";
+import { readCatalogState, submitCatalogMutation } from "./catalog-r2.server";
+import type { Anime } from "@/data/anime";
 
-type Environment = Record<string, unknown> & { YUME_DB?: unknown; KODIK_API_TOKEN?: string };
-type Statement = {
-  bind(...values: unknown[]): Statement;
-  first<T = Record<string, unknown>>(): Promise<T | null>;
-  all<T = Record<string, unknown>>(): Promise<{ results: T[] }>;
-  run(): Promise<{ meta?: { changes?: number } }>;
-};
-type Database = { prepare(sql: string): Statement; batch(statements: Statement[]): Promise<unknown[]> };
+type Environment = Record<string, unknown> & { KODIK_API_TOKEN?: string };
 type EpisodeValue = string | { link?: string | null };
 type KodikSeason = { episodes?: Record<string, EpisodeValue> | null };
 type KodikResult = {
@@ -32,10 +26,6 @@ function environment(): Environment {
   }
   const injected = (globalThis as typeof globalThis & { __YUME_RUNTIME_ENV__?: unknown }).__YUME_RUNTIME_ENV__;
   return injected && typeof injected === "object" ? injected as Environment : {};
-}
-
-function database(env: Environment): Database | null {
-  return env.YUME_DB && typeof env.YUME_DB === "object" ? env.YUME_DB as Database : null;
 }
 
 function validPlayerLink(value: EpisodeValue | null | undefined): string | null {
@@ -101,53 +91,45 @@ export function parseKodikAvailability(payload: unknown, expectedAnimeId: string
 
 export async function runScheduledKodikAvailabilityRefresh(input: unknown): Promise<void> {
   const env = input && typeof input === "object" ? input as Environment : environment();
-  setCatalogRuntimeEnvironment(env);
-  const db = database(env);
-  if (!db) throw new Error("Kodik availability cron has no YUME_DB binding.");
   const token = typeof env.KODIK_API_TOKEN === "string" ? env.KODIK_API_TOKEN.trim() : "";
   if (!token) {
     console.warn("[YUME][KODIK_AVAILABILITY] Skipping refresh: KODIK_API_TOKEN is not configured.");
     return;
   }
+  const state = await readCatalogState();
   const now = Date.now();
-  const lock = await db.prepare("UPDATE anime_kodik_availability_lock SET locked_until=? WHERE id=1 AND locked_until<?")
-    .bind(now + LOCK_TTL_MS, now).run();
-  if ((lock.meta?.changes ?? 0) === 0) return;
+  const due = state.items.filter((anime) => {
+    if (anime.status !== "Онгоинг") return false;
+    const checkedAt = Date.parse(state.metadata["kodik_checked_at:" + anime.id] ?? "");
+    const attemptedAt = Date.parse(state.metadata["kodik_last_attempt_at:" + anime.id] ?? "");
+    return (!Number.isFinite(checkedAt) || checkedAt <= now - 6 * 60 * 60 * 1000) &&
+      (!Number.isFinite(attemptedAt) || attemptedAt <= now - 30 * 60 * 1000);
+  }).slice(0, CHECK_BATCH_SIZE);
+  if (!due.length) return;
 
-  try {
-    const due = await db.prepare(
-      "SELECT a.id FROM anime_catalog a LEFT JOIN anime_kodik_availability k ON k.anime_id=a.id " +
-      "WHERE a.status='Онгоинг' " +
-      "AND (k.checked_at IS NULL OR datetime(k.checked_at) <= datetime('now', '-6 hours')) " +
-      "AND (k.last_attempt_at IS NULL OR datetime(k.last_attempt_at) <= datetime('now', '-30 minutes')) " +
-      "ORDER BY COALESCE(k.checked_at,'1970-01-01 00:00:00') ASC, COALESCE(k.last_attempt_at,'1970-01-01 00:00:00') ASC, a.position ASC, a.id ASC LIMIT ?",
-    ).bind(CHECK_BATCH_SIZE).all<{ id: string }>();
-
-    for (const row of due.results) {
-      const attemptedAt = new Date().toISOString();
-      try {
-        const result = await fetchKodikAvailability(row.id, token);
-        await db.prepare(
-          "INSERT INTO anime_kodik_availability(anime_id,has_episodes,episode_count,checked_at,last_attempt_at,last_error) " +
-          "VALUES(?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,NULL) " +
-          "ON CONFLICT(anime_id) DO UPDATE SET has_episodes=excluded.has_episodes,episode_count=excluded.episode_count," +
-          "checked_at=CURRENT_TIMESTAMP,last_attempt_at=CURRENT_TIMESTAMP,last_error=NULL",
-        ).bind(row.id, result.hasEpisodes ? 1 : 0, result.episodeCount).run();
-      } catch (error) {
-        const message = (error instanceof Error ? error.message : "Unknown Kodik error").slice(0, 500);
-        await db.prepare(
-          "INSERT INTO anime_kodik_availability(anime_id,has_episodes,episode_count,checked_at,last_attempt_at,last_error) " +
-          "VALUES(?,0,0,NULL,?,?) ON CONFLICT(anime_id) DO UPDATE SET last_attempt_at=?,last_error=?",
-        ).bind(row.id, attemptedAt, message, attemptedAt, message).run();
-        console.warn("[YUME][KODIK_AVAILABILITY] Check failed; preserving the last successful availability snapshot.", {
-          animeId: row.id, message,
-        });
-      }
+  const updates: Anime[] = [];
+  const metadata: Record<string,string> = {};
+  const deleteMetadataKeys:string[]=[];
+  for (const anime of due) {
+    const attemptedAt = new Date().toISOString();
+    try {
+      const result = await fetchKodikAvailability(anime.id, token);
+      updates.push({ ...anime, kodikAvailable: result.hasEpisodes });
+      metadata["kodik_episode_count:" + anime.id] = String(result.episodeCount);
+      metadata["kodik_checked_at:" + anime.id] = attemptedAt;
+      metadata["kodik_last_attempt_at:" + anime.id] = attemptedAt;
+      deleteMetadataKeys.push("kodik_last_error:" + anime.id);
+    } catch (error) {
+      metadata["kodik_last_attempt_at:" + anime.id] = attemptedAt;
+      metadata["kodik_last_error:" + anime.id] = (error instanceof Error ? error.message : "Unknown Kodik error").slice(0,500);
+      console.warn("[YUME][KODIK_AVAILABILITY] Check failed; preserving last successful availability snapshot.", { animeId:anime.id, message:metadata["kodik_last_error:" + anime.id] });
     }
-
-    if (due.results.length) await invalidatePersistentCatalogCache();
-    console.info("[YUME][KODIK_AVAILABILITY] Refresh slice completed.", { checked: due.results.length });
-  } finally {
-    await db.prepare("UPDATE anime_kodik_availability_lock SET locked_until=0 WHERE id=1").run();
   }
+  if (updates.length || Object.keys(metadata).length) {
+    const mutations:import("@/data/catalog-r2.shared").CatalogMutation[]=[];
+    if(updates.length)mutations.push({type:"upsert",items:updates});
+    if(Object.keys(metadata).length||deleteMetadataKeys.length)mutations.push({type:"metadata",values:metadata,deleteKeys:deleteMetadataKeys});
+    await submitCatalogMutation({type:"batch",mutations});
+  }
+  console.info("[YUME][KODIK_AVAILABILITY] Refresh slice completed.", { checked:due.length, updated:updates.length });
 }
