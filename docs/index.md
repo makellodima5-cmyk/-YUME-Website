@@ -24,3 +24,8 @@ The prior \`docs/persistent-catalog-d1.md\` is now a historical note and is supe
 - CI is not a production deployment and does not prove live Cloudflare binding permissions, D1 metrics or R2 access policy.
 - New D1 SQL is prepared in Stage 2/3, manually applied by the owner in D1 Console, and separately verified after application.
 - Keep the old D1, current \`main\`, and the backup branch untouched during the migration work.
+
+
+## Stage 3 launch preparation
+
+- [Launch and verification runbook](technical/stage-3-launch-and-verification.md)
