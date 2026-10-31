@@ -4,7 +4,7 @@ import { resolve } from "node:path";
 
 describe("automatic Worker maintenance", () => {
   it("keeps all scheduled refresh jobs disabled and exposes manual section refresh", async () => {
-    const [viteConfig, catalogImporter, wranglerConfig, queueConfig, workflow, homeRoute, queueConsumer] = await Promise.all([
+    const [viteConfig, catalogImporter, wranglerConfig, queueConfig, workflow, homeRoute, queueConsumer, queueWorker] = await Promise.all([
       readFile(resolve(process.cwd(), "vite.config.ts"), "utf8"),
       readFile(resolve(process.cwd(), "src/data/admin-catalog-import.server.ts"), "utf8"),
       readFile(resolve(process.cwd(), "wrangler.jsonc"), "utf8"),
@@ -12,6 +12,7 @@ describe("automatic Worker maintenance", () => {
       readFile(resolve(process.cwd(), ".github/workflows/cloudflare-worker.yml"), "utf8"),
       readFile(resolve(process.cwd(), "src/routes/index.tsx"), "utf8"),
       readFile(resolve(process.cwd(), "src/data/episode-notification-queue.server.ts"), "utf8"),
+      readFile(resolve(process.cwd(), "src/queue-worker.ts"), "utf8"),
     ]);
 
     expect(viteConfig).not.toContain("catalog-refresh.ts");
@@ -21,8 +22,12 @@ describe("automatic Worker maintenance", () => {
     expect(queueConfig).toContain('"yume-web-tasks-dlq"');
     expect(queueConfig).toContain('"max_concurrency": 1');
     expect(queueConfig).toContain('"src/queue-worker.ts"');
+    expect(queueConfig).toContain('"workers_dev": false');
+    expect(queueConfig).toContain('"preview_urls": false');
     expect(queueConsumer).toContain("INSERT OR IGNORE INTO yume_notification_targets");
     expect(queueConsumer).toContain("message.retry({ delaySeconds: RETRY_DELAY_SECONDS })");
+    expect(queueWorker).toContain("runScheduledNotificationCleanup(env)");
+    expect(queueWorker).toContain("runScheduledEpisodeNotifications(env)");
     expect(workflow).toContain("Automatic scheduled Worker jobs must remain disabled.");
     expect(workflow).toContain("Generated Worker entry still includes scheduled job");
     expect(catalogImporter).toContain('body.action === "refresh_section_metadata"');
