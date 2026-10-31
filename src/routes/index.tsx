@@ -473,8 +473,13 @@ function Index() {
   const [historyError, setHistoryError] = useState("");
 
   useEffect(() => {
-    setIsTelegramMiniApp(Boolean(getTelegramWebApp()?.initData));
-    setTelegramDetectionComplete(true);
+    const detectTelegramMiniApp = () => {
+      setIsTelegramMiniApp(Boolean(getTelegramWebApp()?.initData));
+      setTelegramDetectionComplete(true);
+    };
+    detectTelegramMiniApp();
+    window.addEventListener("yume-telegram-webapp-ready", detectTelegramMiniApp);
+    return () => window.removeEventListener("yume-telegram-webapp-ready", detectTelegramMiniApp);
   }, []);
 
   useEffect(() => {
