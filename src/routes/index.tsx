@@ -15,7 +15,13 @@ import { HomeDepthAtmosphere } from "@/components/yume/HomeDepthAtmosphere";
 import "../home-depth.css";
 import { useYumePreferences, displayGenre, type TranslationKey } from "@/data/preferences";
 import { filterAndSortCatalog, getCatalogPageCount, matchesCollectionGenres, paginateCatalog } from "@/data/catalog-utils";
-import { validateCatalogSearch } from "@/data/catalog-search";
+import {
+  CATALOG_RETURN_STORAGE_KEY,
+  CATALOG_SCROLL_RESTORE_STORAGE_KEY,
+  parseCatalogReturnState,
+  serializeCatalogReturnState,
+  validateCatalogSearch,
+} from "@/data/catalog-search";
 import homeSocialImage from "@/assets/yume-desktop.webp";
 import { absoluteImageUrl, canonicalUrl } from "@/data/seo";
 import { getTelegramWebApp, telegramHapticImpact } from "@/lib/telegram-mini-app";
@@ -1385,8 +1391,29 @@ function Index() {
     navigate({ to: "/", search: { section: v, q: undefined, page: undefined, sort: undefined, genres: undefined, status: undefined, from: undefined, to: undefined, rating: undefined, kind: undefined, age: undefined, lang: v === "catalog" ? language : undefined } });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
-  const select = (anime: Anime) =>
-    navigate({ to: "/anime/$animeId", params: { animeId: anime.id } });
+  const select = (anime: Anime) => {
+    if (view === "catalog") {
+      try {
+        window.sessionStorage.setItem(CATALOG_RETURN_STORAGE_KEY, serializeCatalogReturnState({
+          section: "catalog",
+          q: urlQuery,
+          page: urlPage,
+          sort: urlSort,
+          genres: urlGenres,
+          status: urlStatus,
+          from: urlFrom,
+          to: urlTo,
+          rating: urlRating,
+          kind: urlKind,
+          age: urlAge,
+          lang: urlLang,
+        }, window.scrollY));
+      } catch {
+        // Navigation still works if browser storage is unavailable.
+      }
+    }
+    void navigate({ to: "/anime/$animeId", params: { animeId: anime.id } });
+  };
 
   const handleAuthComplete = useCallback(async () => {
     setTelegramAuthError("");
@@ -1438,6 +1465,29 @@ function Index() {
     setActiveFilters(current => JSON.stringify(current) === JSON.stringify(routeFilters) ? current : routeFilters);
     setDraftFilters(current => JSON.stringify(current) === JSON.stringify(routeFilters) ? current : routeFilters);
   }, [view, loadedCatalogPage, urlQuery, urlSort, urlGenres, urlStatus, urlFrom, urlTo, urlRating, urlKind, urlAge]);
+  useEffect(() => {
+    if (view !== "catalog") return;
+    let scrollY = 0;
+    try {
+      const raw = window.sessionStorage.getItem(CATALOG_SCROLL_RESTORE_STORAGE_KEY);
+      if (raw === null) return;
+      window.sessionStorage.removeItem(CATALOG_SCROLL_RESTORE_STORAGE_KEY);
+      const parsed = Number(raw);
+      if (Number.isFinite(parsed) && parsed > 0) scrollY = Math.floor(parsed);
+    } catch {
+      return;
+    }
+    if (scrollY <= 0) return;
+    let secondFrame = 0;
+    const firstFrame = window.requestAnimationFrame(() => {
+      secondFrame = window.requestAnimationFrame(() => window.scrollTo({ top: scrollY, behavior: "auto" }));
+    });
+    return () => {
+      window.cancelAnimationFrame(firstFrame);
+      if (secondFrame) window.cancelAnimationFrame(secondFrame);
+    };
+  }, [view, loadedCatalogPage]);
+
   const activeFilterCount = activeFilters.genres.length +
     Number(activeFilters.status !== "Любой") + Number(activeFilters.yearFrom !== "") +
     Number(activeFilters.yearTo !== "") + Number(activeFilters.minRating > 0) +

@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { validateCatalogSearch } from "@/data/catalog-search";
+import {
+  parseCatalogReturnState,
+  serializeCatalogReturnState,
+  validateCatalogSearch,
+} from "@/data/catalog-search";
 import { getCatalogPageCount, paginateCatalog } from "@/data/catalog-utils";
 
 describe("catalog URL search validation", () => {
@@ -81,5 +85,49 @@ describe("server catalog pagination contract", () => {
     expect(paginateCatalog(all, 2, 20).map((item) => item.id)).toEqual(Array.from({ length: 20 }, (_, index) => index + 21));
     expect(getCatalogPageCount(all.length, 20)).toBe(4);
     expect(paginateCatalog(all, 4, 20).map((item) => item.id)).toEqual([61, 62, 63]);
+  });
+});
+
+
+describe("catalog return position", () => {
+  it("preserves the catalog page, filters, sorting, and scroll position when opening a title", () => {
+    const raw = serializeCatalogReturnState({
+      section: "catalog",
+      page: 50,
+      q: "naruto",
+      sort: "newest",
+      genres: "Экшен,Фэнтези",
+      status: "Онгоинг",
+      from: 2020,
+      to: 2026,
+      rating: 7,
+      kind: "TV",
+      age: "16+",
+      lang: "ru",
+    }, 1842.8);
+
+    expect(parseCatalogReturnState(raw)).toEqual({
+      search: {
+        section: "catalog",
+        page: 50,
+        q: "naruto",
+        sort: "newest",
+        genres: "Экшен,Фэнтези",
+        status: "Онгоинг",
+        from: 2020,
+        to: 2026,
+        rating: 7,
+        kind: "TV",
+        age: "16+",
+        lang: "ru",
+      },
+      scrollY: 1842,
+    });
+  });
+
+  it("rejects malformed or non-catalog return state", () => {
+    expect(parseCatalogReturnState(null)).toBeNull();
+    expect(parseCatalogReturnState("{broken")).toBeNull();
+    expect(parseCatalogReturnState(JSON.stringify({ search: { section: "home" }, scrollY: 300 }))).toBeNull();
   });
 });
