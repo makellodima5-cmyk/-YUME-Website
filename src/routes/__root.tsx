@@ -16,6 +16,7 @@ import { YumePreferencesProvider, useYumePreferences } from "@/data/preferences"
 import { DEFAULT_META_DESCRIPTION, SITE_NAME } from "@/data/seo";
 import { initializeTelegramMiniApp } from "@/lib/telegram-mini-app";
 import { TelegramSubscriptionGate } from "@/components/yume/TelegramSubscriptionGate";
+import { CookieConsentBanner } from "@/components/yume/CookieConsentBanner";
 
 type InterfaceLanguage = "ru" | "en";
 
@@ -122,9 +123,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     ],
     links: [
       { rel: "stylesheet", href: appCss },
-      { rel: "preconnect", href: "https://fonts.googleapis.com" },
-      { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
-      { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Unbounded:wght@500;700&display=swap&subset=cyrillic" },
       { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
     ],
   }),
@@ -138,7 +136,6 @@ function RootShell({ children }: { children: ReactNode }) {
   return (
     <html lang="ru">
       <head>
-        <script src="https://telegram.org/js/telegram-web-app.js"></script>
         <script
           dangerouslySetInnerHTML={{
             __html: `(function(){try{var t=localStorage.getItem("yume-theme")||"dark";var r=t==="system"?(matchMedia("(prefers-color-scheme: light)").matches?"light":"dark"):t;document.documentElement.dataset.theme=r;document.documentElement.style.colorScheme=r;document.documentElement.classList.toggle("dark",r==="dark")}catch(e){document.documentElement.dataset.theme="dark";document.documentElement.classList.add("dark")}})();`,
@@ -174,7 +171,18 @@ function SkipToContent() {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
-  useEffect(() => initializeTelegramMiniApp(), []);
+  useEffect(() => {
+    let cleanup = initializeTelegramMiniApp();
+    const initializeAfterConsent = () => {
+      cleanup?.();
+      cleanup = initializeTelegramMiniApp();
+    };
+    window.addEventListener("yume-telegram-webapp-ready", initializeAfterConsent);
+    return () => {
+      window.removeEventListener("yume-telegram-webapp-ready", initializeAfterConsent);
+      cleanup?.();
+    };
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -182,6 +190,7 @@ function RootComponent() {
         <DocumentLanguageSync />
         <SkipToContent />
         <TelegramSubscriptionGate><Outlet /></TelegramSubscriptionGate>
+        <CookieConsentBanner />
       </YumePreferencesProvider>
     </QueryClientProvider>
   );

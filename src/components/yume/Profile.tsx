@@ -869,28 +869,28 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
                         "Информация может обрабатываться для обеспечения работы сайта и учётной записи, предоставления доступных функций, сохранения пользовательских настроек, обеспечения безопасности, предотвращения злоупотреблений, диагностики ошибок и ответа на обращения пользователей.",
                         "В зависимости от используемых функций могут обрабатываться сведения, переданные при авторизации через Telegram, данные профиля, настройки и действия внутри сервиса, а также технические сведения о запросах и сбоях.",
                         "Обработка осуществляется в объёме, необходимом для указанных целей, на соответствующем основании, включая предоставление запрошенной функции, выполнение применимых требований и согласие пользователя в тех случаях, когда оно необходимо.",
-                        "Для оформления интерфейса браузер загружает шрифты Manrope и Unbounded через Google Fonts; для интеграции с Telegram загружается официальный скрипт Telegram Web Apps с telegram.org. При загрузке этих ресурсов соответствующие поставщики получают сетевые данные запроса, например IP-адрес и сведения о браузере, согласно собственным условиям и политикам.",
+                        "При входе в аккаунт пользователь может выбрать авторизацию через Telegram. В этом случае Telegram передаёт сведения, необходимые для подтверждения учётной записи и работы выбранной функции.",
                         "Администрация не должна использовать данные для несовместимых с указанными целями задач без надлежащего основания и информирования пользователя, когда это требуется."
                       ] : [
                         "Information may be processed to operate the site and account, provide available features, save preferences, maintain security, prevent abuse, diagnose errors, and respond to user requests.",
                         "Depending on the features used, this may include information provided through Telegram authentication, profile details, settings and activity within the service, and technical request or error information.",
                         "Processing is limited to what is necessary for these purposes and relies on an appropriate basis, including providing a requested feature, meeting applicable requirements, or user consent where required.",
-                        "For interface styling, the browser loads the Manrope and Unbounded fonts through Google Fonts; Telegram integration loads the official Telegram Web Apps script from telegram.org. When these resources are requested, the respective providers receive request-level network data such as the IP address and browser information under their own terms and policies.",
+                        "When signing in, users may choose Telegram authentication. Telegram then provides the information needed to verify the account and operate the requested feature.",
                         "Information should not be used for purposes incompatible with those described without an appropriate basis and user notice where required."
                       ]
                     },
                     {
                       title: language === "ru" ? "Cookie-файлы и аналогичные технологии" : "Cookies and similar technologies",
                       clauses: language === "ru" ? [
-                        "Сайт может использовать cookie-файлы, локальное хранилище браузера и аналогичные технологии для поддержки основных функций, сохранения настроек и обеспечения безопасности.",
-                        "Строго необходимые технологии могут использоваться для работы запрошенных пользователем функций. Аналитические, рекламные и иные необязательные технологии применяются только при наличии соответствующих инструментов и с учётом выбора пользователя и применимых требований.",
+                        "YUME использует cookie-файлы и аналогичные технологии для сохранения выбора пользователя и работы необходимых функций сайта.",
+                        "При первом посещении сайта показывается уведомление с выбором. Если пользователь соглашается, YUME может использовать все предусмотренные сайтом cookie-файлы. Если пользователь нажимает «Отклонить все», необязательные cookie-файлы и аналогичные технологии не включаются. Сохранение самого выбора и работа функций, которые пользователь запросил, могут требовать строго необходимых технических данных.",
                         "Пользователь может ограничить или удалить cookie-файлы в настройках браузера. Это может повлиять на доступность отдельных функций или сохранение настроек.",
-                        "Для каталожных постеров YUME использует ограниченный прокси на собственном домене, чтобы браузер не обращался к домену изображений напрямую. При иных прямых запросах к ресурсам Shikimori её защитная инфраструктура может устанавливать собственные технические cookie; их назначение, сроки действия и условия обработки контролируются сторонним поставщиком, а не YUME. Подробности следует уточнять в политиках Shikimori/DDoS-Guard."
+                        "Выбор пользователя можно изменить позднее, открыв настройки cookie на странице Политики конфиденциальности."
                       ] : [
-                        "The site may use cookies, browser local storage, and similar technologies to support core features, save preferences, and maintain security.",
-                        "Strictly necessary technologies may be used to provide features requested by the user. Analytics, advertising, and other optional technologies are used only if actually implemented and in line with user choices and applicable requirements.",
+                        "YUME uses cookies and similar technologies to remember the user’s choice and support essential site features.",
+                        "A notice is shown on the first visit. If the user accepts, YUME may use all cookies provided by the site. If the user selects “Reject all”, optional cookies and similar technologies are not enabled. Remembering the choice and providing features requested by the user may still require strictly necessary technical data.",
                         "Users can restrict or delete cookies in browser settings. This may affect some features or saved preferences.",
-                        "YUME uses a restricted same-origin proxy for catalog posters so the browser does not contact the image host directly. Other direct requests to Shikimori resources, if any, may cause its protection infrastructure to set technical cookies; their purpose, lifetime and processing terms are controlled by the third-party provider, not YUME. Consult Shikimori/DDoS-Guard policies for details."
+                        "Users can change their choice later by opening cookie settings on the Privacy Policy page."
                       ]
                     },
                     {
@@ -898,13 +898,13 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
                       clauses: language === "ru" ? [
                         "Администрация применяет разумные технические и организационные меры для защиты информации от неправомерного доступа, утраты, изменения или раскрытия.",
                         "Данные хранятся не дольше, чем это необходимо для целей обработки, обеспечения безопасности, разрешения обращений и выполнения применимых требований. Конкретный срок зависит от вида данных и цели их использования.",
-                        "Доступ к данным ограничивается случаями, когда он необходим для работы и поддержки сервиса. Информация может обрабатываться поставщиками инфраструктуры и технических услуг в объёме, необходимом для функционирования YUME.",
+                        "Доступ к данным ограничивается случаями, когда он необходим для работы и поддержки сервиса.",
                         "Передача информации также возможна в случаях, предусмотренных применимым законодательством, либо для защиты прав, безопасности пользователей и работоспособности сервиса в допустимых пределах.",
                         "Ни один способ передачи или хранения данных не может гарантировать абсолютную безопасность, однако Администрация принимает разумные меры для снижения соответствующих рисков."
                       ] : [
                         "The administration applies reasonable technical and organizational safeguards to protect information against unauthorized access, loss, alteration, or disclosure.",
                         "Information is retained no longer than necessary for the processing purposes, security, handling requests, and applicable requirements. The period depends on the type of information and its use.",
-                        "Access is limited to what is needed to operate and support the service. Infrastructure and technical service providers may process information as necessary for YUME to function.",
+                        "Access is limited to what is needed to operate and support the service.",
                         "Information may also be disclosed where required by applicable law or, where permitted, to protect rights, user safety, and service reliability.",
                         "No method of transmission or storage can guarantee absolute security, but reasonable measures are taken to reduce risks."
                       ]
@@ -970,7 +970,16 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
                 <p className="pt-2 text-xs leading-relaxed text-muted-foreground">
                   {language === "ru" ? "По вопросам конфиденциальности: " : "Privacy inquiries: "}
                   <a className="text-primary underline underline-offset-4" href="mailto:yumesupport833@gmail.com">yumesupport833@gmail.com</a>
+                  {" · "}
+                  <a className="text-primary underline underline-offset-4" href="https://t.me/YumeSupport" target="_blank" rel="noreferrer">Telegram</a>
                 </p>
+                <button
+                  type="button"
+                  className="text-xs font-semibold text-primary underline underline-offset-4"
+                  onClick={() => window.dispatchEvent(new Event("yume-open-cookie-consent"))}
+                >
+                  {language === "ru" ? "Изменить выбор cookie" : "Change cookie choice"}
+                </button>
                               </article>
             ) : null}
 
