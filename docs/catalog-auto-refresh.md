@@ -2,7 +2,7 @@
 
 ## Current design
 
-Catalog metadata enrichment is manual-only. The Cloudflare Cron Trigger runs lightweight episode checks every five minutes. Catalog status synchronization runs in two daily windows at 07:37 and 19:41 UTC. Trailer lookup is manual-only and is not run by Cron. The separate full metadata/screenshot enrichment remains manual-only. The admin interface no longer exposes start/stop controls for catalog auto-refresh.
+Catalog metadata enrichment is manual-only. The dedicated Queue Consumer runs notification cleanup and checks due episode releases once daily at 03:00 UTC. Catalog status synchronization, trailer lookup, and full metadata/screenshot enrichment are manual-only; no automated catalog or trailer Cron jobs are enabled. The admin interface no longer exposes start/stop controls for catalog auto-refresh.
 
 New catalog imports now request scene screenshot URLs in the same Shikimori GraphQL response as titles, descriptions, posters, trailers, genres, and other metadata. YUME stores at most five unique screenshots for newly imported anime. The screenshot URLs and per-title status are written in the same D1 batch as the catalog records. Previously saved screenshot rows are preserved rather than destructively trimmed by this change.
 
@@ -24,12 +24,12 @@ The metadata update step uses the existing catalog row already read for the curr
 
 The admin status panel polls every five seconds. Polling uses a lightweight status=1 endpoint that reads saved progress without running full-catalog quality aggregates or counting every screenshot status. Full quality and completeness summaries are calculated on initial load or when the user explicitly opens/refreshes catalog quality.
 
-The production Worker runs scheduled maintenance every five minutes rather than every minute, and the due-episode query has a matching expression index. This reduces repeated D1 reads; exact savings must still be measured from Cloudflare metrics. Validate the change by comparing Cloudflare D1 rows_read and rows_written, the time to import a page, response size, and Worker errors before and after deployment.
+The dedicated Queue Consumer runs scheduled maintenance once daily at 03:00 UTC, and the due-episode query has a matching expression index. This reduces repeated D1 reads; exact savings must still be measured from Cloudflare metrics. Validate the change by comparing Cloudflare D1 rows_read and rows_written, the time to import a page, response size, and Worker errors before and after deployment.
 
 ## Deployment and operations
 
 - Keep the YUME_DB D1 binding configured.
-- The existing five-minute Cron Trigger runs only the episode-notification check. The two daily Cron windows run catalog status synchronization. Trailer lookup and metadata/screenshot enrichment are manual-only.
+- The dedicated Queue Consumer runs notification cleanup and due-episode checks once daily at 03:00 UTC. Catalog status synchronization, trailer lookup, and metadata/screenshot enrichment are manual-only.
 - No new API key or external service binding is required.
 - Use the manual Run manually / Stop manual controls only when an existing catalog needs repair. The cursor is saved after each successful page; after a transient upstream failure, retrying resumes the same page.
 - Newly imported titles get their screenshot URLs as part of import, so there is no automatic full-catalog follow-up pass.

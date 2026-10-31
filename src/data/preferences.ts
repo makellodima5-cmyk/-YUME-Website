@@ -10,6 +10,8 @@ const PREFERENCES_EVENT = "yume-preferences-changed";
 
 const RU = {
   "nav.main": "Основная навигация",
+  "nav.openMenu": "Открыть меню",
+  "nav.closeMenu": "Закрыть меню",
   "nav.profileButton": "Профиль",
   "nav.home": "Главная",
   "nav.catalog": "Каталог",
@@ -233,6 +235,8 @@ export type TranslationKey = keyof typeof RU;
 
 const EN: Record<TranslationKey, string> = {
   "nav.main": "Main navigation",
+  "nav.openMenu": "Open menu",
+  "nav.closeMenu": "Close menu",
   "nav.profileButton": "Profile",
   "nav.home": "Home",
   "nav.catalog": "Catalog",

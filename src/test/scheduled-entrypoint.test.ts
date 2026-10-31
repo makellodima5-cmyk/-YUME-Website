@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { runScheduledMaintenance } from "@/queue-worker";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
@@ -44,5 +45,40 @@ describe("automatic Worker maintenance", () => {
     expect(workflow).toContain("Validate Queue consumer Worker deploy artifact");
     expect(workflow).toContain("Production deployments are owned by Cloudflare Workers Builds.");
     expect(workflow).not.toContain("secrets.CLOUDFLARE_API_TOKEN");
+  });
+});
+
+
+describe("scheduled maintenance isolation", () => {
+  it("runs the episode poller even when notification cleanup fails", async () => {
+    const completed: string[] = [];
+
+    await expect(runScheduledMaintenance({}, {
+      cleanup: async () => {
+        completed.push("cleanup");
+        throw new Error("temporary cleanup failure");
+      },
+      episodeNotifications: async () => {
+        completed.push("episodes");
+      },
+    })).rejects.toThrow("notification cleanup");
+
+    expect(completed).toEqual(["cleanup", "episodes"]);
+  });
+
+  it("reports an episode poller failure without skipping cleanup", async () => {
+    const completed: string[] = [];
+
+    await expect(runScheduledMaintenance({}, {
+      cleanup: async () => {
+        completed.push("cleanup");
+      },
+      episodeNotifications: async () => {
+        completed.push("episodes");
+        throw new Error("temporary upstream failure");
+      },
+    })).rejects.toThrow("episode notifications");
+
+    expect(completed).toEqual(["cleanup", "episodes"]);
   });
 });

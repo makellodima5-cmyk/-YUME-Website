@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ANIME } from "@/data/anime";
 import { EMPTY_CATALOG_FILTERS, type CatalogFiltersValue } from "@/components/yume/CatalogFilters";
-import { filterAndSortCatalog, getCatalogPageCount, paginateCatalog } from "@/data/catalog-utils";
+import { filterAndSortCatalog, getCatalogPageCount, matchesCollectionGenres, paginateCatalog } from "@/data/catalog-utils";
 import type { Language } from "@/data/preferences";
 
 const translateGenre = (genre: string, language: Language) => language === "en" ? ({
@@ -80,5 +80,13 @@ describe("catalog pagination", () => {
     expect(getCatalogPageCount(41, 20)).toBe(3);
     expect(getCatalogPageCount(10, 0)).toBe(1);
     expect(paginateCatalog([1, 2], 1, 0)).toEqual([]);
+  });
+});
+
+
+describe("collection genre matching", () => {
+  it("matches genre tags despite capitalization and surrounding whitespace", () => {
+    expect(matchesCollectionGenres(["  сверхъестественное  "], ["Сверхъестественное"])).toBe(true);
+    expect(matchesCollectionGenres(["Романтика"], ["Сверхъестественное", "Мистика"])).toBe(false);
   });
 });
