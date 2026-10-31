@@ -129,7 +129,7 @@ Recommended journal properties:
 - \`created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP\`;
 - no secondary indexes, foreign keys or unique constraints; no readback endpoint in the application.
 
-A full import page can be recorded as one event containing the normalized page delta, rather than one D1 row per field. The event payload must stay within the tested Worker/D1 request limits. Large imports are chunked into bounded batches.
+A full import page can be recorded as one accepted event and one committed event containing the normalized page delta, rather than one D1 row per field. The event payload must stay within the tested Worker/D1 request limits. Large imports are chunked into bounded batches. The two event types distinguish an operation that was durably accepted but has not yet published from an operation whose R2 revision committed.
 
 The append log is not a second queryable catalogue and does not replace the R2 snapshot. If the R2 bucket is lost, restore from retained R2 revisions or an independently exported backup; normal runtime must not scan the D1 log to reconstruct the active catalogue.
 
