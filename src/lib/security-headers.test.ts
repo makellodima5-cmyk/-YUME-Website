@@ -22,6 +22,9 @@ describe("applySecurityHeaders", () => {
     expect(response.headers.get("Content-Security-Policy-Report-Only")).toContain("default-src 'self'");
     expect(response.headers.get("Content-Security-Policy-Report-Only")).toContain("report-uri /api/csp-report");
     expect(response.headers.get("Content-Security-Policy-Report-Only")).toContain("report-to csp-endpoint");
+    expect(response.headers.get("Content-Security-Policy-Report-Only")).toBe(
+      response.headers.get("Content-Security-Policy"),
+    );
     expect(response.headers.get("Reporting-Endpoints")).toBe('csp-endpoint="https://example.com/api/csp-report"');
   });
 
