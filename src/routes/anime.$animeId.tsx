@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, notFound, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import {
   Bookmark,
@@ -55,7 +55,10 @@ function formatAnimeDate(value: string | undefined, language: "ru" | "en", inclu
 export const Route = createFileRoute("/anime/$animeId")({
   loader: async ({ params }) => {
     // Read the current title and a bounded related-title set directly from D1.
-    return getShikimoriAnimeDetails({ data: { animeId: params.animeId } });
+    const result = await getShikimoriAnimeDetails({ data: { animeId: params.animeId } });
+    // Do not turn a temporary database/provider failure into a false 404.
+    if (!result.anime && !result.apiError) throw notFound();
+    return result;
   },
   head: ({ loaderData }) => {
     const anime = loaderData?.anime;
@@ -82,7 +85,30 @@ export const Route = createFileRoute("/anime/$animeId")({
     };
   },
   component: AnimeDetailPage,
+  notFoundComponent: AnimeNotFoundRoute,
 });
+
+function AnimeNotFoundRoute() {
+  const { language } = useYumePreferences();
+  return (
+    <main className="min-h-screen px-4 pt-28 md:px-10">
+      <section className="mx-auto max-w-3xl rounded-3xl border border-border bg-card p-8 text-center">
+        <h1 className="text-2xl font-bold">{language === "en" ? "Anime not found" : "Аниме не найдено"}</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          {language === "en"
+            ? "This title does not exist in the YUME catalog."
+            : "Такого тайтла нет в каталоге YUME."}
+        </p>
+        <a
+          href="/?section=catalog"
+          className="mt-6 inline-flex rounded-full bg-neon px-5 py-2.5 text-sm font-semibold text-primary-foreground"
+        >
+          {language === "en" ? "Open catalog" : "Открыть каталог"}
+        </a>
+      </section>
+    </main>
+  );
+}
 
 function AnimeDetailPage() {
   const { language, t } = useYumePreferences();
