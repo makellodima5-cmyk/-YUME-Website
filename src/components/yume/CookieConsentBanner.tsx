@@ -4,12 +4,41 @@ import { readCookieConsent, saveCookieConsent, type CookieConsentChoice } from "
 
 const PRIVACY_POLICY_URL = "/?section=privacy-policy";
 
+function isTelegramMiniAppEnvironment(): boolean {
+  if (typeof window === "undefined") return false;
+  return /(?:^|[&#])tgWebAppData=/.test(window.location.hash)
+    || "TelegramWebviewProxy" in window
+    || "TelegramWebviewProxyProto" in window;
+}
+
+function loadTelegramWebAppAfterConsent(): void {
+  if (!isTelegramMiniAppEnvironment()) return;
+  if (window.Telegram?.WebApp) {
+    window.dispatchEvent(new Event("yume-telegram-webapp-ready"));
+    return;
+  }
+
+  const existing = document.querySelector<HTMLScriptElement>(`script[data-yume-telegram-webapp="true"]`);
+  if (existing) return;
+
+  const script = document.createElement("script");
+  script.src = "https://telegram.org/js/telegram-web-app.js";
+  script.async = true;
+  script.dataset.yumeTelegramWebapp = "true";
+  script.addEventListener("load", () => {
+    window.dispatchEvent(new Event("yume-telegram-webapp-ready"));
+  }, { once: true });
+  document.head.appendChild(script);
+}
+
 export function CookieConsentBanner() {
   const { language } = useYumePreferences();
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    setVisible(readCookieConsent() === null);
+    const savedChoice = readCookieConsent();
+    setVisible(savedChoice === null);
+    if (savedChoice === "accepted") loadTelegramWebAppAfterConsent();
 
     const openSettings = () => setVisible(true);
     window.addEventListener("yume-open-cookie-consent", openSettings);
@@ -18,6 +47,7 @@ export function CookieConsentBanner() {
 
   const choose = (choice: CookieConsentChoice) => {
     saveCookieConsent(choice);
+    if (choice === "accepted") loadTelegramWebAppAfterConsent();
     setVisible(false);
   };
 
