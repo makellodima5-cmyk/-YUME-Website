@@ -5,7 +5,7 @@
 
 ## Changes in this stage
 
-- Keep Content Security Policy in `Content-Security-Policy-Report-Only` mode. No resource is blocked by this policy yet.
+- The current main branch emits both an enforcing `Content-Security-Policy` header and a parallel `Content-Security-Policy-Report-Only` header for HTML. The enforcing policy can block resources; Report-Only is additional telemetry, not a substitute for compatibility testing.
 - Configure both `report-uri` and Reporting API `report-to` to send browser CSP violations to the same-origin `/api/csp-report` endpoint.
 - Set the `Reporting-Endpoints` response header for the default HTML policy.
 - Add a dedicated Cloudflare rate-limit binding for the reporting endpoint: 30 requests per minute per trusted Cloudflare client IP. If the binding or trusted client IP is missing, the endpoint fails closed.
@@ -15,7 +15,7 @@
 
 ## Important limits
 
-- Report-only mode does not block malicious content. The policy still needs browser observation and an explicit compatibility review before any enforcing CSP is considered.
+- The Report-Only header does not block resources, but the parallel enforcing header does. Browser observation and explicit compatibility review are still required; this source audit is not proof that Telegram, Kodik, YouTube, fonts, or posters work under the active policy.
 - Report delivery varies by browser. Absence of reports is not proof that a policy is clean or that clients are receiving the updated header.
 - The rate limit uses Cloudflare's approximate, location-local counters. It is abuse protection, not exact accounting.
 - Server logs will contain minimized violation summaries. Check Cloudflare log access and retention settings before treating this as permanent monitoring.
@@ -24,8 +24,8 @@
 ## Release checks
 
 1. CI: tests, lint, dependency audit, Worker build/config checks, and deploy dry-run must pass.
-2. Production smoke: HTML documents return CSP Report-Only plus Reporting-Endpoints; API endpoints retain no document CSP.
+2. Production smoke: HTML documents return both enforcing CSP and CSP Report-Only plus Reporting-Endpoints; API endpoints retain no document CSP.
 3. Browser: inspect CSP violations while testing Telegram login, anime pages, Kodik player, YouTube embeds, fonts, and poster images.
-4. Review observed violations and update the allowlist only for confirmed required origins. Do not add blanket `https:` script permission or switch to enforcing CSP without validating the inline bootstrap strategy.
+4. Review observed violations and update the allowlist only for confirmed required origins. Do not add blanket `https:` script permission or broaden the active policy without validating the inline bootstrap strategy.
 
 **Status:** implementation prepared for CI review. Live browser observation and enforcement decision remain release checks.

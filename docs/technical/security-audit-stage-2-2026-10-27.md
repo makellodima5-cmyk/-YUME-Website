@@ -41,7 +41,7 @@ These are source-review observations, not guarantees that every flow is free of 
 
 ## Residual issues and release checks
 
-1. **No CSP header yet.** The shared security-header helper intentionally omits Content-Security-Policy because the app has inline bootstrap code and Telegram/video embeds. A safe CSP needs a nonce/hash and explicit vendor allowlist with browser regression tests. Do not add a rushed blanket policy that breaks login, styles, or embeds.
+1. **CSP status changed after this audit.** Current main emits both an enforcing Content-Security-Policy and a parallel Report-Only header on HTML responses. The enforcing header can block resources, so browser regression checks for Telegram login, Kodik, YouTube, fonts, and posters remain necessary before relying on compatibility.
 2. **Rate limiting is an infrastructure task.** The public Kodik proxy and authentication/webhook endpoints use input validation and timeouts, but source review did not establish comprehensive per-IP/request rate limiting at the Cloudflare edge. No Cloudflare account/dashboard configuration was changed in this audit; configure and test edge rate limits separately if the connected account and correct permissions are available.
 3. **External-provider disclosure is not consent to every provider.** Google Fonts and Telegram Web Apps resources are loaded site-wide and can receive request metadata. Their purpose is now named in the policy text on this branch; vendor contracts, retention, transfer/location, and the final legal wording need owner review.
 4. **Third-party cookie semantics are not legally adjudicated.** Shikimori/DDos-Guard's exact per-cookie purpose and necessity remain to be confirmed by the provider if formal closure is required.
@@ -49,4 +49,4 @@ These are source-review observations, not guarantees that every flow is free of 
 
 ## Release status
 
-The fixes are committed on `security/consent-preferences-final-2026-10-27` and grouped into PR #98. The PR is open and has not been merged or deployed. This branch report must not be interpreted as confirmation that the live Worker already runs these changes.
+This report records the branch and PR #98 state as of 2026-10-27. It is a historical audit and does not describe the current deployed state of main.
