@@ -117,6 +117,12 @@ jobs:
           if (!queueEntry.includes("runScheduledNotificationCleanup")) {
             throw new Error("Dedicated Queue Worker entry does not invoke scheduled notification cleanup.");
           }
+          if (!queueEntry.includes("runScheduledEpisodeNotifications")) {
+            throw new Error("Dedicated Queue Worker entry does not invoke scheduled episode notifications.");
+          }
+          if (queueConfig.workers_dev !== false || queueConfig.preview_urls !== false) {
+            throw new Error("Queue consumer must not expose public workers.dev or preview URLs.");
+          }
           const rootKvBinding = (rootConfig.kv_namespaces ?? []).find(
             (item) => item.binding === "YUME_SHIKIMORI_CACHE"
               && item.id === "598c5207a7054b3eb45e2efe8214f5d7",
