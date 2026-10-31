@@ -33,7 +33,7 @@ describe("registration consent UI", () => {
     expect(terms.checked).toBe(false);
     expect(submit.disabled).toBe(true);
 
-    fireEvent.click(screen.getByRole("button", { name: "Privacy Policy" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "Privacy Policy" })[0]!);
     expect(onPrivacy).toHaveBeenCalledTimes(1);
     expect(privacy.checked).toBe(false);
 
