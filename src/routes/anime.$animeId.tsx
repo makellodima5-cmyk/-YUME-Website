@@ -16,6 +16,11 @@ import {
 } from "lucide-react";
 import { getShikimoriAnimeDetails, getShikimoriAnimeScreenshots, type ShikimoriScreenshot } from "@/data/shikimori";
 import { Header, type View } from "@/components/yume/Header";
+import {
+  CATALOG_RETURN_STORAGE_KEY,
+  CATALOG_SCROLL_RESTORE_STORAGE_KEY,
+  parseCatalogReturnState,
+} from "@/data/catalog-search";
 import { Footer } from "@/components/yume/Footer";
 import { AnimeCard, PosterArt } from "@/components/yume/Poster";
 import { useYumePreferences, displayAnimeTitle, displayAnimeStatus, displayGenre, displayAnimeKind } from "@/data/preferences";
@@ -429,6 +434,19 @@ function AnimeDetailPage() {
       try { window.sessionStorage.setItem("yume-auth-intent-v1", view); } catch { /* Root may still open auth through its event handler. */ }
       void navigate({ to: "/", search: { section: "home" } });
       return;
+    }
+    if (view === "catalog") {
+      try {
+        const saved = parseCatalogReturnState(window.sessionStorage.getItem(CATALOG_RETURN_STORAGE_KEY));
+        if (saved) {
+          window.sessionStorage.removeItem(CATALOG_RETURN_STORAGE_KEY);
+          window.sessionStorage.setItem(CATALOG_SCROLL_RESTORE_STORAGE_KEY, String(saved.scrollY));
+          void navigate({ to: "/", search: saved.search });
+          return;
+        }
+      } catch {
+        // Fall back to the first catalog page when browser storage is unavailable.
+      }
     }
     navigate({ to: "/", search: { section: view } });
   };

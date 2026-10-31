@@ -1,5 +1,36 @@
 import type { View } from "@/components/yume/Header";
 
+export const CATALOG_RETURN_STORAGE_KEY = "yume-catalog-return-v1";
+export const CATALOG_SCROLL_RESTORE_STORAGE_KEY = "yume-catalog-scroll-restore-v1";
+
+export type CatalogReturnState = {
+  search: CatalogSearch;
+  scrollY: number;
+};
+
+export function serializeCatalogReturnState(search: CatalogSearch, scrollY: number): string {
+  return JSON.stringify({
+    search: { ...search, section: "catalog" },
+    scrollY: Number.isFinite(scrollY) ? Math.max(0, Math.floor(scrollY)) : 0,
+  } satisfies CatalogReturnState);
+}
+
+export function parseCatalogReturnState(raw: string | null): CatalogReturnState | null {
+  if (!raw || raw.length > 4096) return null;
+  try {
+    const value: unknown = JSON.parse(raw);
+    if (!value || typeof value !== "object") return null;
+    const candidate = value as { search?: unknown; scrollY?: unknown };
+    if (!candidate.search || typeof candidate.search !== "object" ||
+      (candidate.scrollY !== undefined && (typeof candidate.scrollY !== "number" || !Number.isFinite(candidate.scrollY)))) return null;
+    const search = validateCatalogSearch(candidate.search as Record<string, unknown>);
+    if (search.section !== "catalog") return null;
+    return { search, scrollY: Math.max(0, Math.floor(Number(candidate.scrollY ?? 0))) };
+  } catch {
+    return null;
+  }
+}
+
 export type CatalogSearch = {
   section?: View;
   q?: string;
