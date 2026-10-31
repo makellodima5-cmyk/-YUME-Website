@@ -1,236 +1,263 @@
-# Yume D1/R2 architecture design
+# Yume: architecture design for R2 catalogue and write-only D1 journal
 
-**Date:** 2026-10-31  
-**Repository:** `makellodima5-cmyk/-YUME-Website`  
-**Audited baseline:** `main` at `edb67cc61208c85e70edba8c394b70cb60edc930`  
-**Design branch:** `feature/yume-d1-r2-architecture`  
-**Status:** proposed; implementation is gated on owner approval.
+**Date:** 31 October 2026  
+**Repository:** \`makellodima5-cmyk/-YUME-Website\`  
+**Audited baseline:** \`main\` at \`edb67cc61208c85e70edba8c394b70cb60edc930\`  
+**Design branch:** \`feature/yume-d1-r2-architecture\`  
+**Status:** Stage 1 design baseline. Stage 2 implementation must follow this design and its acceptance gates.
 
-## 1. Intent
+## 1. Decision and objective
 
-Rebuild the database schema for a completely empty D1 database named `yumedb` (ID `c2f0f25d-e29b-47e2-ad11-b726f7a3e9a2`), keep the current Yume application and its user-facing capabilities, and move public catalogue reads to an R2 JSON snapshot.
+The catalogue's current, queryable state lives in the private R2 bucket \`yume-catalog\`. Every current-catalogue read, including public pages and admin operations, is served from R2. D1 is not the source of the current catalogue and is not used as a mutable catalogue mirror.
 
-No existing records are migrated from the old D1 database. The old database remains untouched as a fallback until the new deployment has been verified.
+D1 continues to receive catalogue changes, but through an **append-only write journal**. A journal insert records the operation and the changed payload. Application code does not SELECT, UPDATE, DELETE, UPSERT, or conflict-check current catalogue rows in D1. The journal has no uniqueness constraint or secondary index that would require application-level conflict lookup. Repeated journal events are acceptable at the persistence layer; the coordinator's durable operation ID and replay state govern the actual catalogue mutation.
 
-D1 remains the authoritative store for catalogue administration and user/application state. R2 stores a versioned public projection of the catalogue, not user data and not image binaries.
+This distinction is essential. A design that reads from R2 but still uses D1 \`UPDATE ... WHERE id\`, \`DELETE ... WHERE id\`, or \`INSERT ... ON CONFLICT DO UPDATE\` is not a zero-catalogue-read design. D1 reports rows read and rows written per statement, including rows reached through indexes. A mutable row store therefore cannot be promised to have exactly zero billable reads just because the application removed its explicit SELECT statements. The write-only journal is the selected design for the strictest interpretation of the goal. Actual D1 metrics for plain journal INSERTs still have to be measured in Stage 2/3 before claiming a numerical zero.
 
-## 2. Goals
+## 2. Architecture at a glance
 
-- Preserve the existing Yume interface and supported flows.
-- Start the new D1 with an empty catalogue and empty user state.
-- Populate the catalogue through the existing Telegram admin workflow.
-- Avoid D1 full-catalogue reads on public home, catalogue, details, related-title and sitemap paths.
-- Keep all user-specific data in D1.
-- Ensure the public site Worker has no R2 write capability.
-- Publish one complete, atomic JSON snapshot after a logical catalogue update, not one object per anime row.
-- Detect and report publication failures to the admin UI.
-- Keep rollback possible by leaving the old D1 and current `main` untouched during implementation and testing.
+### 2.1 Data ownership
 
-## 3. Non-goals
+| Data | Runtime source of truth | D1 behaviour |
+|---|---|---|
+| Current anime catalogue and its public projection | Versioned R2 state | Append catalogue mutation events only; no readback |
+| Import exclusions, catalogue ordering, admin refresh cursors, screenshot retry state, Kodik availability, trailer queue, publish revision | Private catalogue state managed by the coordinator and persisted in R2 / Durable Object storage | No current-state catalogue queries |
+| Telegram users, sessions, browser auth, OIDC state | D1 | Normal reads and writes |
+| Favourites, watch history, subscriptions | D1 | Normal user-scoped reads and writes |
+| Notifications and notification delivery state | D1 | Normal reads and writes |
+| Catalogue operation journal | D1 append-only event table | INSERT only; no application read/update/delete |
+| Serialisation, idempotency, pending operations and retry state | One singleton Durable Object with durable SQLite storage and alarms | Not stored in D1 |
 
-- Copying any old catalogue, account, session, favourite, watchlist, history, subscription or notification records.
-- Storing poster or screenshot image bytes in R2. The catalogue stores external image URLs.
-- Purchasing or configuring a custom domain at this stage.
-- Changing the visual design or removing current product capabilities as a shortcut.
+The current catalogue is not duplicated as a mutable 26-table relational structure in D1. That would recreate the read/modify/delete cost the redesign is intended to remove.
 
-## 4. Current application architecture found in the repository
+### 2.2 Components and permissions
 
-### Public catalogue reads
+1. **Public Yume Worker**
+   - Keeps the D1 binding for users, authentication, personal library, subscriptions and notifications.
+   - Has a Durable Object namespace binding for the private catalogue coordinator.
+   - Has a Service Binding to the private catalogue reader.
+   - Has no R2 bucket binding, no R2 S3 credentials and no direct permission to write catalogue objects.
+   - Does not call the old D1 catalogue loader or the old D1 catalogue mutation functions after Stage 2.
 
-- `src/routes/index.tsx` loads the catalogue through `getShikimoriCatalog`.
-- `src/data/shikimori.ts` calls `getPersistentCatalog` and loads selected-title detail and screenshot data.
-- `src/data/catalog-d1.server.ts` reads all `anime_catalog` rows and joins Kodik availability. It uses a 5-minute isolate cache and the Cache API.
-- The detail path calls `refreshPersistentAnimeIdentity`, which can update rating, popularity and poster URL in D1 during an ordinary page view.
-- Screenshots are stored separately in `anime_catalog_screenshots` and may be enriched lazily when a detail page is opened.
-- `src/routes/sitemap[.]xml.ts` is another catalogue consumer and must be moved to the same snapshot source.
+2. **Private Catalogue Reader Worker**
+   - Is not exposed through \`workers.dev\` or preview URLs.
+   - Has bucket-scoped R2 Object Read permission only, through an S3-compatible API token stored as a Cloudflare secret. Do not use a normal R2 Worker binding as a supposed read-only grant: that binding exposes write methods as well.
+   - Accepts only the private Service Binding contract. It does not accept a caller-selected bucket or arbitrary object key.
+   - Reads the committed revision pointer and the revision object after validating the revision-key format.
+   - Returns the public catalogue projection for public site requests. Administrative consumers use a separate authenticated internal method/contract for private control metadata.
+   - Never lists the bucket and never writes or deletes objects.
 
-The Cache API used by the current code is not a reliable cache for this project's `workers.dev` deployment: Cloudflare's current Cache API documentation limits functional Cache API operations to Workers on custom domains and Pages Functions. Cloudflare's separate Workers Cache supports `workers.dev` and service-binding fetches when enabled in Wrangler. The implementation should use Workers Cache for the published snapshot, not rely on `caches.default` for this purpose.
+3. **Private Catalogue Coordinator Durable Object**
+   - There is one logical singleton object for the Yume catalogue. All catalogue mutations go through it: admin import, single-title import, bulk import, delete, exclusions, metadata repair, screenshot enrichment, trailer changes, episode updates and Kodik availability changes.
+   - It owns the durable operation journal, operation IDs, revision sequencing, retry state and the R2 write capability.
+   - It has the R2 bucket binding and the D1 binding used solely to append the catalogue journal. These bindings exist in the separate coordinator Worker script, not in the public Yume Worker.
+   - It serialises mutation commands. It persists accepted commands before performing external side effects and uses its Durable Object storage and Alarm API to resume incomplete work after failures or restarts.
+   - It writes immutable revision objects, then atomically advances a small current-revision pointer using R2 conditional write / ETag matching. A failed condition means another write won; the coordinator reloads current state and reapplies the operation rather than overwriting a newer revision.
+   - It appends the operation to D1's journal. Journal insertion is write-only and is never used to reconstruct the current catalogue during normal runtime.
+   - A request is reported as fully completed only when the catalogue revision has been committed to R2 and the journal append has completed. If either side fails, the operation stays pending and is retried; the UI must not report it as published.
 
-### Catalogue mutation paths
+4. **Private catalogue reader cache**
+   - Cache only committed revision data. A cache key must include the committed revision (or use an ETag-aware cache contract), so a newer revision cannot be hidden behind a cache entry for an older object.
+   - Cache invalidation is performed only after the current-revision pointer commits. A short TTL is a fallback, not the correctness mechanism.
+   - The design must be verified on the actual Workers configuration. Do not rely on assumptions about Cache API support or global cache invalidation.
 
-The audit found these important mutation sources:
+### 2.3 R2 object layout and commit protocol
 
-1. `src/data/admin-catalog-import.server.ts`
-   - bulk import and single-title import;
-   - delete title and delete selected titles;
-   - add exclusions to prevent bulk re-import;
-   - manual metadata and status refresh;
-   - screenshot and screenshot-status enrichment.
-2. `src/data/admin-trailers.server.ts`
-   - trailer queue processing and writes to `anime_catalog.youtube_trailer_id`.
-3. `src/data/catalog-d1.server.ts`
-   - `refreshPersistentAnimeIdentity` updates public catalogue identity fields from the detail-page path;
-   - legacy seed/import logic remains in this module, though the current `getShikimoriCatalog` wrapper does not enable `allowImport`.
-4. `src/data/episode-notifications-cron.server.ts`
-   - scheduled episode updates write episode counts, status and next-episode date back to `anime_catalog`.
-5. `src/data/kodik-availability.server.ts`
-   - updates `anime_kodik_availability`, which is currently joined into catalogue reads.
+Use immutable revisions and one mutable pointer:
 
-A correct R2 projection must account for every mutation that changes fields included in the JSON. The ordinary detail-page write in item 3 must not cause a visitor to indirectly trigger an R2 write. Proposed change: use live Shikimori data for that individual detail response, but do not persist catalogue identity changes on a public page view. Keep screenshot enrichment separate in D1 because screenshots are not part of the catalogue JSON projection.
+- \`catalog/v1/revisions/<revision>.json\` — complete private catalogue state for that revision.
+- \`catalog/v1/current.json\` — small pointer containing the committed revision, object key, schema version, and checksum/ETag metadata.
 
-### User and operational data
+One revision state includes:
+- all public Anime fields consumed by the UI: Shikimori ID, titles, year, episodes, rating, genres, status, description, display hue/glyph, new/popular flags, poster/banner URLs, kind, age rating, air date, next episode, studios, trailer ID and Kodik availability;
+- scene screenshot URLs and their retry/refresh metadata;
+- import exclusions and catalogue ordering;
+- operational metadata for import, quality checking, metadata repair and trailer discovery that is currently mixed into catalogue-specific D1 tables;
+- a monotonically increasing revision and schema version.
 
-D1 is still required for Telegram users and sessions, browser authentication, favourites/watchlist, view history, subscriptions, notifications, notification reads/dismissals, admin state, import progress, audit records, trailer work queues, Kodik state, and scheduled episode-notification state.
+The Reader returns only a sanitised public projection. Private fields such as exclusions, operation history, lock state and internal error details are not exposed to visitors.
 
-## 5. D1 schema inventory
+The coordinator follows this logical protocol:
 
-The following final tables are referenced by current code or required by the current workflows. Runtime-created tables and columns must be made explicit in the new initial migration rather than being created or altered lazily on user requests.
+1. Validate the action and persist an operation ID plus its full bounded payload in Durable Object storage.
+2. Load the current committed R2 pointer and revision.
+3. Apply the command to that latest state in memory, with idempotency checks against the coordinator's operation journal.
+4. Append the D1 write-journal record. The record is an immutable audit of the intended committed catalogue change, not the runtime source of truth.
+5. Write the next immutable R2 revision.
+6. Advance \`current.json\` with an atomic ETag conditional write. If the ETag no longer matches, discard the candidate revision as uncommitted, load the latest pointer and reapply the command.
+7. Mark the operation committed in Durable Object storage, schedule cache refresh/invalidation, and return the committed revision.
+8. If a process fails at any intermediate step, the Durable Object Alarm resumes from the persisted operation status. Repeated D1 journal inserts may exist after an ambiguous response; they are harmless audit duplicates and must not cause repeated state mutation in R2.
 
-### Catalogue and enrichment
+The object pointer is the commit boundary visible to readers. R2 is strongly consistent, and conditional writes are evaluated atomically at commit time. Competing writers cannot silently overwrite a newer pointer when they use the ETag precondition. Keep old revision objects for a bounded rollback window; cleanup is a separate, safe maintenance operation.
 
-- `anime_catalog`
-- `anime_catalog_meta`
-- `anime_catalog_screenshots`
-- `anime_catalog_screenshot_status`
-- `anime_kodik_availability`
-- `anime_kodik_availability_lock`
-- `admin_catalog_exclusions`
-- `admin_catalog_import_lock`
-- `admin_catalog_import_items`
+### 2.4 Why a Queue is not the mutation lock
 
-### Users and authentication
+The existing notification Queue remains dedicated to notification fanout and scheduled notification maintenance. Do not reuse its message order as the catalogue write-order guarantee. Cloudflare Queues provides at-least-once delivery and does not guarantee that messages arrive in publication order; a single consumer with \`max_concurrency: 1\` is not a FIFO/transaction primitive. A Queue may be used as a wake-up or retry signal later, but the Durable Object journal and ETag-guarded revision commit are the correctness mechanisms.
 
-- `yume_users` — Telegram-only identity; include the current terms-consent columns in the initial schema.
-- `yume_sessions`
-- `yume_browser_auth` — include `terms_consent`, `confirmation_code_hash` and `telegram_user_id` up front.
-- `yume_telegram_oidc_states` — currently created/altered lazily by the OIDC handler.
+## 3. Catalogue read and write routing
 
-### User library and activity
+| Current behaviour | Current implementation | Stage 2 target |
+|---|---|---|
+| Home/catalogue list | \`getShikimoriCatalog\` → \`getPersistentCatalog\` → full D1 \`readRows\` | Reader Worker → current R2 revision |
+| Detail and related titles | \`getPersistentAnimeDetails\` loads full D1 catalogue when cache misses | Read requested title and related-title candidates from R2 |
+| Detail live metadata | Shikimori request followed by \`refreshPersistentAnimeIdentity\` D1 UPDATE on public visit | Live response may enrich the current response; any durable change is an explicit coordinator command, never an implicit D1 write from a visitor |
+| Sitemap | \`sitemap.xml\` → catalogue server function | Read catalogue IDs from R2 |
+| Screenshot display | D1 screenshot SELECT, with KV fallbacks and lazy write | Screenshot URLs are part of the R2 revision; source fetch and save go through coordinator |
+| Admin delete search | SQL LIKE scan of \`anime_catalog\` | Search the R2 snapshot in memory / indexed local projection |
+| Admin delete/import duplicate checks | D1 lookups by ID | Compare IDs with the current R2 revision |
+| Bulk import | D1 exclusion, existence and COUNT queries, then D1 inserts | Compare Shikimori page IDs and exclusions against R2 state; append one journal event per logical batch |
+| Metadata repair/backfill | Read D1 pages, update rows, verify with further SELECTs | Read R2 pages, fetch Shikimori records, submit normalized updates to coordinator |
+| Screenshot retry | D1 screenshot-status and screenshot tables joined to catalogue | Retry state lives in the private R2 state / coordinator journal |
+| Trailer discovery | D1 catalogue scans populate a D1 queue; trailer ID updates in D1 | Candidate selection and queue state come from R2; result is a coordinator mutation |
+| Episode schedule | Cron selects due rows from D1, then updates D1 | Select due titles from R2, retain user subscription/notification reads in D1, then coordinator mutation |
+| Kodik availability | D1 join selects stale availability and later updates D1 | Check candidates from R2, write availability into the next R2 revision, append journal event |
+| Subscription eligibility | User session/subscription in D1 plus anime status read from D1 | Session/subscription remains D1; current anime status is validated from R2 |
 
-- `yume_saved_anime`
-- `yume_view_history`
-- `yume_anime_subscriptions`
+**No catalog-row SELECT, COUNT, JOIN, LIKE scan, UPDATE, DELETE or UPSERT is permitted against D1 in the Stage 2 application paths.** Reads from D1 for Telegram identity, sessions, user libraries, subscriptions, notifications, OIDC/browser auth and other user-state tables remain permitted and are measured separately.
 
-### Notifications and background processing
+## 4. D1 target role and write journal
 
-- `yume_notifications`
-- `yume_notification_reads`
-- `yume_notification_dismissals`
-- `yume_notification_reads_v2`
-- `yume_notification_targets`
-- `yume_episode_notification_state`
-- `yume_telegram_subscription_state` — currently created lazily by the Telegram bot handler.
+The clean \`yumedb\` schema must preserve the current user-facing features while replacing the mutable catalogue table with an append-only journal table, provisionally named \`yume_catalog_write_log\`.
 
-### Administration and trailer maintenance
+Recommended journal properties:
+- \`id INTEGER PRIMARY KEY\` as the only key;
+- \`operation_id TEXT NOT NULL\` (not unique);
+- \`revision INTEGER NOT NULL\`;
+- \`operation TEXT NOT NULL\` (for example \`catalog.batch_upsert\`, \`catalog.delete\`, \`catalog.screenshot_update\`, \`catalog.kodik_update\`, \`catalog.trailer_update\`);
+- \`anime_id TEXT\` for single-title operations; null for multi-title batches;
+- \`payload_json TEXT NOT NULL\` containing the bounded normalized delta and enough context for audit;
+- \`created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP\`;
+- no secondary indexes, foreign keys or unique constraints; no readback endpoint in the application.
 
-- `yume_admin_audit_log`
-- `anime_trailer_update_queue` — currently created lazily by the trailer admin handler.
-- `yume_trailer_auto_state` — currently created lazily by the trailer admin handler.
+A full import page can be recorded as one event containing the normalized page delta, rather than one D1 row per field. The event payload must stay within the tested Worker/D1 request limits. Large imports are chunked into bounded batches.
 
-That is 26 application tables. The schema migration also needs the indexes and singleton lock rows required by current queries. The old `yume_analytics_events` table is not part of the target schema; migration 0007 explicitly retired it.
+The append log is not a second queryable catalogue and does not replace the R2 snapshot. If the R2 bucket is lost, restore from retained R2 revisions or an independently exported backup; normal runtime must not scan the D1 log to reconstruct the active catalogue.
 
-### Schema details to consolidate
+**Metric acceptance gate:** every journal INSERT returns its D1 \`meta.rows_read\` and \`meta.rows_written\` values in Stage 2 integration tests. Stage 3 must verify the same in Cloudflare for the new D1 database. If a journal INSERT itself reports billable reads, redesign the journal statement/table until the metric matches the required objective. The design removes catalogue reads from application logic; a numerical \`rows_read = 0\` claim is not made before measurement.
 
-- Migration 0005 makes `yume_users` Telegram-only and removes the old browser OAuth providers/date-of-birth field. Keep that final state, not the earlier intermediate schema.
-- Add `terms_agreed_at` and `terms_version` directly to the final `yume_users` definition. Current code adds these at runtime if missing.
-- Define the complete current `yume_browser_auth` shape in the initial migration. Current code includes defensive runtime `ALTER TABLE` statements.
-- Define `yume_telegram_oidc_states`, `yume_telegram_subscription_state`, `anime_trailer_update_queue` and `yume_trailer_auto_state` in the initial migration.
-- Keep both legacy notification read/dismissal tables and v2 tables for now: current handlers and cleanup/account-deletion paths still reference them.
-- Keep the two singleton lock rows for `anime_kodik_availability_lock` and `admin_catalog_import_lock`.
-- Keep indexes required by the actual query order and fanout paths; do not reintroduce indexes explicitly dropped by migration 0008.
+## 5. D1 user and application data
 
-## 6. Migration findings and target strategy
+Keep D1 for the data where relational lookup and transactions are valuable:
+- Telegram users, sessions, browser authentication and OIDC states;
+- favourites/watchlist, view history and anime subscriptions;
+- notifications, notification targets, read and dismissal state;
+- queue fanout and notification cleanup state, where it is user/notification data rather than catalogue state.
 
-There are **12 SQL files** in the current migration directory. Prefixes `0002` and `0003` each occur twice.
+The current two notification read models are both in use. Keep them until code consolidation and regression tests prove one can be removed. The old \`yume_analytics_events\` table was retired by migration 0007 and must not return.
 
-The repeated numeric prefixes are not by themselves a migration-table collision: current Wrangler D1 migration tracking stores the full migration name in a unique `name` column and sorts the leading numeric prefix with a lexical tiebreaker. The current pair ordering is deterministic. Still, new filenames should have unique sequential prefixes.
+Anime IDs in personal-library/history/subscription records are values, not foreign keys to the catalogue. Catalogue deletion must not silently delete a user's favourite, watch history or subscription record unless a separate product rule explicitly defines that behaviour.
 
-For a brand-new empty database, preserve the final schema, not the historical sequence of intermediate rebuilds and data-cleanup migrations. Proposed target: one comprehensive, idempotent initial schema migration (or a very small number only if tests show a real operational reason to separate concerns). It should create the final tables, indexes, triggers/revision metadata, initial lock rows and required meta defaults. It must not create retired analytics structures or perform old-data cleanup.
+Catalogue-specific exclusions, locks, import cursors, quality aggregates, screenshot statuses, Kodik state, trailer discovery queue and catalogue refresh metadata move to the coordinator's private state. General admin/audit records can remain as append-only events; do not create an admin polling endpoint that rescans catalogue history in D1.
 
-Because the user will run SQL manually in the D1 Console, Stage 3 must provide a complete SQL script and explicitly create/update the standard `d1_migrations` tracking record for the migration filename. Otherwise a later Wrangler migration run could treat the file as unapplied and try to execute it again.
+## 6. Current D1 schema inventory and migration consolidation
 
-## 7. Proposed R2 architecture
+The current repository contains 12 migration files, with duplicated numeric prefixes 0002 and 0003. The full object/index/relationship inventory and the query-by-query audit are in [D1 schema and SQL query map](../../technical/d1-schema-and-query-map-2026-10-31.md).
 
-### Recommended: private reader + private publish dispatcher + private queue publisher
+The historical schema currently has 26 application tables when lazy-created runtime tables are included:
+- catalogue and enrichment: \`anime_catalog\`, \`anime_catalog_meta\`, \`anime_catalog_screenshots\`, \`anime_catalog_screenshot_status\`, \`anime_kodik_availability\`, \`anime_kodik_availability_lock\`;
+- import administration: \`admin_catalog_exclusions\`, \`admin_catalog_import_lock\`, \`admin_catalog_import_items\`;
+- identity and auth: \`yume_users\`, \`yume_sessions\`, \`yume_browser_auth\`, \`yume_telegram_oidc_states\`;
+- user library/activity: \`yume_saved_anime\`, \`yume_view_history\`, \`yume_anime_subscriptions\`;
+- notifications/background state: \`yume_notifications\`, \`yume_notification_reads\`, \`yume_notification_dismissals\`, \`yume_notification_reads_v2\`, \`yume_notification_targets\`, \`yume_episode_notification_state\`, \`yume_telegram_subscription_state\`;
+- admin/trailers: \`yume_admin_audit_log\`, \`anime_trailer_update_queue\`, \`yume_trailer_auto_state\`.
 
-**Public Yume Worker**
-- Keeps the current D1, KV and rate-limit bindings needed by the site.
-- Has no R2 bucket binding, no R2 API credentials and no direct Queue producer binding for catalogue publication.
-- Has Service Bindings to the private catalogue reader and the private publish dispatcher.
-- Calls the reader's fixed GET endpoint for the public snapshot.
-- Calls the dispatcher only from server-side code after the existing Telegram admin authorization has succeeded and the D1 catalogue transaction/batch has committed. The call carries a short-lived HMAC-signed internal request, not an object body or caller-selected key.
-- Public detail-page requests must not persist identity changes to D1 or schedule catalogue publication.
+That is the **current** schema inventory, not the target schema. Stage 2 will consolidate the history into a small initial schema for a clean database:
+- preserve current Telegram identity/session/browser-auth/OIDC fields directly in the first migration;
+- preserve user library, subscriptions and notification tables/indexes that the application still uses;
+- add the append-only catalogue journal;
+- move catalogue-specific current-state and queue tables to R2/DO state;
+- do not create legacy OAuth providers/date-of-birth fields or retired analytics structures;
+- remove lazy CREATE/ALTER TABLE/PRAGMA-on-request paths once their required shapes are in the initial migration;
+- seed only the user/notification defaults and journal setup that Stage 2 actually needs.
 
-**Catalogue Reader Worker**
-- Is not exposed on `workers.dev`, has no public route, and is invoked only through a Service Binding.
-- Uses a bucket-scoped R2 `Object Read only` S3 API token stored as Cloudflare secrets. This token is supported by the S3-compatible API, not the R2 Workers binding or Cloudflare REST API.
-- Fetches only the fixed catalogue object key (for example `catalog/v1/catalog.json`); it does not list objects and accepts only GET/HEAD for that key.
-- Returns typed JSON with an ETag and `Cache-Tag: yume-catalog-v1`.
-- Enables Cloudflare Workers Cache. Workers Cache supports service-binding fetches and workers.dev Workers; it is private to the Reader Worker and controlled with `cache.enabled` and response cache headers. A custom domain is not required.
-- Exposes only an internal cache-purge handler, reachable through Service Binding and authenticated with a separate internal signature. After a successful R2 publication, the publisher calls that handler to run `ctx.cache.purge({ tags: ["yume-catalog-v1"] })`. This prevents a successful update from being hidden behind a still-fresh cache entry.
-- Keeps the R2 bucket private. No Public Development URL, CORS or custom domain is needed.
+The current historical \`banner_url\` field is still used by the current mapper and admin quality checks. Keep the public banner URL in the R2 projection; do not confuse that with the old AniList-specific URL cleanup in migration 0007.
 
-**Catalogue Publish Dispatcher Worker**
-- Is not exposed on `workers.dev` and has `workers_dev: false` and `preview_urls: false`.
-- Has no R2 binding and no D1 binding. Its only data capability is a Queue producer for the dedicated catalogue-publisher queue.
-- Accepts only a fixed internal POST operation over Service Binding, validates the HMAC signature, timestamp/replay window, request size, and a minimal revision payload, then enqueues a normalized publication message. It never accepts arbitrary object keys or serialized catalogue content.
-- Uses a dedicated secret shared only with the trusted server-side callers and the dispatcher. It does not accept public HTTP traffic.
+## 7. Cloudflare configuration and operational boundaries
 
-**Catalogue Publisher Worker**
-- Is a dedicated Queue consumer with no public HTTP endpoint, `workers_dev: false` and `preview_urls: false`.
-- Has the D1 binding needed to build the snapshot and the only R2 write-capable binding in the application.
-- Receives messages only from the private dispatcher queue (and a separately authenticated internal maintenance caller, if required).
-- Reads the latest committed catalogue from D1, writes the complete JSON snapshot to one fixed object key in one R2 object replacement, and never trusts stale rows carried in a message.
-- Uses a monotonically increasing catalogue revision, one consumer with concurrency limit one, and object metadata to skip already-published revisions and prevent older/duplicate jobs from overwriting newer snapshots.
-- Rechecks the D1 revision after building the snapshot. If it changed during the build, it rebuilds rather than publishing a stale snapshot.
-- Records publish state/error in D1 so the admin UI distinguishes saved-to-D1, queued, published and failed states.
-- After a successful PutObject, requests the private Reader cache purge through Service Binding.
+Current production-oriented repository configuration before Stage 2:
+- main Worker: \`yume-website\`, entry \`.output/server/index.mjs\`;
+- D1 binding \`YUME_DB\` still names old \`yume_db\`, ID \`29aea579-e316-413f-922b-44c17b12f45a\`;
+- existing KV \`YUME_SHIKIMORI_CACHE\`, ID \`598c5207a7054b3eb45e2efe8214f5d7\`;
+- Queue producer \`YUME_WEB_TASKS\` → \`yume-web-tasks\`;
+- notification Queue Worker \`yume-web-queue-consumer\`, entry \`src/queue-worker.ts\`, Cron \`0 3 * * *\`, no workers.dev/preview URLs;
+- rate limiters KODIK 30/min, MEDIA 600/min, CSP report 30/min;
+- \`.github/workflows/cloudflare-worker.yml\` has assertions hardcoded to the old D1 name and ID.
 
-This puts every R2 write capability in the isolated Publisher Worker. The public Worker has no R2 write credentials or direct Queue producer, the Reader has only a bucket-scoped read-only S3 token, and the dispatcher can only enqueue a constrained internal event. Ordinary visitors can cause a cache miss/read when requesting the public catalogue, but they have no route or credential that can reach an R2 write operation. The backend admin gate and the dispatcher's independent internal-signature check are both required before publication is queued.
+New Cloudflare resource already created by the owner:
+- D1 \`yumedb\`, ID \`c2f0f25d-e29b-47e2-ad11-b726f7a3e9a2\`, currently empty;
+- private R2 bucket \`yume-catalog\`, with public Development URL disabled and no custom domain or CORS policy.
 
-### Alternatives considered
+Stage 2 will add and verify:
+- main Worker → private Reader Service Binding and private Coordinator Durable Object namespace only; no R2 write binding;
+- Reader Worker → private bucket-scoped Object Read S3 token, no write permission, no public endpoint;
+- Coordinator Worker → R2 read/write binding, D1 journal binding, Durable Object SQLite storage and alarm;
+- new D1 database name/ID in both main Worker and notification Worker only where each actually uses the user-state database;
+- updated CI assertions for every Worker entry, binding and permission boundary.
 
-1. **Attach a normal R2 binding to the public Yume Worker.** Rejected. Cloudflare describes an R2 Worker binding as a capability to read and write objects; the binding API exposes `put` and `delete`. Hiding write buttons or checking routes is weaker than removing the capability from the public Worker.
-2. **Expose the bucket via `r2.dev` and keep the writer separate.** Technically simpler, but the development URL exposes bucket contents publicly, is rate-limited and is not intended for production. It is not the preferred long-term design, and the user has not purchased a domain.
-3. **Private reader with bucket-scoped Object Read only credentials plus a separate publisher.** Recommended. It avoids public bucket access and avoids placing write credentials in the public Worker. The additional reader/publisher Workers and S3 signing dependency add operational complexity, but the permissions boundary is much clearer.
+Do not add R2 public development access, custom public bucket domain, unrestricted API keys or CORS merely to make the snapshot readable.
 
+## 8. Migration and data-cutover policy
 
-## 8. Snapshot correctness and publishing lifecycle
+- Do not copy any existing records from the old D1 database. The old D1 remains untouched for rollback.
+- The new \`yumedb\` starts empty, as requested.
+- The initial catalogue is imported from Shikimori through the Telegram admin interface. The coordinator commits each bounded import batch to R2 and appends its D1 journal event.
+- The public site does not serve the empty placeholder or silently fall back to D1. Until the first valid R2 revision is committed, return a controlled catalogue-not-ready response and preserve the rest of the site where possible.
+- Stage 3 creates a complete SQL script that is manually applied by the owner in D1 Console. It must also create the exact \`d1_migrations\` tracking record that matches the migration filename used by Wrangler. No SQL is executed by the implementation agent.
 
-- D1 remains the source of truth. R2 is a derived, complete public snapshot.
-- The JSON contains only public catalogue data required by home/catalogue/detail/related-title/sitemap views. User information, sessions, favourites, watchlist, history, subscriptions and notification state never enter the object.
-- Screenshots stay in their separate D1 table initially; they are not included in the snapshot and therefore do not trigger R2 writes when lazily enriched.
-- Catalogue revision changes whenever a field represented in the snapshot changes. D1 triggers or a shared write helper should guarantee revision increments, while every relevant mutation path schedules a publish after its D1 batch commits.
-- Bulk import and long metadata repair should publish at logical batch completion, not once for every inserted row. The initial empty database should publish its first snapshot after the first successful admin import.
-- Publisher messages are idempotent. The publisher always reads the latest committed D1 state instead of trusting stale catalogue data embedded in the queue message.
-- Before writing, publisher compares the current D1 revision with the R2 object's published revision. If the source revision changed while it was building the snapshot, it rebuilds rather than publishing a stale snapshot.
-- A single `PutObject` replaces the JSON object as a whole. R2 documents strong consistency after a write resolves.
-- The Reader's Workers Cache entry is tagged with `yume-catalog-v1`. The Publisher purges this tag through the Reader's private Service Binding only after the R2 write succeeds. If cache purge fails, the publication state records that separately and the short TTL remains the fallback.
-- If publication fails, the previous snapshot remains available; D1 changes are not reported as published. Queue retries/DLQ and a D1 publication-state record make the failure visible in admin.
-- Scheduled episode updates and any enabled Kodik availability refresh that affect snapshot fields must enqueue publication too.
+## 9. Stage 2/3 acceptance criteria
 
-## 9. Cloudflare configuration changes expected in implementation
+### Catalogue correctness
+- Home/catalogue, detail, related-title, search/filter/sort, sitemap and screenshot reads come from the committed R2 revision.
+- Every catalogue mutation path listed in the query map uses the coordinator.
+- Admin import duplicate detection, exclusions, title search, delete search, quality checks and metadata refresh compare against R2 state, not D1 catalogue rows.
+- Kodik availability, trailer IDs, episode schedules and screenshots are included in the next committed R2 revision.
+- No public page view can mutate the catalogue or request publication implicitly.
+- Current R2 pointer always references one complete immutable revision. Readers never see a partially written JSON document.
 
-The current repository has:
-- Main Worker D1 binding `YUME_DB` in `wrangler.jsonc`.
-- Dedicated notification Queue Worker and a second D1 binding in `wrangler.queue.jsonc`.
-- KV binding `YUME_SHIKIMORI_CACHE`.
-- Existing Queue producer/consumer, rate limiters and observability.
+### Concurrency and recovery
+- ETag conditional pointer update prevents stale writers from overwriting newer state.
+- DO journal is persisted before side effects; alarm recovery completes operations after Worker interruption/deployment.
+- Duplicate commands with the same operation ID do not apply catalogue changes twice.
+- R2 failures leave an operation pending and visible in admin; successful retries finish it.
+- Queue delivery order is never assumed for catalogue consistency.
 
-Both Wrangler files currently point to the old D1 ID `29aea579-e316-413f-922b-44c17b12f45a` and database name `yume_db`. The supplied target must become `yumedb` / `c2f0f25d-e29b-47e2-ad11-b726f7a3e9a2` in all relevant configurations.
+### D1 quota evidence
+- Static code search finds no catalogue-table SELECT/COUNT/JOIN/LIKE queries and no catalogue-table UPDATE/DELETE/UPSERT in normal runtime.
+- All user-state reads are identified and explicitly excluded from the catalogue-zero-read metric.
+- D1 statement-level metrics for catalogue journal inserts are captured in tests.
+- Stage 3 verifies Cloudflare D1 \`rows_read\` and \`rows_written\` and reports the measured values, not an estimate.
 
-The current GitHub Actions workflow hardcodes the old D1 name/ID in its generated-config checks. It must be updated alongside the Wrangler files, and it must validate the reader/publisher Worker configurations and bindings.
+### Security
+- Public Worker has no R2 write capability.
+- Reader can only read the private catalogue objects and cannot list or write.
+- Coordinator is not publicly addressable and validates a strict action schema, bounded payloads, and internal caller identity.
+- User authentication remains in place for admin routes; authorisation happens before invoking the coordinator.
+- No user data is included in the public R2 projection.
 
-The old database is not deleted or modified as part of these changes.
+### Regression and release
+- Keep Telegram login/OIDC, session expiry, personal library, view history, anime subscriptions, notification targeting/read/dismissal, Telegram bot subscription gate, queue fanout, cleanup and legal consent fields.
+- Full build, type-check, test, lint, generated-config assertions and Wrangler dry-runs pass.
+- Production deployment and manual SQL application remain separate owner-controlled actions.
 
-## 10. Verification plan
+## 10. Stage 1 verification limits
 
-Stage 2 implementation should add tests for:
-- the final initial schema: all required tables, columns, foreign keys, check constraints, indexes, trigger/revision state and singleton rows;
-- empty-database start-up and first admin import;
-- all catalogue mutation paths and whether each schedules a publication;
-- page/detail/sitemap reads using the R2 snapshot rather than full D1 catalogue scans;
-- no public-route path that can reach a R2 write operation or private publisher directly;
-- reader accepts only fixed GET/HEAD access and does not list or write;
-- publisher handles duplicate/out-of-order messages, concurrent catalogue changes, failed puts, retries and stale-revision prevention;
-- publication state is surfaced correctly in admin;
-- regression coverage for Telegram authentication, favourites/watchlist, history, subscriptions, notifications, episode fanout, trailer administration and Kodik behaviour.
+Stage 1 is a source-level audit and architecture design. It does not include:
+- execution against the actual live D1 database;
+- execution of SQL against \`yumedb\`;
+- R2 uploads, public-access changes, API-token creation or permission tests;
+- deployment to Cloudflare;
+- proof of billable D1 row metrics in the new database.
 
-Stage 3 must run the full current test, lint, build, generated-config and Wrangler dry-run workflow, plus targeted local D1 schema/integration tests. No production D1 query, manual SQL execution, R2 public-access toggle, token creation, deployment or main-branch update is part of Stage 1.
+Those are implementation/integration checks in Stages 2 and 3. Repository CI can prove source-level checks, tests, build and dry-run compatibility; it cannot prove live Cloudflare permissions, live D1 metrics or production deployment success.
 
-## 11. Baseline and limits of this audit
+## 11. Reference documentation
 
-- Read-only review of repository source at the recorded commit.
-- Current GitHub Actions workflow was run on the same commit from the new feature branch and completed successfully: dependency audit, automated tests, lint, Worker build, generated-config assertions and both Wrangler dry-runs passed.
-- No code changes or live Cloudflare database queries were made.
-- The repository review can establish source-level schema and call paths; it cannot independently inspect the actual Cloudflare D1 table contents or dashboard account settings. The user has confirmed the old database has all current migrations applied and the new database is empty.
+- [Cloudflare D1 pricing and row accounting](https://developers.cloudflare.com/d1/platform/pricing/)
+- [D1 metrics and analytics](https://developers.cloudflare.com/d1/observability/metrics-analytics/)
+- [R2 consistency and conditional writes](https://developers.cloudflare.com/r2/reference/consistency/)
+- [R2 Workers API and conditional \`put\`](https://developers.cloudflare.com/r2/api/workers/workers-api-reference/)
+- [Queues ordering and delivery semantics](https://developers.cloudflare.com/queues/reference/how-queues-works/)
+- [Queue at-least-once delivery](https://developers.cloudflare.com/queues/reference/delivery-guarantees/)
+- [Durable Objects concepts](https://developers.cloudflare.com/durable-objects/concepts/what-are-durable-objects/)
+- [Durable Object storage](https://developers.cloudflare.com/durable-objects/best-practices/access-durable-objects-storage/)
+- [Durable Object alarms](https://developers.cloudflare.com/durable-objects/api/alarms/)

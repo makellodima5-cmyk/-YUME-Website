@@ -1,39 +1,26 @@
 # YUME — индекс документации
 
-Актуальность аудита: 29 октября 2026 г. Статус: предпусковой комплект. Юридические документы не готовы к публикации до заполнения сведений оператора, проверки инфраструктуры и юридической проверки.
+Актуальность аудита: 31 октября 2026 г.
 
 ## Источники истины
 
-- legal/privacy-policy-draft.md — политика конфиденциальности для текущей функциональности.
-- legal/user-agreement-draft.md — пользовательское соглашение.
-- legal/personal-data-consent-draft.md — проект отдельного согласия для конкретной цели, если оно требуется.
-- legal/rights-holder-notice.md — информация для правообладателей.
-- technical/territorial-access.md — политика отсутствия собственных географических ограничений YUME.
-- technical/kodik-availability.md — кэш доступности серий Kodik и правила секции онгоинга.
-- technical/browser-storage-and-third-party-services.md — хранилища браузера и сторонние сервисы.
-- Рекламные места и инструкция по их настройке удалены; реклама сейчас не входит в продукт.
-- launch/launch-checklist.md — блокирующие условия публичного запуска.
-- project-status.md — актуальное состояние функций.
+- \`superpowers/specs/2026-10-31-yume-d1-r2-architecture-design.md\` — Stage 1 architecture decision and implementation acceptance criteria for the R2 catalogue / write-only D1 journal.
+- \`technical/d1-schema-and-query-map-2026-10-31.md\` — current D1 schema/index/foreign-key inventory and SQL query ownership map.
+- \`launch/launch-checklist.md\` — launch blockers.
+- \`legal/privacy-policy-draft.md\`, \`legal/user-agreement-draft.md\`, \`legal/personal-data-consent-draft.md\`, \`legal/rights-holder-notice.md\` — legal drafts; they are not ready-to-publish legal approval.
+- \`technical/territorial-access.md\` — territorial-access implementation notes.
+- \`technical/kodik-availability.md\` — current Kodik behaviour before the R2 redesign.
+- \`technical/browser-storage-and-third-party-services.md\` — browser storage and third-party services.
 
-## Текущий статус
+## Current implementation vs. target design
 
-| Область | Подтверждённое состояние | Вывод |
-|---|---|---|
-| Каталог | Shikimori API и Cloudflare D1; искусственный общий лимит записей удалён | Реальный объём ограничен квотами Cloudflare и доступностью источника |
-| Хостинг | Cloudflare Workers / Nitro и D1 | Логи, регионы, retention и договоры должны быть подтверждены |
-| Геоограничение | YUME не скрывает тайтлы по стране IP | Внешние ограничения Kodik/плеера не обходятся |
-| Плеер серий | Интеграция Kodik подключена; доступность зависит от API и внешнего провайдера | В секцию онгоинга попадают только тайтлы со статусом Shikimori «Онгоинг» и свежей положительной проверкой Kodik |
-| Аккаунты / OAuth | Рабочий полный пользовательский аккаунт не подтверждён | Не описывать как активный серверный профиль |
-| Избранное / список | localStorage браузера | Нет облачной синхронизации |
-| Cookie-consent | Есть уведомление и флаг его закрытия в localStorage; нет менеджера согласий по категориям | Закрытие баннера не является универсальным согласием |
-| Яндекс Метрика | Интеграция не обнаружена в просмотренном коде | Не указывать как активную до запуска и сетевой проверки |
-| Реклама / Premium | Рекламные места удалены из UI; рекламные кампании не включены | Не подключать без отдельного решения |
-| Публичные правовые страницы | Юридические ссылки ведут на заглушки / разделы профиля с текстом «скоро» | До запуска заменить полными утверждёнными документами |
+The repository's existing code still reads and writes the catalogue through D1. The Stage 1 documents describe the approved target only; the target is not active until Stage 2 is implemented, tested and deployed separately.
 
-Старые заметки «Ветка · Проверка GitHub и Cloudflare.txt», «Ветка · Проверка этапов проекта.txt» и прежние «Этапы работы.txt» являются историческими рабочими заметками, а не публичной документацией. Актуальный план — launch/launch-checklist.md.
+The prior \`docs/persistent-catalog-d1.md\` is now a historical note and is superseded by the Stage 1 architecture document. The 29 October D1 usage audit records the previous implementation and should be read as historical measurement context, not as evidence of R2 cutover.
 
-## Важные оговорки
+## Verification policy
 
-1. Текст политики сам по себе не исправляет несоответствие фактической инфраструктуры требованиям закона.
-2. До запуска надо подтвердить статус оператора, адрес, email, домен, размещение баз/журналов, сроки хранения, договоры и применимость уведомлений Роскомнадзора.
-3. Юридические выводы предварительные. Перед публикацией нужен специалист по праву РФ, знакомый с действительной схемой данных и контента YUME.
+- GitHub Actions CI validates the commit's automated tests, lint, build, generated Worker configuration assertions and Wrangler dry-runs.
+- CI is not a production deployment and does not prove live Cloudflare binding permissions, D1 metrics or R2 access policy.
+- New D1 SQL is prepared in Stage 2/3, manually applied by the owner in D1 Console, and separately verified after application.
+- Keep the old D1, current \`main\`, and the backup branch untouched during the migration work.
