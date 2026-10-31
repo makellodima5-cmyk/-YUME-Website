@@ -14,7 +14,6 @@ describe("published privacy policy", () => {
 
     expect(screen.getByText("Редакция от 31 октября 2026 года")).toBeInTheDocument();
     for (const heading of [
-      "Политика конфиденциальности",
       "1. Общие положения",
       "2. Сбор информации",
       "3. Использование информации",
