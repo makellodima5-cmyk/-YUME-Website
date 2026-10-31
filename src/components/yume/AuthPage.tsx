@@ -183,7 +183,7 @@ export function AuthPage({ mode, language, onModeChange, onPrivacy, onRules, onC
                 <input
                   id="yume-privacy-consent"
                   type="checkbox"
-                  aria-label={isRu ? "Согласие с Политикой обработки персональных данных" : "Accept the Personal Data Processing Policy"}
+                  aria-label={isRu ? "Согласие с Политикой конфиденциальности" : "Accept the Privacy Policy"}
                   checked={consentAccepted}
                   onChange={(event) => setConsentAccepted(event.target.checked)}
                   className="mt-1 h-4 w-4 shrink-0 accent-primary"
@@ -191,7 +191,7 @@ export function AuthPage({ mode, language, onModeChange, onPrivacy, onRules, onC
                 <div className="min-w-0 flex-1 text-left">
                   <label htmlFor="yume-privacy-consent" className="cursor-pointer">{isRu ? "Я принимаю " : "I accept the "}</label>
                   <button type="button" onClick={onPrivacy} className="inline break-words text-left font-semibold text-primary underline underline-offset-4">
-                    {isRu ? "Политику обработки персональных данных" : "Personal Data Processing Policy"}
+                    {isRu ? "Политику конфиденциальности" : "Privacy Policy"}
                   </button>
                 </div>
               </div>
@@ -199,7 +199,7 @@ export function AuthPage({ mode, language, onModeChange, onPrivacy, onRules, onC
                 <input
                   id="yume-terms-consent"
                   type="checkbox"
-                  aria-label={isRu ? "Согласие с Пользовательским соглашением" : "Accept the User Agreement"}
+                  aria-label={isRu ? "Согласие с Правилами использования сайта" : "Accept the Site Terms of Use"}
                   checked={termsAccepted}
                   onChange={(event) => setTermsAccepted(event.target.checked)}
                   className="mt-1 h-4 w-4 shrink-0 accent-primary"
