@@ -37,6 +37,12 @@ describe("catalog URL search validation", () => {
     });
   });
 
+  it("accepts all public legal document destinations from footer and registration links", () => {
+    for (const section of ["privacy-policy", "rules", "rights"] as const) {
+      expect(validateCatalogSearch({ section }).section).toBe(section);
+    }
+  });
+
   it("rejects unsupported values and malformed numbers", () => {
     expect(validateCatalogSearch({
       section: "not-a-section",
