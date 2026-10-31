@@ -4,134 +4,165 @@ const POLICY_DATE_RU = "31 октября 2026 года";
 const POLICY_DATE_EN = "October 31, 2026";
 const POLICY_URL = "https://yume-website.yumesupport833.workers.dev/?section=privacy-policy";
 
-type PolicySection = { title: string; paragraphs: string[] };
+type PolicyBlock = { type: "p"; text: string } | { type: "list"; items: string[] };
+type PolicySection = { title: string; blocks: PolicyBlock[] };
+const p = (text: string): PolicyBlock => ({ type: "p", text });
+const list = (...items: string[]): PolicyBlock => ({ type: "list", items });
+
+const POLICY_RU_INTRO = [
+  "Настоящая Политика регулирует сбор, использование, хранение и защиту информации пользователей сервиса YUME — сайта https://yume-website.yumesupport833.workers.dev.",
+  "YUME может обрабатывать данные аккаунта, техническую информацию, настройки и историю взаимодействий с Сервисом. Эти сведения используются для обеспечения работы сайта, предоставления его функций, поддержания безопасности и связи с Пользователями.",
+  "Передача информации третьим лицам осуществляется только в случаях, предусмотренных настоящей Политикой, необходимых для работы отдельных функций Сервиса либо в установленных случаях.",
+];
 
 const POLICY_RU: PolicySection[] = [
-{title:"1. Общие положения",paragraphs:[
-"Настоящая Политика конфиденциальности описывает, какие сведения YUME получает и использует при посещении сайта, создании и использовании аккаунта, а также при работе с функциями сервиса.",
-"Сайт YUME доступен по адресу https://yume-website.yumesupport833.workers.dev/. Используя сайт, пользователь может просматривать каталог, сохранять выбранные произведения, пользоваться личным аккаунтом и другими доступными функциями.",
-"Политика относится к данным, которые пользователь предоставляет сам, которые передаются при использовании аккаунта и которые технически возникают при обращении к сайту. Встроенные внешние сервисы могут самостоятельно обрабатывать данные в рамках своей работы.",
-"YUME не запрашивает у пользователя пароль от Telegram, данные банковских карт или платёжные реквизиты. Регистрация и вход в аккаунт выполняются через Telegram."
-]},
-{title:"2. Какие данные обрабатываются",paragraphs:[
-"Данные аккаунта. При авторизации через Telegram YUME может получать Telegram ID, имя и фамилию, имя пользователя (username), язык интерфейса и другие сведения профиля, если Telegram передаёт их в рамках авторизации. Эти данные используются для распознавания аккаунта и предоставления его функций.",
-"Данные сессии. Для поддержания входа могут использоваться технические сведения сессии и данные, позволяющие подтвердить, что пользователь авторизован. Они нужны для работы аккаунта и защиты доступа к нему.",
-"Данные о действиях на сайте. В зависимости от используемых функций могут сохраняться списки «Избранное» и «Буду смотреть», история просмотра, настройки уведомлений и другие выбранные пользователем параметры.",
-"Технические данные. При обращении к сайту автоматически передаются технические сведения, необходимые для доставки страниц и работы сервиса. Они могут включать IP-адрес, дату и время запроса, адрес запрошенной страницы, тип и версию браузера, сведения об устройстве и операционной системе, язык браузера, технические идентификаторы и сведения об ошибках.",
-"Cookie-файлы и аналогичные технологии. Они могут использоваться для сохранения выбора пользователя, поддержания сессии, запоминания настроек и работы функций сайта. Подробности выбора приведены в разделе 3.",
-"YUME не собирает платёжные данные и не принимает оплату на сайте. Для создания аккаунта не требуется указывать адрес электронной почты. Пользовательские оценки и комментарии не запрашиваются."
-]},
-{title:"3. Для чего используются данные и как работает выбор cookie",paragraphs:[
-"Данные используются для предоставления доступа к сайту и аккаунту, сохранения избранного и списка просмотра, отображения истории, работы настроек уведомлений, поддержания пользовательской сессии, защиты сайта, предотвращения злоупотреблений, поиска и устранения технических ошибок, а также ответа на обращения в поддержку.",
-"При первом посещении сайта показывается уведомление с двумя вариантами выбора. Кнопка «Соглашаюсь на использование всех» сохраняет согласие на использование предусмотренных сайтом cookie-файлов и необязательных технологий. Кнопка «Отклонить все» сохраняет отказ: необязательные cookie-файлы и аналогичные технологии не должны включаться.",
-"При отказе YUME не запускает необязательные технологии, для которых требуется согласие. При этом сам факт обращения к сайту технически требует передачи минимальных данных запроса, а необходимые для запрошенных пользователем функций данные сессии могут продолжать использоваться. Отказ от необязательных cookie не может отменить передачу IP-адреса и других технических сведений, необходимых для доставки интернет-запроса.",
-"Выбор сохраняется в браузере, чтобы баннер не появлялся при каждом посещении. Изменить его можно в любое время с помощью ссылки «Изменить выбор cookie» на странице этой Политики. Пользователь также может удалить cookie-файлы и локальные данные через настройки своего браузера, однако после этого отдельные настройки и функции могут сброситься."
-]},
-{title:"4. Передача данных сторонним сервисам",paragraphs:[
-"Telegram. Если пользователь выбирает вход или регистрацию через Telegram, сервис Telegram участвует в подтверждении авторизации и передаёт сведения, необходимые для работы выбранной функции. Взаимодействие с Telegram регулируется также правилами и политикой самого Telegram.",
-"Встроенный видеоплеер. На сайте может отображаться встроенный внешний видеоплеер. При его загрузке или использовании браузер пользователя взаимодействует с сервисом, предоставляющим плеер. Такой сервис может самостоятельно получать технические сведения и обрабатывать их по собственным правилам. YUME не управляет внутренней работой такого плеера и не определяет его способы обработки данных.",
-"YUME не продаёт персональные данные пользователей и не передаёт их третьим лицам для самостоятельной рекламной рассылки."
-]},
-{title:"5. Хранение и защита данных",paragraphs:[
-"Данные используются и хранятся столько времени, сколько необходимо для целей, описанных в этой Политике, работы аккаунта и его функций, обеспечения безопасности и обработки обращений.",
-"YUME принимает разумные меры для защиты информации от случайного или неправомерного доступа, изменения, утраты и раскрытия. Доступ к данным предоставляется только в объёме, необходимом для работы и поддержки сервиса.",
-"Пользователь может удалить аккаунт через соответствующий раздел профиля. При удалении аккаунта удаляются аккаунт YUME, связанные с ним сессии, избранное, список «Буду смотреть», история просмотра, настройки и другие связанные с аккаунтом данные, доступные YUME для удаления в рамках этой функции. Удаление аккаунта YUME не удаляет аккаунт пользователя в Telegram.",
-"После удаления аккаунта пользовательские данные, связанные с ним, больше не используются для предоставления функций аккаунта. Технические сведения, которые не относятся к удаляемому аккаунту и необходимы для работы или безопасности сайта, могут обрабатываться отдельно в пределах целей, указанных в Политике."
-]},
-{title:"6. Внешний видеоплеер и ограничения",paragraphs:[
-"Если пользователь запускает встроенный внешний видеоплеер, его работа, содержание, доступность материалов и внутренние правила обработки данных зависят от поставщика плеера, а не от YUME.",
-"YUME не гарантирует постоянную доступность внешнего плеера, конкретного видеоматериала или бесперебойное воспроизведение. Сбой или изменение работы внешнего сервиса может повлиять на доступность соответствующей функции.",
-"Передача данных через интернет и хранение информации в электронном виде не могут быть абсолютно защищены от всех возможных рисков. YUME принимает разумные меры защиты, но не может гарантировать абсолютную безопасность."
-]},
-{title:"7. Изменение Политики",paragraphs:[
-"Политика может обновляться при изменении функций YUME, состава обрабатываемых данных или способов использования сайта.",
-"Актуальная редакция всегда размещается на странице: " + POLICY_URL + ". Дата последнего редактирования указывается в начале документа.",
-"Если изменения затрагивают выбор пользователя в отношении cookie-файлов или других необязательных технологий, сайт может повторно показать уведомление, чтобы пользователь мог сделать выбор."
-]},
-{title:"8. Контакты",paragraphs:[
-"По вопросам конфиденциальности, обработки данных, работы аккаунта и удаления связанных с ним данных можно обратиться в поддержку YUME.",
-"Электронная почта: yumesupport833@gmail.com.",
-"Telegram-поддержка: https://t.me/YumeSupport."
-]}
+  { title: "1. Общие положения", blocks: [
+    p("1.1. Настоящая Политика конфиденциальности (далее — «Политика») регулирует порядок обработки и защиты информации, которую Пользователь предоставляет или которая может собираться при использовании сайта YUME (далее — «Сервис»)."),
+    p("1.2. Используя Сервис, Пользователь подтверждает, что ознакомился с условиями настоящей Политики и принимает их. Если Пользователь не согласен с условиями Политики, он обязан прекратить использование Сервиса."),
+    p("1.3. Политика распространяется на информацию, получаемую при посещении сайта, авторизации через Telegram, использовании личного профиля и других доступных функций YUME."),
+  ]},
+  { title: "2. Сбор информации", blocks: [
+    p("2.1. При использовании Сервиса могут собираться и обрабатываться следующие сведения:"),
+    list("Данные аккаунта: Telegram ID, имя, фамилия, имя пользователя и языковые настройки, передаваемые при авторизации через Telegram.","Техническая информация: IP-адрес, сведения о браузере, устройстве и операционной системе, дата и время обращения к Сервису, технические данные запросов, а также cookie-файлы и аналогичные технологии.","Информация о взаимодействии с Сервисом: сведения об избранных тайтлах, списке «Смотреть позже», истории просмотров, настройках профиля и взаимодействии с уведомлениями.","Данные сеанса: технические идентификаторы, необходимые для авторизации, поддержания входа в аккаунт и защиты учётной записи."),
+    p("2.2. Сервис не требует от Пользователя паспортных данных, фотографий документов, банковских реквизитов, адреса проживания или иной личной информации, не предусмотренной функциональностью YUME."),
+    p("2.3. YUME не собирает пользовательские оценки и комментарии, поскольку соответствующие функции не предусмотрены текущей функциональностью Сервиса."),
+    p("2.4. Cookie-файлы и аналогичные технологии"),
+    p("Сервис может использовать cookie-файлы и локальное хранилище браузера для сохранения пользовательских настроек, поддержания авторизации, обеспечения безопасности и корректной работы основных функций."),
+    p("При первом посещении Сервиса Пользователю отображается уведомление об использовании cookie-файлов и аналогичных технологий. Пользователь может принять предложенные условия либо отказаться от их использования."),
+    p("В случае отказа Пользователь должен прекратить использование Сервиса и покинуть сайт."),
+    p("Пользователь также может самостоятельно удалить сохранённые данные через настройки своего браузера. Это может привести к сбросу отдельных настроек, завершению сеанса или недоступности некоторых функций."),
+  ]},
+  { title: "3. Использование информации", blocks: [
+    p("3.1. Полученная информация используется исключительно для следующих целей:"),
+    list("обеспечения работы Сервиса и его основных функций;","создания, авторизации и обслуживания аккаунта Пользователя;","сохранения избранного, списка «Смотреть позже» и истории просмотров;","предоставления уведомлений и сохранения настроек Пользователя;","обеспечения безопасности аккаунтов и предотвращения злоупотреблений;","выявления и устранения технических ошибок;","обработки обращений Пользователей и взаимодействия со службой поддержки."),
+    p("3.2. Администрация не использует полученную информацию для целей, не связанных с работой Сервиса, без соответствующего основания и необходимого информирования Пользователя."),
+  ]},
+  { title: "4. Передача информации третьим лицам", blocks: [
+    p("4.1. Для авторизации и работы аккаунтов YUME использует Telegram. При использовании этой функции осуществляется взаимодействие с Telegram, в рамках которого Сервис получает необходимые сведения профиля Пользователя."),
+    p("4.2. При использовании встроенного видеоплеера браузер Пользователя взаимодействует с внешним видеомодулем. Такой модуль работает независимо от YUME. Администрация не управляет его внутренними механизмами, содержимым, доступностью и правилами обработки информации."),
+    p("4.3. Администрация не продаёт и не передаёт информацию Пользователей третьим лицам для самостоятельного использования в рекламных или иных посторонних целях."),
+    p("4.4. Передача информации также возможна в случаях, когда это необходимо для обеспечения работы запрошенных Пользователем функций Сервиса либо предусмотрено применимыми требованиями."),
+  ]},
+  { title: "5. Хранение и защита данных", blocks: [
+    p("5.1. Информация хранится в течение срока, необходимого для достижения целей её обработки, обеспечения работы Сервиса и предоставления Пользователю доступных функций."),
+    p("5.2. Данные аккаунта и связанные с ним сведения хранятся до момента удаления аккаунта Пользователем либо до момента, когда необходимость их дальнейшего хранения отпадает."),
+    p("5.3. Пользователь может самостоятельно удалить свой аккаунт в настройках профиля YUME."),
+    p("После подтверждения удаления аккаунта удаляются учётная запись YUME и связанные с ней данные, включая:"),
+    list("сведения аккаунта, полученные при авторизации через Telegram;","сохранённые сеансы авторизации;","избранные тайтлы;","список «Смотреть позже»;","историю просмотров;","связанные с аккаунтом настройки уведомлений и другие записи профиля."),
+    p("Удаление аккаунта YUME не приводит к удалению самого аккаунта Пользователя в Telegram."),
+    p("Удаление аккаунта YUME является необратимым. Восстановление удалённых данных не предусмотрено."),
+    p("5.4. Администрация принимает разумные технические и организационные меры для защиты информации от неправомерного доступа, изменения, утраты или раскрытия."),
+    p("5.5. Несмотря на принимаемые меры, Администрация не гарантирует абсолютную безопасность информации при её передаче и хранении с использованием сети Интернет."),
+  ]},
+  { title: "6. Отказ от ответственности", blocks: [
+    p("6.1. Пользователь понимает, что передача информации через сеть Интернет сопряжена с определёнными рисками, которые не могут быть полностью исключены."),
+    p("6.2. Администрация не несёт ответственности за работу внешних сервисов и встроенного видеоплеера, включая их доступность, содержание, качество воспроизведения, технические сбои и правила обработки информации."),
+    p("6.3. Администрация не отвечает за утрату или раскрытие информации, произошедшие вследствие действий самого Пользователя, неправомерных действий третьих лиц либо обстоятельств, находящихся вне разумного контроля Администрации."),
+  ]},
+  { title: "7. Изменения в Политике", blocks: [
+    p("7.1. Администрация вправе вносить изменения и дополнения в настоящую Политику при изменении функциональности Сервиса, порядка обработки информации или условий его использования."),
+    p("7.2. Актуальная редакция Политики всегда размещается на сайте YUME."),
+    p("7.3. Продолжение использования Сервиса после публикации изменений означает согласие Пользователя с новой редакцией Политики."),
+  ]},
+  { title: "8. Контакты", blocks: [
+    p("По вопросам, связанным с использованием Сервиса, обработкой информации и настоящей Политикой, Пользователь может обратиться к Администрации YUME следующими способами:"),
+    p("Электронная почта: yumesupport833@gmail.com"),
+    p("Telegram службы поддержки: https://t.me/YumeSupport"),
+  ]},
 ];
 
 const POLICY_EN: PolicySection[] = [
-{title:"1. General provisions",paragraphs:[
-"This Privacy Policy describes what information YUME receives and uses when visitors browse the site, create or use an account, and interact with available service features.",
-"YUME is available at https://yume-website.yumesupport833.workers.dev/. The site provides an anime catalog, personal lists, account features, and other functions made available to users.",
-"This Policy covers information users provide, information sent when using an account, and technical information generated when requests are made to the site. Embedded external services may process information independently as part of their operation.",
-"YUME does not ask users for their Telegram password, bank card details, or payment credentials. Account registration and sign-in are provided through Telegram."
-]},
-{title:"2. Information processed",paragraphs:[
-"Account information. When a user authenticates through Telegram, YUME may receive a Telegram ID, first and last name, username, interface language, and other profile details if Telegram supplies them during authentication. This information is used to identify the account and provide its features.",
-"Session information. Technical session data may be used to maintain sign-in, confirm that a user is authenticated, and protect account access.",
-"Site activity. Depending on the features used, YUME may store Favorites, Watch Later items, viewing history, notification settings, and other preferences selected by the user.",
-"Technical information. When a user accesses the site, technical information required to deliver pages and operate the service may be transmitted automatically. This may include IP address, request date and time, requested page address, browser type and version, device and operating system details, browser language, technical identifiers, and error information.",
-"Cookies and similar technologies. These may be used to remember the user's choice, maintain a session, save preferences, and support site features. The available choices are described in Section 3.",
-"YUME does not collect payment details or process payments on the site. An email address is not required to create an account. User ratings and comments are not requested."
-]},
-{title:"3. How information is used and cookie choices",paragraphs:[
-"Information is used to provide access to the site and account, save Favorites and Watch Later lists, display viewing history, operate notification settings, maintain user sessions, protect the site, prevent abuse, diagnose technical errors, and respond to support requests.",
-"A notice with two choices is displayed on the first visit. Selecting “Accept all” records consent to the use of the site's available cookies and optional technologies. Selecting “Reject all” records a refusal: optional cookies and similar technologies should not be enabled.",
-"After rejection, YUME does not start optional technologies that require consent. However, accessing a website technically requires minimal request data to be transmitted, and session information necessary for features explicitly requested by the user may still be used. Rejecting optional cookies cannot prevent an IP address and other technical information required to deliver an internet request from being transmitted.",
-"The choice is saved in the browser so the notice does not appear on every visit. It can be changed at any time using the “Change cookie choice” link on this Policy page. Users can also delete cookies and local browser data in their browser settings, although some preferences and features may then reset."
-]},
-{title:"4. Sharing with third-party services",paragraphs:[
-"Telegram. If a user chooses to sign in or register through Telegram, Telegram participates in authentication and provides information required for the selected feature. Use of Telegram is also subject to Telegram's own terms and privacy policy.",
-"Embedded video player. The site may display an embedded external video player. When it loads or is used, the user's browser communicates with the service that provides the player. That service may independently receive technical information and process it under its own rules. YUME does not control the player's internal operation or determine its data-processing practices.",
-"YUME does not sell users' personal information or provide it to third parties for their own advertising mailings."
-]},
-{title:"5. Storage and protection",paragraphs:[
-"Information is used and retained for as long as necessary for the purposes described in this Policy, account operation, security, and handling support requests.",
-"YUME takes reasonable measures to protect information against accidental or unauthorized access, alteration, loss, and disclosure. Access is limited to what is needed to operate and support the service.",
-"Users can delete their account through the relevant section of their profile. Account deletion removes the YUME account, associated sessions, Favorites, Watch Later list, viewing history, settings, and other account-linked information that YUME can delete through this feature. Deleting a YUME account does not delete the user's Telegram account.",
-"After account deletion, account-linked information is no longer used to provide account features. Technical information that is not part of the account and is needed to operate or secure the site may be processed separately for the purposes described in this Policy."
-]},
-{title:"6. External video player and limitations",paragraphs:[
-"If a user starts an embedded external video player, its operation, content, material availability, and internal data-processing rules are determined by the player provider, not YUME.",
-"YUME does not guarantee continuous availability of an external player, a particular video, or uninterrupted playback. An outage or change by the external service may affect the feature.",
-"Internet transmission and electronic storage cannot be guaranteed to be completely secure against every possible risk. YUME takes reasonable protective measures but cannot guarantee absolute security."
-]},
-{title:"7. Changes to this Policy",paragraphs:[
-"This Policy may be updated when YUME features, the information processed, or the ways the site is used change.",
-"The current version is always published at: " + POLICY_URL + ". The date of the latest edit appears at the beginning of the document.",
-"If changes affect users' choices about cookies or other optional technologies, the site may display the notice again so users can make a choice."
-]},
-{title:"8. Contact",paragraphs:[
-"For privacy questions, information processing, account operation, or deletion of account-linked information, contact YUME support.",
-"Email: yumesupport833@gmail.com.",
-"Telegram support: https://t.me/YumeSupport."
-]}
+  { title: "1. General provisions", blocks: [
+    p("1.1. This Privacy Policy (the “Policy”) governs the processing and protection of information provided by the User or collected when using the YUME website (the “Service”)."),
+    p("1.2. By using the Service, the User confirms that they have read and accept this Policy. If the User does not agree with it, they must stop using the Service."),
+    p("1.3. This Policy applies to information received when visiting the website, signing in through Telegram, using a personal profile, and accessing other available YUME features."),
+  ]},
+  { title: "2. Information collection", blocks: [
+    p("2.1. When using the Service, the following information may be collected and processed:"),
+    list("Account data: Telegram ID, first name, last name, username, and language settings transmitted during Telegram authentication.","Technical information: IP address, browser, device and operating system details, date and time of access, technical request data, cookies, and similar technologies.","Service interaction information: Favorites, Watch Later list, viewing history, profile settings, and notification interactions.","Session data: technical identifiers required for authentication, maintaining account sign-in, and protecting the account."),
+    p("2.2. The Service does not require passport details, photographs of identity documents, bank details, residential address, or other personal information not required by YUME functionality."),
+    p("2.3. YUME does not collect user ratings or comments because these features are not part of the Service's current functionality."),
+    p("2.4. Cookies and similar technologies"),
+    p("The Service may use cookies and browser local storage to save user preferences, maintain authentication, provide security, and ensure that core features work correctly."),
+    p("On the first visit, the User is shown a notice about cookies and similar technologies. The User may accept the proposed terms or refuse their use."),
+    p("If the User refuses, they must stop using the Service and leave the website."),
+    p("The User may also delete saved data through browser settings. This may reset certain preferences, end a session, or make some features unavailable."),
+  ]},
+  { title: "3. Use of information", blocks: [
+    p("3.1. Information received is used exclusively for the following purposes:"),
+    list("operating the Service and its core features;","creating, authenticating, and maintaining the User's account;","saving Favorites, the Watch Later list, and viewing history;","providing notifications and saving User preferences;","protecting accounts and preventing abuse;","detecting and fixing technical errors;","handling User requests and communicating with support."),
+    p("3.2. The Administration does not use information for purposes unrelated to operating the Service without an appropriate basis and necessary notice to the User."),
+  ]},
+  { title: "4. Sharing information with third parties", blocks: [
+    p("4.1. YUME uses Telegram for authentication and account operation. When this feature is used, YUME interacts with Telegram and receives the User profile information required for the feature."),
+    p("4.2. When the embedded video player is used, the User's browser interacts with an external video module. This module operates independently of YUME. The Administration does not control its internal mechanisms, content, availability, or information-processing rules."),
+    p("4.3. The Administration does not sell User information or provide it to third parties for their independent use in advertising or other unrelated purposes."),
+    p("4.4. Information may also be transferred when necessary to provide Service features requested by the User or where applicable requirements provide for it."),
+  ]},
+  { title: "5. Data storage and protection", blocks: [
+    p("5.1. Information is stored for the period necessary to achieve its processing purposes, operate the Service, and provide available User features."),
+    p("5.2. Account data and related information are stored until the User deletes the account or further storage is no longer necessary."),
+    p("5.3. The User may delete their account in the YUME profile settings."),
+    p("After account deletion is confirmed, the YUME account and associated data are deleted, including:"),
+    list("account information received through Telegram authentication;","saved authentication sessions;","Favorites;","the Watch Later list;","viewing history;","account-linked notification settings and other profile records."),
+    p("Deleting a YUME account does not delete the User's Telegram account."),
+    p("YUME account deletion is irreversible. Deleted data cannot be restored."),
+    p("5.4. The Administration takes reasonable technical and organizational measures to protect information against unauthorized access, alteration, loss, or disclosure."),
+    p("5.5. Despite these measures, the Administration does not guarantee absolute security of information during transmission and storage over the Internet."),
+  ]},
+  { title: "6. Disclaimer", blocks: [
+    p("6.1. The User understands that transmitting information over the Internet involves risks that cannot be completely eliminated."),
+    p("6.2. The Administration is not responsible for external services or the embedded video player, including their availability, content, playback quality, technical failures, or information-processing rules."),
+    p("6.3. The Administration is not responsible for loss or disclosure of information resulting from the User's actions, unlawful actions of third parties, or circumstances beyond its reasonable control."),
+  ]},
+  { title: "7. Changes to the Policy", blocks: [
+    p("7.1. The Administration may amend or supplement this Policy when Service functionality, information-processing procedures, or conditions of use change."),
+    p("7.2. The current version of the Policy is always published on the YUME website."),
+    p("7.3. Continued use of the Service after changes are published means the User agrees to the new version of the Policy."),
+  ]},
+  { title: "8. Contacts", blocks: [
+    p("For questions about use of the Service, information processing, or this Policy, the User may contact the YUME Administration using the following details:"),
+    p("Email: yumesupport833@gmail.com"),
+    p("Telegram support: https://t.me/YumeSupport"),
+  ]},
 ];
 
 export function PrivacyPolicy() {
- const { language } = useYumePreferences();
- const isRu = language === "ru";
- const sections = isRu ? POLICY_RU : POLICY_EN;
- return (
-  <article className="max-w-3xl space-y-6 rounded-2xl border border-border bg-card/60 p-5 sm:p-7">
-   <header className="space-y-2">
-    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-primary">{isRu ? "Документ YUME" : "YUME document"}</p>
-    <h2 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">{isRu ? "Политика конфиденциальности" : "Privacy Policy"}</h2>
-    <p className="text-sm font-medium text-muted-foreground">{isRu ? `Дата последнего редактирования: ${POLICY_DATE_RU}` : `Last updated: ${POLICY_DATE_EN}`}</p>
-   </header>
-   <div className="h-px w-full bg-border" />
-   {sections.map(section => (
-    <section key={section.title} className="space-y-3">
-     <h3 className="text-base font-bold text-foreground sm:text-lg">{section.title}</h3>
-     <div className="space-y-3">
-      {section.paragraphs.map((paragraph,index) => <p key={index} className="text-sm leading-7 text-foreground/85 sm:text-[15px]">{paragraph}</p>)}
-     </div>
-    </section>
-   ))}
-   <div className="h-px w-full bg-border" />
-   <div className="space-y-3 text-sm">
-    <p className="text-foreground/85">{isRu ? "Электронная почта: " : "Email: "}<a className="font-semibold text-primary underline underline-offset-4" href="mailto:yumesupport833@gmail.com">yumesupport833@gmail.com</a></p>
-    <p className="text-foreground/85">{isRu ? "Telegram-поддержка: " : "Telegram support: "}<a className="font-semibold text-primary underline underline-offset-4" href="https://t.me/YumeSupport" target="_blank" rel="noreferrer">t.me/YumeSupport</a></p>
-   </div>
-   <button type="button" className="text-sm font-semibold text-primary underline underline-offset-4" onClick={() => window.dispatchEvent(new Event("yume-open-cookie-consent"))}>
-    {isRu ? "Изменить выбор cookie" : "Change cookie choice"}
-   </button>
-  </article>
- );
+  const { language } = useYumePreferences();
+  const isRu = language === "ru";
+  const sections = isRu ? POLICY_RU : POLICY_EN;
+  const intro = isRu ? POLICY_RU_INTRO : [
+    "This Policy governs the collection, use, storage, and protection of information of users of the YUME service, available at https://yume-website.yumesupport833.workers.dev.",
+    "YUME may process account data, technical information, preferences, and interaction history. This information is used to operate the website, provide its features, maintain security, and communicate with Users.",
+    "Information is transferred to third parties only as described in this Policy, when necessary for individual Service features, or where required.",
+  ];
+  return (
+    <article className="max-w-3xl space-y-6 rounded-2xl border border-border bg-card/60 p-5 sm:p-7">
+      <header className="space-y-3">
+        <p className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">{isRu ? "Политика конфиденциальности" : "Privacy Policy"}</p>
+        <p className="text-sm font-medium text-muted-foreground">{isRu ? `Редакция от ${POLICY_DATE_RU}` : `Edition dated ${POLICY_DATE_EN}`}</p>
+        <div className="space-y-3">
+          {intro.map((paragraph, index) => <p key={index} className="text-sm leading-7 text-foreground/85 sm:text-[15px]">{paragraph}</p>)}
+        </div>
+      </header>
+      <div className="h-px w-full bg-border" />
+      {sections.map(section => (
+        <section key={section.title} className="space-y-3">
+          <h3 className="text-base font-bold text-foreground sm:text-lg">{section.title}</h3>
+          {section.blocks.map((block, index) => block.type === "p" ? (
+            <p key={index} className="text-sm leading-7 text-foreground/85 sm:text-[15px]">{block.text}</p>
+          ) : (
+            <ul key={index} className="list-disc space-y-2 pl-6 text-sm leading-7 text-foreground/85 sm:text-[15px]">
+              {block.items.map((item, itemIndex) => <li key={itemIndex}>{item}</li>)}
+            </ul>
+          ))}
+        </section>
+      ))}
+      <div className="h-px w-full bg-border" />
+      <div className="space-y-3 text-sm">
+        <p className="text-foreground/85">{isRu ? "Электронная почта: " : "Email: "}<a className="font-semibold text-primary underline underline-offset-4" href="mailto:yumesupport833@gmail.com">yumesupport833@gmail.com</a></p>
+        <p className="text-foreground/85">{isRu ? "Telegram службы поддержки: " : "Telegram support: "}<a className="font-semibold text-primary underline underline-offset-4" href="https://t.me/YumeSupport" target="_blank" rel="noreferrer">t.me/YumeSupport</a></p>
+      </div>
+    </article>
+  );
 }
