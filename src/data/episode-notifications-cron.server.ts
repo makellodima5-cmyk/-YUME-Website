@@ -9,6 +9,16 @@ type ShikimoriAnime = { id:string; status?:string|null; episodes?:number|null; e
 function env():Env { try { return cloudflareEnv as unknown as Env; } catch { const e=(globalThis as typeof globalThis & {__YUME_RUNTIME_ENV__?:unknown}).__YUME_RUNTIME_ENV__; return e&&typeof e==="object"?e as Env:{}; } }
 const API="https://shikimori.io/api/graphql";
 
+/** Convert Shikimori's API status values to the status vocabulary stored by YUME. */
+export function storedStatus(value: string | null | undefined, fallback: string): string {
+ switch(value) {
+  case "ongoing": return "Онгоинг";
+  case "released": return "Вышел";
+  case "anons": return "Анонс";
+  default: return fallback || "Неизвестно";
+ }
+}
+
 export async function runScheduledEpisodeNotifications(input:unknown):Promise<void>{
  const e=(input&&typeof input==="object"?input:env()) as Env, db=e.YUME_DB as DB|undefined;
  if(!db||typeof db.prepare!=="function") throw new Error("Episode notification cron has no YUME_DB binding");
