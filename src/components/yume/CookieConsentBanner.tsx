@@ -62,7 +62,7 @@ export function CookieConsentBanner() {
         aria-label={isRussian ? "Настройки файлов cookie" : "Cookie preferences"}
       >
         <p className="text-sm leading-relaxed text-foreground">
-          {isRussian ? "Продолжая пользоваться сайтом вы соглашаетесь с " : "By continuing to use the site, you agree to the processing of "}
+          {isRussian ? "Продолжая пользоваться сайтом вы соглашаетесь с обработкой " : "By continuing to use the site, you agree to the processing of "}
           <a
             href={PRIVACY_POLICY_URL}
             className="font-semibold text-primary underline underline-offset-4"
