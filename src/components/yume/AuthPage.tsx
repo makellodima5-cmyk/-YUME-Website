@@ -76,7 +76,7 @@ export function AuthPage({ mode, language, onModeChange, onPrivacy, onRules, onC
     setError("");
     setMessage("");
     if (isRegister && (!consentAccepted || !termsAccepted)) {
-      setError(isRu ? "Прими Политику обработки персональных данных и Пользовательское соглашение." : "Accept the Personal Data Processing Policy and User Agreement.");
+      setError(isRu ? "Прими Политику конфиденциальности и Правила использования сайта." : "Accept the Privacy Policy and Site Terms of Use.");
       return;
     }
     if (busy) return;
@@ -207,7 +207,7 @@ export function AuthPage({ mode, language, onModeChange, onPrivacy, onRules, onC
                 <div className="min-w-0 flex-1 text-left">
                   <label htmlFor="yume-terms-consent" className="cursor-pointer">{isRu ? "Я принимаю " : "I accept the "}</label>
                   <button type="button" onClick={onRules} className="inline break-words text-left font-semibold text-primary underline underline-offset-4">
-                    {isRu ? "Пользовательское соглашение" : "User Agreement"}
+                    {isRu ? "Правила использования сайта" : "Site Terms of Use"}
                   </button>
                 </div>
               </div>
