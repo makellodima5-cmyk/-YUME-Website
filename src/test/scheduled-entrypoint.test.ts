@@ -30,6 +30,8 @@ describe("automatic Worker maintenance", () => {
     expect(queueWorker).toContain("runScheduledEpisodeNotifications(env)");
     expect(workflow).toContain("Automatic scheduled Worker jobs must remain disabled.");
     expect(workflow).toContain("Generated Worker entry still includes scheduled job");
+    expect(workflow).toContain("Dedicated Queue Worker entry does not invoke scheduled episode notifications.");
+    expect(workflow).toContain("Queue consumer must not expose public workers.dev or preview URLs.");
     expect(catalogImporter).toContain('body.action === "refresh_section_metadata"');
     expect(catalogImporter).toContain('body.statusFilter === "ongoing" || body.statusFilter === "announcements"');
     expect(catalogImporter).toContain("UPDATE anime_catalog SET status=?, episodes=?, next_episode_at=?");
@@ -38,10 +40,9 @@ describe("automatic Worker maintenance", () => {
     expect(homeRoute).toContain('anime.status === "Онгоинг"');
     expect(homeRoute).toContain('anime.status === "Анонс"');
 
-    // Production deploy remains gated to pushes on main after tests/build checks.
-    expect(workflow).toContain("if: github.event_name == 'push' && github.ref == 'refs/heads/main'");
-    expect(workflow).toContain("secrets.CLOUDFLARE_API_TOKEN");
-    expect(workflow).toContain("secrets.CLOUDFLARE_ACCOUNT_ID");
-    expect(workflow).toContain("bunx wrangler@4 deploy --config wrangler.jsonc");
+    // Cloudflare Workers Builds owns production deploys; GitHub Actions validates artifacts only.
+    expect(workflow).toContain("Validate Queue consumer Worker deploy artifact");
+    expect(workflow).toContain("Production deployments are owned by Cloudflare Workers Builds.");
+    expect(workflow).not.toContain("secrets.CLOUDFLARE_API_TOKEN");
   });
 });
