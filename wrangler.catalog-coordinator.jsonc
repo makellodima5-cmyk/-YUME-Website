@@ -27,6 +27,12 @@
       ]
     }
   ],
+  "kv_namespaces": [
+    {
+      "binding": "YUME_CATALOG_CACHE",
+      "id": "598c5207a7054b3eb45e2efe8214f5d7"
+    }
+  ],
   "r2_buckets": [
     {
       "binding": "CATALOG_BUCKET",
