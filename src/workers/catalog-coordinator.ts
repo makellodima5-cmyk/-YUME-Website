@@ -1,6 +1,6 @@
 import { DurableObject } from "cloudflare:workers";
 import { applyCatalogMutation, CATALOG_CURRENT_KEY, CATALOG_REVISION_PREFIX, emptyCatalogState, type CatalogMutation, type CatalogPointer, type CatalogState } from "@/data/catalog-r2.shared";
-import { writeCatalogSnapshotCache } from "@/data/catalog-kv-cache.shared";
+import { pruneCatalogSnapshotCache, writeCatalogSnapshotCache } from "@/data/catalog-kv-cache.shared";
 
 type CoordinatorEnv = { CATALOG_BUCKET:R2Bucket; YUME_DB:D1Database; YUME_CATALOG_CACHE:KVNamespace };
 type Env = { CATALOG_COORDINATOR:DurableObjectNamespace<CatalogCoordinator> };
@@ -85,7 +85,7 @@ export class CatalogCoordinator extends DurableObject<CoordinatorEnv>{
       if(pointer.operationId===operation.id){
         const existingObject=await this.env.CATALOG_BUCKET.get(pointer.key);
         if(existingObject){
-          try{await writeCatalogSnapshotCache(this.env.YUME_CATALOG_CACHE,await existingObject.json<CatalogState>());}
+          try{await writeCatalogSnapshotCache(this.env.YUME_CATALOG_CACHE,await existingObject.json<CatalogState>());await pruneCatalogSnapshotCache(this.env.YUME_CATALOG_CACHE,pointer.revision);}
           catch(error){console.warn("[YUME][CATALOG_COORDINATOR] Shared cache refresh failed; Reader will use R2 fallback.",error);}
         }
         await this.appendJournal(operation,pointer.revision);
@@ -115,7 +115,7 @@ export class CatalogCoordinator extends DurableObject<CoordinatorEnv>{
       onlyIf:pointerObject?{etagMatches:pointerObject.etag}:{etagDoesNotMatch:"*"},
     });
     if(!committed)throw new Error("catalog_pointer_conflict");
-    try{await writeCatalogSnapshotCache(this.env.YUME_CATALOG_CACHE,next);}
+    try{await writeCatalogSnapshotCache(this.env.YUME_CATALOG_CACHE,next);await pruneCatalogSnapshotCache(this.env.YUME_CATALOG_CACHE,next.revision);}
     catch(error){console.warn("[YUME][CATALOG_COORDINATOR] Shared cache population failed; Reader will use R2 fallback.",error);}
     await this.appendJournal(operation,next.revision);
     await this.pruneOldRevision(next.revision);
