@@ -210,6 +210,11 @@ function stats(items: Anime[]) {
   return { total:items.length, incomplete, complete:items.length-incomplete, missingTrailer:items.length-withTrailer, hasTrailer:withTrailer };
 }
 async function saveMetadata(values: Record<string,string>, deleteKeys: string[] = []) { return submitCatalogMutation({ type:"metadata", values, deleteKeys }); }
+export function adminCatalogImportResumeCursor(values:Record<string,string>,statusFilter:string):number{
+  const previousFilter=values.admin_import_status_filter??"";
+  const savedCursor=Number(values.admin_import_cursor??1);
+  return previousFilter===statusFilter&&Number.isSafeInteger(savedCursor)&&savedCursor>0?savedCursor:1;
+}
 
 export async function handleAdminCatalogImport(request: Request): Promise<Response> {
   if (request.method !== "GET" && request.method !== "POST") return json({ error:"method_not_allowed" },405);
@@ -219,11 +224,18 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
   if (!auth) return json({ isAdmin:false,error:"admin_required" },403);
   const { db, actor } = auth;
   try {
-    const state = await readCatalogState();
+    const state = await readCatalogState(true)
     const current = metadata(state);
-    const quality = stats(state.items);
     if (request.method === "GET") {
       const query=new URL(request.url).searchParams;
+      if(query.has("status")){
+        const screenshotFailures=Object.keys(state.metadata).filter((key)=>key.startsWith("screenshot_last_error:")&&Boolean(state.metadata[key])).length;
+        const screenshotRetries=Object.keys(state.metadata).filter((key)=>key.startsWith("screenshot_attempts:")&&Number(state.metadata[key])>0&&Number(state.metadata[key])<3).length;
+        const metadataCursor=Math.max(0,Number(state.metadata.metadata_refresh_cursor??0)||0);
+        const metadataRefresh={autoEnabled:false,phase:state.metadata.metadata_refresh_state??"metadata",metadataOffset:metadataCursor,screenshotOffset:metadataCursor,total:state.items.length,screenshotFailures,screenshotRetries,done:metadataCursor>=state.items.length};
+        return json({isAdmin:true,...current,metadataRefresh});
+      }
+      const quality = stats(state.items);
       const qualityOffset=Math.max(0,Math.min(state.items.length,Number(query.get("qualityOffset")??0)||0));
       const qualityItems=state.items.map((item)=>({id:item.id,title:item.title,year:item.year,missingYear:!item.year,missingPoster:!item.posterUrl,missingDescription:!item.description})).filter((item)=>item.missingYear||item.missingPoster||item.missingDescription);
       const qualitySummary={total:state.items.length,incomplete:qualityItems.length,missingYear:qualityItems.filter(item=>item.missingYear).length,missingPoster:qualityItems.filter(item=>item.missingPoster).length,missingDescription:qualityItems.filter(item=>item.missingDescription).length};
@@ -251,9 +263,10 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
       if (!["","ongoing","anons","released"].includes(statusFilter)) return json({error:"invalid_status_filter"},400);
       if (current.state === "running") return json({isAdmin:true,...current,message:"Импорт уже выполняется."},409);
       const runId = crypto.randomUUID();
-      await saveMetadata({admin_import_run_id:runId,admin_import_started_at:String(Date.now()),admin_import_target:String(target),admin_import_cursor:"1",admin_import_added:"0",admin_import_skipped:"0",admin_import_incomplete:"0",admin_import_errors:"0",admin_import_state:"running",admin_import_status_filter:statusFilter,admin_import_run_block_18_plus:current.bulkImportBlock18Plus?"1":"0",admin_import_resume_at:"0"});
+      const resumeCursor = adminCatalogImportResumeCursor(state.metadata,statusFilter);
+      await saveMetadata({admin_import_run_id:runId,admin_import_started_at:String(Date.now()),admin_import_target:String(target),admin_import_cursor:String(resumeCursor),admin_import_added:"0",admin_import_skipped:"0",admin_import_incomplete:"0",admin_import_errors:"0",admin_import_state:"running",admin_import_status_filter:statusFilter,admin_import_run_block_18_plus:current.bulkImportBlock18Plus?"1":"0",admin_import_resume_at:"0"});
       await audit(db,"catalog.import.start","success",{target,statusFilter},actor);
-      return json({isAdmin:true,...metadata(await readCatalogState()),message:"Импорт подготовлен."});
+      return json({isAdmin:true,...metadata(await readCatalogState(true)),message:"Импорт подготовлен."});
     }
     if (action === "stop") {
       await saveMetadata({admin_import_state:"paused"});
