@@ -89,7 +89,7 @@ describe("Telegram OIDC browser binding", () => {
         Origin: "https://yume.test",
         "Content-Type": "application/x-www-form-urlencoded",
       },
-      body: "flow=register&privacyConsent=true",
+      body: "flow=register&privacyConsent=true&termsAccepted=false",
     }));
 
     expect(response.status).toBe(400);
