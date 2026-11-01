@@ -412,6 +412,7 @@ function Index() {
   const [telegramAuthError, setTelegramAuthError] = useState("");
   const [telegramAuthReady, setTelegramAuthReady] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [adminMenuVisible, setAdminMenuVisible] = useState(false);
   const [adminPasswordRequired, setAdminPasswordRequired] = useState(false);
   const [adminPassword, setAdminPassword] = useState("");
   const [adminPasswordBusy, setAdminPasswordBusy] = useState(false);
@@ -585,6 +586,7 @@ function Index() {
     let cancelled = false;
     setAdminCheckComplete(false);
     setIsAdmin(false);
+    setAdminMenuVisible(false);
     setAdminPasswordRequired(false);
     setAdminPasswordError("");
     setAdminStats(null);
@@ -592,6 +594,7 @@ function Index() {
       .then(async response => {
         const gate = await response.json().catch(() => ({})) as { isAdmin?: boolean; confirmed?: boolean; error?: string };
         if (cancelled) return;
+        if (gate.isAdmin === true || gate.error === "admin_password_not_configured") setAdminMenuVisible(true);
         if (gate.error === "admin_password_not_configured") {
           setAdminPasswordRequired(true);
           setAdminPasswordError(language === "ru"
@@ -1670,7 +1673,7 @@ function Index() {
     <div className="relative isolate min-h-screen pb-8">
       {view === "home" && <HomeDepthAtmosphere />}
       <div className="relative z-10">
-      <Header view={view} setView={setView} onProfile={() => setView(telegramAuthReady ? "profile" : "login")} isAdmin={isAdmin} unreadNotificationCount={notificationStateLoaded && notificationRemoteAccount ? notificationItems.filter((item) => !notificationReadIds.includes(item.id) && !notificationDismissedIds.includes(item.id)).length : 0} />
+      <Header view={view} setView={setView} onProfile={() => setView(telegramAuthReady ? "profile" : "login")} isAdmin={adminMenuVisible} unreadNotificationCount={notificationStateLoaded && notificationRemoteAccount ? notificationItems.filter((item) => !notificationReadIds.includes(item.id) && !notificationDismissedIds.includes(item.id)).length : 0} />
       {isTelegramMiniApp && telegramConsentRequired && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-background/85 px-4 py-6 backdrop-blur-md" role="dialog" aria-modal="true" aria-labelledby="telegram-consent-title">
           <section className="w-full max-w-md rounded-3xl border border-border bg-card p-6 shadow-2xl sm:p-8">
