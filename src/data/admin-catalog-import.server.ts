@@ -195,7 +195,7 @@ function metadata(state: Awaited<ReturnType<typeof readCatalogState>>) {
     target:Number(values.admin_import_target ?? 0), cursor:Number(values.admin_import_cursor ?? 1),
     added:Number(values.admin_import_added ?? 0), skipped:Number(values.admin_import_skipped ?? 0),
     incomplete:Number(values.admin_import_incomplete ?? 0), errors:Number(values.admin_import_errors ?? 0),
-    state:values.admin_import_state ?? "idle", bulkImportBlock18Plus:values.admin_import_block_18_plus !== "0",
+    state:values.admin_import_state ?? "idle", runId:values.admin_import_run_id ?? "", bulkImportBlock18Plus:values.admin_import_block_18_plus !== "0",
     statusFilter:values.admin_import_status_filter ?? "", delayMs:REQUEST_DELAY_MS,
   };
 }
@@ -293,7 +293,8 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
         if(shots.length)mutations.push({type:"screenshots",animeId:String(item.id),items:shots.map((shot,position)=>({originalUrl:shot.original,previewUrl:shot.preview,position}))});
       }
       mutations.push({type:"metadata",values:{admin_import_cursor:String(progress.cursor+1),admin_import_added:String(nextAdded),admin_import_skipped:String(progress.skipped+skipped),admin_import_incomplete:String(progress.incomplete+incompleteCount),admin_import_resume_at:String(Date.now()+REQUEST_DELAY_MS),admin_import_state:nextState}});
-      await submitCatalogMutation({type:"batch",mutations});
+      const operationId=("import"+(progress.runId||"legacy").replace(/[^A-Za-z0-9]/g,"")+String(progress.cursor).padStart(8,"0")).slice(0,80);
+      await submitCatalogMutation({type:"batch",mutations},operationId);
       await audit(db,"catalog.import.page","success",{page:progress.cursor,added:mapped.length,skipped,state:nextState},actor);
       return json({isAdmin:true,...metadata(await readCatalogState())});
     }
@@ -313,8 +314,9 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
       const source = (await fetchByIds([id],true))[0];
       if (!source) return json({error:"anime_not_found"},404);
       const anime = mapAnime(source); const shots = mapAdminCatalogScreenshots(source);
-      await submitCatalogMutation({type:"upsert",items:[anime]});
-      if (shots.length) await submitCatalogMutation({type:"screenshots",animeId:id,items:shots.map((shot,position)=>({originalUrl:shot.original,previewUrl:shot.preview,position}))});
+      const mutations:import("@/data/catalog-r2.shared").CatalogMutation[]=[{type:"upsert",items:[anime]}];
+      if(shots.length)mutations.push({type:"screenshots",animeId:id,items:shots.map((shot,position)=>({originalUrl:shot.original,previewUrl:shot.preview,position}))});
+      await submitCatalogMutation({type:"batch",mutations});
       const after = await readCatalogState(); const resultStats = stats(after.items);
       await audit(db,"catalog.import.title","success",{animeId:id,title:anime.title},actor);
       return json({isAdmin:true,imported:true,anime:{id:anime.id,title:anime.title,year:anime.year,englishTitle:anime.englishTitle,originalTitle:anime.original},screenshots:shots.length,catalogTotal:after.items.length,catalogWithTrailer:resultStats.hasTrailer,missingTrailers:resultStats.missingTrailer,message:"Тайтл добавлен в каталог вместе с метаданными и доступными скриншотами."});
