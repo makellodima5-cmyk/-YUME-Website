@@ -1,6 +1,7 @@
 import { env as cloudflareEnv } from "cloudflare:workers";
 import { USER_NOTIFICATIONS } from "@/data/notifications.shared";
 import { cleanupFullyDismissedNotification } from "@/data/notification-cleanup.server";
+import { isSameOriginRequest, normalizeInternalRedirect } from "@/lib/request-security";
 
 type Environment = Record<string, unknown> & { YUME_DB?: unknown; YUME_AUTH_SESSION_SECRET?: string };
 type Statement = {
@@ -56,18 +57,6 @@ async function sessionTokenHash(value: string, secret: string): Promise<string> 
   return Array.from(digest, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-function sameOrigin(request: Request): boolean {
-  const origin = request.headers.get("origin");
-  if (origin) {
-    try { return new URL(origin).origin === new URL(request.url).origin; } catch { return false; }
-  }
-  const referer = request.headers.get("referer");
-  if (referer) {
-    try { return new URL(referer).origin === new URL(request.url).origin; } catch { return false; }
-  }
-  return request.headers.get("sec-fetch-site") === "same-origin";
-}
-
 async function readNotificationState(db: Database, userId: string): Promise<{ readIds: string[]; dismissedIds: string[] }> {
   const [reads, dismissals] = await Promise.all([
     db.prepare("SELECT notification_id FROM yume_notification_reads WHERE user_id = ?")
@@ -103,7 +92,7 @@ export async function handleNotifications(request: Request): Promise<Response> {
   if (request.method !== "GET" && request.method !== "POST") {
     return json({ error: "method_not_allowed" }, 405);
   }
-  if (request.method === "POST" && !sameOrigin(request)) {
+  if (request.method === "POST" && !isSameOriginRequest(request)) {
     return json({ error: "cross_origin_request" }, 403);
   }
 
@@ -118,7 +107,7 @@ export async function handleNotifications(request: Request): Promise<Response> {
       const state = await readNotificationState(db, userId);
       // Schema is initialized once above; avoid repeating DDL for every notification poll.
       const dynamicRows = await db.prepare("SELECT n.id,n.title,n.body,n.target_url,n.created_at,r.read_at,r.dismissed_at FROM yume_notifications n LEFT JOIN yume_notification_reads_v2 r ON r.notification_id=n.id AND r.user_id=? WHERE n.active=1 AND (NOT EXISTS (SELECT 1 FROM yume_notification_targets t WHERE t.notification_id=n.id) OR EXISTS (SELECT 1 FROM yume_notification_targets t WHERE t.notification_id=n.id AND t.user_id=?)) ORDER BY n.created_at DESC LIMIT 100").bind(userId,userId).all<{id:string;title:string;body:string;target_url:string|null;created_at:string;read_at:string|null;dismissed_at:string|null}>();
-      const dynamicNotifications = dynamicRows.results.map(n => ({ id:n.id, publishedAt:n.created_at, title:{ru:n.title,en:n.title}, description:{ru:n.body,en:n.body}, targetUrl:n.target_url, dynamic:true }));
+      const dynamicNotifications = dynamicRows.results.map(n => ({ id:n.id, publishedAt:n.created_at, title:{ru:n.title,en:n.title}, description:{ru:n.body,en:n.body}, targetUrl:normalizeInternalRedirect(n.target_url), dynamic:true }));
       const dynamicReadIds = dynamicRows.results.filter(n => n.read_at).map(n => n.id);
       const dynamicDismissedIds = dynamicRows.results.filter(n => n.dismissed_at).map(n => n.id);
       return json({ notifications: [...dynamicNotifications, ...USER_NOTIFICATIONS], authenticated: true, readIds:[...state.readIds,...dynamicReadIds], dismissedIds:[...state.dismissedIds,...dynamicDismissedIds] });
@@ -136,7 +125,14 @@ export async function handleNotifications(request: Request): Promise<Response> {
     if (body.action === "read-one" || body.action === "dismiss-one") {
       const notificationId = typeof body.notificationId === "string" ? body.notificationId : "";
       const isStatic = USER_NOTIFICATIONS.some((notification) => notification.id === notificationId);
-      const isDynamic = !isStatic && Boolean(await db.prepare("SELECT id FROM yume_notifications WHERE id=? AND active=1").bind(notificationId).first<{id:string}>());
+      // A dynamic notification with an explicit recipient snapshot is visible
+      // only to its recipients. Untargeted legacy announcements remain public.
+      const isDynamic = !isStatic && Boolean(await db.prepare(
+        "SELECT n.id FROM yume_notifications n WHERE n.id=? AND n.active=1 AND (" +
+        "NOT EXISTS (SELECT 1 FROM yume_notification_targets t WHERE t.notification_id=n.id) " +
+        "OR EXISTS (SELECT 1 FROM yume_notification_targets t WHERE t.notification_id=n.id AND t.user_id=?)" +
+        ")",
+      ).bind(notificationId,userId).first<{id:string}>());
       if (!isStatic && !isDynamic) return json({ error: "invalid_notification" }, 400);
       if (isDynamic) {
         if (body.action === "read-one") {
