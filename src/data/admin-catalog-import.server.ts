@@ -274,7 +274,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
       return json({isAdmin:true,...metadata(await readCatalogState(true))});
     }
     if (action === "step") {
-      const fresh = await readCatalogState(true); const progress = metadata(fresh);
+      const fresh = state; const progress = metadata(fresh);
       if (progress.state !== "running") return json({isAdmin:true,...progress,message:"Нет активного импорта."},409);
       const resumeAt = Number(fresh.metadata.admin_import_resume_at ?? "0");
       if (resumeAt > Date.now()) return json({isAdmin:true,...progress,retryAfterMs:resumeAt-Date.now()},503);
