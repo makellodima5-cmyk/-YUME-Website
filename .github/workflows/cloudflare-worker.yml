@@ -67,7 +67,7 @@ jobs:
           }
           const kvBinding = (config.kv_namespaces ?? []).find(
             (item) => item.binding === "YUME_SHIKIMORI_CACHE"
-              && item.id === "598c5207a7054b3eb45e2efe8214f5d7",
+              && item.id === "1c8a7a08a42949218d1de5d194df4573",
           );
           if (!kvBinding) {
             throw new Error("Generated Worker config does not contain the expected YUME_SHIKIMORI_CACHE binding.");
@@ -159,7 +159,7 @@ jobs:
           }
           const rootKvBinding = (rootConfig.kv_namespaces ?? []).find(
             (item) => item.binding === "YUME_SHIKIMORI_CACHE"
-              && item.id === "598c5207a7054b3eb45e2efe8214f5d7",
+              && item.id === "1c8a7a08a42949218d1de5d194df4573",
           );
           if (!rootKvBinding) {
             throw new Error("Root Wrangler config is missing the expected YUME_SHIKIMORI_CACHE binding.");
