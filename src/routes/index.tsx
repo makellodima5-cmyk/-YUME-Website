@@ -29,6 +29,7 @@ import { setProfileStorageAuthenticated, syncTelegramLibrary } from "@/data/prof
 import { USER_NOTIFICATIONS } from "@/data/notifications.shared";
 import { runAdminTrailerUpdate, type AdminTrailerStats } from "@/data/admin-trailer-update";
 import { hasAdminSession } from "@/lib/admin-access";
+import { normalizeInternalRedirect } from "@/lib/request-security";
 
 const NOTIFICATION_STORAGE_KEY = "yume-user-notifications-read-v1";
 const NOTIFICATION_DISMISSED_STORAGE_KEY = "yume-user-notifications-dismissed-v1";
@@ -1866,7 +1867,7 @@ function Index() {
                         <div className={`grid transition-[grid-template-rows,opacity] duration-300 ease-out ${expanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}>
                           <div className="overflow-hidden">
                             <p className="whitespace-pre-line pl-[52px] pt-3 text-sm leading-relaxed text-foreground/85">{item.description[language]}</p>
-                            {item.targetUrl && <div className="pl-[52px] pt-3"><button type="button" onClick={() => { const target = item.targetUrl; if (target && target.startsWith("/") && !target.startsWith("//")) window.location.assign(target); }} className="inline-flex min-h-9 items-center rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90">{language === "ru" ? "Открыть" : "Open"}</button></div>}
+                            {item.targetUrl && <div className="pl-[52px] pt-3"><button type="button" onClick={() => { const target = item.targetUrl; const safeTarget = normalizeInternalRedirect(target); if (safeTarget) window.location.assign(safeTarget); }} className="inline-flex min-h-9 items-center rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90">{language === "ru" ? "Открыть" : "Open"}</button></div>}
                             <div className="flex justify-end pl-[52px] pt-3">
                               <button type="button" onClick={() => { setNotificationSwipe(null); void dismissNotification(item.id); }} className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-muted-foreground transition hover:bg-red-500/10 hover:text-red-400">
                                 <X className="h-3.5 w-3.5" />{language === "ru" ? "Удалить уведомление" : "Delete notification"}
