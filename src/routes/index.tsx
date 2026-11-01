@@ -28,6 +28,7 @@ import { getTelegramWebApp, telegramHapticImpact } from "@/lib/telegram-mini-app
 import { setProfileStorageAuthenticated, syncTelegramLibrary } from "@/data/profile-storage";
 import { USER_NOTIFICATIONS } from "@/data/notifications.shared";
 import { runAdminTrailerUpdate, type AdminTrailerStats } from "@/data/admin-trailer-update";
+import { hasAdminSession } from "@/lib/admin-access";
 
 const NOTIFICATION_STORAGE_KEY = "yume-user-notifications-read-v1";
 const NOTIFICATION_DISMISSED_STORAGE_KEY = "yume-user-notifications-dismissed-v1";
@@ -594,13 +595,25 @@ function Index() {
           auto?: {enabled?:boolean;running?:boolean;nextRunAt?:number|null;lastRunAt?:number|null;retryAt?:number|null;lastError?:string};
         };
         if (cancelled) return;
-        if (!response.ok || result.isAdmin !== true) {
+        if (!hasAdminSession(result)) {
           setIsAdmin(false);
           setAdminStats(null);
           setAdminCheckComplete(true);
           return;
         }
+        // The trailers endpoint can return 503 after it has already confirmed the
+        // admin session (for example, when the R2 catalogue is unavailable).
+        // A catalogue outage must not be mistaken for revoked administrator access.
         setIsAdmin(true);
+        if (!response.ok) {
+          setAdminStats(null);
+          setAdminMessage(language === "ru"
+            ? "Доступ администратора подтверждён, но каталог временно недоступен. Панель сохранена, состояние будет проверено повторно."
+            : "Administrator access is confirmed, but the catalogue is temporarily unavailable. The panel remains available and status will be retried.");
+          setAdminCheckComplete(true);
+          return;
+        }
+        setAdminMessage("");
         if (result.auto) setTrailerAuto({enabled:result.auto.enabled===true,running:result.auto.running===true,nextRunAt:result.auto.nextRunAt ?? null,lastRunAt:result.auto.lastRunAt ?? null,retryAt:result.auto.retryAt ?? null,lastError:result.auto.lastError ?? ""});
         setAdminStats({
           total: Number(result.catalogTotal ?? 0),
