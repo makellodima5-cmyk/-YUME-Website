@@ -40,7 +40,7 @@ export function normalizeInternalRedirect(value: unknown, maxLength = 500): stri
     !value.startsWith("/") ||
     value.startsWith("//") ||
     value.includes("\\") ||
-    /[\u0000-\u001f\u007f]/.test(value) ||
+    [...value].some(character => { const code = character.charCodeAt(0); return code <= 0x1f || code === 0x7f; }) ||
     /%(?:2f|5c)/i.test(value)
   ) {
     return null;
