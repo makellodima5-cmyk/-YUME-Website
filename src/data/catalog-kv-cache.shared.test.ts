@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { emptyCatalogState } from "@/data/catalog-r2.shared";
-import { readCatalogCachePointer, readCatalogSnapshotCache, writeCatalogSnapshotCache } from "@/data/catalog-kv-cache.shared";
+import { pruneCatalogSnapshotCache, readCatalogCachePointer, readCatalogSnapshotCache, writeCatalogSnapshotCache } from "@/data/catalog-kv-cache.shared";
 import type { Anime } from "@/data/anime";
 
 class MemoryKV {
@@ -39,3 +39,14 @@ describe("shared catalogue snapshot KV cache", () => {
     expect(await readCatalogSnapshotCache(kv as unknown as KVNamespace, 9)).toBeNull();
   });
 });
+  it("retains only the latest ten snapshot revisions in shared KV", async () => {
+    const kv = new MemoryKV();
+    const oldState = { ...emptyCatalogState(), revision: 1, items: [anime("1", "Old")] };
+    const newState = { ...emptyCatalogState(), revision: 11, items: [anime("2", "New")] };
+    await writeCatalogSnapshotCache(kv as unknown as KVNamespace, oldState);
+    await writeCatalogSnapshotCache(kv as unknown as KVNamespace, newState);
+    await pruneCatalogSnapshotCache(kv as unknown as KVNamespace, 11);
+    expect(kv.values.has("yume:catalog:v1:revision:1:manifest")).toBe(false);
+    expect(await readCatalogSnapshotCache(kv as unknown as KVNamespace, 11)).toEqual(newState);
+  });
+
