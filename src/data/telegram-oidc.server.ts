@@ -133,8 +133,8 @@ export async function handleTelegramOidc(request: Request): Promise<Response> {
       return response({ error: "invalid_request" }, 400);
     }
     flow = form.get("flow");
-    consent = form.get("privacyConsent") === "true";
-    termsConsent = form.get("termsAccepted") === "true";
+    consent = flow === "register" && form.get("privacyConsent") === "true";
+    termsConsent = flow === "register" && form.get("termsAccepted") === "true";
   }
   const environment = env();
   const db = dbFor(environment);
