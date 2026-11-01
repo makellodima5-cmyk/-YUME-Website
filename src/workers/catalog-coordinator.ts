@@ -85,7 +85,7 @@ export class CatalogCoordinator extends DurableObject<CoordinatorEnv>{
       if(pointer.operationId===operation.id){
         const existingObject=await this.env.CATALOG_BUCKET.get(pointer.key);
         if(existingObject){
-          try{await writeCatalogSnapshotCache(this.env.YUME_CATALOG_CACHE,await existingObject.json<CatalogState>());await pruneCatalogSnapshotCache(this.env.YUME_CATALOG_CACHE,pointer.revision);}
+          try{await this.publishCacheIfReady(await existingObject.json<CatalogState>());}
           catch(error){console.warn("[YUME][CATALOG_COORDINATOR] Shared cache refresh failed; Reader will use R2 fallback.",error);}
         }
         await this.appendJournal(operation,pointer.revision);
@@ -115,11 +115,19 @@ export class CatalogCoordinator extends DurableObject<CoordinatorEnv>{
       onlyIf:pointerObject?{etagMatches:pointerObject.etag}:{etagDoesNotMatch:"*"},
     });
     if(!committed)throw new Error("catalog_pointer_conflict");
-    try{await writeCatalogSnapshotCache(this.env.YUME_CATALOG_CACHE,next);await pruneCatalogSnapshotCache(this.env.YUME_CATALOG_CACHE,next.revision);}
+    try{await this.publishCacheIfReady(next);}
     catch(error){console.warn("[YUME][CATALOG_COORDINATOR] Shared cache population failed; Reader will use R2 fallback.",error);}
     await this.appendJournal(operation,next.revision);
     await this.pruneOldRevision(next.revision);
     return next.revision;
+  }
+
+  private async publishCacheIfReady(state:CatalogState):Promise<void>{
+    // Keep the public KV snapshot pinned while a bulk import is in progress.
+    // Admin requests use the Reader's authoritative fresh=1 path to see checkpoints.
+    if(state.metadata.admin_import_cache_pending==="1")return;
+    await writeCatalogSnapshotCache(this.env.YUME_CATALOG_CACHE,state);
+    await pruneCatalogSnapshotCache(this.env.YUME_CATALOG_CACHE,state.revision);
   }
 
   private async pruneOldRevision(revision:number):Promise<void>{

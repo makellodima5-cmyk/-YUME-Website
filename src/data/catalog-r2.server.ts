@@ -22,7 +22,7 @@ function safeErrorBody(value:string):string {
     .replace(/(authorization|x-yume-reader-token|x-amz-security-token|secretaccesskey|accesskeyid|token)\s*[:=]\s*[^\s<"]+/gi,"$1=[REDACTED]")
     .replace(/Bearer\s+[^\s<"]+/gi,"Bearer [REDACTED]");
 }
-export async function readCatalogState(): Promise<CatalogState> {
+export async function readCatalogState(forceFresh = false): Promise<CatalogState> {
   const reader = environment().YUME_CATALOG_READER;
   if (!reader) throw new Error("YUME_CATALOG_READER binding is unavailable.");
   const token = environment().YUME_CATALOG_READER_TOKEN ?? "";
@@ -30,7 +30,7 @@ export async function readCatalogState(): Promise<CatalogState> {
   for(let attempt=0;attempt<3;attempt++){
     const started=Date.now();
     try{
-      const response = await reader.fetch("https://catalog-reader.internal/v1/state", {
+      const response = await reader.fetch("https://catalog-reader.internal/v1/state" + (forceFresh ? "?fresh=1" : ""), {
         method:"GET",headers:{"X-Yume-Reader-Token":token},signal:AbortSignal.timeout(10000),
       });
       if(response.ok){

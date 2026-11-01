@@ -1085,12 +1085,13 @@ function Index() {
       for (let requestCount=0; requestCount<120; requestCount++) {
         const response = await fetch("/api/admin/catalog-import", {method:"POST",credentials:"same-origin",cache:"no-store",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"step"})});
         const payload = await response.json().catch(() => ({})) as typeof adminImport & {isAdmin?:boolean;error?:string;retryAfterMs?:number;message?:string};
-        if (payload.isAdmin !== true) throw new Error(payload.error ?? (language === "ru" ? "Доступ к импорту отклонён." : "Import access denied."));
-        setAdminImport(payload);
         if (response.status === 503) {
-          setAdminImportMessage((payload.error ?? (language === "ru" ? "Shikimori временно недоступен." : "Shikimori is temporarily unavailable.")) + (language === "ru" ? " Прогресс сохранён; повтори запуск позже." : " Progress saved; resume later."));
+          if (payload.isAdmin === true) setAdminImport(payload);
+          setAdminImportMessage((payload.error ?? (language === "ru" ? "Сервис импорта временно недоступен." : "Import service is temporarily unavailable.")) + (language === "ru" ? " Прогресс сохранён; повтори запуск позже." : " Progress saved; resume later."));
           return;
         }
+        if (payload.isAdmin !== true) throw new Error(payload.error ?? (language === "ru" ? "Доступ к импорту отклонён." : "Import access denied."));
+        setAdminImport(payload);
         if (!response.ok) throw new Error(payload.error ?? "Import request failed");
         if (payload.state !== "running") {
           setAdminImportMessage(payload.message ?? (language === "ru"
