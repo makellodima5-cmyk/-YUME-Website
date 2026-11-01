@@ -79,7 +79,7 @@ export async function handleAdminPassword(request: Request): Promise<Response> {
 
   const env = environment();
   if (!await isTelegramAdministrator(request, env)) return json({ isAdmin: false, error: "admin_required" }, 403);
-  if (!isAdminPasswordConfigured(env)) return json({ isAdmin: false, error: "admin_password_not_configured" }, 503);
+  if (!isAdminPasswordConfigured(env)) return json({ isAdmin: true, error: "admin_password_not_configured" }, 503);
 
   if (request.method === "GET") {
     return json({ isAdmin: true, configured: true, confirmed: await hasAdminPasswordSession(request, env) });
