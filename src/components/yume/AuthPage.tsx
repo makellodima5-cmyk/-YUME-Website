@@ -115,8 +115,25 @@ export function AuthPage({ mode, language, onModeChange, onPrivacy, onRules, onC
         return;
       }
 
-      // Browser authentication uses Telegram's official OIDC Authorization Code + PKCE flow.
-      window.location.assign("/api/telegram/oidc?flow=" + encodeURIComponent(mode) + (isRegister ? "&consent=1&terms=1" : ""));
+      // Submit consent in a same-origin POST body, never in a URL or browser history.
+      const form = document.createElement("form");
+      form.method = "POST";
+      form.action = "/api/telegram/oidc";
+      form.hidden = true;
+      const values: Array<[string, string]> = [
+        ["flow", mode],
+        ["privacyConsent", String(isRegister && consentAccepted)],
+        ["termsAccepted", String(isRegister && termsAccepted)],
+      ];
+      for (const [name, value] of values) {
+        const input = document.createElement("input");
+        input.type = "hidden";
+        input.name = name;
+        input.value = value;
+        form.appendChild(input);
+      }
+      document.body.appendChild(form);
+      form.submit();
       return;
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : (isRu ? "Ошибка авторизации." : "Authentication error."));
