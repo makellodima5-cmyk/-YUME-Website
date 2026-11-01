@@ -1,5 +1,5 @@
 import { env as cloudflareEnv } from "cloudflare:workers";
-import { validateTelegramInitData, type TelegramValidatedUser } from "@/data/telegram-init-data";
+import { isSameOriginRequest } from "@/lib/request-security";
 
 type Environment = Record<string, unknown> & {
   TELEGRAM_BOT_TOKEN?: string;
@@ -68,10 +68,10 @@ async function createSession(db: Database, userId: string, secret: string): Prom
   await db.prepare("INSERT INTO yume_sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)").bind(hash, userId, Date.now() + TTL * 1000).run();
   return sessionCookie(token);
 }
-function redirect(url: URL, cookies: string[] = []): Response {
+function redirect(url: URL, cookies: string[] = [], status = 302): Response {
   const headers = new Headers({ Location: url.toString(), "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" });
   cookies.forEach(value => headers.append("Set-Cookie", value));
-  return new Response(null, { status: 302, headers });
+  return new Response(null, { status, headers });
 }
 function errorRedirect(origin: string, code: string): Response {
   const url = new URL("/", origin); url.searchParams.set("section", "register"); url.searchParams.set("auth_error", code);
@@ -106,10 +106,36 @@ async function verifyIdToken(token: string, clientId: string, nonce: string): Pr
 
 /** Official Telegram OpenID Connect authorization-code flow with PKCE. */
 export async function handleTelegramOidc(request: Request): Promise<Response> {
-  if (request.method !== "GET") return response({ error: "method_not_allowed" }, 405);
   const url = new URL(request.url);
   const origin = url.origin;
-  const callback = url.pathname.endsWith("/callback");
+  const callback = url.pathname === "/api/telegram/oidc/callback";
+  if (callback && request.method !== "GET") return response({ error: "method_not_allowed" }, 405);
+  if (!callback && request.method !== "POST") return response({ error: "method_not_allowed" }, 405);
+
+  let flow: string | null = null;
+  let consent = false;
+  let termsConsent = false;
+  if (!callback) {
+    if (!isSameOriginRequest(request)) return response({ error: "cross_origin_request" }, 403);
+    if (url.search) return response({ error: "invalid_request" }, 400);
+    if (!(request.headers.get("content-type") ?? "").toLowerCase().startsWith("application/x-www-form-urlencoded")) {
+      return response({ error: "invalid_request" }, 400);
+    }
+    let form: URLSearchParams;
+    try {
+      const raw = await request.text();
+      if (raw.length > 2048) return response({ error: "request_too_large" }, 413);
+      form = new URLSearchParams(raw);
+    } catch {
+      return response({ error: "invalid_request" }, 400);
+    }
+    if (["flow", "privacyConsent", "termsAccepted"].some(key => form.getAll(key).length !== 1)) {
+      return response({ error: "invalid_request" }, 400);
+    }
+    flow = form.get("flow");
+    consent = form.get("privacyConsent") === "true";
+    termsConsent = form.get("termsAccepted") === "true";
+  }
   const environment = env();
   const db = dbFor(environment);
   const secret = secretFor(environment);
@@ -119,9 +145,6 @@ export async function handleTelegramOidc(request: Request): Promise<Response> {
   const redirectUri = origin + "/api/telegram/oidc/callback";
   try {
     if (!callback) {
-      const flow = url.searchParams.get("flow");
-      const consent = url.searchParams.get("consent") === "1";
-      const termsConsent = url.searchParams.get("terms") === "1";
       if ((flow !== "login" && flow !== "register") || (flow === "register" && (!consent || !termsConsent))) return response({ error: flow === "register" ? "consent_required" : "invalid_request" }, 400);
       await db.prepare("DELETE FROM yume_telegram_oidc_states WHERE expires_at <= ?").bind(Date.now()).run();
       const state = randomToken(); const nonce = randomToken(); const verifier = randomToken(48);
@@ -138,7 +161,7 @@ export async function handleTelegramOidc(request: Request): Promise<Response> {
       auth.searchParams.set("nonce", nonce);
       auth.searchParams.set("code_challenge", challenge);
       auth.searchParams.set("code_challenge_method", "S256");
-      return redirect(auth, [oidcStateCookie(state)]);
+      return redirect(auth, [oidcStateCookie(state)], 303);
     }
     const code = url.searchParams.get("code");
     const state = url.searchParams.get("state");
