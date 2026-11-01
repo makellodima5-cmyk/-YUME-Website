@@ -264,7 +264,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
       if (current.state === "running") return json({isAdmin:true,...current,message:"Импорт уже выполняется."},409);
       const runId = crypto.randomUUID();
       const resumeCursor = adminCatalogImportResumeCursor(state.metadata,statusFilter);
-      await saveMetadata({admin_import_run_id:runId,admin_import_started_at:String(Date.now()),admin_import_target:String(target),admin_import_cursor:String(resumeCursor),admin_import_added:"0",admin_import_skipped:"0",admin_import_incomplete:"0",admin_import_errors:"0",admin_import_state:"running",admin_import_status_filter:statusFilter,admin_import_run_block_18_plus:current.bulkImportBlock18Plus?"1":"0",admin_import_resume_at:"0"});
+      await saveMetadata({admin_import_run_id:runId,admin_import_started_at:String(Date.now()),admin_import_target:String(target),admin_import_cursor:String(resumeCursor),admin_import_added:"0",admin_import_skipped:"0",admin_import_incomplete:"0",admin_import_errors:"0",admin_import_state:"running",admin_import_cache_pending:"1",admin_import_status_filter:statusFilter,admin_import_run_block_18_plus:current.bulkImportBlock18Plus?"1":"0",admin_import_resume_at:"0"});
       await audit(db,"catalog.import.start","success",{target,statusFilter},actor);
       return json({isAdmin:true,...metadata(await readCatalogState(true)),message:"Импорт подготовлен."});
     }
@@ -286,7 +286,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
         return json({isAdmin:true,...progress,retryAfterMs,error:error instanceof Error?error.message:"Ошибка Shikimori"},503);
       }
       if (!page.length) {
-        await saveMetadata({admin_import_state:"partial"});
+        await saveMetadata({admin_import_state:"partial",admin_import_cache_pending:"0"});
         return json({isAdmin:true,...metadata(await readCatalogState(true)),message:"Источник не вернул записи; импорт остановлен."});
       }
       const existing = new Set(fresh.items.map((item) => item.id));
@@ -310,7 +310,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
         const shots=mapAdminCatalogScreenshots(item);
         if(shots.length)mutations.push({type:"screenshots",animeId:String(item.id),items:shots.map((shot,position)=>({originalUrl:shot.original,previewUrl:shot.preview,position}))});
       }
-      mutations.push({type:"metadata",values:{admin_import_cursor:String(progress.cursor+1),admin_import_added:String(nextAdded),admin_import_skipped:String(progress.skipped+skipped),admin_import_incomplete:String(progress.incomplete+incompleteCount),admin_import_resume_at:String((Number(fresh.metadata.admin_import_started_at??0)||0)+progress.cursor*REQUEST_DELAY_MS),admin_import_state:nextState}});
+      mutations.push({type:"metadata",values:{admin_import_cursor:String(progress.cursor+1),admin_import_added:String(nextAdded),admin_import_skipped:String(progress.skipped+skipped),admin_import_incomplete:String(progress.incomplete+incompleteCount),admin_import_resume_at:String((Number(fresh.metadata.admin_import_started_at??0)||0)+progress.cursor*REQUEST_DELAY_MS),admin_import_state:nextState,admin_import_cache_pending:nextState==="completed"?"0":"1"}});
       const operationId=adminCatalogImportPageOperationId(progress.runId,progress.cursor);
       await submitCatalogMutation({type:"batch",mutations},operationId);
       await audit(db,"catalog.import.page","success",{page:progress.cursor,added:mapped.length,skipped,state:nextState},actor);
