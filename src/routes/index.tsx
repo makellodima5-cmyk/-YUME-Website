@@ -411,6 +411,10 @@ function Index() {
   const [telegramAuthError, setTelegramAuthError] = useState("");
   const [telegramAuthReady, setTelegramAuthReady] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [adminPasswordRequired, setAdminPasswordRequired] = useState(false);
+  const [adminPassword, setAdminPassword] = useState("");
+  const [adminPasswordBusy, setAdminPasswordBusy] = useState(false);
+  const [adminPasswordError, setAdminPasswordError] = useState("");
   const [adminCheckComplete, setAdminCheckComplete] = useState(false);
   const [adminStats, setAdminStats] = useState<AdminTrailerStats | null>(null);
   const [adminRunning, setAdminRunning] = useState(false);
@@ -580,30 +584,48 @@ function Index() {
     let cancelled = false;
     setAdminCheckComplete(false);
     setIsAdmin(false);
+    setAdminPasswordRequired(false);
+    setAdminPasswordError("");
     setAdminStats(null);
-    fetch("/api/admin/trailers", { credentials: "same-origin", cache: "no-store" })
-      .then(async (response) => {
-        const result = await response.json().catch(() => ({})) as {
-          isAdmin?: boolean;
-          total?: number;
-          pending?: number;
-          checked?: number;
-          found?: number;
-          missing?: number;
-          catalogTotal?: number;
-          catalogWithTrailer?: number;
-          auto?: {enabled?:boolean;running?:boolean;nextRunAt?:number|null;lastRunAt?:number|null;retryAt?:number|null;lastError?:string};
-        };
+    fetch("/api/admin/password", { credentials: "same-origin", cache: "no-store" })
+      .then(async response => {
+        const gate = await response.json().catch(() => ({})) as { isAdmin?: boolean; confirmed?: boolean; error?: string };
         if (cancelled) return;
-        if (!hasAdminSession(result)) {
-          setIsAdmin(false);
-          setAdminStats(null);
+        if (gate.error === "admin_password_not_configured") {
+          setAdminPasswordRequired(true);
+          setAdminPasswordError(language === "ru"
+            ? "Дополнительный пароль ещё не настроен. Добавь секрет YUME_ADMIN_PASSWORD в Cloudflare Workers."
+            : "The extra password is not configured. Add the YUME_ADMIN_PASSWORD secret in Cloudflare Workers.");
           setAdminCheckComplete(true);
           return;
         }
-        // The trailers endpoint can return 503 after it has already confirmed the
-        // admin session (for example, when the R2 catalogue is unavailable).
-        // A catalogue outage must not be mistaken for revoked administrator access.
+        if (!response.ok || gate.isAdmin !== true) {
+          setIsAdmin(false);
+          setAdminCheckComplete(true);
+          return;
+        }
+        if (gate.confirmed !== true) {
+          setAdminPasswordRequired(true);
+          setAdminCheckComplete(true);
+          return;
+        }
+        const response = await fetch("/api/admin/trailers", { credentials: "same-origin", cache: "no-store" });
+        const result = await response.json().catch(() => ({})) as {
+          isAdmin?: boolean; total?: number; pending?: number; checked?: number; found?: number;
+          missing?: number; catalogTotal?: number; catalogWithTrailer?: number;
+          auto?: {enabled?:boolean;running?:boolean;nextRunAt?:number|null;lastRunAt?:number|null;retryAt?:number|null;lastError?:string};
+          error?: string;
+        };
+        if (cancelled) return;
+        if (result.error === "admin_password_required") {
+          setAdminPasswordRequired(true);
+          setAdminCheckComplete(true);
+          return;
+        }
+        if (result.isAdmin !== true) {
+          setAdminCheckComplete(true);
+          return;
+        }
         setIsAdmin(true);
         if (!response.ok) {
           setAdminStats(null);
@@ -633,6 +655,7 @@ function Index() {
       });
     return () => { cancelled = true; };
   }, [isTelegramMiniApp, telegramAuthReady, telegramConsentRequired, telegramConsentPending]);
+
 
   useEffect(() => {
     if (isTelegramMiniApp && telegramConsentPending && view !== "privacy-policy") {
@@ -2039,6 +2062,56 @@ function Index() {
               <p role="status" className="rounded-xl border border-border bg-card/60 p-4 text-sm text-muted-foreground">
                 {language === "ru" ? "Проверяем права администратора…" : "Checking administrator access…"}
               </p>
+            ) : adminPasswordRequired ? (
+              <form className="mx-auto grid max-w-md gap-4 rounded-2xl border border-[#8D3DD6]/50 bg-[#0D0A13] p-5 shadow-[0_0_24px_rgba(157,64,245,0.12)]" onSubmit={async event => {
+                event.preventDefault();
+                if (adminPasswordBusy || !adminPassword) return;
+                setAdminPasswordBusy(true);
+                setAdminPasswordError("");
+                try {
+                  const response = await fetch("/api/admin/password", {
+                    method: "POST", credentials: "same-origin", cache: "no-store",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ password: adminPassword }),
+                  });
+                  const result = await response.json().catch(() => ({})) as { isAdmin?: boolean; confirmed?: boolean; error?: string };
+                  if (!response.ok || result.isAdmin !== true || result.confirmed !== true) {
+                    const message = result.error === "invalid_password"
+                      ? (language === "ru" ? "Неверный пароль." : "Incorrect password.")
+                      : result.error === "too_many_attempts"
+                        ? (language === "ru" ? "Слишком много попыток. Подожди минуту." : "Too many attempts. Wait one minute.")
+                        : result.error === "admin_password_not_configured"
+                          ? (language === "ru" ? "Пароль не настроен в Cloudflare." : "The password is not configured in Cloudflare.")
+                          : (language === "ru" ? "Не удалось подтвердить пароль. Попробуй позже." : "Could not confirm the password. Try again later.");
+                    throw new Error(message);
+                  }
+                  setAdminPassword("");
+                  const statusResponse = await fetch("/api/admin/trailers", { credentials: "same-origin", cache: "no-store" });
+                  const status = await statusResponse.json().catch(() => ({})) as { isAdmin?: boolean; catalogTotal?: number; catalogWithTrailer?: number; pending?: number; checked?: number; missing?: number; error?: string };
+                  if (status.isAdmin !== true) throw new Error(language === "ru" ? "Пароль принят, но панель не смогла загрузиться. Обнови страницу." : "Password accepted, but the panel could not load. Refresh the page.");
+                  setIsAdmin(true);
+                  setAdminPasswordRequired(false);
+                  setAdminStats({ total: status.catalogTotal ?? 0, pending: status.pending ?? 0, checked: status.checked ?? 0, found: status.catalogWithTrailer ?? 0, missing: status.missing ?? 0 });
+                  setAdminCheckComplete(true);
+                } catch (error) {
+                  setAdminPasswordError(error instanceof Error ? error.message : (language === "ru" ? "Ошибка проверки пароля." : "Password verification failed."));
+                } finally {
+                  setAdminPasswordBusy(false);
+                }
+              }}>
+                <div>
+                  <h2 className="text-lg font-semibold">{language === "ru" ? "Дополнительная защита" : "Additional protection"}</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">{language === "ru" ? "Подтверди отдельный пароль администратора, чтобы открыть панель. Подтверждение действует 30 минут." : "Enter the separate administrator password to open the panel. Confirmation lasts 30 minutes."}</p>
+                </div>
+                <label className="grid gap-1.5 text-sm">
+                  <span>{language === "ru" ? "Пароль администратора" : "Administrator password"}</span>
+                  <input type="password" autoComplete="current-password" required maxLength={1024} value={adminPassword} onChange={event => setAdminPassword(event.target.value)} className="min-h-11 rounded-lg border border-border bg-background px-3 py-2" />
+                </label>
+                {adminPasswordError && <p role="alert" className="text-sm text-amber-500">{adminPasswordError}</p>}
+                <button type="submit" disabled={adminPasswordBusy || !adminPassword} className="inline-flex min-h-11 items-center justify-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">
+                  {adminPasswordBusy ? (language === "ru" ? "Проверяем…" : "Verifying…") : (language === "ru" ? "Открыть панель" : "Unlock admin panel")}
+                </button>
+              </form>
             ) : isAdmin ? (
               <>
               <section className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-3" aria-label={language === "ru" ? "Актуальные показатели каталога" : "Current catalog metrics"}>
