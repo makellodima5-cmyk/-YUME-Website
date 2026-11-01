@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { adminCatalogImportPageOperationId, chunkAdminCatalogIds, isCatalogMetadataIncomplete, mapAdminCatalogScreenshots, normalizeAdminCatalogIds, isValidAdminImportTarget } from "@/data/admin-catalog-import.server";
+import { adminCatalogImportPageOperationId, adminCatalogImportResumeCursor, chunkAdminCatalogIds, isCatalogMetadataIncomplete, mapAdminCatalogScreenshots, normalizeAdminCatalogIds, isValidAdminImportTarget } from "@/data/admin-catalog-import.server";
 
 describe("admin catalog import target", () => {
   it("accepts targets above the old 500-title application cap", () => {
@@ -108,5 +108,18 @@ describe("bulk import idempotency keys", () => {
 
   it("uses a safe fallback for legacy runs and invalid cursors", () => {
     expect(adminCatalogImportPageOperationId("", 0)).toBe("importlegacy00000001");
+  });
+});
+
+describe("bulk import page checkpoint resume", () => {
+  it("resumes at the next saved page when the filter is unchanged", () => {
+    expect(adminCatalogImportResumeCursor({admin_import_cursor:"21",admin_import_status_filter:""}, "")).toBe(21);
+    expect(adminCatalogImportResumeCursor({admin_import_cursor:"8",admin_import_status_filter:"ongoing"}, "ongoing")).toBe(8);
+  });
+
+  it("starts from page one when no checkpoint exists or the source filter changes", () => {
+    expect(adminCatalogImportResumeCursor({}, "")).toBe(1);
+    expect(adminCatalogImportResumeCursor({admin_import_cursor:"21",admin_import_status_filter:"ongoing"}, "released")).toBe(1);
+    expect(adminCatalogImportResumeCursor({admin_import_cursor:"0",admin_import_status_filter:""}, "")).toBe(1);
   });
 });
