@@ -91,29 +91,38 @@ function safeR2Body(value:string):string {
     .replace(/Bearer\s+[^\s<"]+/gi,"Bearer [REDACTED]");
 }
 async function readObjectText(env:Env,key:string):Promise<string|null>{
-  const startedAt=Date.now();
-  try{
-    const response=await signedGet(env,key);
-    if(response.status===404)return null;
-    if(!response.ok){
+  const retryableStatuses=new Set([429,500,502,503,504]);
+  let lastError:unknown;
+  for(let attempt=0;attempt<3;attempt++){
+    const startedAt=Date.now();
+    try{
+      const response=await signedGet(env,key);
+      if(response.status===404)return null;
+      if(response.ok)return await response.text();
       const body=safeR2Body(await response.text().catch(()=> ""));
-      const code=/<Code>([^<]{1,120})<\/Code>/i.exec(body)?.[1]??null;
-      const requestId=/<RequestId>([^<]{1,160})<\/RequestId>/i.exec(body)?.[1]??response.headers.get("x-amz-request-id");
+      const code=/<Code>([^<]{1,120})<\\/Code>/i.exec(body)?.[1]??null;
+      const requestId=/<RequestId>([^<]{1,160})<\\/RequestId>/i.exec(body)?.[1]??response.headers.get("x-amz-request-id");
       console.error("[YUME][CATALOG_READER] R2 upstream rejected object read.",{
-        resource:key,status:response.status,code,requestId,
+        resource:key,status:response.status,code,requestId,attempt:attempt+1,
         durationMs:Date.now()-startedAt,body:body||null,
       });
-      throw new Error("R2 read failed with HTTP "+response.status+(code?" ("+code+")":""));
+      lastError=new Error("R2 read failed with HTTP "+response.status+(code?" ("+code+")":""));
+      if(!retryableStatuses.has(response.status)||attempt===2)break;
+      const retryAfter=Number(response.headers.get("retry-after"));
+      await new Promise(resolve=>setTimeout(resolve,Number.isFinite(retryAfter)&&retryAfter>0?Math.min(5000,retryAfter*1000):250*Math.pow(2,attempt)));
+    }catch(error){
+      lastError=error;
+      console.error("[YUME][CATALOG_READER] R2 object read threw.",{
+        resource:key,attempt:attempt+1,durationMs:Date.now()-startedAt,
+        errorName:error instanceof Error?error.name:"UnknownError",
+        errorMessage:error instanceof Error?error.message:"Unknown R2 read error",
+      });
+      const retryable=error instanceof Error&&(error.name==="TimeoutError"||error.name==="AbortError"||error instanceof TypeError);
+      if(!retryable||attempt===2)break;
+      await new Promise(resolve=>setTimeout(resolve,250*Math.pow(2,attempt)));
     }
-    return await response.text();
-  }catch(error){
-    console.error("[YUME][CATALOG_READER] R2 object read threw.",{
-      resource:key,durationMs:Date.now()-startedAt,
-      errorName:error instanceof Error?error.name:"UnknownError",
-      errorMessage:error instanceof Error?error.message:"Unknown R2 read error",
-    });
-    throw error;
   }
+  throw lastError instanceof Error?lastError:new Error("R2 object read failed.");
 }
 async function readObject<T>(env:Env,key:string):Promise<T|null>{
   const body=await readObjectText(env,key);
