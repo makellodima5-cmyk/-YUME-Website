@@ -3,19 +3,26 @@
   "name": "yume-web-queue-consumer",
   "main": "src/queue-worker.ts",
   "compatibility_date": "2026-10-20",
-  "compatibility_flags": ["nodejs_compat"],
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
   "keep_vars": true,
   "workers_dev": false,
   "preview_urls": false,
-  "observability": { "enabled": true },
+  "observability": {
+    "enabled": true
+  },
   "triggers": {
-    "crons": ["0 3 * * *"]
+    "crons": [
+      "0 3 * * *"
+    ]
   },
   "d1_databases": [
     {
       "binding": "YUME_DB",
-      "database_name": "yume_db",
-      "database_id": "29aea579-e316-413f-922b-44c17b12f45a"
+      "database_name": "yumedb",
+      "database_id": "c2f0f25d-e29b-47e2-ad11-b726f7a3e9a2",
+      "migrations_dir": "migrations-clean"
     }
   ],
   "queues": {

@@ -98,33 +98,8 @@ function jsonResponse(payload: unknown, status = 200, cookies: string[] = []): R
   return new Response(JSON.stringify(payload), { status, headers });
 }
 
-const telegramSchemaPromises = new WeakMap<object, Promise<void>>();
-
-function ensureSchema(db: TelegramDatabase): Promise<void> {
-  const key = db as object;
-  const cached = telegramSchemaPromises.get(key);
-  if (cached) return cached;
-  // Terms-consent columns are retained as a compatibility bridge for databases
-  // created before the versioned schema migration was introduced.
-  const pending = ensureTermsConsentColumns(db).catch((error) => {
-    telegramSchemaPromises.delete(key);
-    throw error;
-  });
-  telegramSchemaPromises.set(key, pending);
-  return pending;
-}
-
-async function ensureTermsConsentColumns(db: TelegramDatabase): Promise<void> {
-  const result = await db.prepare("PRAGMA table_info(yume_users)").all<{ name: string }>();
-  const columns = new Set(result.results.map((column) => column.name));
-  if (!columns.has("terms_agreed_at")) {
-    await db.prepare("ALTER TABLE yume_users ADD COLUMN terms_agreed_at TEXT").run();
-  }
-  if (!columns.has("terms_version")) {
-    await db.prepare("ALTER TABLE yume_users ADD COLUMN terms_version TEXT").run();
-  }
-}
-
+// The clean yumedb schema is applied before deployment; runtime requests never mutate schema.
+function ensureSchema(_db: TelegramDatabase): Promise<void> { return Promise.resolve(); }
 
 async function createSession(db: TelegramDatabase, userId: string, secret: string): Promise<string> {
   const token = randomToken();
@@ -339,31 +314,8 @@ type BrowserAuthRow = {
   expires_at: number;
 };
 
-const browserAuthSchemaPromises = new WeakMap<object, Promise<void>>();
-
-async function ensureBrowserAuthSchema(db: TelegramDatabase): Promise<void> {
-  const key = db as object;
-  const cached = browserAuthSchemaPromises.get(key);
-  if (cached) return cached;
-  const pending = (async () => {
-    const columnsResult = await db.prepare("PRAGMA table_info(yume_browser_auth)").all<{ name: string }>();
-    const columns = new Set(columnsResult.results.map((column) => column.name));
-    if (!columns.has("terms_consent")) {
-      await db.prepare("ALTER TABLE yume_browser_auth ADD COLUMN terms_consent INTEGER NOT NULL DEFAULT 0 CHECK (terms_consent IN (0,1))").run();
-    }
-    if (!columns.has("confirmation_code_hash")) {
-      await db.prepare("ALTER TABLE yume_browser_auth ADD COLUMN confirmation_code_hash TEXT").run();
-    }
-    if (!columns.has("telegram_user_id")) {
-      await db.prepare("ALTER TABLE yume_browser_auth ADD COLUMN telegram_user_id TEXT").run();
-    }
-  })().catch((error) => {
-    browserAuthSchemaPromises.delete(key);
-    throw error;
-  });
-  browserAuthSchemaPromises.set(key, pending);
-  return pending;
-}
+// Browser-auth columns are part of migrations/0001_clean_yumedb.sql.
+async function ensureBrowserAuthSchema(_db: TelegramDatabase): Promise<void> { return Promise.resolve(); }
 
 /**
  * Associates a Telegram user with a short-lived browser request, but does not

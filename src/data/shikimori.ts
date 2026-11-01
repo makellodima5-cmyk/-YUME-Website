@@ -2,8 +2,8 @@ import { createServerFn } from "@tanstack/react-start";
 import { readShikimoriSharedCache, writeShikimoriSharedCache } from "@/data/shikimori-kv-cache.server";
 import type { Anime } from "@/data/anime";
 import { isNewRelease } from "@/data/anime-sections";
-import { getPersistentAnimeDetails, getPersistentCatalog, getPersistentAnimeScreenshots, savePersistentAnimeScreenshots, refreshPersistentAnimeIdentity, type CatalogResult, type CatalogSeedPageResult } from "@/data/catalog-d1.server";
-import { isUpcomingEpisodeDate, mergeLiveAnimeDetails } from "@/data/catalog-details";
+import { getR2Catalog, readCatalogState, getR2Screenshots } from "@/data/catalog-r2.server";
+import { selectRelatedAnime, mergeLiveAnimeDetails, isUpcomingEpisodeDate } from "@/data/catalog-details";
 import { retryAfterMilliseconds } from "@/data/retry-after";
 export { retryAfterMilliseconds };
 import { filterCatalogForCurrentRequest } from "@/data/territorial-restrictions.server";
@@ -569,116 +569,27 @@ async function fetchShikimoriSectionFeeds(): Promise<ShikimoriSectionFeeds | nul
 export const getShikimoriSectionFeeds = createServerFn({ method: "GET" })
   .handler(async () => fetchShikimoriSectionFeeds());
 
-const CATALOG_CACHE_TTL_MS = 30 * 60 * 1000;
-
-const PRIORITY_SEED_REQUESTS: ShikimoriRequest[] = [
-  ...Array.from({ length: 10 }, (_, index) => ({ page: index + 1, limit: 50, order: "ranked" as const })),
-  ...Array.from({ length: 3 }, (_, index) => ({ page: index + 1, limit: 50, order: "aired_on" as const })),
-  ...Array.from({ length: 3 }, (_, index) => ({ page: index + 1, limit: 50, order: "popularity" as const })),
-  ...Array.from({ length: 2 }, (_, index) => ({ page: index + 1, limit: 50, order: "created_at_desc" as const })),
-  ...Array.from({ length: 2 }, (_, index) => ({ page: index + 1, limit: 50, order: "popularity" as const, status: "anons" as const })),
-];
-
-export function isSuccessfulEmptySeedPage(items: readonly unknown[], error: string | null | undefined, cursor: number): boolean {
-  return !error && items.length === 0 && cursor >= PRIORITY_SEED_REQUESTS.length;
-}
-
 export function seedRequestForCursor(cursor: number): ShikimoriRequest | null {
-  if (cursor < 0) return null;
-  if (cursor < PRIORITY_SEED_REQUESTS.length) return PRIORITY_SEED_REQUESTS[cursor]!;
-  return {
-    page: cursor - PRIORITY_SEED_REQUESTS.length + 11,
-    limit: 50,
-    order: "ranked",
-  };
+  if (!Number.isInteger(cursor) || cursor < 0) return null;
+  if (cursor < 20) {
+    if (cursor < 10) return { page: cursor + 1, limit: 50, order: "ranked" };
+    if (cursor < 13) return { page: cursor - 9, limit: 50, order: "aired_on" };
+    if (cursor < 16) return { page: cursor - 12, limit: 50, order: "popularity" };
+    if (cursor < 18) return { page: cursor - 15, limit: 50, order: "created_at_desc" };
+    return { page: cursor - 17, limit: 50, order: "popularity", status: "anons" };
+  }
+  return { page: cursor - 9, limit: 50, order: "ranked" };
+}
+export function isSuccessfulEmptySeedPage(items: readonly unknown[], error: string | null | undefined, cursor: number): boolean {
+  return !error && items.length === 0 && cursor >= 20;
 }
 
-function makeCatalogProgress(
-  status: CatalogResult["progress"]["status"],
-  imported: number,
-  retryAfterMs?: number,
-) {
+function readyCatalog(items: Anime[]) {
   return {
-    status,
-    imported,
-    target: null,
-    ...(retryAfterMs !== undefined ? { retryAfterMs } : {}),
-  };
-}
-
-type CatalogCacheEntry = { expiresAt: number; result: CatalogResult };
-let catalogCache: CatalogCacheEntry | null = null;
-let fallbackCursor = 0;
-let fallbackResumeAt = 0;
-const fallbackItems = new Map<string, Anime>();
-
-/**
- * Non-D1 fallback for local previews: also fetches one page per invocation.
- * The Cloudflare production path uses D1 as the durable source of progress.
- */
-async function buildShikimoriCatalog(forceRefresh: boolean): Promise<CatalogResult> {
-  const now = Date.now();
-  if (!forceRefresh && catalogCache && catalogCache.expiresAt > now) {
-    return catalogCache.result;
-  }
-
-  const existingItems = Array.from(fallbackItems.values());
-  if (fallbackResumeAt > now) {
-    return {
-      items: existingItems,
-      error: null,
-      progress: makeCatalogProgress("cooldown", existingItems.length, fallbackResumeAt - now),
-    };
-  }
-
-  const request = seedRequestForCursor(fallbackCursor);
-  if (!request) {
-    const result: CatalogResult = {
-      items: existingItems,
-      error: null,
-      progress: makeCatalogProgress("ready", existingItems.length),
-    };
-    catalogCache = { expiresAt: now + CATALOG_CACHE_TTL_MS, result };
-    return result;
-  }
-
-  const page = await fetchShikimoriAnimes(request);
-  if (page.error) {
-    const retryAfterMs = page.retryAfterMs ?? 5000;
-    fallbackResumeAt = Date.now() + retryAfterMs;
-    return {
-      items: existingItems,
-      error: null,
-      progress: makeCatalogProgress("cooldown", existingItems.length, retryAfterMs),
-    };
-  }
-
-  for (const anime of page.items) {
-    if (!fallbackItems.has(anime.id)) fallbackItems.set(anime.id, anime);
-  }
-  if (isSuccessfulEmptySeedPage(page.items, page.error, fallbackCursor)) {
-    const result: CatalogResult = {
-      items: existingItems,
-      error: null,
-      progress: makeCatalogProgress("ready", existingItems.length),
-    };
-    catalogCache = { expiresAt: Date.now() + CATALOG_CACHE_TTL_MS, result };
-    return result;
-  }
-
-  fallbackCursor += 1;
-  fallbackResumeAt = Date.now() + SEED_REQUEST_DELAY_MS;
-
-  const items = Array.from(fallbackItems.values());
-  const status = "seeding";
-  const error = null;
-  const result: CatalogResult = {
     items,
-    error,
-    progress: makeCatalogProgress(status, items.length, status === "seeding" ? SEED_REQUEST_DELAY_MS : undefined),
+    error: null,
+    progress: { status: "ready" as const, imported: items.length, target: items.length },
   };
-  if (status === "ready") catalogCache = { expiresAt: Date.now() + CATALOG_CACHE_TTL_MS, result };
-  return result;
 }
 
 export const getShikimoriCatalog = createServerFn({ method: "GET" })
@@ -686,114 +597,62 @@ export const getShikimoriCatalog = createServerFn({ method: "GET" })
     forceRefresh: input.forceRefresh === true,
     progressOnly: input.progressOnly === true,
   }))
-  .handler(async ({ data }) => {
-    const persistent = await getPersistentCatalog(
-      async (cursor): Promise<CatalogSeedPageResult> => {
-        const request = seedRequestForCursor(cursor);
-        if (!request) return { items: [], error: null, done: true };
-        // Trailer metadata is imported with catalog rows as part of the admin-only seed.
-        const page = await fetchShikimoriAnimes({ ...request, includeVideos: true });
-        return isSuccessfulEmptySeedPage(page.items, page.error, cursor)
-          ? { ...page, done: true }
-          : page;
-      },
-      { progressOnly: data.progressOnly },
-    );
-    if (persistent) return filterCatalogForCurrentRequest(persistent);
-    // With no D1 binding, fail closed instead of making user requests fall back
-    // to a live Shikimori catalog query. Imports must use an admin-only process.
-    return {
-      items: [],
-      error: "Каталог недоступен: база данных D1 не подключена.",
-      progress: makeCatalogProgress("partial", 0),
-    };
+  .handler(async () => {
+    const result = await getR2Catalog();
+    if (result.error) {
+      return { items: [], error: result.error, progress: { status: "partial" as const, imported: 0, target: null } };
+    }
+    return filterCatalogForCurrentRequest(readyCatalog(result.items));
   });
 
-
 /**
- * Loads stable identity from D1, then resolves changing metadata from Shikimori
- * for the selected title. D1 remains the fallback when the provider is unavailable.
+ * The committed R2 snapshot is the only catalogue source for public detail pages.
+ * Live Shikimori data may enrich the response, but a visitor never writes catalogue state.
  */
 export const getShikimoriAnimeDetails = createServerFn({ method: "GET" })
   .validator((input: { animeId?: unknown }) => ({
-    animeId: typeof input?.animeId === "string" && /^\d{1,12}$/.test(input.animeId)
-      ? input.animeId
-      : "",
+    animeId: typeof input?.animeId === "string" && /^\d{1,12}$/.test(input.animeId) ? input.animeId : "",
   }))
   .handler(async ({ data }) => {
     const empty = { anime: null, relatedAnime: [] as Anime[], apiError: null as string | null };
     if (!data.animeId) return empty;
-
-    let details: Awaited<ReturnType<typeof getPersistentAnimeDetails>>;
+    let state;
     try {
-      details = await getPersistentAnimeDetails(data.animeId);
+      state = await readCatalogState();
     } catch (error) {
-      console.error("[YUME] Failed to load anime details from D1:", error);
+      console.error("[YUME] Failed to load anime details from R2:", error);
       return { ...empty, apiError: "Каталог временно недоступен." };
     }
-    if (!details) {
-      return { ...empty, apiError: "Каталог недоступен: база данных D1 не подключена." };
-    }
-    if (!details.anime) return { anime: null, relatedAnime: [], apiError: null };
-
-    let anime: Anime | null = details.anime;
+    const stored = state.items.find((item) => item.id === data.animeId);
+    if (!stored) return empty;
+    const related = selectRelatedAnime(stored, state.items);
+    let anime = stored;
     let apiError: string | null = null;
     try {
-      const liveResult = await fetchShikimoriAnimes(validateRequest({
-        ids: data.animeId,
-        includeVideos: true,
-      }));
+      const liveResult = await fetchShikimoriAnimes(validateRequest({ ids: data.animeId, includeVideos: true }));
       const liveAnime = liveResult.items.find((item) => item.id === data.animeId);
-      if (liveAnime && !liveResult.error) {
-        anime = mergeLiveAnimeDetails(details.anime, liveAnime);
-        try {
-          await refreshPersistentAnimeIdentity({
-            id: anime.id,
-            rating: liveAnime.rating,
-            posterUrl: liveAnime.posterUrl,
-          });
-        } catch (error) {
-          // A transient D1 write failure must not discard the fresh provider response.
-          console.error("[YUME] Failed to persist refreshed anime identity:", error);
-        }
-      } else {
+      if (liveAnime && !liveResult.error) anime = mergeLiveAnimeDetails(stored, liveAnime);
+      else {
         apiError = liveResult.error ?? "Не удалось обновить данные из Shikimori.";
-        anime = {
-          ...details.anime,
-          nextEpisodeAt: isUpcomingEpisodeDate(details.anime.nextEpisodeAt)
-            ? details.anime.nextEpisodeAt
-            : undefined,
-        };
+        anime = { ...stored, nextEpisodeAt: isUpcomingEpisodeDate(stored.nextEpisodeAt) ? stored.nextEpisodeAt : undefined };
       }
     } catch (error) {
       console.error("[YUME] Failed to refresh selected anime from Shikimori:", error);
       apiError = "Не удалось обновить данные из Shikimori.";
-      anime = {
-        ...details.anime,
-        nextEpisodeAt: isUpcomingEpisodeDate(details.anime.nextEpisodeAt)
-          ? details.anime.nextEpisodeAt
-          : undefined,
-      };
+      anime = { ...stored, nextEpisodeAt: isUpcomingEpisodeDate(stored.nextEpisodeAt) ? stored.nextEpisodeAt : undefined };
     }
-
-    if (!anime) return { anime: null, relatedAnime: [], apiError };
-
-    const filtered = filterCatalogForCurrentRequest({
-      items: [anime, ...details.relatedAnime],
-    }).items;
+    const filtered = filterCatalogForCurrentRequest({ items: [anime, ...related] }).items;
     const visibleById = new Map(filtered.map((item) => [item.id, item]));
-    anime = visibleById.get(details.anime.id) ?? null;
     return {
-      anime,
-      relatedAnime: details.relatedAnime
-        .map((item) => visibleById.get(item.id))
-        .filter((item): item is Anime => Boolean(item)),
+      anime: visibleById.get(stored.id) ?? null,
+      relatedAnime: related.map((item) => visibleById.get(item.id)).filter((item): item is Anime => Boolean(item)),
       apiError,
     };
   });
 
 /**
- * Prefer persistent screenshot URLs in D1; populate lazily from Shikimori when absent.
+ * Screenshot URLs are stored in the R2 catalogue snapshot. Missing screenshots
+ * may be fetched from Shikimori for this response and then published via coordinator.
  */
 export const getShikimoriAnimeScreenshots = createServerFn({ method: "GET" })
   .validator((input: { animeId?: unknown }) => ({
@@ -802,20 +661,21 @@ export const getShikimoriAnimeScreenshots = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     if (!data.animeId) return { items: [] as ShikimoriScreenshot[] };
     try {
-      const persisted = await getPersistentAnimeScreenshots(data.animeId);
-      if (persisted?.length) return { items: persisted };
+      const persisted = await getR2Screenshots(data.animeId);
+      if (persisted.length) return { items: persisted };
       const cached = screenshotCache.get(data.animeId);
-      if (cached && cached.expiresAt > Date.now() && cached.items.length) return { items: cached.items };
-      const sharedScreenshots = await readShikimoriSharedCache<ShikimoriScreenshot[]>("screenshots:" + data.animeId);
-      if (sharedScreenshots?.length) {
-        screenshotCache.set(data.animeId, { expiresAt: Date.now() + SCREENSHOT_CACHE_TTL_MS, items: sharedScreenshots });
-        return { items: sharedScreenshots };
+      if (cached && cached.expiresAt > Date.now()) return { items: cached.items };
+      const shared = await readShikimoriSharedCache<ShikimoriScreenshot[]>("screenshots:" + data.animeId);
+      if (shared?.length) {
+        screenshotCache.set(data.animeId, { expiresAt: Date.now() + SCREENSHOT_CACHE_TTL_MS, items: shared });
+        return { items: shared };
       }
-      const details = await getPersistentAnimeDetails(data.animeId);
-      const airedOn = details?.anime?.airedOn;
-      const futureRelease = typeof airedOn === "string" && /^\\d{4}-\\d{2}-\\d{2}/.test(airedOn)
+      const catalog = await readCatalogState();
+      const anime = catalog.items.find((item) => item.id === data.animeId);
+      const airedOn = anime?.airedOn;
+      const futureRelease = typeof airedOn === "string" && /^\d{4}-\d{2}-\d{2}/.test(airedOn)
         && airedOn.slice(0, 10) > new Date().toISOString().slice(0, 10);
-      if (details?.anime?.status === "Анонс" || futureRelease) return { items: [] as ShikimoriScreenshot[] };
+      if (anime?.status === "Анонс" || futureRelease) return { items: [] as ShikimoriScreenshot[] };
       const response = await fetch(SCREENSHOT_API_URL + encodeURIComponent(data.animeId) + "/screenshots", {
         headers: { Accept: "application/json", "User-Agent": "YUME/0.2.0" },
         signal: AbortSignal.timeout(8000),
@@ -824,14 +684,11 @@ export const getShikimoriAnimeScreenshots = createServerFn({ method: "GET" })
       const items = normalizeShikimoriScreenshots(await response.json());
       if (items.length) {
         screenshotCache.set(data.animeId, { expiresAt: Date.now() + SCREENSHOT_CACHE_TTL_MS, items });
-        await Promise.all([
-          savePersistentAnimeScreenshots(data.animeId, items),
-          writeShikimoriSharedCache("screenshots:" + data.animeId, items, SCREENSHOT_CACHE_TTL_MS),
-        ]);
+        await writeShikimoriSharedCache("screenshots:" + data.animeId, items, SCREENSHOT_CACHE_TTL_MS);
       }
       return { items };
     } catch (error) {
-      console.warn("[YUME] Could not load or persist anime screenshots:", error);
+      console.warn("[YUME] Could not load R2 anime screenshots:", error);
       return { items: screenshotCache.get(data.animeId)?.items ?? [] as ShikimoriScreenshot[] };
     }
   });

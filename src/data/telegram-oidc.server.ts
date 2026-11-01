@@ -68,14 +68,6 @@ async function createSession(db: Database, userId: string, secret: string): Prom
   await db.prepare("INSERT INTO yume_sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)").bind(hash, userId, Date.now() + TTL * 1000).run();
   return sessionCookie(token);
 }
-async function ensureOidcStateTable(db: Database): Promise<void> {
-  await db.prepare("CREATE TABLE IF NOT EXISTS yume_telegram_oidc_states (state_hash TEXT PRIMARY KEY NOT NULL, nonce TEXT NOT NULL, verifier TEXT NOT NULL, flow TEXT NOT NULL CHECK (flow IN ('login','register')), privacy_consent INTEGER NOT NULL CHECK (privacy_consent IN (0,1)), terms_consent INTEGER NOT NULL DEFAULT 0 CHECK (terms_consent IN (0,1)), expires_at INTEGER NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)").run();
-  const result = await db.prepare("PRAGMA table_info(yume_telegram_oidc_states)").all<{ name: string }>();
-  if (!result.results.some((column) => column.name === "terms_consent")) {
-    await db.prepare("ALTER TABLE yume_telegram_oidc_states ADD COLUMN terms_consent INTEGER NOT NULL DEFAULT 0 CHECK (terms_consent IN (0,1))").run();
-  }
-  await db.prepare("CREATE INDEX IF NOT EXISTS idx_yume_telegram_oidc_states_expiry ON yume_telegram_oidc_states(expires_at)").run();
-}
 function redirect(url: URL, cookies: string[] = []): Response {
   const headers = new Headers({ Location: url.toString(), "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" });
   cookies.forEach(value => headers.append("Set-Cookie", value));
@@ -126,9 +118,6 @@ export async function handleTelegramOidc(request: Request): Promise<Response> {
   if (!db || !secret || !clientId || !clientSecret) return callback ? errorRedirect(origin, "telegram_login_not_configured") : response({ error: "telegram_login_not_configured" }, 503);
   const redirectUri = origin + "/api/telegram/oidc/callback";
   try {
-    await db.prepare("CREATE TABLE IF NOT EXISTS yume_users (id TEXT PRIMARY KEY NOT NULL, provider TEXT NOT NULL CHECK (provider = 'telegram'), provider_user_id TEXT NOT NULL, telegram_user_id TEXT UNIQUE, telegram_first_name TEXT, telegram_last_name TEXT, telegram_username TEXT, telegram_language_code TEXT, privacy_consent_at TEXT NOT NULL, privacy_policy_version TEXT NOT NULL, terms_agreed_at TEXT, terms_version TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, UNIQUE (provider, provider_user_id))").run();
-    await db.prepare("CREATE TABLE IF NOT EXISTS yume_sessions (token_hash TEXT PRIMARY KEY NOT NULL, user_id TEXT NOT NULL REFERENCES yume_users(id) ON DELETE CASCADE, expires_at INTEGER NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)").run();
-    await ensureOidcStateTable(db);
     if (!callback) {
       const flow = url.searchParams.get("flow");
       const consent = url.searchParams.get("consent") === "1";
