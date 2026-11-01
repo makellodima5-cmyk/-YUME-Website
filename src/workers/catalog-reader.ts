@@ -1,5 +1,5 @@
 import { CATALOG_CURRENT_KEY, CATALOG_REVISION_PREFIX, emptyCatalogState, type CatalogPointer, type CatalogState } from "@/data/catalog-r2.shared";
-import { readCatalogCachePointer, readCatalogSnapshotCache, writeCatalogSnapshotCache } from "@/data/catalog-kv-cache.shared";
+import { readCatalogAdminCachePointer, readCatalogCachePointer, readCatalogSnapshotCache, writeCatalogSnapshotCache } from "@/data/catalog-kv-cache.shared";
 
 type Env = {
   R2_ACCOUNT_ID:string;
@@ -135,6 +135,24 @@ export default {
     if(new URL(request.url).pathname!=="/v1/state")return json({error:"not_found"},404);
     try{
       const fresh=new URL(request.url).searchParams.get("fresh")==="1";
+      if(fresh){
+        // Admin status/import reads follow the private checkpoint pointer. This
+        // avoids repeated SigV4 signing and R2 object reads for every poll/page.
+        // The public cache pointer remains pinned until the import is complete.
+        const adminPointer=await readCatalogAdminCachePointer(env.YUME_CATALOG_CACHE);
+        if(adminPointer){
+          const adminState=cachedRevision===adminPointer.revision&&cachedState
+            ?cachedState
+            :await readCatalogSnapshotCache(env.YUME_CATALOG_CACHE,adminPointer.revision);
+          if(adminState){
+            cachedRevision=adminPointer.revision;
+            cachedState=adminState;
+            return request.method==="HEAD"
+              ?new Response(null,{status:200,headers:{"X-Yume-Catalog-Revision":String(adminPointer.revision)}})
+              :json(adminState,200,{"X-Yume-Catalog-Revision":String(adminPointer.revision)});
+          }
+        }
+      }
       const cachePointer=fresh?null:await readCatalogCachePointer(env.YUME_CATALOG_CACHE);
       let pointer:CatalogPointer|null=cachePointer
         ? {schemaVersion:1,revision:cachePointer.revision,key:CATALOG_REVISION_PREFIX+cachePointer.revision+".json",operationId:"shared-cache",checksum:"",updatedAt:cachePointer.updatedAt}

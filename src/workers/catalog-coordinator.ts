@@ -1,6 +1,6 @@
 import { DurableObject } from "cloudflare:workers";
 import { applyCatalogMutation, CATALOG_CURRENT_KEY, CATALOG_REVISION_PREFIX, emptyCatalogState, type CatalogMutation, type CatalogPointer, type CatalogState } from "@/data/catalog-r2.shared";
-import { pruneCatalogSnapshotCache, writeCatalogSnapshotCache } from "@/data/catalog-kv-cache.shared";
+import { pruneCatalogSnapshotCache, publishCatalogSnapshotCachePointer, writeCatalogAdminSnapshotCache } from "@/data/catalog-kv-cache.shared";
 
 type CoordinatorEnv = { CATALOG_BUCKET:R2Bucket; YUME_DB:D1Database; YUME_CATALOG_CACHE:KVNamespace };
 type Env = { CATALOG_COORDINATOR:DurableObjectNamespace<CatalogCoordinator> };
@@ -123,10 +123,12 @@ export class CatalogCoordinator extends DurableObject<CoordinatorEnv>{
   }
 
   private async publishCacheIfReady(state:CatalogState):Promise<void>{
-    // Keep the public KV snapshot pinned while a bulk import is in progress.
-    // Admin requests use the Reader's authoritative fresh=1 path to see checkpoints.
+    // Admin reads need the latest committed import checkpoint without forcing
+    // the Reader to re-sign multiple R2 requests on every status poll. Keep it
+    // separate from the public pointer so visitors never see a partial import.
+    await writeCatalogAdminSnapshotCache(this.env.YUME_CATALOG_CACHE,state);
     if(state.metadata.admin_import_cache_pending==="1")return;
-    await writeCatalogSnapshotCache(this.env.YUME_CATALOG_CACHE,state);
+    await publishCatalogSnapshotCachePointer(this.env.YUME_CATALOG_CACHE,state);
     await pruneCatalogSnapshotCache(this.env.YUME_CATALOG_CACHE,state.revision);
   }
 
