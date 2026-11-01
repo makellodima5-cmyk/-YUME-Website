@@ -32,6 +32,11 @@ export function isValidAdminImportTarget(value: unknown): value is number {
 export function normalizeAdminCatalogIds(value: unknown): string[] {
   return Array.from(new Set((Array.isArray(value) ? value : []).filter((id): id is string => typeof id === "string" && /^\d{1,20}$/.test(id)))).slice(0, 100);
 }
+export function adminCatalogImportPageOperationId(runId:string,cursor:number):string {
+  const safeRunId=runId.replace(/[^A-Za-z0-9]/g,"")||"legacy";
+  const safeCursor=Number.isSafeInteger(cursor)&&cursor>0?cursor:1;
+  return ("import"+safeRunId+String(safeCursor).padStart(8,"0")).slice(0,80);
+}
 export function chunkAdminCatalogIds(value: unknown, size = METADATA_LOOKUP_BATCH_SIZE): string[][] {
   const ids = normalizeAdminCatalogIds(value);
   const limit = Number.isInteger(size) && size > 0 ? Math.min(size, METADATA_LOOKUP_BATCH_SIZE) : METADATA_LOOKUP_BATCH_SIZE;
@@ -293,7 +298,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
         if(shots.length)mutations.push({type:"screenshots",animeId:String(item.id),items:shots.map((shot,position)=>({originalUrl:shot.original,previewUrl:shot.preview,position}))});
       }
       mutations.push({type:"metadata",values:{admin_import_cursor:String(progress.cursor+1),admin_import_added:String(nextAdded),admin_import_skipped:String(progress.skipped+skipped),admin_import_incomplete:String(progress.incomplete+incompleteCount),admin_import_resume_at:String((Number(fresh.metadata.admin_import_started_at??0)||0)+progress.cursor*REQUEST_DELAY_MS),admin_import_state:nextState}});
-      const operationId=("import"+(progress.runId||"legacy").replace(/[^A-Za-z0-9]/g,"")+String(progress.cursor).padStart(8,"0")).slice(0,80);
+      const operationId=adminCatalogImportPageOperationId(progress.runId,progress.cursor);
       await submitCatalogMutation({type:"batch",mutations},operationId);
       await audit(db,"catalog.import.page","success",{page:progress.cursor,added:mapped.length,skipped,state:nextState},actor);
       return json({isAdmin:true,...metadata(await readCatalogState())});
