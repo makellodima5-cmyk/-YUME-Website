@@ -93,6 +93,15 @@ jobs:
           if ((readerConfig.r2_buckets ?? []).length !== 0 || readerConfig.workers_dev !== false) {
             throw new Error("Catalogue Reader must use scoped S3 credentials and must not expose a public R2 binding or workers.dev URL.");
           }
+          for (const [name, config] of [["Reader", readerConfig], ["Coordinator", coordinatorConfig]]) {
+            const cacheBinding = (config.kv_namespaces ?? []).find(
+              (item) => item.binding === "YUME_CATALOG_CACHE"
+                && item.id === "598c5207a7054b3eb45e2efe8214f5d7",
+            );
+            if (!cacheBinding) {
+              throw new Error(`${name} Worker is missing the shared YUME_CATALOG_CACHE binding.`);
+            }
+          }
           const coordinatorBucket = (coordinatorConfig.r2_buckets ?? []).find((item) => item.binding === "CATALOG_BUCKET" && item.bucket_name === "yume-catalog");
           const coordinatorDatabase = (coordinatorConfig.d1_databases ?? []).find((item) => item.binding === "YUME_DB" && item.database_id === "c2f0f25d-e29b-47e2-ad11-b726f7a3e9a2");
           const coordinatorClass = (coordinatorConfig.durable_objects?.bindings ?? []).find((item) => item.name === "CATALOG_COORDINATOR" && item.class_name === "CatalogCoordinator");
