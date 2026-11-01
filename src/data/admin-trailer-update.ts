@@ -19,6 +19,7 @@ type AdminTrailerPayload = {
   catalogWithTrailer?: number;
   delayMs?: number;
   retryAfterMs?: number;
+  catalogUnavailable?: boolean;
 };
 
 type AdminTrailerUpdateOptions = {
