@@ -147,7 +147,6 @@ export default {
         // KV is eventually consistent. On a cold/missing cache, resolve the authoritative
         // R2 pointer before loading data so a stale KV pointer cannot poison the cache.
         if(cachePointer&&!fresh){
-          const publishedPointer=pointer;
           const latestPointer=await readObject<CatalogPointer>(env,CATALOG_CURRENT_KEY);
           if(!latestPointer||latestPointer.schemaVersion!==1||!Number.isSafeInteger(latestPointer.revision)||latestPointer.key!==CATALOG_REVISION_PREFIX+latestPointer.revision+".json")return json({error:"invalid_catalog_pointer"},503);
           const latestBody=await readObjectText(env,latestPointer.key);
