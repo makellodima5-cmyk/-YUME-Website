@@ -57,6 +57,11 @@ function failureMessage(
       ? "Сервер отклонил административный запрос. Обнови Mini App и повтори вход."
       : "The server rejected the admin request. Reload the Mini App and sign in again.";
   }
+  if (result.payload.error === "catalog_unavailable" || result.payload.catalogUnavailable === true) {
+    return language === "ru"
+      ? "Каталог недоступен. Очередь трейлеров не запускалась; повтори позже."
+      : "The catalogue is unavailable. The trailer queue was not started; retry later.";
+  }
   if (result.payload.error === "database_unavailable" || result.payload.error === "auth_database_unavailable") {
     return language === "ru"
       ? "Административная база данных недоступна. Проверь binding YUME_DB в Cloudflare."
@@ -174,9 +179,11 @@ export async function runAdminTrailerUpdate(options: AdminTrailerUpdateOptions):
 
     // Refresh the missing-trailer count because POST responses do not include it.
     const refreshed = await request();
-    if (refreshed.response.ok && refreshed.payload.isAdmin === true) {
-      publishStats(refreshed.payload);
+    if (!refreshed.response.ok || refreshed.payload.isAdmin !== true) {
+      onMessage(failureMessage(language, refreshed));
+      return;
     }
+    publishStats(refreshed.payload);
 
     onMessage(language === "ru"
       ? `Обновление завершено. Проверено: ${stats.checked}. Найдено трейлеров: ${stats.found}. Без трейлера осталось: ${stats.missing}.`
