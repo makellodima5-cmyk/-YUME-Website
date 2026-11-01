@@ -13,5 +13,11 @@
   },
   "vars": {
     "R2_ACCOUNT_ID": "8a759ec4125475f60d793affe37779b7"
-  }
+  },
+  "kv_namespaces": [
+    {
+      "binding": "YUME_CATALOG_CACHE",
+      "id": "598c5207a7054b3eb45e2efe8214f5d7"
+    }
+  ]
 }
