@@ -269,7 +269,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
       return json({isAdmin:true,...metadata(await readCatalogState(true)),message:"Импорт подготовлен."});
     }
     if (action === "stop") {
-      await saveMetadata({admin_import_state:"paused"});
+      await saveMetadata({admin_import_state:"paused",admin_import_cache_pending:"0"});
       await audit(db,"catalog.import.pause","success",{},actor);
       return json({isAdmin:true,...metadata(await readCatalogState(true))});
     }
@@ -282,7 +282,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
       try { page = await fetchPage(progress.cursor,progress.statusFilter); }
       catch (error) {
         const retryAfterMs = Number((error as {retryAfterMs?:number}).retryAfterMs ?? 5000);
-        await saveMetadata({admin_import_errors:String(progress.errors+1),admin_import_resume_at:String(Date.now()+retryAfterMs)});
+        await saveMetadata({admin_import_errors:String(progress.errors+1),admin_import_resume_at:String(Date.now()+retryAfterMs),admin_import_state:"paused",admin_import_cache_pending:"0"});
         return json({isAdmin:true,...progress,retryAfterMs,error:error instanceof Error?error.message:"Ошибка Shikimori"},503);
       }
       if (!page.length) {
