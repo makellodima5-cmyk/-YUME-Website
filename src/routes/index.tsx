@@ -412,6 +412,7 @@ function Index() {
   const [telegramAuthError, setTelegramAuthError] = useState("");
   const [telegramAuthReady, setTelegramAuthReady] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [adminPasswordConfirmed, setAdminPasswordConfirmed] = useState(false);
   const [adminPasswordRequired, setAdminPasswordRequired] = useState(false);
   const [adminPassword, setAdminPassword] = useState("");
   const [adminPasswordBusy, setAdminPasswordBusy] = useState(false);
@@ -585,6 +586,7 @@ function Index() {
     let cancelled = false;
     setAdminCheckComplete(false);
     setIsAdmin(false);
+    setAdminPasswordConfirmed(false);
     setAdminPasswordRequired(false);
     setAdminPasswordError("");
     setAdminStats(null);
@@ -614,6 +616,7 @@ function Index() {
           setAdminCheckComplete(true);
           return;
         }
+        setAdminPasswordConfirmed(true);
         const trailerResponse = await fetch("/api/admin/trailers", { credentials: "same-origin", cache: "no-store" });
         const result = await trailerResponse.json().catch(() => ({})) as {
           isAdmin?: boolean; total?: number; pending?: number; checked?: number; found?: number;
@@ -880,7 +883,7 @@ function Index() {
   };
 
   useEffect(() => {
-    if (!isAdmin) return;
+    if (!isAdmin || !adminPasswordConfirmed) return;
     let cancelled = false;
     fetch("/api/admin/catalog-import", { credentials: "same-origin", cache: "no-store" })
       .then(async response => ({ response, payload: await response.json().catch(() => ({})) as {isAdmin?:boolean;target?:number;cursor?:number;added?:number;skipped?:number;incomplete?:number;errors?:number;state?:string;delayMs?:number;statusFilter?:string;bulkImportBlock18Plus?:boolean;quality?:typeof catalogQuality;qualitySummary?:typeof catalogQualitySummary;qualityOffset?:number;qualityHasMore?:boolean;auditLog?:typeof adminAuditLog} }))
@@ -896,10 +899,10 @@ function Index() {
         setAdminAuditLog(payload.auditLog ?? []);
       }).catch(() => {});
     return () => { cancelled = true; };
-  }, [isAdmin]);
+  }, [isAdmin, adminPasswordConfirmed]);
 
   useEffect(() => {
-    if (!isAdmin) return;
+    if (!isAdmin || !adminPasswordConfirmed) return;
     let cancelled = false;
     let timer: number | undefined;
     let failures = 0;
@@ -963,7 +966,7 @@ function Index() {
     };
     void poll();
     return () => { cancelled = true; if (timer !== undefined) window.clearTimeout(timer); };
-  }, [isAdmin, language]);
+  }, [isAdmin, adminPasswordConfirmed, language]);
   const refreshCatalogQuality = async (offset = catalogQualityOffset) => {
     const response = await fetch("/api/admin/catalog-import?qualityOffset=" + Math.max(0,offset), {credentials:"same-origin",cache:"no-store"});
     const payload = await response.json().catch(() => ({})) as {isAdmin?:boolean;error?:string;quality?:typeof catalogQuality;qualitySummary?:typeof catalogQualitySummary;qualityOffset?:number;qualityHasMore?:boolean;auditLog?:typeof adminAuditLog};
@@ -2095,6 +2098,7 @@ function Index() {
                   const status = await statusResponse.json().catch(() => ({})) as { isAdmin?: boolean; catalogTotal?: number; catalogWithTrailer?: number; pending?: number; checked?: number; missing?: number; error?: string };
                   if (status.isAdmin !== true) throw new Error(language === "ru" ? "Пароль принят, но панель не смогла загрузиться. Обнови страницу." : "Password accepted, but the panel could not load. Refresh the page.");
                   setIsAdmin(true);
+                  setAdminPasswordConfirmed(true);
                   setAdminPasswordRequired(false);
                   setAdminStats({ total: status.catalogTotal ?? 0, pending: status.pending ?? 0, checked: status.checked ?? 0, found: status.catalogWithTrailer ?? 0, missing: status.missing ?? 0 });
                   setAdminCheckComplete(true);
