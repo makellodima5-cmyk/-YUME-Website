@@ -56,12 +56,71 @@ export async function writeCatalogSnapshotCache(kv: KVNamespace, state: CatalogS
 
   await Promise.all(chunks.map((chunk, index) => kv.put(`${base}:chunk:${index}`, toBase64(chunk))));
   await kv.put(`${base}:manifest`, JSON.stringify(manifest));
-  if (publishPointer) {
-    await kv.put(`${PREFIX}:current`, JSON.stringify({
-      schemaVersion: 1,
-      revision: state.revision,
-      updatedAt: state.updatedAt,
-    } satisfies CatalogCachePointer));
+  if (publishPointer) await publishCatalogSnapshotCachePointer(kv, state);
+}
+
+export async function publishCatalogSnapshotCachePointer(kv: KVNamespace, state: Pick<CatalogState, "revision" | "updatedAt">): Promise<void> {
+  await kv.put(`${PREFIX}:current`, JSON.stringify({
+    schemaVersion: 1,
+    revision: state.revision,
+    updatedAt: state.updatedAt,
+  } satisfies CatalogCachePointer));
+}
+
+const ADMIN_CURRENT_KEY = `${PREFIX}:admin-current`;
+
+export async function readCatalogAdminCachePointer(kv: KVNamespace): Promise<CatalogCachePointer | null> {
+  const raw = await kv.get(ADMIN_CURRENT_KEY);
+  if (!raw) return null;
+  try {
+    const pointer = JSON.parse(raw) as CatalogCachePointer;
+    return pointer.schemaVersion === 1 && Number.isSafeInteger(pointer.revision) && pointer.revision >= 0
+      ? pointer
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The private admin checkpoint follows every committed import page while the
+ * public pointer remains pinned to the last fully published catalogue.
+ */
+export async function writeCatalogAdminSnapshotCache(kv: KVNamespace, state: CatalogState): Promise<void> {
+  const previous = await readCatalogAdminCachePointer(kv);
+  await writeCatalogSnapshotCache(kv, state, false);
+  await kv.put(ADMIN_CURRENT_KEY, JSON.stringify({
+    schemaVersion: 1,
+    revision: state.revision,
+    updatedAt: state.updatedAt,
+  } satisfies CatalogCachePointer));
+
+  // Retain the public snapshot and the new admin checkpoint, but do not let
+  // every import page leave another full catalogue snapshot behind in KV.
+  const published = await readCatalogCachePointer(kv);
+  if (previous && previous.revision !== state.revision && previous.revision !== published?.revision) {
+    await deleteCatalogSnapshotCache(kv, previous.revision);
+  }
+}
+
+export async function readCatalogAdminSnapshotCache(kv: KVNamespace): Promise<CatalogState | null> {
+  const pointer = await readCatalogAdminCachePointer(kv);
+  return pointer ? readCatalogSnapshotCache(kv, pointer.revision) : null;
+}
+
+async function deleteCatalogSnapshotCache(kv: KVNamespace, revision: number): Promise<void> {
+  const base = `${PREFIX}:revision:${revision}`;
+  const manifestRaw = await kv.get(`${base}:manifest`);
+  if (!manifestRaw) return;
+  try {
+    const manifest = JSON.parse(manifestRaw) as CacheManifest;
+    if (!Number.isSafeInteger(manifest.chunks) || manifest.chunks < 0 || manifest.chunks > 10000) return;
+    await Promise.all([
+      ...Array.from({ length: manifest.chunks }, (_, index) => kv.delete(`${base}:chunk:${index}`)),
+      kv.delete(`${base}:manifest`),
+    ]);
+  } catch {
+    await kv.delete(`${base}:manifest`);
   }
 }
 
