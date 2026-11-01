@@ -9,6 +9,14 @@
   "main": ".output/server/index.mjs",
   "ratelimits": [
     {
+      "name": "ADMIN_PASSWORD_RATE_LIMITER",
+      "namespace_id": "202611013",
+      "simple": {
+        "limit": 5,
+        "period": 60
+      }
+    },
+    {
       "name": "KODIK_RATE_LIMITER",
       "namespace_id": "202610271",
       "simple": {
@@ -70,7 +78,7 @@
   "kv_namespaces": [
     {
       "binding": "YUME_SHIKIMORI_CACHE",
-      "id": "598c5207a7054b3eb45e2efe8214f5d7"
+      "id": "1c8a7a08a42949218d1de5d194df4573"
     }
   ],
   "services": [

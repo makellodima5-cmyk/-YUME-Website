@@ -2,17 +2,54 @@ import { afterEach, describe, expect, it } from "vitest";
 import { env as cloudflareEnv } from "cloudflare:workers";
 import { handleTelegramOidc } from "@/data/telegram-oidc.server";
 
-const runtimeEnv = cloudflareEnv as unknown as Record<string, unknown>;
+type ExecutedStatement = { sql: string; values: unknown[] };
 
 class FakeStatement {
-  bind(..._values: unknown[]) { return this; }
-  async run() { return { meta: { changes: 1 } }; }
-  async first<T = Record<string, unknown>>(): Promise<T | null> { return null; }
-  async all<T = Record<string, unknown>>(): Promise<{ results: T[] }> { return { results: [] }; }
+  private values: unknown[] = [];
+
+  constructor(private readonly db: FakeDb, private readonly sql: string) {}
+
+  bind(...values: unknown[]) {
+    this.values = values;
+    return this;
+  }
+
+  async run() {
+    this.db.executed.push({ sql: this.sql, values: this.values });
+    return { meta: { changes: 1 } };
+  }
+
+  async first<T = Record<string, unknown>>(): Promise<T | null> {
+    return null;
+  }
+
+  async all<T = Record<string, unknown>>(): Promise<{ results: T[] }> {
+    return { results: [] };
+  }
 }
+
 class FakeDb {
-  prepare(_sql: string) { return new FakeStatement(); }
-  async batch(_statements: unknown[]) { return []; }
+  executed: ExecutedStatement[] = [];
+
+  prepare(sql: string) {
+    return new FakeStatement(this, sql);
+  }
+
+  async batch(_statements: unknown[]) {
+    return [];
+  }
+}
+
+const runtimeEnv = cloudflareEnv as unknown as Record<string, unknown>;
+
+function configure(db = new FakeDb()) {
+  Object.assign(runtimeEnv, {
+    YUME_DB: db,
+    YUME_AUTH_SESSION_SECRET: "test-session-secret-with-at-least-32-characters",
+    TELEGRAM_OIDC_CLIENT_ID: "test-client-id",
+    TELEGRAM_OIDC_CLIENT_SECRET: "test-client-secret",
+  });
+  return db;
 }
 
 afterEach(() => {
@@ -24,13 +61,7 @@ afterEach(() => {
 
 describe("Telegram OIDC browser binding", () => {
   it("rejects a callback without the browser-bound state cookie", async () => {
-    Object.assign(runtimeEnv, {
-      YUME_DB: new FakeDb(),
-      YUME_AUTH_SESSION_SECRET: "test-session-secret-with-at-least-32-characters",
-      TELEGRAM_OIDC_CLIENT_ID: "test-client-id",
-      TELEGRAM_OIDC_CLIENT_SECRET: "test-client-secret",
-    });
-
+    configure();
     const response = await handleTelegramOidc(new Request(
       "https://yume.test/api/telegram/oidc/callback?code=attacker-code&state=attacker-state",
     ));
@@ -40,19 +71,70 @@ describe("Telegram OIDC browser binding", () => {
     expect(response.headers.get("set-cookie")).toContain("__Host-yume-oidc-state=;");
   });
 
-  it("requires an explicit user-agreement choice before starting registration", async () => {
-    Object.assign(runtimeEnv, {
-      YUME_DB: new FakeDb(),
-      YUME_AUTH_SESSION_SECRET: "test-session-secret-with-at-least-32-characters",
-      TELEGRAM_OIDC_CLIENT_ID: "test-client-id",
-      TELEGRAM_OIDC_CLIENT_SECRET: "test-client-secret",
-    });
-
+  it("does not accept registration consent through URL query parameters", async () => {
+    const db = configure();
     const response = await handleTelegramOidc(new Request(
-      "https://yume.test/api/telegram/oidc?flow=register&consent=1",
+      "https://yume.test/api/telegram/oidc?flow=register&consent=1&terms=1",
     ));
+
+    expect(response.status).toBe(405);
+    expect(db.executed).toHaveLength(0);
+  });
+
+  it("requires both explicit consent values in a same-origin POST body", async () => {
+    const db = configure();
+    const response = await handleTelegramOidc(new Request("https://yume.test/api/telegram/oidc", {
+      method: "POST",
+      headers: {
+        Origin: "https://yume.test",
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: "flow=register&privacyConsent=true&termsAccepted=false",
+    }));
 
     expect(response.status).toBe(400);
     expect(await response.json()).toEqual({ error: "consent_required" });
+    expect(db.executed.some(statement => statement.sql.includes("INSERT INTO yume_telegram_oidc_states"))).toBe(false);
+  });
+
+  it("stores accepted registration choices in D1 and redirects without exposing them in the URL", async () => {
+    const db = configure();
+    const response = await handleTelegramOidc(new Request("https://yume.test/api/telegram/oidc", {
+      method: "POST",
+      headers: {
+        Origin: "https://yume.test",
+        "Sec-Fetch-Site": "same-origin",
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: "flow=register&privacyConsent=true&termsAccepted=true",
+    }));
+
+    expect(response.status).toBe(303);
+    const location = new URL(response.headers.get("location")!);
+    expect(location.origin).toBe("https://oauth.telegram.org");
+    expect(location.searchParams.get("redirect_uri")).toBe("https://yume.test/api/telegram/oidc/callback");
+    expect(location.searchParams.has("consent")).toBe(false);
+    expect(location.searchParams.has("terms")).toBe(false);
+
+    const insert = db.executed.find(statement => statement.sql.includes("INSERT INTO yume_telegram_oidc_states"));
+    expect(insert?.values[3]).toBe("register");
+    expect(insert?.values[4]).toBe(1);
+    expect(insert?.values[5]).toBe(1);
+  });
+
+  it("rejects cross-origin OIDC start requests before storing consent", async () => {
+    const db = configure();
+    const response = await handleTelegramOidc(new Request("https://yume.test/api/telegram/oidc", {
+      method: "POST",
+      headers: {
+        Origin: "https://attacker.test",
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: "flow=register&privacyConsent=true&termsAccepted=true",
+    }));
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: "cross_origin_request" });
+    expect(db.executed).toHaveLength(0);
   });
 });

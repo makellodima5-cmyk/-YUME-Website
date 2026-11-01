@@ -46,4 +46,33 @@ describe("registration consent UI", () => {
     fireEvent.click(terms);
     expect(submit.disabled).toBe(false);
   });
+  it("submits OIDC registration consent in a POST body instead of URL parameters", async () => {
+    const submit = vi.spyOn(HTMLFormElement.prototype, "submit").mockImplementation(() => {});
+    render(
+      <AuthPage
+        mode="register"
+        language="en"
+        onModeChange={vi.fn()}
+        onPrivacy={vi.fn()}
+        onRules={vi.fn()}
+        onComplete={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Accept the Privacy Policy" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Accept the Site Terms of Use" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continue with Telegram" }));
+
+    const form = document.querySelector<HTMLFormElement>('form[action="/api/telegram/oidc"]');
+    expect(submit).toHaveBeenCalledTimes(1);
+    expect(form?.method.toLowerCase()).toBe("post");
+    expect(form?.getAttribute("action")).toBe("/api/telegram/oidc");
+    expect(new FormData(form!).get("flow")).toBe("register");
+    expect(new FormData(form!).get("privacyConsent")).toBe("true");
+    expect(new FormData(form!).get("termsAccepted")).toBe("true");
+    expect(form?.action).not.toContain("consent");
+    form?.remove();
+    submit.mockRestore();
+  });
+
 });

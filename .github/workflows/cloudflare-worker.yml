@@ -67,7 +67,7 @@ jobs:
           }
           const kvBinding = (config.kv_namespaces ?? []).find(
             (item) => item.binding === "YUME_SHIKIMORI_CACHE"
-              && item.id === "598c5207a7054b3eb45e2efe8214f5d7",
+              && item.id === "1c8a7a08a42949218d1de5d194df4573",
           );
           if (!kvBinding) {
             throw new Error("Generated Worker config does not contain the expected YUME_SHIKIMORI_CACHE binding.");
@@ -159,12 +159,13 @@ jobs:
           }
           const rootKvBinding = (rootConfig.kv_namespaces ?? []).find(
             (item) => item.binding === "YUME_SHIKIMORI_CACHE"
-              && item.id === "598c5207a7054b3eb45e2efe8214f5d7",
+              && item.id === "1c8a7a08a42949218d1de5d194df4573",
           );
           if (!rootKvBinding) {
             throw new Error("Root Wrangler config is missing the expected YUME_SHIKIMORI_CACHE binding.");
           }
           const expectedRateLimits = [
+            { name: "ADMIN_PASSWORD_RATE_LIMITER", namespaceId: "202611013", limit: 5, period: 60 },
             { name: "KODIK_RATE_LIMITER", namespaceId: "202610271", limit: 30, period: 60 },
             { name: "MEDIA_RATE_LIMITER", namespaceId: "202610272", limit: 600, period: 60 },
             { name: "CSP_REPORT_RATE_LIMITER", namespaceId: "202610273", limit: 30, period: 60 },

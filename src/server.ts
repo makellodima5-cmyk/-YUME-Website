@@ -223,6 +223,40 @@ export default {
 
     const supportRedirect = getSupportRedirect(request, env);
     if (supportRedirect) return applySecurityHeaders(supportRedirect, request.url);
+
+    // Protect state-changing authenticated and upstream-costing APIs with the
+    // existing Cloudflare limiter. Scope keys by route so unrelated endpoints
+    // do not consume each other's allowance.
+    const isMutation = ["POST", "PUT", "PATCH", "DELETE"].includes(request.method);
+    const isProtectedApiMutation = isMutation && (
+      (requestUrl.pathname.startsWith("/api/telegram/") && requestUrl.pathname !== "/api/telegram/webhook") ||
+      requestUrl.pathname === "/api/anime-subscriptions" ||
+      requestUrl.pathname === "/api/notifications" ||
+      requestUrl.pathname === "/api/admin-notifications"
+    );
+    if (isProtectedApiMutation) {
+      let rateLimitBinding: unknown;
+      try {
+        const cloudflareBindings = cloudflareEnv as unknown as Record<string, unknown>;
+        rateLimitBinding = cloudflareBindings.KODIK_RATE_LIMITER;
+      } catch {
+        rateLimitBinding = undefined;
+      }
+      const rateLimit = await enforceRateLimit(rateLimitBinding, request, "api-mutation:" + requestUrl.pathname);
+      if (rateLimit === "limited") {
+        return applySecurityHeaders(new Response("Too many requests. Please try again later.", {
+          status: 429,
+          headers: { "Cache-Control": "private, no-store", "Retry-After": "60", "X-Content-Type-Options": "nosniff" },
+        }), request.url);
+      }
+      if (rateLimit !== "allowed") {
+        return applySecurityHeaders(new Response("Rate limiting is temporarily unavailable.", {
+          status: 503,
+          headers: { "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" },
+        }), request.url);
+      }
+    }
+
     try {
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);

@@ -1,6 +1,8 @@
 import { env as cloudflareEnv } from "cloudflare:workers";
+import { hasAdminPasswordSession, isAdminPasswordConfigured } from "@/lib/admin-password.server";
+import { normalizeInternalRedirect } from "@/lib/request-security";
 
-type Env = Record<string, unknown> & { YUME_DB?: unknown; YUME_AUTH_SESSION_SECRET?: string; TELEGRAM_ADMIN_ID?: string };
+type Env = Record<string, unknown> & { YUME_DB?: unknown; YUME_AUTH_SESSION_SECRET?: string; TELEGRAM_ADMIN_ID?: string; YUME_ADMIN_PASSWORD?: string };
 type Statement = { bind(...values: unknown[]): Statement; first<T = Record<string, unknown>>(): Promise<T | null>; all<T = Record<string, unknown>>(): Promise<{ results: T[] }>; run(): Promise<unknown> };
 type DB = { prepare(sql: string): Statement; batch(statements: Statement[]): Promise<unknown[]> };
 const COOKIE = "__Host-yume-session";
@@ -19,6 +21,8 @@ export async function handleAdminNotifications(request: Request) {
   try {
     const session = await db.prepare("SELECT u.id, u.telegram_user_id, s.expires_at FROM yume_sessions s JOIN yume_users u ON u.id=s.user_id WHERE s.token_hash=? AND u.provider='telegram'").bind(await hash(token, secret)).first<{ id: string; telegram_user_id: string | null; expires_at: number }>();
     if (!session || session.expires_at <= Date.now() || session.telegram_user_id !== adminId) return json({ error: "forbidden" }, 403);
+    if (!isAdminPasswordConfigured(e)) return json({ error: "admin_password_not_configured" }, 503);
+    if (!await hasAdminPasswordSession(request, e)) return json({ error: "admin_password_required" }, 428);
     const raw = await request.text();
     if (raw.length > 4096) return json({ error: "request_too_large" }, 413);
     let payload: unknown; try { payload = JSON.parse(raw); } catch { return json({ error: "invalid_request" }, 400); }
@@ -27,8 +31,8 @@ export async function handleAdminNotifications(request: Request) {
     if (typeof title !== "string" || !title.trim() || title.trim().length > 120 || typeof body !== "string" || !body.trim() || body.trim().length > 2000) return json({ error: "invalid_notification" }, 400);
     let target: string | null = null;
     if (targetUrl !== undefined && targetUrl !== null && targetUrl !== "") {
-      if (typeof targetUrl !== "string" || !targetUrl.startsWith("/") || targetUrl.startsWith("//") || targetUrl.length > 500) return json({ error: "invalid_target_url" }, 400);
-      target = targetUrl;
+      target = normalizeInternalRedirect(targetUrl);
+      if (!target) return json({ error: "invalid_target_url" }, 400);
     }
     const id = crypto.randomUUID();
     await db.batch([

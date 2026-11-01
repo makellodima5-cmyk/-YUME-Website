@@ -2,8 +2,9 @@ import { env as cloudflareEnv } from "cloudflare:workers";
 import type { Anime } from "@/data/anime";
 import { readCatalogState, submitCatalogMutation } from "@/data/catalog-r2.server";
 import { retryAfterMilliseconds } from "@/data/retry-after";
+import { hasAdminPasswordSession, isAdminPasswordConfigured } from "@/lib/admin-password.server";
 
-type Env = Record<string,unknown> & { YUME_DB?:D1Database; TELEGRAM_ADMIN_ID?:string; YUME_AUTH_SESSION_SECRET?:string };
+type Env = Record<string,unknown> & { YUME_DB?:D1Database; TELEGRAM_ADMIN_ID?:string; YUME_AUTH_SESSION_SECRET?:string; YUME_ADMIN_PASSWORD?:string };
 type Video={url?:string|null;playerUrl?:string|null;name?:string|null;kind?:string|null};
 type Source={id:string;videos?:Video[]|null};
 type Payload={data?:{animes?:Source[]};errors?:{message?:string}[]};
@@ -31,6 +32,8 @@ export async function handleAdminTrailers(request:Request):Promise<Response>{
   if(request.method!=="GET"&&request.method!=="POST")return json({error:"method_not_allowed"},405);
   if(request.method==="POST"&&!sameOrigin(request))return json({error:"cross_origin_request"},403);
   const e=env();if(!await authorize(request,e))return json({isAdmin:false,error:"admin_required"},403);
+  if(!isAdminPasswordConfigured(e))return json({isAdmin:false,error:"admin_password_not_configured"},503);
+  if(!await hasAdminPasswordSession(request,e))return json({isAdmin:false,error:"admin_password_required"},428);
   try{
     const state=await readCatalogState();const meta=state.metadata;
     const total=state.items.length,found=state.items.filter(a=>Boolean(a.youtubeTrailerId)).length,missing=total-found;
