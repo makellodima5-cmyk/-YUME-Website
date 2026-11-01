@@ -36,7 +36,7 @@ describe("shared catalogue snapshot KV cache", () => {
     const kv = new MemoryKV();
     const state = { ...emptyCatalogState(), revision: 9, items: [anime("3", "Integrity")] };
     await writeCatalogSnapshotCache(kv as unknown as KVNamespace, state);
-    kv.values.set("yume:catalog:v1:revision:9:chunk:0", "broken");
+    kv.values.set("yume:catalog:v1:revision:9:chunk:0", "!!!");
     expect(await readCatalogSnapshotCache(kv as unknown as KVNamespace, 9)).toBeNull();
   });
 });
@@ -49,5 +49,15 @@ describe("shared catalogue snapshot KV cache", () => {
     await pruneCatalogSnapshotCache(kv as unknown as KVNamespace, 11);
     expect(kv.values.has("yume:catalog:v1:revision:1:manifest")).toBe(false);
     expect(await readCatalogSnapshotCache(kv as unknown as KVNamespace, 11)).toEqual(newState);
+  });
+
+  it("does not let a delayed cache repair roll back the published pointer", async () => {
+    const kv = new MemoryKV();
+    const older = { ...emptyCatalogState(), revision: 10, items: [anime("10", "Older")] };
+    const latest = { ...emptyCatalogState(), revision: 11, items: [anime("11", "Latest")] };
+    await writeCatalogSnapshotCache(kv as unknown as KVNamespace, latest);
+    await writeCatalogSnapshotCache(kv as unknown as KVNamespace, older, false);
+    expect(await readCatalogCachePointer(kv as unknown as KVNamespace)).toMatchObject({ revision: 11 });
+    expect(await readCatalogSnapshotCache(kv as unknown as KVNamespace, 10)).toEqual(older);
   });
 
