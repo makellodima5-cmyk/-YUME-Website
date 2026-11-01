@@ -2,9 +2,10 @@ import { env as cloudflareEnv } from "cloudflare:workers";
 import type { Anime } from "@/data/anime";
 import { readCatalogState, submitCatalogMutation } from "@/data/catalog-r2.server";
 import { retryAfterMilliseconds } from "@/data/retry-after";
+import { hasAdminPasswordSession, isAdminPasswordConfigured } from "@/lib/admin-password.server";
 
 type RuntimeGlobal = typeof globalThis & { __YUME_RUNTIME_ENV__?: unknown };
-type Environment = Record<string, unknown> & { TELEGRAM_ADMIN_ID?: string; YUME_AUTH_SESSION_SECRET?: string; YUME_DB?: D1Database };
+type Environment = Record<string, unknown> & { TELEGRAM_ADMIN_ID?: string; YUME_AUTH_SESSION_SECRET?: string; YUME_ADMIN_PASSWORD?: string; YUME_DB?: D1Database };
 type ShikimoriAnime = {
   id: string; name?: string | null; russian?: string | null; english?: string | string[] | null;
   kind?: string | null; score?: string | number | null; status?: string | null;
@@ -225,6 +226,8 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
   const env = environment();
   const auth = await authorize(request,env);
   if (!auth) return json({ isAdmin:false,error:"admin_required" },403);
+  if (!isAdminPasswordConfigured(env)) return json({ isAdmin:false,error:"admin_password_not_configured" },503);
+  if (!await hasAdminPasswordSession(request,env)) return json({ isAdmin:false,error:"admin_password_required" },428);
   const { db, actor } = auth;
   try {
     const state = await readCatalogState(true);
