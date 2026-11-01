@@ -83,7 +83,13 @@ export async function applySecurityHeaders(response: Response, requestUrl: strin
     if (!headers.has("Content-Security-Policy")) {
       const nonce = createNonce();
       response = await addNonceToHtml(response, nonce);
-      headers = new Headers(response.headers);
+      const rewrittenHeaders = new Headers(response.headers);
+      for (const [name, value] of headers.entries()) {
+        if (!rewrittenHeaders.has(name) && !["content-length", "content-md5", "etag"].includes(name.toLowerCase())) {
+          rewrittenHeaders.set(name, value);
+        }
+      }
+      headers = rewrittenHeaders;
       headers.set("Content-Security-Policy", policy(nonce));
       if (!headers.has("Content-Security-Policy-Report-Only")) {
         headers.set("Content-Security-Policy-Report-Only", policy(nonce));
