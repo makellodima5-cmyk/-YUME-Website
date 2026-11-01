@@ -166,6 +166,18 @@ export default {
             catch(error){console.warn("[YUME][CATALOG_READER] Shared cache repair failed.",error);}
           }
         }
+        if(!state&&!fresh&&!cachePointer){
+          // With no published KV pointer there is no safe revision to serve during an import.
+          // Recover from R2 only after verifying that the authoritative state is not pending.
+          const body=await readObjectText(env,pointer.key);
+          if(body===null||hex(await sha256(body))!==pointer.checksum)return json({error:"catalog_revision_checksum_mismatch"},503);
+          const latestState=JSON.parse(body) as CatalogState;
+          if(!latestState||latestState.schemaVersion!==1||latestState.revision!==pointer.revision||!Array.isArray(latestState.items))return json({error:"invalid_catalog_revision"},503);
+          if(latestState.metadata.admin_import_cache_pending==="1")return json({error:"published_catalog_cache_unavailable"},503);
+          state=latestState;
+          try{await writeCatalogSnapshotCache(env.YUME_CATALOG_CACHE,state,false);}
+          catch(error){console.warn("[YUME][CATALOG_READER] Shared cache repair failed.",error);}
+        }
         if(!state){
           if(!fresh)return json({error:"published_catalog_cache_unavailable"},503);
           const body=await readObjectText(env,pointer.key);
