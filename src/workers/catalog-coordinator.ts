@@ -125,7 +125,7 @@ export class CatalogCoordinator extends DurableObject<CoordinatorEnv>{
   private async publishCacheIfReady(state:CatalogState):Promise<void>{
     // Keep the public KV snapshot pinned while a bulk import is in progress.
     // Admin requests use the Reader's authoritative fresh=1 path to see checkpoints.
-    if(state.metadata.admin_import_state==="running")return;
+    if(state.metadata.admin_import_cache_pending==="1")return;
     await writeCatalogSnapshotCache(this.env.YUME_CATALOG_CACHE,state);
     await pruneCatalogSnapshotCache(this.env.YUME_CATALOG_CACHE,state.revision);
   }
