@@ -860,15 +860,22 @@ function Index() {
   useEffect(() => {
     if (!isAdmin) return;
     let cancelled = false;
+    let timer: number | undefined;
+    let failures = 0;
+    const schedule = (milliseconds:number) => {
+      if (!cancelled) timer = window.setTimeout(() => void poll(),milliseconds);
+    };
     const poll = async () => {
+      let succeeded = false;
       try {
-        const response = await fetch("/api/admin/catalog-import?status=1", { credentials: "same-origin", cache: "no-store" });
+        const response = await fetch("/api/admin/catalog-import?status=1", { credentials: "same-origin", cache: "no-store", signal: AbortSignal.timeout(10000) });
         const payload = await response.json().catch(() => ({})) as {
           isAdmin?: boolean; target?:number; cursor?:number; added?:number; skipped?:number; incomplete?:number; errors?:number; state?:string; delayMs?:number; bulkImportBlock18Plus?:boolean;
           qualitySummary?:typeof catalogQualitySummary; quality?:typeof catalogQuality; qualityOffset?:number; qualityHasMore?:boolean;
           metadataRefresh?: { autoEnabled?: boolean; phase?: string; metadataOffset?: number; screenshotOffset?: number; total?: number; screenshotFailures?: number; screenshotRetries?: number; done?: boolean; stats?: MetadataCatalogStats; bannersFoundTotal?: number; bannersMatchedTotal?: number; bannersSavedTotal?: number; bannersAddedTotal?: number; bannerErrorsTotal?: number; bannersStored?: number };
         };
-        if (cancelled || !response.ok || payload.isAdmin !== true || !payload.metadataRefresh) return;
+        if (cancelled) return;
+        if (!response.ok || payload.isAdmin !== true || !payload.metadataRefresh) throw new Error("Admin status unavailable");
         const status = payload.metadataRefresh;
         if (status.stats) setMetadataCatalogStats(status.stats);
         if (payload.qualitySummary) setCatalogQualitySummary(payload.qualitySummary);
@@ -899,14 +906,22 @@ function Index() {
             bannersStored: status.bannersStored ?? current.bannersStored,
           };
         });
-        const trailerResponse = await fetch("/api/admin/trailers", {credentials:"same-origin",cache:"no-store"});
+        const trailerResponse = await fetch("/api/admin/trailers", {credentials:"same-origin",cache:"no-store",signal:AbortSignal.timeout(10000)});
         const trailerStats = await trailerResponse.json().catch(() => ({})) as {isAdmin?:boolean;total?:number;pending?:number;checked?:number;found?:number;missing?:number;catalogTotal?:number;catalogWithTrailer?:number};
-        if (!cancelled && trailerResponse.ok && trailerStats.isAdmin) setAdminStats({total:trailerStats.catalogTotal??0,pending:trailerStats.pending??0,checked:trailerStats.checked??0,found:trailerStats.catalogWithTrailer??0,missing:trailerStats.missing??0});
-      } catch { /* Status polling must not interrupt the server-side job. */ }
+        if (!trailerResponse.ok || !trailerStats.isAdmin) throw new Error("Trailer status unavailable");
+        if (!cancelled) setAdminStats({total:trailerStats.catalogTotal??0,pending:trailerStats.pending??0,checked:trailerStats.checked??0,found:trailerStats.catalogWithTrailer??0,missing:trailerStats.missing??0});
+        succeeded = true;
+      } catch {
+        /* Keep the admin UI responsive while backing off failed status requests. */
+      } finally {
+        if (!cancelled) {
+          failures = succeeded ? 0 : Math.min(failures + 1,5);
+          schedule(succeeded ? 10000 : Math.min(60000,5000 * Math.pow(2,failures - 1)));
+        }
+      }
     };
     void poll();
-    const timer = window.setInterval(() => void poll(), 5000);
-    return () => { cancelled = true; window.clearInterval(timer); };
+    return () => { cancelled = true; if (timer !== undefined) window.clearTimeout(timer); };
   }, [isAdmin, language]);
   const refreshCatalogQuality = async (offset = catalogQualityOffset) => {
     const response = await fetch("/api/admin/catalog-import?qualityOffset=" + Math.max(0,offset), {credentials:"same-origin",cache:"no-store"});
