@@ -215,6 +215,9 @@ export function adminCatalogImportResumeCursor(values:Record<string,string>,stat
   const savedCursor=Number(values.admin_import_cursor??1);
   return previousFilter===statusFilter&&Number.isSafeInteger(savedCursor)&&savedCursor>0?savedCursor:1;
 }
+export function adminCatalogImportShouldResumeCounters(values:Record<string,string>,statusFilter:string):boolean{
+  return values.admin_import_status_filter===statusFilter&&["paused","partial"].includes(values.admin_import_state??"")&&adminCatalogImportResumeCursor(values,statusFilter)>1;
+}
 
 export async function handleAdminCatalogImport(request: Request): Promise<Response> {
   if (request.method !== "GET" && request.method !== "POST") return json({ error:"method_not_allowed" },405);
@@ -264,7 +267,10 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
       if (current.state === "running") return json({isAdmin:true,...current,message:"Импорт уже выполняется."},409);
       const runId = crypto.randomUUID();
       const resumeCursor = adminCatalogImportResumeCursor(state.metadata,statusFilter);
-      await saveMetadata({admin_import_run_id:runId,admin_import_started_at:String(Date.now()),admin_import_target:String(target),admin_import_cursor:String(resumeCursor),admin_import_added:"0",admin_import_skipped:"0",admin_import_incomplete:"0",admin_import_errors:"0",admin_import_state:"running",admin_import_cache_pending:"1",admin_import_status_filter:statusFilter,admin_import_run_block_18_plus:current.bulkImportBlock18Plus?"1":"0",admin_import_resume_at:"0"});
+      const resumeCounters = adminCatalogImportShouldResumeCounters(state.metadata,statusFilter);
+      const nextAdded = resumeCounters ? current.added : 0;
+      const alreadyComplete = resumeCounters && nextAdded >= target;
+      await saveMetadata({admin_import_run_id:runId,admin_import_started_at:String(Date.now()),admin_import_target:String(target),admin_import_cursor:String(resumeCursor),admin_import_added:String(nextAdded),admin_import_skipped:String(resumeCounters?current.skipped:0),admin_import_incomplete:String(resumeCounters?current.incomplete:0),admin_import_errors:String(resumeCounters?current.errors:0),admin_import_state:alreadyComplete?"completed":"running",admin_import_cache_pending:alreadyComplete?"0":"1",admin_import_status_filter:statusFilter,admin_import_run_block_18_plus:current.bulkImportBlock18Plus?"1":"0",admin_import_resume_at:"0"});
       await audit(db,"catalog.import.start","success",{target,statusFilter},actor);
       return json({isAdmin:true,...metadata(await readCatalogState(true)),message:"Импорт подготовлен."});
     }
