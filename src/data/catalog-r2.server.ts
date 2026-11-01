@@ -19,8 +19,8 @@ const RETRYABLE_READER_STATUSES = new Set([429, 500, 502, 503, 504]);
 const sleep = (milliseconds:number) => new Promise(resolve => setTimeout(resolve,milliseconds));
 function safeErrorBody(value:string):string {
   return value.slice(0,1200)
-    .replace(/(authorization|x-yume-reader-token|x-amz-security-token|secretaccesskey|accesskeyid|token)\\s*[:=]\\s*[^\\s<"]+/gi,"$1=[REDACTED]")
-    .replace(/Bearer\\s+[^\\s<"]+/gi,"Bearer [REDACTED]");
+    .replace(/(authorization|x-yume-reader-token|x-amz-security-token|secretaccesskey|accesskeyid|token)\s*[:=]\s*[^\s<"]+/gi,"$1=[REDACTED]")
+    .replace(/Bearer\s+[^\s<"]+/gi,"Bearer [REDACTED]");
 }
 export async function readCatalogState(): Promise<CatalogState> {
   const reader = environment().YUME_CATALOG_READER;
