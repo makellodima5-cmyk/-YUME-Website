@@ -283,7 +283,8 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
       catch (error) {
         const retryAfterMs = Number((error as {retryAfterMs?:number}).retryAfterMs ?? 5000);
         await saveMetadata({admin_import_errors:String(progress.errors+1),admin_import_resume_at:String(Date.now()+retryAfterMs),admin_import_state:"paused"});
-        return json({isAdmin:true,...progress,retryAfterMs,error:error instanceof Error?error.message:"Ошибка Shikimori"},503);
+        const paused = metadata(await readCatalogState(true));
+        return json({isAdmin:true,...paused,retryAfterMs,error:error instanceof Error?error.message:"Ошибка Shikimori"},503);
       }
       if (!page.length) {
         await saveMetadata({admin_import_state:"partial",admin_import_cache_pending:"0"});
