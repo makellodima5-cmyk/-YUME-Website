@@ -15,17 +15,53 @@ function environment(): RuntimeEnv {
 
 export type R2CatalogResult = { items: Anime[]; revision: number; updatedAt: string; error: string | null };
 
+const RETRYABLE_READER_STATUSES = new Set([429, 500, 502, 503, 504]);
+const sleep = (milliseconds:number) => new Promise(resolve => setTimeout(resolve,milliseconds));
+function safeErrorBody(value:string):string {
+  return value.slice(0,1200)
+    .replace(/(authorization|x-yume-reader-token|x-amz-security-token|secretaccesskey|accesskeyid|token)\s*[:=]\s*[^\s<"]+/gi,"$1=[REDACTED]")
+    .replace(/Bearer\s+[^\s<"]+/gi,"Bearer [REDACTED]");
+}
 export async function readCatalogState(): Promise<CatalogState> {
   const reader = environment().YUME_CATALOG_READER;
   if (!reader) throw new Error("YUME_CATALOG_READER binding is unavailable.");
   const token = environment().YUME_CATALOG_READER_TOKEN ?? "";
-  const response = await reader.fetch("https://catalog-reader.internal/v1/state", { method: "GET", headers: { "X-Yume-Reader-Token": token } });
-  if (!response.ok) throw new Error("Private catalogue reader returned HTTP " + response.status);
-  const state = await response.json() as CatalogState;
-  if (state.schemaVersion !== 1 || !Array.isArray(state.items) || !Number.isSafeInteger(state.revision)) {
-    throw new Error("R2 catalogue state has an unsupported schema.");
+  let lastError:unknown;
+  for(let attempt=0;attempt<3;attempt++){
+    const started=Date.now();
+    try{
+      const response = await reader.fetch("https://catalog-reader.internal/v1/state", {
+        method:"GET",headers:{"X-Yume-Reader-Token":token},signal:AbortSignal.timeout(10000),
+      });
+      if(response.ok){
+        const state = await response.json() as CatalogState;
+        if(state.schemaVersion!==1||!Array.isArray(state.items)||!Number.isSafeInteger(state.revision))
+          throw new Error("R2 catalogue state has an unsupported schema.");
+        return state;
+      }
+      const body=safeErrorBody(await response.text().catch(()=>""));
+      const requestId=response.headers.get("cf-ray")??response.headers.get("x-amz-request-id");
+      console.error("[YUME][CATALOG_R2] Reader request failed.",{
+        status:response.status,attempt:attempt+1,durationMs:Date.now()-started,
+        requestId,body:body||null,
+      });
+      lastError=new Error("Private catalogue reader returned HTTP "+response.status);
+      if(!RETRYABLE_READER_STATUSES.has(response.status)||attempt===2)break;
+      const retryAfter=Number(response.headers.get("retry-after"));
+      await sleep(Number.isFinite(retryAfter)&&retryAfter>0?Math.min(5000,retryAfter*1000):250*Math.pow(2,attempt));
+    }catch(error){
+      lastError=error;
+      const retryable=error instanceof Error&&(error.name==="TimeoutError"||error.name==="AbortError"||error instanceof TypeError);
+      console.error("[YUME][CATALOG_R2] Reader transport failed.",{
+        attempt:attempt+1,durationMs:Date.now()-started,
+        errorName:error instanceof Error?error.name:"UnknownError",
+        errorMessage:error instanceof Error?error.message:"Unknown reader transport error",
+      });
+      if(!retryable||attempt===2)break;
+      await sleep(250*Math.pow(2,attempt));
+    }
   }
-  return state;
+  throw lastError instanceof Error?lastError:new Error("Private catalogue reader failed.");
 }
 
 export async function getR2Catalog(): Promise<R2CatalogResult> {
@@ -56,14 +92,26 @@ export type { CatalogPointer, CatalogState };
 export async function submitCatalogMutation(mutation: import("./catalog-r2.shared").CatalogMutation, operationId = crypto.randomUUID().replace(/-/g, "")): Promise<{ revision: number; operationId: string }> {
   const coordinator = environment().YUME_CATALOG_COORDINATOR;
   if (!coordinator) throw new Error("YUME_CATALOG_COORDINATOR binding is unavailable.");
-  const response = await coordinator.fetch("https://catalog-coordinator.internal/internal/v1/mutate", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ operationId, mutation }),
-  });
-  const result = await response.json().catch(() => ({})) as { ok?: boolean; revision?: number; operationId?: string; error?: string };
-  if (!response.ok || result.ok !== true || !Number.isSafeInteger(result.revision)) {
-    throw new Error(result.error ?? "Catalogue mutation was not committed.");
+  let lastError:unknown;
+  for(let attempt=0;attempt<3;attempt++){
+    let response:Response;
+    try{
+      response = await coordinator.fetch("https://catalog-coordinator.internal/internal/v1/mutate",{
+        method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({operationId,mutation}),signal:AbortSignal.timeout(12000),
+      });
+    }catch(error){
+      lastError=error;
+      if(attempt===2)break;
+      await sleep(300*Math.pow(2,attempt));
+      continue;
+    }
+    const result = await response.json().catch(() => ({})) as {ok?:boolean;revision?:number;operationId?:string;error?:string};
+    if(response.ok&&result.ok===true&&Number.isSafeInteger(result.revision))
+      return {revision:result.revision!,operationId};
+    lastError=new Error(result.error??"Catalogue mutation was not committed (HTTP "+response.status+").");
+    if(!RETRYABLE_READER_STATUSES.has(response.status)||attempt===2)break;
+    await sleep(300*Math.pow(2,attempt));
   }
-  return { revision: result.revision!, operationId };
+  throw lastError instanceof Error?lastError:new Error("Catalogue mutation was not committed.");
 }
