@@ -605,6 +605,10 @@ function Index() {
           setAdminCheckComplete(true);
           return;
         }
+        // The Telegram administrator must be able to open the panel before
+        // entering the additional Cloudflare-secret password. The password
+        // challenge belongs inside the panel, not in the menu visibility gate.
+        setIsAdmin(true);
         if (gate.confirmed !== true) {
           setAdminPasswordRequired(true);
           setAdminCheckComplete(true);
