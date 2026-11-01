@@ -1,6 +1,7 @@
 import { env as cloudflareEnv } from "cloudflare:workers";
 import { validateTelegramInitData, type TelegramValidatedUser } from "@/data/telegram-init-data";
 import { MAX_SAVED_ANIME_IDS, normalizeSavedAnimeIds } from "@/data/telegram-library.shared";
+import { isSameOriginRequest } from "@/lib/request-security";
 
 type TelegramEnvironment = Record<string, unknown> & {
   TELEGRAM_BOT_TOKEN?: string;
@@ -153,29 +154,6 @@ type SavedListType = "favorite" | "watchlist";
 
 type SavedAnimeRow = { anime_id: string };
 type AuthenticatedSessionRow = { user_id: string; expires_at: number };
-
-function isSameOriginRequest(request: Request): boolean {
-  const expectedOrigin = new URL(request.url).origin;
-  const origin = request.headers.get("origin");
-  if (origin) {
-    try {
-      return new URL(origin).origin === expectedOrigin;
-    } catch {
-      return false;
-    }
-  }
-
-  const referer = request.headers.get("referer");
-  if (referer) {
-    try {
-      return new URL(referer).origin === expectedOrigin;
-    } catch {
-      return false;
-    }
-  }
-
-  return request.headers.get("sec-fetch-site") === "same-origin";
-}
 
 async function authenticatedTelegramUserId(request: Request, db: TelegramDatabase, secret: string): Promise<string | null> {
   const token = readCookie(request, SESSION_COOKIE);
@@ -586,35 +564,31 @@ export async function handleTelegramAccountDelete(request: Request): Promise<Res
       return jsonResponse({ error: "authentication_required" }, 401, [clearSessionCookie()]);
     }
     const userId = session.user_id;
-    // Delete known account-owned tables explicitly as well as relying on FK cascades.
+    const telegramUserId = await db.prepare("SELECT telegram_user_id FROM yume_users WHERE id = ?")
+      .bind(userId).first<{ telegram_user_id: string }>();
+    if (!telegramUserId) return jsonResponse({ error: "account_not_found" }, 404, [clearSessionCookie()]);
+
+    // Clear every account-owned relation, including tables that intentionally do
+    // not use foreign keys, then anonymize retained audit/content records.
     await db.batch([
+      db.prepare("DELETE FROM yume_browser_auth WHERE user_id = ? OR telegram_user_id = ?").bind(userId, telegramUserId.telegram_user_id),
+      db.prepare("DELETE FROM yume_notification_reads_v2 WHERE user_id = ?").bind(userId),
+      db.prepare("DELETE FROM yume_notification_targets WHERE user_id = ?").bind(userId),
       db.prepare("DELETE FROM yume_notification_reads WHERE user_id = ?").bind(userId),
       db.prepare("DELETE FROM yume_notification_dismissals WHERE user_id = ?").bind(userId),
+      db.prepare("DELETE FROM yume_anime_subscriptions WHERE user_id = ?").bind(userId),
       db.prepare("DELETE FROM yume_view_history WHERE user_id = ?").bind(userId),
       db.prepare("DELETE FROM yume_saved_anime WHERE user_id = ?").bind(userId),
+      db.prepare("DELETE FROM yume_telegram_subscription_state WHERE telegram_user_id = ?").bind(telegramUserId.telegram_user_id),
+      db.prepare("UPDATE yume_notifications SET created_by = NULL WHERE created_by = ?").bind(userId),
+      db.prepare("UPDATE yume_admin_audit_log SET actor_telegram_id = NULL WHERE actor_telegram_id = ?").bind(telegramUserId.telegram_user_id),
       db.prepare("DELETE FROM yume_sessions WHERE user_id = ?").bind(userId),
       db.prepare("DELETE FROM yume_users WHERE id = ?").bind(userId),
     ]);
     return jsonResponse({ deleted: true }, 200, [clearSessionCookie()]);
   } catch (error) {
-    // A missing future table should not block account deletion; retry without history-table access.
-    try {
-      const tokenHash = await sessionTokenHash(token, secret);
-      const session = await db.prepare("SELECT user_id, expires_at FROM yume_sessions WHERE token_hash = ?")
-        .bind(tokenHash).first<AuthenticatedSessionRow>();
-      if (!session || session.expires_at <= Date.now()) return jsonResponse({ error: "authentication_required" }, 401, [clearSessionCookie()]);
-      await db.batch([
-        db.prepare("DELETE FROM yume_notification_reads WHERE user_id = ?").bind(session.user_id),
-        db.prepare("DELETE FROM yume_notification_dismissals WHERE user_id = ?").bind(session.user_id),
-        db.prepare("DELETE FROM yume_saved_anime WHERE user_id = ?").bind(session.user_id),
-        db.prepare("DELETE FROM yume_sessions WHERE user_id = ?").bind(session.user_id),
-        db.prepare("DELETE FROM yume_users WHERE id = ?").bind(session.user_id),
-      ]);
-      return jsonResponse({ deleted: true }, 200, [clearSessionCookie()]);
-    } catch (retryError) {
-      console.error("[YUME] Account deletion failed:", retryError, error);
-      return jsonResponse({ error: "account_deletion_failed" }, 503);
-    }
+    console.error("[YUME] Account deletion failed:", error);
+    return jsonResponse({ error: "account_deletion_failed" }, 503);
   }
 }
 
