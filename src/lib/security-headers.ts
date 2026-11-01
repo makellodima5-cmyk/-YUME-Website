@@ -1,32 +1,74 @@
 /**
  * Apply browser security headers to every Worker response.
  *
- * CSP is enforced with an explicit resource allowlist. Inline scripts remain
- * permitted for the current SSR hydration bootstrap; third-party script
- * execution is restricted to the documented Telegram origins. Keep Report-Only
- * enabled as well so any missed resource dependency is observable during rollout.
+ * HTML uses a fresh per-response nonce for script/style elements. This keeps
+ * the SSR bootstrap working without granting the page blanket inline-script
+ * execution. Inline style attributes remain allowed for existing React UI
+ * styles; style elements are nonce-gated.
  */
-const CSP_POLICY = [
-  "default-src 'self'",
-  "base-uri 'self'",
-  "object-src 'none'",
-  "frame-ancestors 'self'",
-  "form-action 'self' https://oauth.telegram.org",
-  "script-src 'self' 'unsafe-inline' https://telegram.org https://oauth.telegram.org",
-  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-  "font-src 'self' https://fonts.gstatic.com data:",
-  "img-src 'self' data: blob: https:",
-  "connect-src 'self' https://telegram.org https://*.telegram.org https://shikimori.one https://*.shikimori.one",
-  "frame-src 'self' https://oauth.telegram.org https://www.youtube-nocookie.com https://youtube.com https://www.youtube.com https://*.youtube.com https://kodik.info https://*.kodik.info https://kodik.biz https://*.kodik.biz https://kodik.cc https://*.kodik.cc https://kodik.online https://*.kodik.online https://kodikplayer.com https://*.kodikplayer.com https://kodikres.com https://*.kodikres.com",
-  "media-src 'self' blob: data: https:",
-  "worker-src 'self' blob:",
-  "manifest-src 'self'",
-  "report-uri /api/csp-report",
-  "report-to csp-endpoint",
-].join("; ");
+type RewriterElement = { setAttribute(name: string, value: string): void };
+type Rewriter = {
+  on(selector: string, handlers: { element(element: RewriterElement): void }): Rewriter;
+  transform(response: Response): Response;
+};
+type RewriterConstructor = new () => Rewriter;
 
-export function applySecurityHeaders(response: Response, requestUrl: string): Response {
+function createNonce(): string {
+  const bytes = new Uint8Array(18);
+  crypto.getRandomValues(bytes);
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+function policy(nonce: string): string {
+  return [
+    "default-src 'self'",
+    "base-uri 'self'",
+    "object-src 'none'",
+    "frame-ancestors 'self'",
+    "form-action 'self' https://oauth.telegram.org",
+    `script-src 'self' 'nonce-${nonce}' https://telegram.org https://oauth.telegram.org`,
+    "script-src-attr 'none'",
+    `style-src 'self' 'nonce-${nonce}' 'unsafe-inline' https://fonts.googleapis.com`,
+    `style-src-elem 'self' 'nonce-${nonce}' https://fonts.googleapis.com`,
+    "style-src-attr 'unsafe-inline'",
+    "font-src 'self' https://fonts.gstatic.com data:",
+    "img-src 'self' data: blob: https:",
+    "connect-src 'self' https://telegram.org https://*.telegram.org https://shikimori.one https://*.shikimori.one",
+    "frame-src 'self' https://oauth.telegram.org https://www.youtube-nocookie.com https://youtube.com https://www.youtube.com https://*.youtube.com https://kodik.info https://*.kodik.info https://kodik.biz https://*.kodik.biz https://kodik.cc https://*.kodik.cc https://kodik.online https://*.kodik.online https://kodikplayer.com https://*.kodikplayer.com https://kodikres.com https://*.kodikres.com",
+    "media-src 'self' blob: data: https:",
+    "worker-src 'self' blob:",
+    "manifest-src 'self'",
+    "report-uri /api/csp-report",
+    "report-to csp-endpoint",
+  ].join("; ");
+}
+
+async function addNonceToHtml(response: Response, nonce: string): Promise<Response> {
+  const RewriterClass = (globalThis as typeof globalThis & { HTMLRewriter?: RewriterConstructor }).HTMLRewriter;
+  if (typeof RewriterClass === "function") {
+    return new RewriterClass()
+      .on("script", { element: (element) => element.setAttribute("nonce", nonce) })
+      .on("style", { element: (element) => element.setAttribute("nonce", nonce) })
+      .transform(response);
+  }
+
+  // Node-based unit tests and non-Workers adapters use a safe buffered fallback.
+  const html = await response.text();
+  const rewritten = html.replace(/<(script|style)\b([^>]*)>/gi, (_match, tag: string, attributes: string) => {
+    const withoutNonce = attributes.replace(/\snonce=(?:"[^"]*"|'[^']*'|[^\s>]+)/i, "");
+    return `<${tag}${withoutNonce} nonce="${nonce}">`;
+  });
   const headers = new Headers(response.headers);
+  headers.delete("Content-Length");
+  headers.delete("Content-MD5");
+  headers.delete("ETag");
+  return new Response(rewritten, { status: response.status, statusText: response.statusText, headers });
+}
+
+export async function applySecurityHeaders(response: Response, requestUrl: string): Promise<Response> {
+  let headers = new Headers(response.headers);
   if (!headers.has("X-Content-Type-Options")) headers.set("X-Content-Type-Options", "nosniff");
   if (!headers.has("X-Permitted-Cross-Domain-Policies")) headers.set("X-Permitted-Cross-Domain-Policies", "none");
   if (!headers.has("X-DNS-Prefetch-Control")) headers.set("X-DNS-Prefetch-Control", "off");
@@ -36,15 +78,26 @@ export function applySecurityHeaders(response: Response, requestUrl: string): Re
     headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
   }
 
-  // Apply CSP only to HTML documents. Preserve stricter route-specific policies.
   const contentType = headers.get("Content-Type") ?? "";
   if (contentType.toLowerCase().includes("text/html")) {
     if (!headers.has("Content-Security-Policy")) {
-      headers.set("Content-Security-Policy", CSP_POLICY);
+      const nonce = createNonce();
+      response = await addNonceToHtml(response, nonce);
+      headers = new Headers(response.headers);
+      headers.set("Content-Security-Policy", policy(nonce));
+      if (!headers.has("Content-Security-Policy-Report-Only")) {
+        headers.set("Content-Security-Policy-Report-Only", policy(nonce));
+      }
+      // A nonce is unique to this HTML response; it must not be replayed from a
+      // shared cache as a reusable script authorization token.
+      headers.set("Cache-Control", "private, no-store");
+      headers.delete("Content-Length");
+      headers.delete("Content-MD5");
+      headers.delete("ETag");
+    } else if (!headers.has("Content-Security-Policy-Report-Only")) {
+      headers.set("Content-Security-Policy-Report-Only", headers.get("Content-Security-Policy")!);
     }
-    if (!headers.has("Content-Security-Policy-Report-Only")) {
-      headers.set("Content-Security-Policy-Report-Only", CSP_POLICY);
-    }
+
     if (!headers.has("Reporting-Endpoints")) {
       try {
         const endpointUrl = new URL("/api/csp-report", requestUrl).toString();
