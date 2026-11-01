@@ -7,6 +7,7 @@ class MemoryKV {
   values = new Map<string, string>();
   async put(key: string, value: string) { this.values.set(key, value); }
   async get(key: string) { return this.values.get(key) ?? null; }
+  async delete(key: string) { this.values.delete(key); }
 }
 
 const anime = (id: string, title: string): Anime => ({
