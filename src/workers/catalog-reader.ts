@@ -64,7 +64,7 @@ async function signedGet(env:Env,key:string):Promise<Response>{
   const date=amzDate.slice(0,8);
   const scope=date+"/auto/s3/aws4_request";
   const payloadHash=hex(await sha256(""));
-  const canonicalHeaders="host:"+host+"\n"+"x-amz-content-sha256:"+payloadHash+"\n"+"x-amz-date:"+amzDate+"\n"+"x-amz-security-token:"+credentials.sessionToken+"\n";
+  // SigV4 canonical headers are joined with one newline by canonicalRequest below.\n  // A trailing newline here would create an extra blank line and invalidate every signature.\n  const canonicalHeaders=["host:"+host,"x-amz-content-sha256:"+payloadHash,"x-amz-date:"+amzDate,"x-amz-security-token:"+credentials.sessionToken].join("\\n");
   const signedHeaders="host;x-amz-content-sha256;x-amz-date;x-amz-security-token";
   const canonicalRequest=["GET",path,"",canonicalHeaders,signedHeaders,payloadHash].join("\n");
   const stringToSign=["AWS4-HMAC-SHA256",amzDate,scope,hex(await sha256(canonicalRequest))].join("\n");
