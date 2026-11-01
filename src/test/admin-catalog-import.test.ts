@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { adminCatalogImportPageOperationId, adminCatalogImportResumeCursor, chunkAdminCatalogIds, isCatalogMetadataIncomplete, mapAdminCatalogScreenshots, normalizeAdminCatalogIds, isValidAdminImportTarget } from "@/data/admin-catalog-import.server";
+import { adminCatalogImportPageOperationId, adminCatalogImportResumeCursor, adminCatalogImportShouldResumeCounters, chunkAdminCatalogIds, isCatalogMetadataIncomplete, mapAdminCatalogScreenshots, normalizeAdminCatalogIds, isValidAdminImportTarget } from "@/data/admin-catalog-import.server";
 
 describe("admin catalog import target", () => {
   it("accepts targets above the old 500-title application cap", () => {
@@ -121,5 +121,18 @@ describe("bulk import page checkpoint resume", () => {
     expect(adminCatalogImportResumeCursor({}, "")).toBe(1);
     expect(adminCatalogImportResumeCursor({admin_import_cursor:"21",admin_import_status_filter:"ongoing"}, "released")).toBe(1);
     expect(adminCatalogImportResumeCursor({admin_import_cursor:"0",admin_import_status_filter:""}, "")).toBe(1);
+  });
+});
+
+describe("bulk import resume counters", () => {
+  it("preserves accumulated counts for a paused or partial run with the same filter", () => {
+    expect(adminCatalogImportShouldResumeCounters({admin_import_cursor:"12",admin_import_status_filter:"",admin_import_state:"paused"}, "")).toBe(true);
+    expect(adminCatalogImportShouldResumeCounters({admin_import_cursor:"8",admin_import_status_filter:"ongoing",admin_import_state:"partial"}, "ongoing")).toBe(true);
+  });
+
+  it("resets counters for completed runs, changed filters, or missing checkpoints", () => {
+    expect(adminCatalogImportShouldResumeCounters({admin_import_cursor:"12",admin_import_status_filter:"",admin_import_state:"completed"}, "")).toBe(false);
+    expect(adminCatalogImportShouldResumeCounters({admin_import_cursor:"12",admin_import_status_filter:"ongoing",admin_import_state:"paused"}, "released")).toBe(false);
+    expect(adminCatalogImportShouldResumeCounters({admin_import_cursor:"1",admin_import_status_filter:"",admin_import_state:"paused"}, "")).toBe(false);
   });
 });
