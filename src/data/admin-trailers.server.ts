@@ -61,5 +61,5 @@ export async function handleAdminTrailers(request:Request):Promise<Response>{
     await submitCatalogMutation({type:"batch",mutations});
     const after=await readCatalogState();const afterFound=after.items.filter(a=>Boolean(a.youtubeTrailerId)).length;
     return json({isAdmin:true,total:queue.length,pending:Math.max(0,queue.length-nextCursor),checked:nextChecked,found:nextFound,catalogTotal:after.items.length,catalogWithTrailer:afterFound,missing:after.items.length-afterFound,delayMs:DELAY});
-  }catch(error){console.error("[YUME][ADMIN_TRAILERS] Operation failed.",error);if(request.method==="GET"){return json({isAdmin:true,total:0,pending:0,checked:0,found:0,missing:0,catalogTotal:0,catalogWithTrailer:0,delayMs:DELAY,catalogUnavailable:true,error:"catalog_unavailable"});}return json({isAdmin:true,error:"admin_operation_failed",message:error instanceof Error?error.message:"Unknown error"},503);}
+  }catch(error){console.error("[YUME][ADMIN_TRAILERS] Operation failed.",error);if(request.method==="GET"){return json({isAdmin:true,catalogUnavailable:true,error:"catalog_unavailable",retryAfterMs:5000},503);}return json({isAdmin:true,error:"admin_operation_failed",message:error instanceof Error?error.message:"Unknown error"},503);}
 }
