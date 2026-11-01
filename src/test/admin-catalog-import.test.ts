@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chunkAdminCatalogIds, isCatalogMetadataIncomplete, mapAdminCatalogScreenshots, normalizeAdminCatalogIds, isValidAdminImportTarget } from "@/data/admin-catalog-import.server";
+import { adminCatalogImportPageOperationId, chunkAdminCatalogIds, isCatalogMetadataIncomplete, mapAdminCatalogScreenshots, normalizeAdminCatalogIds, isValidAdminImportTarget } from "@/data/admin-catalog-import.server";
 
 describe("admin catalog import target", () => {
   it("accepts targets above the old 500-title application cap", () => {
@@ -94,5 +94,19 @@ describe("catalog import screenshot policy", () => {
   it("falls back to the original image when no preview URL is available", () => {
     expect(mapAdminCatalogScreenshots({ screenshots: [{ originalUrl: "https://cdn.example.org/frame.jpg" }] }))
       .toEqual([{ original: "https://cdn.example.org/frame.jpg", preview: "https://cdn.example.org/frame.jpg" }]);
+  });
+});
+
+describe("bulk import idempotency keys", () => {
+  it("uses the same operation ID for retries of the same run and page", () => {
+    const first = adminCatalogImportPageOperationId("b4a90f8e-22d7-4a3b-93a7-0d9c40b17d51", 12);
+    const retry = adminCatalogImportPageOperationId("b4a90f8e-22d7-4a3b-93a7-0d9c40b17d51", 12);
+    expect(retry).toBe(first);
+    expect(adminCatalogImportPageOperationId("b4a90f8e-22d7-4a3b-93a7-0d9c40b17d51", 13)).not.toBe(first);
+    expect(first).toMatch(/^[A-Za-z0-9_-]{12,80}$/);
+  });
+
+  it("uses a safe fallback for legacy runs and invalid cursors", () => {
+    expect(adminCatalogImportPageOperationId("", 0)).toBe("importlegacy00000001");
   });
 });
