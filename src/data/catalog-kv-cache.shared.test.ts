@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { emptyCatalogState } from "@/data/catalog-r2.shared";
-import { pruneCatalogSnapshotCache, readCatalogCachePointer, readCatalogSnapshotCache, writeCatalogSnapshotCache } from "@/data/catalog-kv-cache.shared";
+import { pruneCatalogSnapshotCache, readCatalogAdminCachePointer, readCatalogCachePointer, readCatalogSnapshotCache, writeCatalogAdminSnapshotCache, writeCatalogSnapshotCache } from "@/data/catalog-kv-cache.shared";
 import type { Anime } from "@/data/anime";
 
 class MemoryKV {
@@ -61,3 +61,41 @@ describe("shared catalogue snapshot KV cache", () => {
     expect(await readCatalogSnapshotCache(kv as unknown as KVNamespace, 10)).toEqual(older);
   });
 
+
+
+describe("private admin catalogue checkpoint cache", () => {
+  it("tracks import checkpoints without moving the public catalogue pointer", async () => {
+    const kv = new MemoryKV();
+    const published = { ...emptyCatalogState(), revision: 7, items: [anime("7", "Published")] };
+    const checkpoint = {
+      ...emptyCatalogState(),
+      revision: 8,
+      metadata: { admin_import_cache_pending: "1" },
+      items: [anime("7", "Published"), anime("8", "Import checkpoint")],
+    };
+
+    await writeCatalogSnapshotCache(kv as unknown as KVNamespace, published);
+    await writeCatalogAdminSnapshotCache(kv as unknown as KVNamespace, checkpoint);
+
+    expect(await readCatalogCachePointer(kv as unknown as KVNamespace)).toMatchObject({ revision: 7 });
+    expect(await readCatalogAdminCachePointer(kv as unknown as KVNamespace)).toMatchObject({ revision: 8 });
+    expect(await readCatalogSnapshotCache(kv as unknown as KVNamespace, 7)).toEqual(published);
+    expect(await readCatalogSnapshotCache(kv as unknown as KVNamespace, 8)).toEqual(checkpoint);
+  });
+
+  it("replaces the previous private checkpoint without deleting the published snapshot", async () => {
+    const kv = new MemoryKV();
+    const published = { ...emptyCatalogState(), revision: 10, items: [anime("10", "Published")] };
+    const first = { ...emptyCatalogState(), revision: 11, metadata: { admin_import_cache_pending: "1" }, items: [anime("11", "First")] };
+    const second = { ...emptyCatalogState(), revision: 12, metadata: { admin_import_cache_pending: "1" }, items: [anime("12", "Second")] };
+
+    await writeCatalogSnapshotCache(kv as unknown as KVNamespace, published);
+    await writeCatalogAdminSnapshotCache(kv as unknown as KVNamespace, first);
+    await writeCatalogAdminSnapshotCache(kv as unknown as KVNamespace, second);
+
+    expect(await readCatalogAdminCachePointer(kv as unknown as KVNamespace)).toMatchObject({ revision: 12 });
+    expect(await readCatalogSnapshotCache(kv as unknown as KVNamespace, 12)).toEqual(second);
+    expect(await readCatalogSnapshotCache(kv as unknown as KVNamespace, 10)).toEqual(published);
+    expect(await readCatalogSnapshotCache(kv as unknown as KVNamespace, 11)).toBeNull();
+  });
+});
