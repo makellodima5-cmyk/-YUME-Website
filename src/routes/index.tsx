@@ -609,8 +609,8 @@ function Index() {
           setAdminCheckComplete(true);
           return;
         }
-        const response = await fetch("/api/admin/trailers", { credentials: "same-origin", cache: "no-store" });
-        const result = await response.json().catch(() => ({})) as {
+        const trailerResponse = await fetch("/api/admin/trailers", { credentials: "same-origin", cache: "no-store" });
+        const result = await trailerResponse.json().catch(() => ({})) as {
           isAdmin?: boolean; total?: number; pending?: number; checked?: number; found?: number;
           missing?: number; catalogTotal?: number; catalogWithTrailer?: number;
           auto?: {enabled?:boolean;running?:boolean;nextRunAt?:number|null;lastRunAt?:number|null;retryAt?:number|null;lastError?:string};
@@ -627,7 +627,7 @@ function Index() {
           return;
         }
         setIsAdmin(true);
-        if (!response.ok) {
+        if (!trailerResponse.ok) {
           setAdminStats(null);
           setAdminMessage(language === "ru"
             ? "Доступ администратора подтверждён, но каталог временно недоступен. Панель сохранена, состояние будет проверено повторно."
