@@ -110,3 +110,23 @@ export async function readCatalogCachePointer(kv: KVNamespace): Promise<CatalogC
     return null;
   }
 }
+
+export async function pruneCatalogSnapshotCache(kv: KVNamespace, currentRevision: number): Promise<void> {
+  const obsoleteRevision = currentRevision - 10;
+  if (obsoleteRevision < 1) return;
+  const base = `${PREFIX}:revision:${obsoleteRevision}`;
+  const manifestRaw = await kv.get(`${base}:manifest`);
+  if (!manifestRaw) return;
+  let manifest: CacheManifest;
+  try {
+    manifest = JSON.parse(manifestRaw) as CacheManifest;
+  } catch {
+    await kv.delete(`${base}:manifest`);
+    return;
+  }
+  if (!Number.isSafeInteger(manifest.chunks) || manifest.chunks < 0 || manifest.chunks > 10000) return;
+  await Promise.all([
+    ...Array.from({ length: manifest.chunks }, (_, index) => kv.delete(`${base}:chunk:${index}`)),
+    kv.delete(`${base}:manifest`),
+  ]);
+}
