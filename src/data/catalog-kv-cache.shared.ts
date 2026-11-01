@@ -39,7 +39,7 @@ function fromBase64(value: string): Uint8Array {
   return bytes;
 }
 
-export async function writeCatalogSnapshotCache(kv: KVNamespace, state: CatalogState): Promise<void> {
+export async function writeCatalogSnapshotCache(kv: KVNamespace, state: CatalogState, publishPointer = true): Promise<void> {
   const bytes = encoder.encode(JSON.stringify(state));
   const chunks: Uint8Array[] = [];
   for (let offset = 0; offset < bytes.length; offset += CHUNK_BYTES) {
@@ -56,11 +56,13 @@ export async function writeCatalogSnapshotCache(kv: KVNamespace, state: CatalogS
 
   await Promise.all(chunks.map((chunk, index) => kv.put(`${base}:chunk:${index}`, toBase64(chunk))));
   await kv.put(`${base}:manifest`, JSON.stringify(manifest));
-  await kv.put(`${PREFIX}:current`, JSON.stringify({
-    schemaVersion: 1,
-    revision: state.revision,
-    updatedAt: state.updatedAt,
-  } satisfies CatalogCachePointer));
+  if (publishPointer) {
+    await kv.put(`${PREFIX}:current`, JSON.stringify({
+      schemaVersion: 1,
+      revision: state.revision,
+      updatedAt: state.updatedAt,
+    } satisfies CatalogCachePointer));
+  }
 }
 
 export async function readCatalogSnapshotCache(kv: KVNamespace, revision: number): Promise<CatalogState | null> {
@@ -81,7 +83,12 @@ export async function readCatalogSnapshotCache(kv: KVNamespace, revision: number
     Array.from({ length: manifest.chunks }, (_, index) => kv.get(`${base}:chunk:${index}`)),
   );
   if (encoded.some((chunk) => chunk === null)) return null;
-  const chunks = encoded.map((chunk) => fromBase64(chunk!));
+  let chunks: Uint8Array[];
+  try {
+    chunks = encoded.map((chunk) => fromBase64(chunk!));
+  } catch {
+    return null;
+  }
   const bytes = new Uint8Array(chunks.reduce((sum, chunk) => sum + chunk.length, 0));
   let offset = 0;
   for (const chunk of chunks) {
