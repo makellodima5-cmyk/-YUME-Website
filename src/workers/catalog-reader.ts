@@ -100,8 +100,8 @@ async function readObjectText(env:Env,key:string):Promise<string|null>{
       if(response.status===404)return null;
       if(response.ok)return await response.text();
       const body=safeR2Body(await response.text().catch(()=> ""));
-      const code=/<Code>([^<]{1,120})<\\/Code>/i.exec(body)?.[1]??null;
-      const requestId=/<RequestId>([^<]{1,160})<\\/RequestId>/i.exec(body)?.[1]??response.headers.get("x-amz-request-id");
+      const code=/<Code>([^<]{1,120})<\/Code>/i.exec(body)?.[1]??null;
+      const requestId=/<RequestId>([^<]{1,160})<\/RequestId>/i.exec(body)?.[1]??response.headers.get("x-amz-request-id");
       console.error("[YUME][CATALOG_READER] R2 upstream rejected object read.",{
         resource:key,status:response.status,code,requestId,attempt:attempt+1,
         durationMs:Date.now()-startedAt,body:body||null,
