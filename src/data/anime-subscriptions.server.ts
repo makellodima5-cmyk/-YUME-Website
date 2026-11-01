@@ -1,5 +1,6 @@
 import { env as cloudflareEnv } from "cloudflare:workers";
 import { readCatalogState } from "@/data/catalog-r2.server";
+import { isSameOriginRequest } from "@/lib/request-security";
 
 type Env = Record<string, unknown> & { YUME_DB?: unknown; YUME_AUTH_SESSION_SECRET?: string };
 type Stmt = { bind(...values: unknown[]): Stmt; first<T = Record<string, unknown>>(): Promise<T | null>; all<T = Record<string, unknown>>(): Promise<{results:T[]}>; run(): Promise<unknown> };
@@ -13,6 +14,7 @@ async function user(request:Request,db:DB,e:Env){const t=cookie(request),s=typeo
 
 export async function handleAnimeSubscriptions(request:Request):Promise<Response>{
 if(!["GET","POST","DELETE"].includes(request.method))return json({error:"method_not_allowed"},405);
+if((request.method==="POST"||request.method==="DELETE")&&!isSameOriginRequest(request))return json({error:"cross_origin_request"},403);
 const e=env(),db=e.YUME_DB as DB|undefined;if(!db||typeof db.prepare!=="function")return json({error:"database_unavailable"},503);
 try{const userId=await user(request,db,e);if(!userId)return json({error:"authentication_required"},401);
 const url=new URL(request.url);let animeId=url.searchParams.get("animeId")??"";
