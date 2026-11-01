@@ -165,6 +165,7 @@ jobs:
             throw new Error("Root Wrangler config is missing the expected YUME_SHIKIMORI_CACHE binding.");
           }
           const expectedRateLimits = [
+            { name: "ADMIN_PASSWORD_RATE_LIMITER", namespaceId: "202611013", limit: 5, period: 60 },
             { name: "KODIK_RATE_LIMITER", namespaceId: "202610271", limit: 30, period: 60 },
             { name: "MEDIA_RATE_LIMITER", namespaceId: "202610272", limit: 600, period: 60 },
             { name: "CSP_REPORT_RATE_LIMITER", namespaceId: "202610273", limit: 30, period: 60 },
