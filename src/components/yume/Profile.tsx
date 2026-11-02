@@ -641,7 +641,7 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
                 <div className="mt-4 rounded-xl border border-destructive/30 bg-destructive/5 p-4" role="alertdialog" aria-labelledby="delete-account-title" aria-describedby="delete-account-description">
                   <h3 id="delete-account-title" className="font-semibold text-destructive">{language === "ru" ? "Удалить аккаунт без возможности восстановления?" : "Permanently delete your account?"}</h3>
                   <p id="delete-account-description" className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                    {language === "ru" ? "Будут удалены аккаунт YUME, все сеансы, избранное, «Смотреть позже», история просмотров и связанные данные. Telegram-аккаунт не удаляется. Восстановить данные нельзя." : "Your YUME account, sessions, favorites, Watch Later, viewing history, and linked data will be deleted. Your Telegram account will not be deleted. This cannot be undone."}
+                    {language === "ru" ? "Будут удалены аккаунт Yubera, все сеансы, избранное, «Смотреть позже», история просмотров и связанные данные. Telegram-аккаунт не удаляется. Восстановить данные нельзя." : "Your Yubera account, sessions, favorites, Watch Later, viewing history, and linked data will be deleted. Your Telegram account will not be deleted. This cannot be undone."}
                   </p>
                   <div className="mt-4 flex flex-wrap justify-end gap-2">
                     <button type="button" disabled={accountBusy} onClick={() => setShowDeleteConfirm(false)} className="rounded-lg border border-border px-3 py-2 text-sm font-semibold hover:bg-accent">{language === "ru" ? "Отмена" : "Cancel"}</button>
@@ -708,32 +708,32 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
                 <section className="rounded-2xl border border-border bg-card/60 p-4 sm:p-5">
                   <p className="text-sm leading-relaxed text-muted-foreground">
                     {language === "ru"
-                      ? "Сбор информации в сети и формирование каталога на сайте YUME осуществляются в автоматическом режиме."
-                      : "Information collection across the web and catalog creation on the YUME website are carried out automatically."}
+                      ? "Сбор информации в сети и формирование каталога на сайте Yubera осуществляются в автоматическом режиме."
+                      : "Information collection across the web and catalog creation on the Yubera website are carried out automatically."}
                   </p>
                 </section>
 
                 <section className="rounded-2xl border border-border bg-card/60 p-4 sm:p-5">
                   <p className="text-sm leading-relaxed text-muted-foreground">
                     {language === "ru"
-                      ? "На сайте YUME представлены сведения о произведениях, а также материалы для бесплатного домашнего ознакомительного просмотра, включая фрагменты материалов, любительские переводы и озвучку. Видеофайлы не хранятся на серверах YUME. На страницах сайта могут использоваться встроенные плееры сторонних сервисов."
-                      : "YUME provides information about works and materials for free, at-home viewing for familiarization, including excerpts, fan translations and voice-overs. Video files are not stored on YUME servers. Pages may use embedded players from third-party services."}
+                      ? "На сайте Yubera представлены сведения о произведениях, а также материалы для бесплатного домашнего ознакомительного просмотра, включая фрагменты материалов, любительские переводы и озвучку. Видеофайлы не хранятся на серверах Yubera. На страницах сайта могут использоваться встроенные плееры сторонних сервисов."
+                      : "Yubera provides information about works and materials for free, at-home viewing for familiarization, including excerpts, fan translations and voice-overs. Video files are not stored on Yubera servers. Pages may use embedded players from third-party services."}
                   </p>
                 </section>
 
                 <section className="rounded-2xl border border-border bg-card/60 p-4 sm:p-5">
                   <p className="text-sm leading-relaxed text-muted-foreground">
                     {language === "ru"
-                      ? "YUME не продаёт представленные на сайте материалы. Контент предназначен исключительно для бесплатного домашнего ознакомительного просмотра."
-                      : "YUME does not sell materials presented on the website. Content is intended exclusively for free, at-home viewing for familiarization."}
+                      ? "Yubera не продаёт представленные на сайте материалы. Контент предназначен исключительно для бесплатного домашнего ознакомительного просмотра."
+                      : "Yubera does not sell materials presented on the website. Content is intended exclusively for free, at-home viewing for familiarization."}
                   </p>
                 </section>
 
                 <section className="rounded-2xl border border-border bg-card/60 p-4 sm:p-5">
                   <p className="text-sm leading-relaxed text-muted-foreground">
                     {language === "ru"
-                      ? "Администрация YUME открыта к сотрудничеству с правообладателями и их уполномоченными представителями."
-                      : "YUME administration welcomes cooperation with copyright holders and their authorized representatives."}
+                      ? "Администрация Yubera открыта к сотрудничеству с правообладателями и их уполномоченными представителями."
+                      : "Yubera administration welcomes cooperation with copyright holders and their authorized representatives."}
                   </p>
                 </section>
 
@@ -743,8 +743,8 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
                   </h3>
                   <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
                     {language === "ru"
-                      ? "Если вы обнаружили на сайте материал, который, по вашему мнению, нарушает авторские права или иные законные интересы либо содержит недостоверную или искажённую информацию о правообладателе, просим связаться с администрацией YUME по адресу:"
-                      : "If you find material on the website that you believe infringes copyright or other lawful interests, or contains inaccurate or misleading information about a rights holder, please contact YUME administration at:"}
+                      ? "Если вы обнаружили на сайте материал, который, по вашему мнению, нарушает авторские права или иные законные интересы либо содержит недостоверную или искажённую информацию о правообладателе, просим связаться с администрацией Yubera по адресу:"
+                      : "If you find material on the website that you believe infringes copyright or other lawful interests, or contains inaccurate or misleading information about a rights holder, please contact Yubera administration at:"}
                   </p>
                   <a
                     href="mailto:yumesupport833@gmail.com"
@@ -770,8 +770,8 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
                 <section className="rounded-2xl border border-border bg-card/60 p-4 sm:p-5">
                   <p className="text-sm leading-relaxed text-muted-foreground">
                     {language === "ru"
-                      ? "Администрация YUME рассматривает обращения правообладателей и их уполномоченных представителей и принимает предусмотренные законодательством меры в установленные законом сроки. Для проверки обращения администрация вправе запросить дополнительные сведения и документы. Порядок рассмотрения официальных заявлений определяется применимым законодательством."
-                      : "YUME administration reviews requests from rights holders and their authorized representatives and takes measures provided by law within the applicable legal time limits. Additional information and documents may be requested to review a request. Official claims are handled in accordance with applicable law."}
+                      ? "Администрация Yubera рассматривает обращения правообладателей и их уполномоченных представителей и принимает предусмотренные законодательством меры в установленные законом сроки. Для проверки обращения администрация вправе запросить дополнительные сведения и документы. Порядок рассмотрения официальных заявлений определяется применимым законодательством."
+                      : "Yubera administration reviews requests from rights holders and their authorized representatives and takes measures provided by law within the applicable legal time limits. Additional information and documents may be requested to review a request. Official claims are handled in accordance with applicable law."}
                   </p>
                 </section>
 
@@ -786,8 +786,8 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
                 <section className="rounded-2xl border border-border bg-card/60 p-4 sm:p-5">
                   <p className="text-sm leading-relaxed text-muted-foreground">
                     {language === "ru"
-                      ? "YUME не взимает плату за просмотр материалов на сайте."
-                      : "YUME does not charge users to view materials on the website."}
+                      ? "Yubera не взимает плату за просмотр материалов на сайте."
+                      : "Yubera does not charge users to view materials on the website."}
                   </p>
                 </section>
               </article>
@@ -795,8 +795,8 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
               <article className="max-w-3xl space-y-3">
                 <p className="text-sm leading-relaxed text-muted-foreground">
                   {language === "ru"
-                    ? `Настоящие Правила использования сайта YUME. Дата последнего обновления: ${SITE_RULES_LAST_UPDATED}.`
-                    : `YUME website terms of use. Last updated: ${SITE_RULES_LAST_UPDATED}.`}
+                    ? `Настоящие Правила использования сайта Yubera. Дата последнего обновления: ${SITE_RULES_LAST_UPDATED}.`
+                    : `Yubera website terms of use. Last updated: ${SITE_RULES_LAST_UPDATED}.`}
                 </p>
                 <div className="space-y-3">
                   {SITE_RULES.map((section, index) => (
@@ -850,7 +850,7 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
                     About the project
                   </p>
                   <h2 className="mt-2 text-3xl font-bold tracking-tight text-foreground">
-                    {language === "ru" ? "О YUME" : "About YUME"}
+                    {language === "ru" ? "О Yubera" : "About Yubera"}
                   </h2>
                   <p className="mt-3 text-base leading-relaxed text-muted-foreground sm:text-lg">
                     {language === "ru"
