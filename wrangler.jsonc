@@ -48,7 +48,7 @@
   "assets": {
     "directory": ".output/public",
     "binding": "ASSETS",
-    "run_worker_first": true
+    "run_worker_first": ["/*", "!/google31ba377df3a22378.html"]
   },
   "rules": [
     {
