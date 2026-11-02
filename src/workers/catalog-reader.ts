@@ -1,5 +1,5 @@
 import { CATALOG_CURRENT_KEY, CATALOG_REVISION_PREFIX, emptyCatalogState, type CatalogPointer, type CatalogState } from "@/data/catalog-r2.shared";
-import { readCatalogAdminCachePointer, readCatalogCachePointer, readCatalogSnapshotCache, writeCatalogSnapshotCache } from "@/data/catalog-kv-cache.shared";
+import { readCatalogAdminCachePointer, readCatalogCachePointer, readCatalogSnapshotCacheText, writeCatalogSnapshotCache } from "@/data/catalog-kv-cache.shared";
 
 type Env = {
   R2_ACCOUNT_ID:string;
@@ -12,7 +12,7 @@ type TemporaryCredentials={accessKeyId:string;secretAccessKey:string;sessionToke
 const encoder=new TextEncoder();
 let cachedCredentials:TemporaryCredentials|null=null;
 let cachedRevision:number|null=null;
-let cachedState:CatalogState|null=null;
+let cachedStateBody:string|null=null;
 function hex(value:ArrayBuffer):string{return [...new Uint8Array(value)].map(byte=>byte.toString(16).padStart(2,"0")).join("");}
 async function sha256(value:string|ArrayBuffer):Promise<ArrayBuffer>{return crypto.subtle.digest("SHA-256",typeof value==="string"?encoder.encode(value):value);}
 async function hmac(key:ArrayBuffer|string,value:string):Promise<ArrayBuffer>{
@@ -79,6 +79,9 @@ async function signedGet(env:Env,key:string):Promise<Response>{
 function json(data:unknown,status=200,headers?:HeadersInit):Response{
   return Response.json(data,{status,headers:{"Cache-Control":"private, no-store",...Object.fromEntries(new Headers(headers))}});
 }
+function jsonText(body:string,status=200,headers?:HeadersInit):Response{
+  return new Response(body,{status,headers:{"Cache-Control":"private, no-store","Content-Type":"application/json; charset=utf-8",...Object.fromEntries(new Headers(headers))}});
+}
 function validToken(supplied:string,expected:string):boolean{
   if(!expected||supplied.length!==expected.length)return false;
   const a=encoder.encode(supplied),b=encoder.encode(expected);let mismatch=0;
@@ -136,34 +139,41 @@ export default {
     try{
       const fresh=new URL(request.url).searchParams.get("fresh")==="1";
       if(fresh){
-        // Admin status/import reads follow the private checkpoint pointer. This
-        // avoids repeated SigV4 signing and R2 object reads for every poll/page.
-        // The public cache pointer remains pinned until the import is complete.
+        // Admin reads follow the private checkpoint pointer without parsing the
+        // complete snapshot in this Worker. The cached JSON is already verified
+        // by its manifest checksum and was written by the trusted coordinator.
         const adminPointer=await readCatalogAdminCachePointer(env.YUME_CATALOG_CACHE);
         if(adminPointer){
-          const adminState=cachedRevision===adminPointer.revision&&cachedState
-            ?cachedState
-            :await readCatalogSnapshotCache(env.YUME_CATALOG_CACHE,adminPointer.revision);
-          if(adminState){
+          const adminBody=cachedRevision===adminPointer.revision&&cachedStateBody
+            ?cachedStateBody
+            :await readCatalogSnapshotCacheText(env.YUME_CATALOG_CACHE,adminPointer.revision);
+          if(adminBody){
             cachedRevision=adminPointer.revision;
-            cachedState=adminState;
+            cachedStateBody=adminBody;
             return request.method==="HEAD"
               ?new Response(null,{status:200,headers:{"X-Yume-Catalog-Revision":String(adminPointer.revision)}})
-              :json(adminState,200,{"X-Yume-Catalog-Revision":String(adminPointer.revision)});
+              :jsonText(adminBody,200,{"X-Yume-Catalog-Revision":String(adminPointer.revision)});
           }
         }
       }
+
       const cachePointer=fresh?null:await readCatalogCachePointer(env.YUME_CATALOG_CACHE);
       let pointer:CatalogPointer|null=cachePointer
-        ? {schemaVersion:1,revision:cachePointer.revision,key:CATALOG_REVISION_PREFIX+cachePointer.revision+".json",operationId:"shared-cache",checksum:"",updatedAt:cachePointer.updatedAt}
-        : await readObject<CatalogPointer>(env,CATALOG_CURRENT_KEY);
-      if(!pointer){const state=emptyCatalogState();return request.method==="HEAD"?new Response(null,{status:200}):json(state);}
+        ?{schemaVersion:1,revision:cachePointer.revision,key:CATALOG_REVISION_PREFIX+cachePointer.revision+".json",operationId:"shared-cache",checksum:"",updatedAt:cachePointer.updatedAt}
+        :await readObject<CatalogPointer>(env,CATALOG_CURRENT_KEY);
+      if(!pointer){
+        const empty=JSON.stringify(emptyCatalogState());
+        return request.method==="HEAD"?new Response(null,{status:200}):jsonText(empty);
+      }
       if(pointer.schemaVersion!==1||!Number.isSafeInteger(pointer.revision)||pointer.key!==CATALOG_REVISION_PREFIX+pointer.revision+".json")return json({error:"invalid_catalog_pointer"},503);
-      let state=fresh?null:cachedRevision===pointer.revision?cachedState:null;
-      if(!fresh&&!state)state=await readCatalogSnapshotCache(env.YUME_CATALOG_CACHE,pointer.revision);
-      if(!state){
-        // KV is eventually consistent. On a cold/missing cache, resolve the authoritative
-        // R2 pointer before loading data so a stale KV pointer cannot poison the cache.
+
+      let body:string|null=!fresh&&cachedRevision===pointer.revision?cachedStateBody:null;
+      if(!fresh&&!body)body=await readCatalogSnapshotCacheText(env.YUME_CATALOG_CACHE,pointer.revision);
+
+      if(!body){
+        // KV is eventually consistent. On a cold/missing cache, resolve the
+        // authoritative R2 pointer before loading data so a stale KV pointer
+        // cannot poison the cache.
         if(cachePointer&&!fresh){
           const latestPointer=await readObject<CatalogPointer>(env,CATALOG_CURRENT_KEY);
           if(!latestPointer||latestPointer.schemaVersion!==1||!Number.isSafeInteger(latestPointer.revision)||latestPointer.key!==CATALOG_REVISION_PREFIX+latestPointer.revision+".json")return json({error:"invalid_catalog_pointer"},503);
@@ -171,41 +181,48 @@ export default {
           if(latestBody===null||hex(await sha256(latestBody))!==latestPointer.checksum)return json({error:"catalog_revision_checksum_mismatch"},503);
           const latestState=JSON.parse(latestBody) as CatalogState;
           if(!latestState||latestState.schemaVersion!==1||latestState.revision!==latestPointer.revision||!Array.isArray(latestState.items))return json({error:"invalid_catalog_revision"},503);
-          if(latestState.metadata.admin_import_cache_pending==="1"){
-            // During an import, never repair a cold public cache from the in-progress R2 revision.
-            // Serve only the last published snapshot; if it is unavailable, fail closed.
+          if(latestState.metadata?.admin_import_cache_pending==="1"){
+            // During an import, never repair a cold public cache from the
+            // in-progress R2 revision. Serve only the last published snapshot.
             pointer={...latestPointer,revision:cachePointer.revision,key:CATALOG_REVISION_PREFIX+cachePointer.revision+".json"};
-            state=cachedRevision===pointer.revision?cachedState:await readCatalogSnapshotCache(env.YUME_CATALOG_CACHE,pointer.revision);
-            if(!state)return json({error:"published_catalog_cache_unavailable"},503);
+            body=cachedRevision===pointer.revision?cachedStateBody:await readCatalogSnapshotCacheText(env.YUME_CATALOG_CACHE,pointer.revision);
+            if(!body)return json({error:"published_catalog_cache_unavailable"},503);
           }else{
             pointer=latestPointer;
-            state=latestState;
-            try{await writeCatalogSnapshotCache(env.YUME_CATALOG_CACHE,state,false);}
+            body=latestBody;
+            try{await writeCatalogSnapshotCache(env.YUME_CATALOG_CACHE,latestState,false);}
             catch(error){console.warn("[YUME][CATALOG_READER] Shared cache repair failed.",error);}
           }
         }
-        if(!state&&!fresh&&!cachePointer){
-          // With no published KV pointer there is no safe revision to serve during an import.
-          // Recover from R2 only after verifying that the authoritative state is not pending.
-          const body=await readObjectText(env,pointer.key);
-          if(body===null||hex(await sha256(body))!==pointer.checksum)return json({error:"catalog_revision_checksum_mismatch"},503);
-          const latestState=JSON.parse(body) as CatalogState;
-          if(!latestState||latestState.schemaVersion!==1||latestState.revision!==pointer.revision||!Array.isArray(latestState.items))return json({error:"invalid_catalog_revision"},503);
-          if(latestState.metadata.admin_import_cache_pending==="1")return json({error:"published_catalog_cache_unavailable"},503);
-          state=latestState;
-          try{await writeCatalogSnapshotCache(env.YUME_CATALOG_CACHE,state,false);}
+
+        if(!body&&!fresh&&!cachePointer){
+          // With no published KV pointer there is no safe revision to serve
+          // during an import. Recover from R2 only after verifying it is published.
+          const fallbackBody=await readObjectText(env,pointer.key);
+          if(fallbackBody===null||hex(await sha256(fallbackBody))!==pointer.checksum)return json({error:"catalog_revision_checksum_mismatch"},503);
+          const fallbackState=JSON.parse(fallbackBody) as CatalogState;
+          if(!fallbackState||fallbackState.schemaVersion!==1||fallbackState.revision!==pointer.revision||!Array.isArray(fallbackState.items))return json({error:"invalid_catalog_revision"},503);
+          if(fallbackState.metadata?.admin_import_cache_pending==="1")return json({error:"published_catalog_cache_unavailable"},503);
+          body=fallbackBody;
+          try{await writeCatalogSnapshotCache(env.YUME_CATALOG_CACHE,fallbackState,false);}
           catch(error){console.warn("[YUME][CATALOG_READER] Shared cache repair failed.",error);}
         }
-        if(!state){
+
+        if(!body){
           if(!fresh)return json({error:"published_catalog_cache_unavailable"},503);
-          const body=await readObjectText(env,pointer.key);
-          if(body===null||hex(await sha256(body))!==pointer.checksum)return json({error:"catalog_revision_checksum_mismatch"},503);
-          state=JSON.parse(body) as CatalogState;
-          if(!state||state.schemaVersion!==1||state.revision!==pointer.revision||!Array.isArray(state.items))return json({error:"invalid_catalog_revision"},503);
+          const freshBody=await readObjectText(env,pointer.key);
+          if(freshBody===null||hex(await sha256(freshBody))!==pointer.checksum)return json({error:"catalog_revision_checksum_mismatch"},503);
+          const freshState=JSON.parse(freshBody) as CatalogState;
+          if(!freshState||freshState.schemaVersion!==1||freshState.revision!==pointer.revision||!Array.isArray(freshState.items))return json({error:"invalid_catalog_revision"},503);
+          body=freshBody;
         }
       }
-      if(!fresh){cachedRevision=pointer.revision;cachedState=state;}
-      return request.method==="HEAD"?new Response(null,{status:200,headers:{"X-Yume-Catalog-Revision":String(pointer.revision)}}):json(state,200,{"X-Yume-Catalog-Revision":String(pointer.revision)});
+
+      if(!body)return json({error:"catalog_unavailable"},503);
+      if(!fresh){cachedRevision=pointer.revision;cachedStateBody=body;}
+      return request.method==="HEAD"
+        ?new Response(null,{status:200,headers:{"X-Yume-Catalog-Revision":String(pointer.revision)}})
+        :jsonText(body,200,{"X-Yume-Catalog-Revision":String(pointer.revision)});
     }catch(error){console.error("[YUME][CATALOG_READER] Failed to read R2 catalogue.",error);return json({error:"catalog_unavailable"},503);}
   },
 } satisfies ExportedHandler<Env>;
