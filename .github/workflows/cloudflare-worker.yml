@@ -114,7 +114,7 @@ jobs:
           if (rootConfig.assets?.directory !== ".output/public" || !fs.existsSync(rootConfig.assets.directory)) {
             throw new Error("Root Wrangler config must target the generated public assets.");
           }
-          const expectedWorkerFirst = ["/*", "!/google31ba377df3a22378.html"];
+          const expectedWorkerFirst = ["/*", "!/google31ba377df3a22378.html", "!/google26f6fbefff16894a.html"];
           const workerFirst = config.assets?.run_worker_first;
           const rootWorkerFirst = rootConfig.assets?.run_worker_first;
           const hasExpectedWorkerFirst = (value) => Array.isArray(value)

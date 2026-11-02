@@ -49,7 +49,7 @@
     "directory": ".output/public",
     "binding": "ASSETS",
     "html_handling": "none",
-    "run_worker_first": ["/*", "!/google31ba377df3a22378.html"]
+    "run_worker_first": ["/*", "!/google31ba377df3a22378.html", "!/google26f6fbefff16894a.html"]
   },
   "rules": [
     {
