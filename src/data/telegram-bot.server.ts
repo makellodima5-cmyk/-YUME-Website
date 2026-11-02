@@ -29,22 +29,22 @@ type RuntimeGlobal = typeof globalThis & { __YUME_RUNTIME_ENV__?: unknown };
 const SITE_URL = "https://yume-website.yumesupport833.workers.dev";
 const PLAYER_HELP_CALLBACK = "yume_player_help";
 const CHECK_SUBSCRIPTION_CALLBACK = "yume_check_subscription";
-const FIRST_GATE_MESSAGE = "👀 Кажется, ты на шаг от входа в YUME!\n\nОсталось только подписаться на наш канал. Не переживай, это не квест на 100 серий 😏 Зато будешь в курсе новостей и обновлений проекта.\n\nПодписывайся и заходи! 💜";
-const RETURN_GATE_MESSAGE = "👀 Опа, кажется, ты немного поторопился с выходом из нашего канала!\n\nБез подписки доступ к YUME закрывается 😢 Но не переживай, никто не отбирает у тебя любимое аниме навсегда.\n\nВозвращайся в канал, подписывайся, и мы снова откроем тебе двери! 💜\n\nА то как же мы без тебя? 😏";
-const RESTORED_MESSAGE = "👀 О, явился! Решил, что без YUME жизнь слишком скучная?\n\n🔓 Доступ восстановлен! Возвращайся к аниме, пока мы не добавили тебе арку возвращения 🍿💜";
+const FIRST_GATE_MESSAGE = "👀 Кажется, ты на шаг от входа в Yubera!\n\nОсталось только подписаться на наш канал. Не переживай, это не квест на 100 серий 😏 Зато будешь в курсе новостей и обновлений проекта.\n\nПодписывайся и заходи! 💜";
+const RETURN_GATE_MESSAGE = "👀 Опа, кажется, ты немного поторопился с выходом из нашего канала!\n\nБез подписки доступ к Yubera закрывается 😢 Но не переживай, никто не отбирает у тебя любимое аниме навсегда.\n\nВозвращайся в канал, подписывайся, и мы снова откроем тебе двери! 💜\n\nА то как же мы без тебя? 😏";
+const RESTORED_MESSAGE = "👀 О, явился! Решил, что без Yubera жизнь слишком скучная?\n\n🔓 Доступ восстановлен! Возвращайся к аниме, пока мы не добавили тебе арку возвращения 🍿💜";
 
 function originalWelcomeMessage(firstName?: string): string {
   const safeFirstName = (firstName?.trim() || "друг")
     .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
   return [
-    `<b>🌙 Привет, ${safeFirstName}! Добро пожаловать в YUME.</b>`,
+    `<b>🌙 Привет, ${safeFirstName}! Добро пожаловать в Yubera.</b>`,
     "",
     "Знаешь, иногда одна история может изменить всё.",
     "",
     "<i>Включаешь аниме просто на вечер — и вдруг ловишь себя на том, что переживаешь за героев, не замечаешь, как наступает рассвет, и ещё долго не можешь отпустить эту историю после финальных титров…</i>",
     "",
-    "💜 <b>Именно для таких моментов и существует YUME.</b>",
+    "💜 <b>Именно для таких моментов и существует Yubera.</b>",
     "",
     "Я хочу, чтобы здесь ты находил не просто аниме, а истории, которые попадают прямо в сердце.",
     "",
@@ -67,7 +67,7 @@ const PLAYER_HELP_MESSAGE = `<b>🛠 Не работает плеер?</b>
 
 Если у тебя не открывается плеер или мини-приложение, попробуй следующие шаги:
 
-<b>1. Открой YUME в браузере</b>
+<b>1. Открой Yubera в браузере</b>
 Иногда доступ через Telegram может быть ограничен. Попробуй открыть сайт в обычном браузере.
 
 <b>2. Попробуй отключить VPN</b>
@@ -167,7 +167,7 @@ function returnGateKeyboard(): Record<string, unknown> {
 
 function welcomeKeyboard(): Record<string, unknown> {
   return { inline_keyboard: [
-    [{ text: "🎬 Открыть YUME", web_app: { url: SITE_URL } }],
+    [{ text: "🎬 Открыть Yubera", web_app: { url: SITE_URL } }],
     [{ text: "🛠 Не работает плеер?", callback_data: PLAYER_HELP_CALLBACK }],
   ] };
 }
@@ -216,7 +216,7 @@ export async function handleTelegramWebhook(request: Request): Promise<Response>
         return json({ ok: true, action: "subscription_check_failed" });
       }
       if (!subscribed) {
-        await answerCallback(token, callback.id, "Ты ещё не подписан на канал YUME. Подпишись, затем нажми «Проверить подписку».");
+        await answerCallback(token, callback.id, "Ты ещё не подписан на канал Yubera. Подпишись, затем нажми «Проверить подписку».");
         const gateText = state?.had_access ? RETURN_GATE_MESSAGE : FIRST_GATE_MESSAGE;
         const gateResponse = await telegramApi(token, "editMessageText", {
           chat_id: callback.message.chat.id, message_id: callback.message.message_id,
@@ -289,7 +289,7 @@ export async function handleTelegramWebhook(request: Request): Promise<Response>
         message_id: callback.message.message_id,
         text: PLAYER_HELP_MESSAGE,
         parse_mode: "HTML",
-        reply_markup: { inline_keyboard: [[{ text: "🌐 Открыть YUME в браузере", url: SITE_URL }]] },
+        reply_markup: { inline_keyboard: [[{ text: "🌐 Открыть Yubera в браузере", url: SITE_URL }]] },
       });
       if (!response.ok) {
         const responseText = (await response.text()).slice(0, 500);
@@ -362,13 +362,13 @@ export async function handleTelegramWebhook(request: Request): Promise<Response>
 
   const firstName = message?.from?.first_name?.trim();
   const safeFirstName = (firstName || "друг").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-  let greeting = `<b>🌙 Привет, ${safeFirstName}! Добро пожаловать в YUME.</b>
+  let greeting = `<b>🌙 Привет, ${safeFirstName}! Добро пожаловать в Yubera.</b>
 
 Знаешь, иногда одна история может изменить всё.
 
 <i>Включаешь аниме просто на вечер — и вдруг ловишь себя на том, что переживаешь за героев, не замечаешь, как наступает рассвет, и ещё долго не можешь отпустить эту историю после финальных титров…</i>
 
-💜 <b>Именно для таких моментов и существует YUME.</b>
+💜 <b>Именно для таких моментов и существует Yubera.</b>
 
 Я хочу, чтобы здесь ты находил не просто аниме, а истории, которые попадают прямо в сердце.
 
@@ -398,12 +398,12 @@ export async function handleTelegramWebhook(request: Request): Promise<Response>
       ...(sender.language_code?.trim() ? { languageCode: sender.language_code.trim() } : {}),
     });
     greeting = result === "awaiting_code"
-      ? "🔐 Чтобы завершить вход, отправь сюда 8-символьный код, показанный на странице YUME в браузере. Не отправляй код другим людям."
-      : result === "account_not_found" ? "Аккаунт YUME не найден. Открой сайт, выбери «Регистрация» и повтори попытку."
-      : result === "consent_required" ? "Для регистрации нужно принять оба документа на сайте YUME. Вернись на сайт, отметь оба флажка и начни регистрацию заново."
+      ? "🔐 Чтобы завершить вход, отправь сюда 8-символьный код, показанный на странице Yubera в браузере. Не отправляй код другим людям."
+      : result === "account_not_found" ? "Аккаунт Yubera не найден. Открой сайт, выбери «Регистрация» и повтори попытку."
+      : result === "consent_required" ? "Для регистрации нужно принять оба документа на сайте Yubera. Вернись на сайт, отметь оба флажка и начни регистрацию заново."
       : result === "already_registered" ? "Этот Telegram уже зарегистрирован. Открой сайт и выбери «Вход»."
-      : result === "expired" ? "Ссылка авторизации истекла или уже использована. Вернись на сайт YUME и начни вход заново."
-      : "Не удалось завершить авторизацию. Вернись на сайт YUME и попробуй ещё раз.";
+      : result === "expired" ? "Ссылка авторизации истекла или уже использована. Вернись на сайт Yubera и начни вход заново."
+      : "Не удалось завершить авторизацию. Вернись на сайт Yubera и попробуй ещё раз.";
   } else if (isConfirmationCode) {
     const sender = message?.from;
     if (typeof sender?.id !== "number" || !Number.isSafeInteger(sender.id) || !sender.first_name?.trim()) return json({ ok: true, ignored: true });
@@ -414,12 +414,12 @@ export async function handleTelegramWebhook(request: Request): Promise<Response>
       ...(sender.username?.trim() ? { username: sender.username.trim() } : {}),
       ...(sender.language_code?.trim() ? { languageCode: sender.language_code.trim() } : {}),
     });
-    greeting = result === "ready" ? "✅ Код подтверждён! Вернись во вкладку браузера YUME — вход завершится автоматически."
-      : result === "account_not_found" ? "Аккаунт YUME не найден. Открой сайт, выбери «Регистрация» и повтори попытку."
-      : result === "consent_required" ? "Для регистрации нужно принять оба документа на сайте YUME. Вернись на сайт, отметь оба флажка и начни регистрацию заново."
+    greeting = result === "ready" ? "✅ Код подтверждён! Вернись во вкладку браузера Yubera — вход завершится автоматически."
+      : result === "account_not_found" ? "Аккаунт Yubera не найден. Открой сайт, выбери «Регистрация» и повтори попытку."
+      : result === "consent_required" ? "Для регистрации нужно принять оба документа на сайте Yubera. Вернись на сайт, отметь оба флажка и начни регистрацию заново."
       : result === "already_registered" ? "Этот Telegram уже зарегистрирован. Открой сайт и выбери «Вход»."
-      : result === "expired" ? "Код неверный, истёк или не относится к этому Telegram. Вернись на сайт YUME и начни авторизацию заново."
-      : "Не удалось завершить авторизацию. Вернись на сайт YUME и попробуй ещё раз.";
+      : result === "expired" ? "Код неверный, истёк или не относится к этому Telegram. Вернись на сайт Yubera и начни авторизацию заново."
+      : "Не удалось завершить авторизацию. Вернись на сайт Yubera и попробуй ещё раз.";
   }
 
   let subscriptionGate: "first" | "return" | null = null;
@@ -443,7 +443,7 @@ export async function handleTelegramWebhook(request: Request): Promise<Response>
     const response = await telegramApi(token, "sendMessage", {
       chat_id: chatId, text: greeting, parse_mode: "HTML",
       reply_markup: browserLogin
-        ? { inline_keyboard: [[{ text: "🌸 Открыть YUME", url: SITE_URL }]] }
+        ? { inline_keyboard: [[{ text: "🌸 Открыть Yubera", url: SITE_URL }]] }
         : subscriptionGate === "return"
           ? returnGateKeyboard()
           : subscriptionGate === "first"
