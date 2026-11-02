@@ -67,7 +67,7 @@ function ErrorComponent({ error, reset }: ErrorComponentProps) {
     const details = error instanceof Error
       ? { name: error.name, message: error.message, stack: error.stack }
       : { name: "UnknownError", message: String(error), stack: undefined };
-    console.error("[YUME][PAGE_ERROR] Unhandled route/render error.", {
+    console.error("[Yubera][PAGE_ERROR] Unhandled route/render error.", {
       ...details,
       boundary: "tanstack_root_error_component",
       path: typeof window !== "undefined" ? window.location.pathname : "server",
@@ -75,7 +75,7 @@ function ErrorComponent({ error, reset }: ErrorComponentProps) {
     try {
       reportLovableError(error, { boundary: "tanstack_root_error_component" });
     } catch (reportingError) {
-      console.error("[YUME][PAGE_ERROR] Error reporter itself failed.", reportingError);
+      console.error("[Yubera][PAGE_ERROR] Error reporter itself failed.", reportingError);
     }
   }, [error]);
 
@@ -115,7 +115,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
-      { title: "YUME — смотри аниме онлайн" },
+      { title: "Yubera — смотри аниме онлайн" },
       { name: "description", content: DEFAULT_META_DESCRIPTION },
       { property: "og:site_name", content: SITE_NAME },
       { property: "og:type", content: "website" },
