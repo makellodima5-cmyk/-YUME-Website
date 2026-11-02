@@ -106,6 +106,23 @@ export const Route = createFileRoute("/")({
     rating: search.rating, kind: search.kind, age: search.age, lang: search.lang,
   }),
   loader: async ({ deps }) => {
+    // The admin screen loads its own bounded status/quality APIs. Fetching the
+    // complete public catalogue here only burns the Free Worker CPU budget.
+    if (deps.section === "admin") {
+      return {
+        catalogMode: "paged",
+        anime: [],
+        popular: [],
+        sectionFeeds: { airing: [], newReleases: [], announcements: [] },
+        catalogIds: [],
+        catalogTotal: 0,
+        catalogPage: 1,
+        catalogFacets: null,
+        apiError: null,
+        catalogProgress: { status: "ready" as const, imported: 0, target: 0 },
+      };
+    }
+
     const catalog = await getShikimoriCatalog({ data: {} });
     if (deps.section === "catalog") {
       const allItems = catalog.items;

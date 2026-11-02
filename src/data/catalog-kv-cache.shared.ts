@@ -124,7 +124,7 @@ async function deleteCatalogSnapshotCache(kv: KVNamespace, revision: number): Pr
   }
 }
 
-export async function readCatalogSnapshotCache(kv: KVNamespace, revision: number): Promise<CatalogState | null> {
+export async function readCatalogSnapshotCacheText(kv: KVNamespace, revision: number): Promise<string | null> {
   const base = `${PREFIX}:revision:${revision}`;
   const manifestRaw = await kv.get(`${base}:manifest`);
   if (!manifestRaw) return null;
@@ -155,8 +155,14 @@ export async function readCatalogSnapshotCache(kv: KVNamespace, revision: number
     offset += chunk.length;
   }
   if (bytes.byteLength !== manifest.byteLength || await digest(bytes) !== manifest.checksum) return null;
+  return new TextDecoder().decode(bytes);
+}
+
+export async function readCatalogSnapshotCache(kv: KVNamespace, revision: number): Promise<CatalogState | null> {
+  const body = await readCatalogSnapshotCacheText(kv, revision);
+  if (body === null) return null;
   try {
-    const state = JSON.parse(new TextDecoder().decode(bytes)) as CatalogState;
+    const state = JSON.parse(body) as CatalogState;
     if (!state || state.schemaVersion !== 1 || state.revision !== revision || !Array.isArray(state.items)) return null;
     return state;
   } catch {

@@ -38,7 +38,7 @@ describe("automatic Worker maintenance", () => {
     expect(catalogImporter).toContain("submitCatalogMutation({type:\"upsert\",items:changes})");
     expect(catalogImporter).not.toContain("anime_catalog");
     expect(catalogImporter).not.toContain("UPDATE anime_catalog");
-    expect(catalogImporter).toContain("readCatalogState");
+    expect(catalogImporter).toContain("readAdminCatalogState");
     expect(homeRoute).toContain('action:"refresh_section_metadata"');
     expect(homeRoute).not.toContain("setInterval(() => { void refreshSectionFeeds(); }");
     expect(homeRoute).toContain('anime.status === "Онгоинг"');

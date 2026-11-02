@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { emptyCatalogState } from "@/data/catalog-r2.shared";
-import { pruneCatalogSnapshotCache, readCatalogAdminCachePointer, readCatalogCachePointer, readCatalogSnapshotCache, writeCatalogAdminSnapshotCache, writeCatalogSnapshotCache } from "@/data/catalog-kv-cache.shared";
+import { pruneCatalogSnapshotCache, readCatalogAdminCachePointer, readCatalogCachePointer, readCatalogSnapshotCache, readCatalogSnapshotCacheText, writeCatalogAdminSnapshotCache, writeCatalogSnapshotCache } from "@/data/catalog-kv-cache.shared";
 import type { Anime } from "@/data/anime";
 
 class MemoryKV {
@@ -22,6 +22,7 @@ describe("shared catalogue snapshot KV cache", () => {
     await writeCatalogSnapshotCache(kv as unknown as KVNamespace, state);
     expect(await readCatalogCachePointer(kv as unknown as KVNamespace)).toMatchObject({ revision: 7 });
     expect(await readCatalogSnapshotCache(kv as unknown as KVNamespace, 7)).toEqual(state);
+    expect(await readCatalogSnapshotCacheText(kv as unknown as KVNamespace, 7)).toBe(JSON.stringify(state));
   });
 
   it("stores large UTF-8 snapshots as multiple chunks without breaking Cyrillic text", async () => {
