@@ -1,7 +1,7 @@
-# Yume: architecture design for R2 catalogue and write-only D1 journal
+# Yubera: architecture design for R2 catalogue and write-only D1 journal
 
 **Date:** 31 October 2026  
-**Repository:** \`makellodima5-cmyk/-YUME-Website\`  
+**Repository:** \`makellodima5-cmyk/-Yubera-Website\`  
 **Audited baseline:** \`main\` at \`edb67cc61208c85e70edba8c394b70cb60edc930\`  
 **Design branch:** \`feature/yume-d1-r2-architecture\`  
 **Status:** Stage 1 design baseline. Stage 2 implementation must follow this design and its acceptance gates.
@@ -32,7 +32,7 @@ The current catalogue is not duplicated as a mutable 26-table relational structu
 
 ### 2.2 Components and permissions
 
-1. **Public Yume Worker**
+1. **Public Yubera Worker**
    - Keeps the D1 binding for users, authentication, personal library, subscriptions and notifications.
    - Has a Durable Object namespace binding for the private catalogue coordinator.
    - Has a Service Binding to the private catalogue reader.
@@ -48,9 +48,9 @@ The current catalogue is not duplicated as a mutable 26-table relational structu
    - Never lists the bucket and never writes or deletes objects.
 
 3. **Private Catalogue Coordinator Durable Object**
-   - There is one logical singleton object for the Yume catalogue. All catalogue mutations go through it: admin import, single-title import, bulk import, delete, exclusions, metadata repair, screenshot enrichment, trailer changes, episode updates and Kodik availability changes.
+   - There is one logical singleton object for the Yubera catalogue. All catalogue mutations go through it: admin import, single-title import, bulk import, delete, exclusions, metadata repair, screenshot enrichment, trailer changes, episode updates and Kodik availability changes.
    - It owns the durable pending-operation log, operation IDs, revision sequencing, retry state and the R2 write capability.
-   - It has the R2 bucket binding and the D1 binding used solely to append the catalogue journal. These bindings exist in the separate coordinator Worker script, not in the public Yume Worker.
+   - It has the R2 bucket binding and the D1 binding used solely to append the catalogue journal. These bindings exist in the separate coordinator Worker script, not in the public Yubera Worker.
    - It serialises mutation commands with a monotonic sequence allocated in a SQLite storage transaction. The DO processes pending operations in sequence order under `blockConcurrencyWhile`; external I/O awaits cannot cause a later command to overtake an earlier pending command.
    - It persists accepted commands before performing external side effects and uses its Durable Object storage and Alarm API to resume incomplete work after failures or restarts.
    - If an alarm attempt fails repeatedly, the handler records the attempt and schedules a new alarm explicitly. Do not assume Cloudflare's bounded automatic alarm retries are an unlimited retry service.
