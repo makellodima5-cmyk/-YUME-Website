@@ -1,4 +1,4 @@
-# YUME security audit: Stage 2
+# Yubera security audit: Stage 2
 
 **Audit date:** 2026-10-27  
 **Scope:** source review of the working branch against `main`, read-only production HTTP/browser probes, automated CI, and the limited CertScore public scan. This is not a penetration test, legal opinion, or certification.
@@ -7,12 +7,12 @@
 
 ### Cookie consent and analytics
 - The production first layer exposed “Essential only” and “Accept all” but no granular settings action. The branch now adds “Settings / Настроить”, an optional analytics toggle, and explicit save/refusal choices.
-- An isolated live browser test confirmed the existing opt-in/refusal path: YUME analytics identifiers and POSTs appeared after opt-in and were removed/stopped after refusal in the observed window.
+- An isolated live browser test confirmed the existing opt-in/refusal path: Yubera analytics identifiers and POSTs appeared after opt-in and were removed/stopped after refusal in the observed window.
 - Global Privacy Control was indeterminate in the external scanner. The branch now honours `navigator.globalPrivacyControl === true` in the browser and `Sec-GPC: 1` in the analytics endpoint, even if an older opt-in cookie remains. Both branches have tests.
 - Analytics event identifiers are hashed server-side; the reviewed handler does not read or store raw client IP addresses. This does not establish what hosting providers include in their own infrastructure logs.
 
 ### Third-party image cookies
-- Shikimori poster responses return `Server: ddos-guard` and `Set-Cookie` values named `__ddg1_`, `__ddg8_`, `__ddg9_`, and `__ddg10_`. These are from the third-party resource/protection layer, not YUME analytics. The exact purpose of every cookie is not authoritatively documented by the primary sources reviewed.
+- Shikimori poster responses return `Server: ddos-guard` and `Set-Cookie` values named `__ddg1_`, `__ddg8_`, `__ddg9_`, and `__ddg10_`. These are from the third-party resource/protection layer, not Yubera analytics. The exact purpose of every cookie is not authoritatively documented by the primary sources reviewed.
 - Rather than block a likely protective mechanism, the branch routes catalog posters and screenshot previews/links through a restricted same-origin proxy. It accepts HTTPS static image paths only from the exact Shikimori host allowlist, refuses redirects and non-image responses, caps output at 8 MiB, and does not forward upstream `Set-Cookie` headers. Tests cover allowed/blocked URLs, redirects, and cookie-header isolation.
 - This behavior is not live until the branch is released. The production network scan must confirm that poster and screenshot requests succeed and that the browser no longer receives these third-party cookies for those assets.
 
