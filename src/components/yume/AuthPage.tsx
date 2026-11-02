@@ -150,10 +150,10 @@ export function AuthPage({ mode, language, onModeChange, onPrivacy, onRules, onC
           <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-sky-500/10 text-sky-400">
             <Send className="h-7 w-7" />
           </div>
-          <h1 className="text-center text-2xl font-bold">{isRegister ? (isRu ? "Регистрация" : "Create an account") : (isRu ? "Вход в аккаунт" : "Sign in to YUME")}</h1>
+          <h1 className="text-center text-2xl font-bold">{isRegister ? (isRu ? "Регистрация" : "Create an account") : (isRu ? "Вход в аккаунт" : "Sign in to Yubera")}</h1>
           <p className="mx-auto mt-2 max-w-sm text-center text-sm leading-relaxed text-muted-foreground">
             {isRegister
-              ? (isRu ? "Создай аккаунт YUME через Telegram, чтобы сохранять личные списки и историю." : "Create your YUME account through Telegram to save your lists and history.")
+              ? (isRu ? "Создай аккаунт Yubera через Telegram, чтобы сохранять личные списки и историю." : "Create your Yubera account through Telegram to save your lists and history.")
               : (isRu ? "Войди через Telegram, чтобы получить доступ к своему профилю и сохранённым данным." : "Sign in through Telegram to access your profile and saved data.")}
           </p>
 
