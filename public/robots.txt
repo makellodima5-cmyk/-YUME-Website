@@ -1,4 +1,66 @@
+# Public pages are crawlable. Internal API endpoints are not useful search landing pages.
 User-agent: *
 Allow: /
+Disallow: /api/
+
+# OpenAI search indexing, separate from training
+User-agent: OAI-SearchBot
+Allow: /
+Disallow: /api/
+
+# OpenAI user-requested fetches
+User-agent: ChatGPT-User
+Allow: /
+Disallow: /api/
+
+# OpenAI model-training crawler; allowed independently
+User-agent: GPTBot
+Allow: /
+Disallow: /api/
+
+# Anthropic search, training and user-requested crawlers
+User-agent: ClaudeBot
+Allow: /
+Disallow: /api/
+
+User-agent: Claude-SearchBot
+Allow: /
+Disallow: /api/
+
+User-agent: Claude-User
+Allow: /
+Disallow: /api/
+
+# Perplexity search and user-requested fetchers
+User-agent: PerplexityBot
+Allow: /
+Disallow: /api/
+
+User-agent: Perplexity-User
+Allow: /
+Disallow: /api/
+
+# Applebot search crawler; Extended is a usage-control token
+User-agent: Applebot
+Allow: /
+Disallow: /api/
+
+User-agent: Applebot-Extended
+Allow: /
+Disallow: /api/
+
+# Googlebot search crawler; Extended is a usage-control token
+User-agent: Googlebot
+Allow: /
+Disallow: /api/
+
+User-agent: Google-Extended
+Allow: /
+Disallow: /api/
+
+# Microsoft Bing Search
+User-agent: Bingbot
+Allow: /
+Disallow: /api/
 
 Sitemap: https://yume-website.yumesupport833.workers.dev/sitemap.xml

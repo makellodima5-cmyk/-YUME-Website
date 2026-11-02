@@ -67,10 +67,10 @@ export const Route = createFileRoute("/anime/$animeId")({
   },
   head: ({ loaderData }) => {
     const anime = loaderData?.anime;
-    const title = anime ? `${anime.title} — смотреть аниме | YUME` : "Аниме не найдено | YUME";
+    const title = anime ? `${anime.title} — смотреть аниме | Yubera` : "Аниме не найдено | Yubera";
     const description = sanitizeMetaDescription(
       anime?.description,
-      anime ? `Смотри ${anime.title} на YUME — информация, рейтинг, жанры и трейлер аниме.` : "Это аниме не найдено. Открой каталог YUME, чтобы найти другие тайтлы.",
+      anime ? `Смотри ${anime.title} на Yubera — информация, рейтинг, жанры и трейлер аниме.` : "Это аниме не найдено. Открой каталог Yubera, чтобы найти другие тайтлы.",
     );
     const image = absoluteImageUrl(anime?.bannerUrl ?? anime?.posterUrl);
     const canonical = anime ? canonicalUrl(`/anime/${encodeURIComponent(anime.id)}`) : canonicalUrl("/");
@@ -101,8 +101,8 @@ function AnimeNotFoundRoute() {
         <h1 className="text-2xl font-bold">{language === "en" ? "Anime not found" : "Аниме не найдено"}</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           {language === "en"
-            ? "This title does not exist in the YUME catalog."
-            : "Такого тайтла нет в каталоге YUME."}
+            ? "This title does not exist in the Yubera catalog."
+            : "Такого тайтла нет в каталоге Yubera."}
         </p>
         <a
           href="/?section=catalog"
@@ -135,7 +135,7 @@ function AnimeDetailPage() {
   const screenshotTriggerRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
-    if (anime) document.title = displayAnimeTitle(anime, language) + (language === "en" ? " — watch anime | YUME" : " — смотреть аниме | YUME");
+    if (anime) document.title = displayAnimeTitle(anime, language) + (language === "en" ? " — watch anime | Yubera" : " — смотреть аниме | Yubera");
   }, [anime, language]);
 
   useEffect(() => {
@@ -723,7 +723,7 @@ function AnimeDetailPage() {
                         ? (language === "ru"
                           ? "Не удалось синхронизировать список с аккаунтом. Проверь соединение и повтори действие."
                           : "Could not sync this list to your account. Check your connection and try again.")
-                        : (language === "ru" ? "Сохранено в аккаунте YUME." : "Saved to your YUME account.")}
+                        : (language === "ru" ? "Сохранено в аккаунте Yubera." : "Saved to your Yubera account.")}
                     {authRequired && (
                       <span className="mt-2 flex flex-wrap gap-2">
                         <button type="button" onClick={() => requestAuth("login")} className="font-semibold text-primary underline underline-offset-4">{language === "ru" ? "Войти через Telegram" : "Sign in with Telegram"}</button>
