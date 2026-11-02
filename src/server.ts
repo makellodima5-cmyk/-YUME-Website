@@ -185,7 +185,10 @@ export default {
           headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" },
         });
       }
-      return assets.fetch(request);
+      const assetResponse = await assets.fetch(request);
+      if (assetResponse.status !== 404) return assetResponse;
+      // If the static asset manifest does not contain the verification file,
+      // let TanStack Start's explicit server route handle the exact URL.
     }
 
     if (requestUrl.pathname === "/api/csp-report") {
