@@ -99,11 +99,11 @@ export function TelegramStarsDonation({ open, onClose }: Props) {
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-black/65 px-5 py-4 backdrop-blur-md [padding-top:env(safe-area-inset-top)] [padding-bottom:env(safe-area-inset-bottom)]" onMouseDown={(event) => { if (event.target === event.currentTarget && !loading) onClose(); }}>
       <section role="dialog" aria-modal="true" aria-labelledby="yubera-donation-title" className="relative my-auto max-h-[62dvh] w-full max-w-[560px] overflow-x-hidden overflow-y-auto overscroll-contain rounded-[1.65rem] border border-fuchsia-500/60 bg-[#10091b] shadow-[0_0_45px_rgba(168,75,255,0.24)] sm:max-h-[88dvh] sm:max-w-[580px] sm:rounded-[2rem]">
-        <div className="absolute inset-0 bg-cover bg-center opacity-75" style={{ backgroundImage: "linear-gradient(180deg, rgba(13,7,25,.08), rgba(8,5,16,.78)), url('/images/yubera-stars-donation-bg.webp')", backgroundSize: "100% 65%", backgroundPosition: "top center", backgroundRepeat: "no-repeat" }} />
+        <div className="absolute inset-0 bg-cover bg-center opacity-75" style={{ backgroundImage: "linear-gradient(180deg, rgba(13,7,25,.08), rgba(8,5,16,.78)), url('/images/yubera-stars-donation-bg.webp')", backgroundSize: "100% 45%", backgroundPosition: "top center", backgroundRepeat: "no-repeat" }} />
         <div className="absolute inset-0 bg-gradient-to-b from-[#170b2a]/25 via-[#10091b]/30 to-[#080610]/80" />
         <div className="relative px-4 pb-4 pt-3 sm:px-7 sm:pb-7 sm:pt-6">
           <button type="button" onClick={onClose} disabled={loading} aria-label="Закрыть" className="absolute right-4 top-4 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-black/25 text-white/80 transition hover:bg-white/10 hover:text-white disabled:opacity-40"><X className="h-6 w-6" /></button>
-          <div className="mx-auto mb-1 flex h-[104px] w-28 items-center justify-center sm:mb-2 sm:h-24">
+          <div className="mx-auto mb-1 flex h-[128px] w-28 items-center justify-center sm:mb-2 sm:h-24">
             <span className="h-full w-full" aria-hidden="true" />
           </div>
           <h2 id="yubera-donation-title" className="text-center text-[21px] font-bold tracking-tight text-white sm:text-[27px]">Поддержать Yubera</h2>
