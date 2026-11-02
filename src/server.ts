@@ -179,7 +179,7 @@ export default {
       ["GET", "HEAD"].includes(request.method)
     ) {
       return applySecurityHeaders(new Response(
-        request.method === "HEAD" ? null : "google-site-verification: google31ba377df3a22378.html\\n",
+        request.method === "HEAD" ? null : "google-site-verification: google31ba377df3a22378.html\n",
         {
           status: 200,
           headers: {
