@@ -1,10 +1,10 @@
-# YUME catalog import and screenshot enrichment
+# Yubera catalog import and screenshot enrichment
 
 ## Current design
 
 Catalog metadata enrichment is manual-only. The dedicated Queue Consumer runs notification cleanup and checks due episode releases once daily at 03:00 UTC. Catalog status synchronization, trailer lookup, and full metadata/screenshot enrichment are manual-only; no automated catalog or trailer Cron jobs are enabled. The admin interface no longer exposes start/stop controls for catalog auto-refresh.
 
-New catalog imports now request scene screenshot URLs in the same Shikimori GraphQL response as titles, descriptions, posters, trailers, genres, and other metadata. YUME stores at most five unique screenshots for newly imported anime. The screenshot URLs and per-title status are written in the same D1 batch as the catalog records. Previously saved screenshot rows are preserved rather than destructively trimmed by this change.
+New catalog imports now request scene screenshot URLs in the same Shikimori GraphQL response as titles, descriptions, posters, trailers, genres, and other metadata. Yubera stores at most five unique screenshots for newly imported anime. The screenshot URLs and per-title status are written in the same D1 batch as the catalog records. Previously saved screenshot rows are preserved rather than destructively trimmed by this change.
 
 The import no longer launches a second full-catalog enrichment pass when it finishes. Existing populated metadata fields are preserved, and existing titles are skipped during import. This avoids automatically rescanning the catalog after every import.
 
@@ -12,7 +12,7 @@ The import no longer launches a second full-catalog enrichment pass when it fini
 
 For existing catalog rows, the manual metadata refresh remains available when an explicit repair is needed:
 
-1. Missing metadata is identified from the fields already supported by YUME. Complete records are skipped.
+1. Missing metadata is identified from the fields already supported by Yubera. Complete records are skipped.
 2. The screenshot phase reads an indexed page of up to 40 catalog rows and requests screenshots for eligible IDs together through Shikimori GraphQL.
 3. At most five unique screenshots are stored when frames are newly fetched. Existing screenshot rows, future/unreleased titles, and recently confirmed empty screenshot results are skipped. Older rows that already contain more than five screenshots are preserved.
 4. A provider/network failure leaves the current page cursor unchanged, so restarting manual mode retries the same batch.
