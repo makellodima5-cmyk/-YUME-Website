@@ -1,4 +1,4 @@
-# Stage 2 infrastructure setup: Yume R2-first catalogue
+# Stage 2 infrastructure setup: Yubera R2-first catalogue
 
 This document is the deployment contract for the isolated catalogue services. It does not authorize applying SQL, creating keys, changing live bindings, or deploying Workers.
 
