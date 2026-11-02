@@ -123,6 +123,9 @@ jobs:
           if (!hasExpectedWorkerFirst(workerFirst) || !hasExpectedWorkerFirst(rootWorkerFirst)) {
             throw new Error("Worker-first routing must cover the app while excluding the exact Google verification static asset.");
           }
+          if (config.assets?.html_handling !== "none" || rootConfig.assets?.html_handling !== "none") {
+            throw new Error("Cloudflare must preserve the exact .html path for Google ownership verification.");
+          }
           if (Array.isArray(rootConfig.triggers?.crons) && rootConfig.triggers.crons.length > 0) {
             throw new Error("Automatic scheduled Worker jobs must remain disabled.");
           }
