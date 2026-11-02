@@ -19,14 +19,21 @@ export type R2CatalogResult = { items: Anime[]; revision: number; updatedAt: str
 // snapshot in a warm Website isolate instead of parsing the same multi-megabyte
 // JSON response for every route/server-function invocation.
 const CATALOG_STATE_CACHE_TTL_MS = 5_000;
-let catalogStateCache: { state: CatalogState; expiresAt: number } | null = null;
+type CachedCatalogState = { state: CatalogState; expiresAt: number };
+let catalogStateCache: CachedCatalogState | null = null;
 let catalogStateRequest: Promise<CatalogState> | null = null;
 let catalogStateGeneration = 0;
+let adminCatalogStateCache: CachedCatalogState | null = null;
+let adminCatalogStateRequest: Promise<CatalogState> | null = null;
+let adminCatalogStateGeneration = 0;
 
 function invalidateCatalogStateCache(): void {
   catalogStateGeneration += 1;
   catalogStateCache = null;
   catalogStateRequest = null;
+  adminCatalogStateGeneration += 1;
+  adminCatalogStateCache = null;
+  adminCatalogStateRequest = null;
 }
 
 const RETRYABLE_READER_STATUSES = new Set([429, 500, 502, 503, 504]);
@@ -36,7 +43,7 @@ function safeErrorBody(value:string):string {
     .replace(/(authorization|x-yume-reader-token|x-amz-security-token|secretaccesskey|accesskeyid|token)\s*[:=]\s*[^\s<"]+/gi,"$1=[REDACTED]")
     .replace(/Bearer\s+[^\s<"]+/gi,"Bearer [REDACTED]");
 }
-async function fetchCatalogState(forceFresh = false): Promise<CatalogState> {
+async function fetchCatalogState(useAdminCheckpoint = false): Promise<CatalogState> {
   const reader = environment().YUME_CATALOG_READER;
   if (!reader) throw new Error("YUME_CATALOG_READER binding is unavailable.");
   const token = environment().YUME_CATALOG_READER_TOKEN ?? "";
@@ -44,7 +51,7 @@ async function fetchCatalogState(forceFresh = false): Promise<CatalogState> {
   for(let attempt=0;attempt<3;attempt++){
     const started=Date.now();
     try{
-      const response = await reader.fetch("https://catalog-reader.internal/v1/state" + (forceFresh ? "?fresh=1" : ""), {
+      const response = await reader.fetch("https://catalog-reader.internal/v1/state" + (useAdminCheckpoint ? "?fresh=1" : ""), {
         method:"GET",headers:{"X-Yume-Reader-Token":token},signal:AbortSignal.timeout(10000),
       });
       if(response.ok){
@@ -78,27 +85,58 @@ async function fetchCatalogState(forceFresh = false): Promise<CatalogState> {
   throw lastError instanceof Error?lastError:new Error("Private catalogue reader failed.");
 }
 
-export async function readCatalogState(forceFresh = false): Promise<CatalogState> {
-  const now = Date.now();
-  if (!forceFresh && catalogStateCache && catalogStateCache.expiresAt > now) {
-    return catalogStateCache.state;
-  }
-  if (!forceFresh && catalogStateRequest) return catalogStateRequest;
+async function readCachedCatalogState(useAdminCheckpoint: boolean, forceFresh: boolean): Promise<CatalogState> {
+  const cache = useAdminCheckpoint ? adminCatalogStateCache : catalogStateCache;
+  const pending = useAdminCheckpoint ? adminCatalogStateRequest : catalogStateRequest;
+  const generation = useAdminCheckpoint ? adminCatalogStateGeneration : catalogStateGeneration;
+  if (!forceFresh && cache && cache.expiresAt > Date.now()) return cache.state;
+  if (!forceFresh && pending) return pending;
 
-  if (forceFresh) invalidateCatalogStateCache();
-  const generation = ++catalogStateGeneration;
-  const request = fetchCatalogState(forceFresh);
-  if (!forceFresh) catalogStateRequest = request;
+  const nextGeneration = generation + 1;
+  if (useAdminCheckpoint) {
+    adminCatalogStateGeneration = nextGeneration;
+    if (forceFresh) {
+      adminCatalogStateCache = null;
+      adminCatalogStateRequest = null;
+    }
+  } else {
+    catalogStateGeneration = nextGeneration;
+    if (forceFresh) {
+      catalogStateCache = null;
+      catalogStateRequest = null;
+    }
+  }
+
+  const request = fetchCatalogState(useAdminCheckpoint);
+  if (useAdminCheckpoint) adminCatalogStateRequest = request;
+  else catalogStateRequest = request;
 
   try {
     const state = await request;
-    if (generation === catalogStateGeneration) {
+    if (useAdminCheckpoint) {
+      if (adminCatalogStateGeneration === nextGeneration) {
+        adminCatalogStateCache = { state, expiresAt: Date.now() + CATALOG_STATE_CACHE_TTL_MS };
+      }
+    } else if (catalogStateGeneration === nextGeneration) {
       catalogStateCache = { state, expiresAt: Date.now() + CATALOG_STATE_CACHE_TTL_MS };
     }
     return state;
   } finally {
-    if (catalogStateRequest === request) catalogStateRequest = null;
+    if (useAdminCheckpoint) {
+      if (adminCatalogStateRequest === request) adminCatalogStateRequest = null;
+    } else if (catalogStateRequest === request) {
+      catalogStateRequest = null;
+    }
   }
+}
+
+export async function readCatalogState(forceFresh = false): Promise<CatalogState> {
+  return readCachedCatalogState(false, forceFresh);
+}
+
+/** Read the private import checkpoint, cached separately from the published public snapshot. */
+export async function readAdminCatalogState(forceFresh = false): Promise<CatalogState> {
+  return readCachedCatalogState(true, forceFresh);
 }
 
 export async function getR2Catalog(): Promise<R2CatalogResult> {
