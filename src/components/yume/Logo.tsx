@@ -1,4 +1,4 @@
-import logoArtwork from "@/assets/DF5D40FA-7E17-4527-9130-E3E489578CD8.png";
+import logoArtwork from "@/assets/DF5D40FA-7E17-4527-9130-E3E489578CD8.webp";
 
 /**
  * Yubera wordmark artwork: Yubera wordmark without tagline.

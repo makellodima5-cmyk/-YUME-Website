@@ -97,7 +97,7 @@ export function Hero({
       </div>
       <div className="relative z-10 flex h-full flex-col items-start justify-end px-5 pb-5 pt-20 sm:pb-8 md:max-w-[760px] md:justify-center md:px-10 md:pb-8 md:pt-8 lg:px-12">
         <img
-          src="/images/899F3B51-DD87-47F7-9DCF-C5A2B66892D0.png"
+          src="/images/899F3B51-DD87-47F7-9DCF-C5A2B66892D0.webp"
           alt="Yubera — Больше, чем аниме"
           width={1920}
           height={1024}
