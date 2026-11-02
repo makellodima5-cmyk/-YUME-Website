@@ -1,9 +1,9 @@
 import { env as cloudflareEnv } from "cloudflare:workers";
 import { validateTelegramInitData } from "@/data/telegram-init-data";
+import { TELEGRAM_CHANNEL_ID } from "@/data/telegram-channel";
 
 type SubscriptionEnvironment = Record<string, unknown> & {
   TELEGRAM_BOT_TOKEN?: string;
-  TELEGRAM_CHANNEL_ID?: string;
 };
 type RuntimeGlobal = typeof globalThis & { __YUME_RUNTIME_ENV__?: unknown };
 
@@ -34,9 +34,6 @@ export async function handleTelegramSubscriptionCheck(request: Request): Promise
 
   const env = environment();
   const token = typeof env.TELEGRAM_BOT_TOKEN === "string" ? env.TELEGRAM_BOT_TOKEN.trim() : "";
-  const channelId = typeof env.TELEGRAM_CHANNEL_ID === "string" && env.TELEGRAM_CHANNEL_ID.trim()
-    ? env.TELEGRAM_CHANNEL_ID.trim()
-    : "@yumeanime_news";
   if (!token) return json({ ok: false, error: "Subscription check is not configured" }, 503);
 
   let body: unknown;
@@ -59,7 +56,7 @@ export async function handleTelegramSubscriptionCheck(request: Request): Promise
       method: "POST",
       headers: { "Content-Type": "application/json" },
       signal: AbortSignal.timeout(5_000),
-      body: JSON.stringify({ chat_id: channelId, user_id: validated.user.id }),
+      body: JSON.stringify({ chat_id: TELEGRAM_CHANNEL_ID, user_id: validated.user.id }),
     });
     const result: unknown = await response.json();
     if (!response.ok || !result || typeof result !== "object" || !("ok" in result) || (result as { ok?: unknown }).ok !== true || !("result" in result)) {

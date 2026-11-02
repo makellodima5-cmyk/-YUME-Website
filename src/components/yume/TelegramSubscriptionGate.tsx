@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { getTelegramWebApp } from "@/lib/telegram-mini-app";
-
-const CHANNEL_URL = "https://t.me/yumeanime_news";
+import { TELEGRAM_TELEGRAM_CHANNEL_URL } from "@/data/telegram-channel";
 
 type CheckResult = "loading" | "subscribed" | "not_subscribed" | "error";
 
@@ -69,8 +68,8 @@ export function TelegramSubscriptionGate({ children }: { children: ReactNode }) 
           <button
             type="button"
             onClick={() => {
-              if (webApp?.openTelegramLink) webApp.openTelegramLink(CHANNEL_URL);
-              else window.open(CHANNEL_URL, "_blank", "noopener,noreferrer");
+              if (webApp?.openTelegramLink) webApp.openTelegramLink(TELEGRAM_CHANNEL_URL);
+              else window.open(TELEGRAM_CHANNEL_URL, "_blank", "noopener,noreferrer");
             }}
             className="inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
           >

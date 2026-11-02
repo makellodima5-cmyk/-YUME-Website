@@ -1,10 +1,10 @@
 import { env as cloudflareEnv } from "cloudflare:workers";
 import { completeTelegramBrowserAuth, confirmTelegramBrowserAuth } from "@/data/telegram-auth.server";
+import { TELEGRAM_TELEGRAM_CHANNEL_URL, TELEGRAM_CHANNEL_ID } from "@/data/telegram-channel";
 
 type TelegramEnvironment = Record<string, unknown> & {
   TELEGRAM_BOT_TOKEN?: string;
   TELEGRAM_WEBHOOK_SECRET?: string;
-  TELEGRAM_CHANNEL_ID?: string;
   YUME_DB?: unknown;
 };
 type TelegramUser = {
@@ -29,7 +29,6 @@ type RuntimeGlobal = typeof globalThis & { __YUME_RUNTIME_ENV__?: unknown };
 const SITE_URL = "https://yume-website.yumesupport833.workers.dev";
 const PLAYER_HELP_CALLBACK = "yume_player_help";
 const CHECK_SUBSCRIPTION_CALLBACK = "yume_check_subscription";
-const CHANNEL_URL = "https://t.me/yumeanime_news";
 const FIRST_GATE_MESSAGE = "👀 Кажется, ты на шаг от входа в YUME!\n\nОсталось только подписаться на наш канал. Не переживай, это не квест на 100 серий 😏 Зато будешь в курсе новостей и обновлений проекта.\n\nПодписывайся и заходи! 💜";
 const RETURN_GATE_MESSAGE = "👀 Опа, кажется, ты немного поторопился с выходом из нашего канала!\n\nБез подписки доступ к YUME закрывается 😢 Но не переживай, никто не отбирает у тебя любимое аниме навсегда.\n\nВозвращайся в канал, подписывайся, и мы снова откроем тебе двери! 💜\n\nА то как же мы без тебя? 😏";
 const RESTORED_MESSAGE = "👀 О, явился! Решил, что без YUME жизнь слишком скучная?\n\n🔓 Доступ восстановлен! Возвращайся к аниме, пока мы не добавили тебе арку возвращения 🍿💜";
@@ -140,7 +139,7 @@ async function saveSubscriptionState(db: TelegramDb | null, userId: number, chat
 }
 
 async function isChannelMember(token: string, env: TelegramEnvironment, userId: number): Promise<boolean | null> {
-  const channelId = typeof env.TELEGRAM_CHANNEL_ID === "string" && env.TELEGRAM_CHANNEL_ID.trim() ? env.TELEGRAM_CHANNEL_ID.trim() : "@yumeanime_news";
+  const channelId = TELEGRAM_CHANNEL_ID;
   try {
     const response = await telegramApi(token, "getChatMember", { chat_id: channelId, user_id: userId });
     const payload = await response.json() as { ok?: boolean; result?: { status?: string; is_member?: boolean } };
@@ -154,14 +153,14 @@ async function isChannelMember(token: string, env: TelegramEnvironment, userId: 
 
 function gateKeyboard(): Record<string, unknown> {
   return { inline_keyboard: [
-    [{ text: "😏 Ладно, подписываюсь", url: CHANNEL_URL }],
+    [{ text: "😏 Ладно, подписываюсь", url: TELEGRAM_CHANNEL_URL }],
     [{ text: "🔎 Проверить подписку", callback_data: CHECK_SUBSCRIPTION_CALLBACK }],
   ] };
 }
 
 function returnGateKeyboard(): Record<string, unknown> {
   return { inline_keyboard: [
-    [{ text: "😏 Подписаться на канал", url: CHANNEL_URL }],
+    [{ text: "😏 Подписаться на канал", url: TELEGRAM_CHANNEL_URL }],
     [{ text: "🔎 Проверить подписку", callback_data: CHECK_SUBSCRIPTION_CALLBACK }],
   ] };
 }
