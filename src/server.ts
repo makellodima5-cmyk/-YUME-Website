@@ -174,6 +174,23 @@ export default {
     if (httpsRedirect) return httpsRedirect;
 
     const requestUrl = new URL(request.url);
+    if (
+      requestUrl.pathname === "/google31ba377df3a22378.html" &&
+      ["GET", "HEAD"].includes(request.method)
+    ) {
+      return applySecurityHeaders(new Response(
+        request.method === "HEAD" ? null : "google-site-verification: google31ba377df3a22378.html\\n",
+        {
+          status: 200,
+          headers: {
+            "Cache-Control": "no-cache, max-age=0",
+            "Content-Type": "text/html; charset=utf-8",
+            "X-Content-Type-Options": "nosniff",
+          },
+        },
+      ), request.url);
+    }
+
     if (requestUrl.pathname === "/api/csp-report") {
       let rateLimitBinding: unknown;
       try {
