@@ -11,8 +11,10 @@ type Env = {
 type TemporaryCredentials={accessKeyId:string;secretAccessKey:string;sessionToken:string;expiresAt:number};
 const encoder=new TextEncoder();
 let cachedCredentials:TemporaryCredentials|null=null;
-let cachedRevision:number|null=null;
-let cachedStateBody:string|null=null;
+let cachedPublicRevision:number|null=null;
+let cachedPublicBody:string|null=null;
+let cachedAdminRevision:number|null=null;
+let cachedAdminBody:string|null=null;
 function hex(value:ArrayBuffer):string{return [...new Uint8Array(value)].map(byte=>byte.toString(16).padStart(2,"0")).join("");}
 async function sha256(value:string|ArrayBuffer):Promise<ArrayBuffer>{return crypto.subtle.digest("SHA-256",typeof value==="string"?encoder.encode(value):value);}
 async function hmac(key:ArrayBuffer|string,value:string):Promise<ArrayBuffer>{
@@ -144,12 +146,12 @@ export default {
         // by its manifest checksum and was written by the trusted coordinator.
         const adminPointer=await readCatalogAdminCachePointer(env.YUME_CATALOG_CACHE);
         if(adminPointer){
-          const adminBody=cachedRevision===adminPointer.revision&&cachedStateBody
-            ?cachedStateBody
+          const adminBody=cachedAdminRevision===adminPointer.revision&&cachedAdminBody
+            ?cachedAdminBody
             :await readCatalogSnapshotCacheText(env.YUME_CATALOG_CACHE,adminPointer.revision);
           if(adminBody){
-            cachedRevision=adminPointer.revision;
-            cachedStateBody=adminBody;
+            cachedAdminRevision=adminPointer.revision;
+            cachedAdminBody=adminBody;
             return request.method==="HEAD"
               ?new Response(null,{status:200,headers:{"X-Yume-Catalog-Revision":String(adminPointer.revision)}})
               :jsonText(adminBody,200,{"X-Yume-Catalog-Revision":String(adminPointer.revision)});
@@ -167,7 +169,7 @@ export default {
       }
       if(pointer.schemaVersion!==1||!Number.isSafeInteger(pointer.revision)||pointer.key!==CATALOG_REVISION_PREFIX+pointer.revision+".json")return json({error:"invalid_catalog_pointer"},503);
 
-      let body:string|null=!fresh&&cachedRevision===pointer.revision?cachedStateBody:null;
+      let body:string|null=!fresh&&cachedPublicRevision===pointer.revision?cachedPublicBody:null;
       if(!fresh&&!body)body=await readCatalogSnapshotCacheText(env.YUME_CATALOG_CACHE,pointer.revision);
 
       if(!body){
@@ -185,7 +187,7 @@ export default {
             // During an import, never repair a cold public cache from the
             // in-progress R2 revision. Serve only the last published snapshot.
             pointer={...latestPointer,revision:cachePointer.revision,key:CATALOG_REVISION_PREFIX+cachePointer.revision+".json"};
-            body=cachedRevision===pointer.revision?cachedStateBody:await readCatalogSnapshotCacheText(env.YUME_CATALOG_CACHE,pointer.revision);
+            body=cachedPublicRevision===pointer.revision?cachedPublicBody:await readCatalogSnapshotCacheText(env.YUME_CATALOG_CACHE,pointer.revision);
             if(!body)return json({error:"published_catalog_cache_unavailable"},503);
           }else{
             pointer=latestPointer;
@@ -219,7 +221,7 @@ export default {
       }
 
       if(!body)return json({error:"catalog_unavailable"},503);
-      if(!fresh){cachedRevision=pointer.revision;cachedStateBody=body;}
+      if(!fresh){cachedPublicRevision=pointer.revision;cachedPublicBody=body;}
       return request.method==="HEAD"
         ?new Response(null,{status:200,headers:{"X-Yume-Catalog-Revision":String(pointer.revision)}})
         :jsonText(body,200,{"X-Yume-Catalog-Revision":String(pointer.revision)});
