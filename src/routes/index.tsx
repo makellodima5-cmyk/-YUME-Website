@@ -22,7 +22,7 @@ import {
   serializeCatalogReturnState,
   validateCatalogSearch,
 } from "@/data/catalog-search";
-import homeSocialImage from "@/assets/yume-desktop.webp";
+const homeSocialImage = "/images/899F3B51-DD87-47F7-9DCF-C5A2B66892D0.png";
 import { absoluteImageUrl, canonicalUrl } from "@/data/seo";
 import { getTelegramWebApp, telegramHapticImpact } from "@/lib/telegram-mini-app";
 import { setProfileStorageAuthenticated, syncTelegramLibrary } from "@/data/profile-storage";
@@ -614,8 +614,8 @@ function Index() {
         if (gate.error === "admin_password_not_configured") {
           setAdminPasswordRequired(true);
           setAdminPasswordError(language === "ru"
-            ? "Дополнительный пароль ещё не настроен. Добавь секрет YUME_ADMIN_PASSWORD в Cloudflare Workers."
-            : "The extra password is not configured. Add the YUME_ADMIN_PASSWORD secret in Cloudflare Workers.");
+            ? "Дополнительный пароль ещё не настроен. Добавь секрет пароля администратора в Cloudflare Workers."
+            : "The extra password is not configured. Add the administrator password secret in Cloudflare Workers.");
           setAdminCheckComplete(true);
           return;
         }
