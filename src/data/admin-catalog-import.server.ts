@@ -1,6 +1,6 @@
 import { env as cloudflareEnv } from "cloudflare:workers";
 import type { Anime } from "@/data/anime";
-import { readCatalogState, submitCatalogMutation } from "@/data/catalog-r2.server";
+import { readAdminCatalogState, submitCatalogMutation } from "@/data/catalog-r2.server";
 import { retryAfterMilliseconds } from "@/data/retry-after";
 import { hasAdminPasswordSession, isAdminPasswordConfigured } from "@/lib/admin-password.server";
 
@@ -195,7 +195,7 @@ async function recentAudit(db:D1Database):Promise<Array<{id:number;action:string
   const result=await db.prepare("SELECT id,action,status,details,created_at FROM yume_admin_audit_log ORDER BY id DESC LIMIT 20").all<{id:number;action:string;status:string;details:string;created_at:string}>();
   return (result.results??[]).map(row=>({id:row.id,action:row.action,status:row.status,details:(()=>{try{return JSON.parse(row.details) as Record<string,unknown>;}catch{return {};}})(),created_at:row.created_at}));
 }
-function metadata(state: Awaited<ReturnType<typeof readCatalogState>>) {
+function metadata(state: Awaited<ReturnType<typeof readAdminCatalogState>>) {
   const values = state.metadata;
   return {
     target:Number(values.admin_import_target ?? 0), cursor:Number(values.admin_import_cursor ?? 1),
@@ -232,7 +232,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
   try {
     // Status and quality GETs are read-only and can use the short-lived isolate cache.
     // Mutating requests still force a fresh checkpoint before applying changes.
-    const state = await readCatalogState(request.method !== "GET");
+    const state = await readAdminCatalogState(request.method !== "GET");
     const current = metadata(state);
     if (request.method === "GET") {
       const query=new URL(request.url).searchParams;
@@ -277,12 +277,12 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
       const alreadyComplete = resumeCounters && nextAdded >= target;
       await saveMetadata({admin_import_run_id:runId,admin_import_started_at:String(Date.now()),admin_import_target:String(target),admin_import_cursor:String(resumeCursor),admin_import_added:String(nextAdded),admin_import_skipped:String(resumeCounters?current.skipped:0),admin_import_incomplete:String(resumeCounters?current.incomplete:0),admin_import_errors:String(resumeCounters?current.errors:0),admin_import_state:alreadyComplete?"completed":"running",admin_import_cache_pending:alreadyComplete?"0":"1",admin_import_status_filter:statusFilter,admin_import_run_block_18_plus:current.bulkImportBlock18Plus?"1":"0",admin_import_resume_at:current.state==="paused"&&state.metadata.admin_import_status_filter===statusFilter?String(Number(state.metadata.admin_import_resume_at??"0")||0):"0"});
       await audit(db,"catalog.import.start","success",{target,statusFilter},actor);
-      return json({isAdmin:true,...metadata(await readCatalogState(true)),message:"Импорт подготовлен."});
+      return json({isAdmin:true,...metadata(await readAdminCatalogState(true)),message:"Импорт подготовлен."});
     }
     if (action === "stop") {
       await saveMetadata({admin_import_state:"paused"});
       await audit(db,"catalog.import.pause","success",{},actor);
-      return json({isAdmin:true,...metadata(await readCatalogState(true))});
+      return json({isAdmin:true,...metadata(await readAdminCatalogState(true))});
     }
     if (action === "step") {
       const fresh = state; const progress = metadata(fresh);
@@ -294,12 +294,12 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
       catch (error) {
         const retryAfterMs = Number((error as {retryAfterMs?:number}).retryAfterMs ?? 5000);
         await saveMetadata({admin_import_errors:String(progress.errors+1),admin_import_resume_at:String(Date.now()+retryAfterMs),admin_import_state:"paused"});
-        const paused = metadata(await readCatalogState(true));
+        const paused = metadata(await readAdminCatalogState(true));
         return json({isAdmin:true,...paused,retryAfterMs,error:error instanceof Error?error.message:"Ошибка Shikimori"},503);
       }
       if (!page.length) {
         await saveMetadata({admin_import_state:"partial",admin_import_cache_pending:"0"});
-        return json({isAdmin:true,...metadata(await readCatalogState(true)),message:"Источник не вернул записи; импорт остановлен."});
+        return json({isAdmin:true,...metadata(await readAdminCatalogState(true)),message:"Источник не вернул записи; импорт остановлен."});
       }
       const existing = new Set(fresh.items.map((item) => item.id));
       const exclusions = new Set(Object.keys(fresh.exclusions));
@@ -326,7 +326,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
       const operationId=adminCatalogImportPageOperationId(progress.runId,progress.cursor);
       await submitCatalogMutation({type:"batch",mutations},operationId);
       await audit(db,"catalog.import.page","success",{page:progress.cursor,added:mapped.length,skipped,state:nextState},actor);
-      return json({isAdmin:true,...metadata(await readCatalogState(true))});
+      return json({isAdmin:true,...metadata(await readAdminCatalogState(true))});
     }
     if (action === "delete" || action === "delete_title") {
       const ids = normalizeAdminCatalogIds(action === "delete" ? body.ids : [body.animeId]);
@@ -334,7 +334,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
       const titles = Object.fromEntries(freshTitlePairs(state.items,ids));
       await submitCatalogMutation({type:"delete",animeIds:ids,titles});
       await audit(db,"catalog.delete","success",{requested:ids.length,deleted:ids.length},actor);
-      const after = await readCatalogState(true); const qualityAfter = stats(after.items);
+      const after = await readAdminCatalogState(true); const qualityAfter = stats(after.items);
       return json({isAdmin:true,deleted:ids.length,quality:[],qualitySummary:qualityAfter,catalogTotal:after.items.length});
     }
     if (action === "import_title") {
@@ -347,7 +347,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
       const mutations:import("@/data/catalog-r2.shared").CatalogMutation[]=[{type:"upsert",items:[anime]}];
       if(shots.length)mutations.push({type:"screenshots",animeId:id,items:shots.map((shot,position)=>({originalUrl:shot.original,previewUrl:shot.preview,position}))});
       await submitCatalogMutation({type:"batch",mutations});
-      const after = await readCatalogState(true); const resultStats = stats(after.items);
+      const after = await readAdminCatalogState(true); const resultStats = stats(after.items);
       await audit(db,"catalog.import.title","success",{animeId:id,title:anime.title},actor);
       return json({isAdmin:true,imported:true,anime:{id:anime.id,title:anime.title,year:anime.year,englishTitle:anime.englishTitle,originalTitle:anime.original},screenshots:shots.length,catalogTotal:after.items.length,catalogWithTrailer:resultStats.hasTrailer,missingTrailers:resultStats.missingTrailer,message:"Тайтл добавлен в каталог вместе с метаданными и доступными скриншотами."});
     }
@@ -364,7 +364,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
       const currentById = new Map(state.items.map((item)=>[item.id,item]));
       const updates = source.map(mapAnime).map((fresh)=>{const old=currentById.get(fresh.id);return old?{...old,...fresh}:fresh;});
       for(let offset=0;offset<updates.length;offset+=100) await submitCatalogMutation({type:"upsert",items:updates.slice(offset,offset+100)});
-      const after=await readCatalogState(true); const s=stats(after.items);
+      const after=await readAdminCatalogState(true); const s=stats(after.items);
       await audit(db,"catalog.repair","success",{requested:ids.length,repaired:updates.length},actor);
       return json({isAdmin:true,repaired:updates.length,notFound:ids.length-source.length,stillIncomplete:updates.filter((item)=>!item.posterUrl||!item.description||!item.year).length,quality:[],qualitySummary:s});
     }
@@ -434,7 +434,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
       if(updates.length)mutations.unshift({type:"upsert",items:updates.slice(0,100)});
       mutations.push({type:"metadata",values:meta});
       await submitCatalogMutation({type:"batch",mutations});
-      const after=await readCatalogState(true);
+      const after=await readAdminCatalogState(true);
       const screenshotFailures=Object.keys(after.metadata).filter((key)=>key.startsWith("screenshot_last_error:")&&Boolean(after.metadata[key])).length;
       const screenshotRetries=Object.keys(after.metadata).filter((key)=>key.startsWith("screenshot_attempts:")&&Number(after.metadata[key])>0&&Number(after.metadata[key])<3).length;
       const nextOffset=Math.min(state.items.length,cursor+page.length);
