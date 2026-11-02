@@ -178,17 +178,14 @@ export default {
       requestUrl.pathname === "/google31ba377df3a22378.html" &&
       ["GET", "HEAD"].includes(request.method)
     ) {
-      return applySecurityHeaders(new Response(
-        request.method === "HEAD" ? null : "google-site-verification: google31ba377df3a22378.html\n",
-        {
-          status: 200,
-          headers: {
-            "Cache-Control": "no-cache, max-age=0",
-            "Content-Type": "text/html; charset=utf-8",
-            "X-Content-Type-Options": "nosniff",
-          },
-        },
-      ), request.url);
+      const assets = (env as { ASSETS?: { fetch: (request: Request) => Promise<Response> } }).ASSETS;
+      if (!assets) {
+        return new Response("Static asset binding is unavailable.", {
+          status: 503,
+          headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" },
+        });
+      }
+      return assets.fetch(request);
     }
 
     if (requestUrl.pathname === "/api/csp-report") {
