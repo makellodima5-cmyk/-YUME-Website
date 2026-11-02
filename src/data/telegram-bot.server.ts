@@ -424,6 +424,21 @@ export async function handleTelegramWebhook(request: Request): Promise<Response>
   const message = update.message;
   const text = message?.text?.trim() ?? "";
   const chatId = message?.chat?.id;
+  const isPaySupportCommand = /^\/paysupport(?:@\w+)?(?:\s|$)/.test(text);
+  if (isPaySupportCommand && typeof chatId === "number" && Number.isSafeInteger(chatId)) {
+    try {
+      const supportResponse = await telegramApi(token, "sendMessage", {
+        chat_id: chatId,
+        text: "💜 По вопросам оплаты Telegram Stars, списания или возврата обратитесь к администрации Yubera через наш официальный Telegram-канал.",
+        reply_markup: { inline_keyboard: [[{ text: "Открыть канал Yubera", url: TELEGRAM_CHANNEL_URL }]] },
+      });
+      if (!supportResponse.ok) return json({ ok: false, error: "Could not send payment support instructions" }, 502);
+      return json({ ok: true, action: "payment_support_shown" });
+    } catch (error) {
+      console.error("[YUBERA][STARS] Could not send payment support instructions.", error);
+      return json({ ok: false, error: "Payment support is unavailable" }, 502);
+    }
+  }
   const isStartCommand = /^\/start(?:@\w+)?(?:\s|$)/.test(text);
   const isConfirmationCode = /^[A-Za-z0-9_-]{8}$/.test(text);
   if ((!isStartCommand && !isConfirmationCode) || typeof chatId !== "number" || !Number.isSafeInteger(chatId)) {
