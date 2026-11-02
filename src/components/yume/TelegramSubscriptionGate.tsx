@@ -61,7 +61,7 @@ export function TelegramSubscriptionGate({ children }: { children: ReactNode }) 
         <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-3xl" aria-hidden="true">👀</div>
         <div className="space-y-4 text-sm leading-6 text-muted-foreground">
           <p className="text-base font-semibold leading-7 text-foreground">Опа, кажется, ты немного поторопился с выходом из нашего канала!</p>
-          <p>Без подписки доступ к YUME закрывается 😢 Но не переживай, никто не отбирает у тебя любимое аниме навсегда.</p>
+          <p>Без подписки доступ к Yubera закрывается 😢 Но не переживай, никто не отбирает у тебя любимое аниме навсегда.</p>
           <p>Возвращайся в канал, подписывайся, и мы снова откроем тебе двери! 💜</p>
           <p className="font-medium text-foreground">А то как же мы без тебя? 😏</p>
         </div>
