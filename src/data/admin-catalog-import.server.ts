@@ -230,7 +230,9 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
   if (!await hasAdminPasswordSession(request,env)) return json({ isAdmin:false,error:"admin_password_required" },428);
   const { db, actor } = auth;
   try {
-    const state = await readCatalogState(true);
+    // Status and quality GETs are read-only and can use the short-lived isolate cache.
+    // Mutating requests still force a fresh checkpoint before applying changes.
+    const state = await readCatalogState(request.method !== "GET");
     const current = metadata(state);
     if (request.method === "GET") {
       const query=new URL(request.url).searchParams;
