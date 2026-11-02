@@ -13,8 +13,5 @@ export function filterCatalogForCurrentRequest<
   T extends CatalogWithItems<TItem>,
 >(result: T): T {
   setResponseHeader("Cache-Control", "private, no-store");
-  return {
-    ...result,
-    items: [...result.items],
-  } as T;
+  return result;
 }
