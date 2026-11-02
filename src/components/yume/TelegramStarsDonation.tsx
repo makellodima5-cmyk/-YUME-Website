@@ -13,10 +13,12 @@ export function TelegramStarsDonation({ open, onClose }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [compactMobile, setCompactMobile] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     const previousOverflow = document.body.style.overflow;
+    setCompactMobile(window.matchMedia("(pointer: coarse)").matches || window.innerWidth < 640);
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape" && !loading) onClose();
     };
@@ -99,10 +101,10 @@ export function TelegramStarsDonation({ open, onClose }: Props) {
 
   return (
     <div className="fixed inset-0 z-[100] flex items-end justify-center overflow-hidden bg-transparent px-3 pb-[calc(env(safe-area-inset-bottom)+10px)] pointer-events-none sm:items-center sm:overflow-y-auto sm:bg-black/65 sm:px-4 sm:py-6 sm:backdrop-blur-md" onMouseDown={(event) => { if (event.target === event.currentTarget && !loading) onClose(); }}>
-      <section role="dialog" aria-modal="true" aria-labelledby="yubera-donation-title" className="pointer-events-auto relative h-[50dvh] max-h-[50dvh] w-full max-w-[560px] overflow-hidden rounded-[1.4rem] border border-fuchsia-500/60 bg-[#10091b] shadow-[0_0_45px_rgba(168,75,255,0.24)] sm:my-auto sm:h-auto sm:max-h-[88dvh] sm:max-w-[580px] sm:overflow-y-auto sm:rounded-[2rem]">
+      <section role="dialog" aria-modal={compactMobile ? "false" : "true"} aria-labelledby="yubera-donation-title" style={compactMobile ? { height: "50dvh", minHeight: "50dvh", maxHeight: "50dvh", flex: "0 0 50dvh" } : undefined} className="pointer-events-auto relative h-[50dvh] max-h-[50dvh] w-full max-w-[560px] overflow-hidden rounded-[1.4rem] border border-fuchsia-500/60 bg-[#10091b] shadow-[0_0_45px_rgba(168,75,255,0.24)] sm:my-auto sm:h-auto sm:max-h-[88dvh] sm:max-w-[580px] sm:overflow-y-auto sm:rounded-[2rem]">
         <div className="absolute inset-0 bg-cover bg-center opacity-75" style={{ backgroundImage: "linear-gradient(180deg, rgba(13,7,25,.08), rgba(8,5,16,.78)), url('/images/yubera-stars-donation-bg.webp')", backgroundSize: "100% 42%", backgroundPosition: "top center", backgroundRepeat: "no-repeat" }} />
         <div className="absolute inset-0 bg-gradient-to-b from-[#170b2a]/25 via-[#10091b]/30 to-[#080610]/80" />
-        <div className="relative px-3 pb-2 pt-2 sm:px-7 sm:pb-7 sm:pt-6">
+        <div style={compactMobile ? { zoom: 0.72, width: "138.9%", marginLeft: "-19.45%" } : undefined} className="relative px-3 pb-2 pt-2 sm:px-7 sm:pb-7 sm:pt-6">
           <button type="button" onClick={onClose} disabled={loading} aria-label="Закрыть" className="absolute right-3 top-2 z-10 flex h-7 w-7 sm:right-4 sm:top-4 sm:h-9 sm:w-9 items-center justify-center rounded-full bg-black/25 text-white/80 transition hover:bg-white/10 hover:text-white disabled:opacity-40"><X className="h-6 w-6" /></button>
           <div className="mx-auto mb-0 flex h-[58px] w-24 items-center justify-center sm:mb-2 sm:h-24">
             <span className="h-full w-full" aria-hidden="true" />
