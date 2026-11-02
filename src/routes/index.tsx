@@ -81,15 +81,15 @@ export const Route = createFileRoute("/")({
     const image = absoluteImageUrl(homeSocialImage);
     return {
       meta: [
-        { title: "YUME — смотри аниме онлайн" },
+        { title: "Yubera — смотри аниме онлайн" },
         {
           name: "description",
-          content: "YUME — каталог аниме с рейтингами, новинками и тематическими подборками.",
+          content: "Yubera — каталог аниме с рейтингами, новинками и тематическими подборками.",
         },
-        { property: "og:title", content: "YUME — больше чем аниме" },
+        { property: "og:title", content: "Yubera — больше чем аниме" },
         {
           property: "og:description",
-          content: "Открой свой мир в YUME: популярное, новинки и подборки.",
+          content: "Открой свой мир в Yubera: популярное, новинки и подборки.",
         },
         { property: "og:type", content: "website" },
         { property: "og:url", content: canonicalUrl("/") },
@@ -368,16 +368,16 @@ function Index() {
   useEffect(() => {
     const metadata = language === "en"
       ? {
-          title: "YUME — watch anime online",
-          description: "YUME — an anime catalog with themed collections and top-rated titles.",
-          ogTitle: "YUME — more than anime",
-          ogDescription: "Discover your world in YUME: popular anime, new releases and collections.",
+          title: "Yubera — watch anime online",
+          description: "Yubera — an anime catalog with themed collections and top-rated titles.",
+          ogTitle: "Yubera — more than anime",
+          ogDescription: "Discover your world in Yubera: popular anime, new releases and collections.",
         }
       : {
-          title: "YUME — смотри аниме онлайн",
-          description: "YUME — каталог аниме, тематические подборки и рейтинг лучших тайтлов.",
-          ogTitle: "YUME — больше чем аниме",
-          ogDescription: "Открой свой мир в YUME: популярное, новинки и подборки.",
+          title: "Yubera — смотри аниме онлайн",
+          description: "Yubera — каталог аниме, тематические подборки и рейтинг лучших тайтлов.",
+          ogTitle: "Yubera — больше чем аниме",
+          ogDescription: "Открой свой мир в Yubera: популярное, новинки и подборки.",
         };
     document.title = metadata.title;
     document.querySelector('meta[name="description"]')?.setAttribute("content", metadata.description);
@@ -1698,11 +1698,11 @@ function Index() {
       {isTelegramMiniApp && telegramConsentRequired && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-background/85 px-4 py-6 backdrop-blur-md" role="dialog" aria-modal="true" aria-labelledby="telegram-consent-title">
           <section className="w-full max-w-md rounded-3xl border border-border bg-card p-6 shadow-2xl sm:p-8">
-            <h2 id="telegram-consent-title" className="text-xl font-bold">{language === "ru" ? "Добро пожаловать в YUME" : "Welcome to YUME"}</h2>
+            <h2 id="telegram-consent-title" className="text-xl font-bold">{language === "ru" ? "Добро пожаловать в Yubera" : "Welcome to Yubera"}</h2>
             <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
               {language === "ru"
-                ? "Чтобы создать аккаунт и сохранять твои данные, YUME будет обрабатывать Telegram ID и имя профиля в соответствии с "
-                : "To create your account and save your data, YUME will process your Telegram ID and profile name under the "}
+                ? "Чтобы создать аккаунт и сохранять твои данные, Yubera будет обрабатывать Telegram ID и имя профиля в соответствии с "
+                : "To create your account and save your data, Yubera will process your Telegram ID and profile name under the "}
               <button type="button" onClick={() => { setTelegramConsentPending(true); setTelegramConsentRequired(false); setView("privacy-policy"); }} className="font-semibold text-primary underline underline-offset-4">
                 {language === "ru" ? "Политикой конфиденциальности" : "Privacy Policy"}
               </button>.
@@ -1811,7 +1811,7 @@ function Index() {
             </div>
             <h1 className="mt-4 text-2xl font-bold">{language === "ru" ? "Уведомления для зарегистрированных пользователей" : "Notifications for registered users"}</h1>
             <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-              {language === "ru" ? "Войди в аккаунт или зарегистрируйся через Telegram, чтобы получать новости и уведомления YUME." : "Sign in or register through Telegram to receive YUME news and notifications."}
+              {language === "ru" ? "Войди в аккаунт или зарегистрируйся через Telegram, чтобы получать новости и уведомления Yubera." : "Sign in or register through Telegram to receive Yubera news and notifications."}
             </p>
             <div className="mt-5 flex flex-col justify-center gap-2 sm:flex-row">
               <button type="button" onClick={() => setView("login")} className="inline-flex min-h-11 items-center justify-center rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90">{language === "ru" ? "Войти" : "Sign in"}</button>
@@ -1828,9 +1828,9 @@ function Index() {
           <section className="mx-auto max-w-3xl">
             <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
               <div className="min-w-0">
-                <div className="mb-2 flex items-center gap-2 text-primary"><Bell className="h-5 w-5" /><span className="text-xs font-semibold uppercase tracking-[0.16em]">{language === "ru" ? "Новости YUME" : "YUME updates"}</span></div>
+                <div className="mb-2 flex items-center gap-2 text-primary"><Bell className="h-5 w-5" /><span className="text-xs font-semibold uppercase tracking-[0.16em]">{language === "ru" ? "Новости Yubera" : "Yubera updates"}</span></div>
                 <h1 className="text-3xl font-bold tracking-tight text-foreground">{language === "ru" ? "Уведомления" : "Notifications"}</h1>
-                <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">{language === "ru" ? "Здесь собраны новости о новых пользовательских возможностях и функциях YUME." : "Updates about new user-facing YUME features and capabilities appear here."}</p>
+                <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">{language === "ru" ? "Здесь собраны новости о новых пользовательских возможностях и функциях Yubera." : "Updates about new user-facing Yubera features and capabilities appear here."}</p>
               </div>
               <button type="button" onClick={markAllNotificationsRead} disabled={notificationActionBusy || notificationItems.filter((item) => !notificationDismissedIds.includes(item.id)).every((item) => notificationReadIds.includes(item.id))} className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-primary/30 bg-primary/10 px-3 py-2 text-sm font-semibold text-foreground transition hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-45">
                 <CheckCheck className="h-4 w-4" />
@@ -1851,7 +1851,7 @@ function Index() {
               <div className="rounded-2xl border border-dashed border-border bg-card/30 px-5 py-12 text-center">
                 <Bell className="mx-auto h-8 w-8 text-muted-foreground" />
                 <h2 className="mt-3 font-semibold">{language === "ru" ? "Пока нет уведомлений" : "No notifications yet"}</h2>
-                <p className="mt-1 text-sm text-muted-foreground">{language === "ru" ? "Когда в YUME появятся новые функции, новости о них будут здесь." : "Announcements about new YUME features will appear here."}</p>
+                <p className="mt-1 text-sm text-muted-foreground">{language === "ru" ? "Когда в Yubera появятся новые функции, новости о них будут здесь." : "Announcements about new Yubera features will appear here."}</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -2079,7 +2079,7 @@ function Index() {
         <main id="main-content" className="min-h-[70vh] bg-[#050408] px-4 pt-20 pb-8 md:px-10 md:pt-24">
           <div className="mx-auto max-w-5xl">
             <h1 className="mb-2 text-2xl font-bold md:text-3xl">{language === "ru" ? "Панель администратора" : "Admin panel"}</h1>
-            <p className="mb-4 text-sm text-muted-foreground">{language === "ru" ? "Управление функциями и обслуживанием YUME." : "Manage YUME features and maintenance."}</p>
+            <p className="mb-4 text-sm text-muted-foreground">{language === "ru" ? "Управление функциями и обслуживанием Yubera." : "Manage Yubera features and maintenance."}</p>
             {!telegramDetectionComplete || (isTelegramMiniApp && (
               (!telegramAuthReady && !telegramAuthError) ||
               (telegramAuthReady && !telegramConsentRequired && !telegramConsentPending && !adminCheckComplete)
@@ -2423,7 +2423,7 @@ function Index() {
             <p className="rounded-2xl border border-border bg-card/40 px-5 py-8 text-sm text-muted-foreground" role="status">{language === "ru" ? "Загружаем историю…" : "Loading history…"}</p>
           ) : !historyAuthenticated ? (
             <section className="rounded-2xl border border-dashed border-border bg-card/40 px-5 py-8 text-center">
-              <p className="text-sm text-muted-foreground">{historyError || (language === "ru" ? "История просмотров доступна только в аккаунте YUME." : "Viewing history is available only in a YUME account.")}</p>
+              <p className="text-sm text-muted-foreground">{historyError || (language === "ru" ? "История просмотров доступна только в аккаунте Yubera." : "Viewing history is available only in a Yubera account.")}</p>
               <div className="mt-4 flex flex-wrap justify-center gap-2">
                 <button type="button" onClick={() => setView("login")} className="rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground">{language === "ru" ? "Войти через Telegram" : "Sign in with Telegram"}</button>
                 <button type="button" onClick={() => setView("register")} className="rounded-xl border border-border px-4 py-2.5 text-sm font-semibold hover:bg-accent">{language === "ru" ? "Регистрация" : "Register"}</button>
