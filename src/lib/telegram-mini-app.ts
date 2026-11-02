@@ -25,6 +25,7 @@ export interface TelegramWebApp {
   ready(): void;
   expand(): void;
   openTelegramLink?(url: string): void;
+  openInvoice?(url: string, callback?: (status: "paid" | "cancelled" | "failed" | "pending") => void): void;
   disableVerticalSwipes?(): void;
   HapticFeedback?: {
     impactOccurred(style: "light" | "medium" | "heavy" | "rigid" | "soft"): void;

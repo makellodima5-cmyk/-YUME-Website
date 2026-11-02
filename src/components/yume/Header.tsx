@@ -3,6 +3,7 @@ import { Home, LayoutGrid, Library, User, Menu, X, Bell, Moon, Sun, ShieldCheck,
 import { Logo } from "./Logo";
 import { useYumePreferences } from "@/data/preferences";
 import { getTelegramWebApp, telegramHapticImpact } from "@/lib/telegram-mini-app";
+import { TelegramStarsDonation } from "./TelegramStarsDonation";
 
 export type View = "home" | "admin" | "catalog" | "collections" | "profile" | "login" | "register" | "popular" | "new-releases" | "announcements" | "airing" | "favorites" | "watchlist" | "history" | "privacy" | "privacy-policy" | "rules" | "rights" | "notifications";
 
@@ -25,9 +26,12 @@ export function Header({ view, setView, onProfile, isAdmin = false, unreadNotifi
   const [menuOpen, setMenuOpen] = useState(false);
   const [telegramPhotoUrl, setTelegramPhotoUrl] = useState<string | null>(null);
   const [telegramPhotoFailed, setTelegramPhotoFailed] = useState(false);
+  const [isTelegramMiniApp, setIsTelegramMiniApp] = useState(false);
+  const [donationOpen, setDonationOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
+    setIsTelegramMiniApp(Boolean(getTelegramWebApp()?.initData));
     fetch("/api/telegram/init-data", { credentials: "same-origin", cache: "no-store" })
       .then(async (response) => {
         const result = await response.json().catch(() => ({})) as { authenticated?: boolean };
@@ -129,6 +133,7 @@ export function Header({ view, setView, onProfile, isAdmin = false, unreadNotifi
           </button>
           <div className="hidden min-w-0 flex-1 md:block" />
           <div className="ml-auto mt-5 flex items-center gap-1 sm:gap-2">
+            {isTelegramMiniApp && <button type="button" onClick={() => { telegramHapticImpact("light"); setDonationOpen(true); }} aria-label="Поддержать Yubera" title="Поддержать Yubera" className="yume-tactile-control flex h-10 w-10 items-center justify-center rounded-2xl border border-fuchsia-400/40 bg-gradient-to-br from-violet-500/25 to-fuchsia-500/20 text-amber-300 shadow-[0_0_18px_rgba(192,90,255,0.2)] transition hover:border-fuchsia-300 hover:from-violet-500/40 hover:to-fuchsia-500/30"><Star className="h-6 w-6 fill-amber-300 drop-shadow-[0_0_7px_rgba(255,190,70,0.65)]" /></button>}
             <button
               type="button"
               onClick={() => { telegramHapticImpact("light"); setView("notifications"); }}
@@ -166,6 +171,8 @@ export function Header({ view, setView, onProfile, isAdmin = false, unreadNotifi
           </div>
         </div>
       </header>
+
+      {isTelegramMiniApp && <TelegramStarsDonation open={donationOpen} onClose={() => setDonationOpen(false)} />}
 
       {menuOpen && (
         <>
