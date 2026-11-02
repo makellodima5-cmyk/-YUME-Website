@@ -1,4 +1,4 @@
-# YUME security audit: Stage 3 CSP reporting
+# Yubera security audit: Stage 3 CSP reporting
 
 **Audit date:** 2026-10-29  
 **Scope:** source review and automated test design for CSP report-only telemetry and related deployment configuration. This is not a penetration test, legal opinion, or certification.
