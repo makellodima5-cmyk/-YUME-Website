@@ -20,7 +20,8 @@ export function TelegramStarsDonation({ open, onClose }: Props) {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape" && !loading) onClose();
     };
-    document.body.style.overflow = "hidden";
+    const lockPageScroll = window.matchMedia("(min-width: 640px)").matches;
+    if (lockPageScroll) document.body.style.overflow = "hidden";
     window.addEventListener("keydown", onKeyDown);
     return () => {
       document.body.style.overflow = previousOverflow;
