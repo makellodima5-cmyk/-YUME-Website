@@ -46,7 +46,7 @@ export function TelegramStarsDonation({ open, onClose }: Props) {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [compactMobile, setCompactMobile] = useState(false);
-  const panelRef = useRef<HTMLElement>(null);
+  const panelRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     if (!open) return;
