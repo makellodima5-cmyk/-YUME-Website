@@ -1,13 +1,13 @@
-import logoArtwork from "@/assets/yume-logo.webp";
+import logoArtwork from "@/assets/DF5D40FA-7E17-4527-9130-E3E489578CD8.png";
 
 /**
- * YUME wordmark artwork: crescent moon and white serif lettering, without kanji.
+ * Yubera wordmark artwork: Yubera wordmark without tagline.
  */
 export function Logo() {
   return (
     <img
       src={logoArtwork}
-      alt="YUME"
+      alt="Yubera"
       width={500}
       height={200}
       className="h-auto w-[124px] shrink-0 object-contain select-none md:w-[148px]"
