@@ -15,7 +15,7 @@ export function Footer({ onNavigate }: Props) {
     <footer className="mt-16 border-t border-border/70 bg-card/20 px-4 pb-8 pt-7 md:px-10 md:pt-8">
       <div className="mx-auto flex max-w-6xl flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
-          <p className="font-display text-sm font-bold tracking-wide text-foreground">YUME</p>
+          <p className="font-display text-sm font-bold tracking-wide text-foreground">Yubera</p>
           <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{t("footer.source")}</p>
           <p className="mt-1 text-[10px] text-muted-foreground">{language === "en" ? "Version" : "Версия"} {APP_VERSION}</p>
         </div>
