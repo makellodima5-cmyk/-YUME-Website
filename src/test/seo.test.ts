@@ -17,7 +17,7 @@ describe("SEO helpers", () => {
     expect(sanitizeMetaDescription("<b>Anime</b> [anime=12]text[/anime] &amp; more")).toBe(
       "Anime text & more",
     );
-    expect(sanitizeMetaDescription("   ")).toContain("YUME");
+    expect(sanitizeMetaDescription("   ")).toContain("Yubera");
     expect(sanitizeMetaDescription("A description that is deliberately longer than the configured maximum", "fallback", 36))
       .toBe("A description that is deliberately…");
   });
