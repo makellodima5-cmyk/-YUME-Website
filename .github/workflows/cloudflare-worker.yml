@@ -114,8 +114,14 @@ jobs:
           if (rootConfig.assets?.directory !== ".output/public" || !fs.existsSync(rootConfig.assets.directory)) {
             throw new Error("Root Wrangler config must target the generated public assets.");
           }
-          if (rootConfig.assets?.run_worker_first !== true) {
-            throw new Error("HTTP-to-HTTPS redirect must run before any static asset is served.");
+          const expectedWorkerFirst = ["/*", "!/google31ba377df3a22378.html"];
+          const workerFirst = config.assets?.run_worker_first;
+          const rootWorkerFirst = rootConfig.assets?.run_worker_first;
+          const hasExpectedWorkerFirst = (value) => Array.isArray(value)
+            && value.length === expectedWorkerFirst.length
+            && expectedWorkerFirst.every((pattern) => value.includes(pattern));
+          if (!hasExpectedWorkerFirst(workerFirst) || !hasExpectedWorkerFirst(rootWorkerFirst)) {
+            throw new Error("Worker-first routing must cover the app while excluding the exact Google verification static asset.");
           }
           if (Array.isArray(rootConfig.triggers?.crons) && rootConfig.triggers.crons.length > 0) {
             throw new Error("Automatic scheduled Worker jobs must remain disabled.");
