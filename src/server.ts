@@ -178,7 +178,7 @@ export default {
       requestUrl.pathname === "/google31ba377df3a22378.html" &&
       ["GET", "HEAD"].includes(request.method)
     ) {
-      const assets = (env as { ASSETS?: { fetch: (request: Request) => Promise<Response> } }).ASSETS;
+      const assets = (cloudflareEnv as unknown as { ASSETS?: { fetch: (request: Request) => Promise<Response> } }).ASSETS;
       if (!assets) {
         return new Response("Static asset binding is unavailable.", {
           status: 503,
