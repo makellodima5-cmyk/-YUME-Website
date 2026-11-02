@@ -10,22 +10,22 @@ const p = (text: string): PolicyBlock => ({ type: "p", text });
 const list = (...items: string[]): PolicyBlock => ({ type: "list", items });
 
 const POLICY_RU_INTRO = [
-  "Настоящая Политика регулирует сбор, использование, хранение и защиту информации пользователей сервиса YUME — сайта https://yume-website.yumesupport833.workers.dev.",
-  "YUME может обрабатывать данные аккаунта, техническую информацию, настройки и историю взаимодействий с Сервисом. Эти сведения используются для обеспечения работы сайта, предоставления его функций, поддержания безопасности и связи с Пользователями.",
+  "Настоящая Политика регулирует сбор, использование, хранение и защиту информации пользователей сервиса Yubera — сайта https://yume-website.yumesupport833.workers.dev.",
+  "Yubera может обрабатывать данные аккаунта, техническую информацию, настройки и историю взаимодействий с Сервисом. Эти сведения используются для обеспечения работы сайта, предоставления его функций, поддержания безопасности и связи с Пользователями.",
   "Передача информации третьим лицам осуществляется только в случаях, предусмотренных настоящей Политикой, необходимых для работы отдельных функций Сервиса либо в установленных случаях.",
 ];
 
 const POLICY_RU: PolicySection[] = [
   { title: "1. Общие положения", blocks: [
-    p("1.1. Настоящая Политика конфиденциальности (далее — «Политика») регулирует порядок обработки и защиты информации, которую Пользователь предоставляет или которая может собираться при использовании сайта YUME (далее — «Сервис»)."),
+    p("1.1. Настоящая Политика конфиденциальности (далее — «Политика») регулирует порядок обработки и защиты информации, которую Пользователь предоставляет или которая может собираться при использовании сайта Yubera (далее — «Сервис»)."),
     p("1.2. Используя Сервис, Пользователь подтверждает, что ознакомился с условиями настоящей Политики и принимает их. Если Пользователь не согласен с условиями Политики, он обязан прекратить использование Сервиса."),
-    p("1.3. Политика распространяется на информацию, получаемую при посещении сайта, авторизации через Telegram, использовании личного профиля и других доступных функций YUME."),
+    p("1.3. Политика распространяется на информацию, получаемую при посещении сайта, авторизации через Telegram, использовании личного профиля и других доступных функций Yubera."),
   ]},
   { title: "2. Сбор информации", blocks: [
     p("2.1. При использовании Сервиса могут собираться и обрабатываться следующие сведения:"),
     list("Данные аккаунта: Telegram ID, имя, фамилия, имя пользователя и языковые настройки, передаваемые при авторизации через Telegram.","Техническая информация: IP-адрес, сведения о браузере, устройстве и операционной системе, дата и время обращения к Сервису, технические данные запросов, а также cookie-файлы и аналогичные технологии.","Информация о взаимодействии с Сервисом: сведения об избранных тайтлах, списке «Смотреть позже», истории просмотров, настройках профиля и взаимодействии с уведомлениями.","Данные сеанса: технические идентификаторы, необходимые для авторизации, поддержания входа в аккаунт и защиты учётной записи."),
-    p("2.2. Сервис не требует от Пользователя паспортных данных, фотографий документов, банковских реквизитов, адреса проживания или иной личной информации, не предусмотренной функциональностью YUME."),
-    p("2.3. YUME не собирает пользовательские оценки и комментарии, поскольку соответствующие функции не предусмотрены текущей функциональностью Сервиса."),
+    p("2.2. Сервис не требует от Пользователя паспортных данных, фотографий документов, банковских реквизитов, адреса проживания или иной личной информации, не предусмотренной функциональностью Yubera."),
+    p("2.3. Yubera не собирает пользовательские оценки и комментарии, поскольку соответствующие функции не предусмотрены текущей функциональностью Сервиса."),
     p("2.4. Cookie-файлы и аналогичные технологии"),
     p("Сервис может использовать cookie-файлы и локальное хранилище браузера для сохранения пользовательских настроек, поддержания авторизации, обеспечения безопасности и корректной работы основных функций."),
     p("При первом посещении Сервиса Пользователю отображается уведомление об использовании cookie-файлов и аналогичных технологий. Пользователь может принять предложенные условия либо отказаться от их использования."),
@@ -38,19 +38,19 @@ const POLICY_RU: PolicySection[] = [
     p("3.2. Администрация не использует полученную информацию для целей, не связанных с работой Сервиса, без соответствующего основания и необходимого информирования Пользователя."),
   ]},
   { title: "4. Передача информации третьим лицам", blocks: [
-    p("4.1. Для авторизации и работы аккаунтов YUME использует Telegram. При использовании этой функции осуществляется взаимодействие с Telegram, в рамках которого Сервис получает необходимые сведения профиля Пользователя."),
-    p("4.2. При использовании встроенного видеоплеера браузер Пользователя взаимодействует с внешним видеомодулем. Такой модуль работает независимо от YUME. Администрация не управляет его внутренними механизмами, содержимым, доступностью и правилами обработки информации."),
+    p("4.1. Для авторизации и работы аккаунтов Yubera использует Telegram. При использовании этой функции осуществляется взаимодействие с Telegram, в рамках которого Сервис получает необходимые сведения профиля Пользователя."),
+    p("4.2. При использовании встроенного видеоплеера браузер Пользователя взаимодействует с внешним видеомодулем. Такой модуль работает независимо от Yubera. Администрация не управляет его внутренними механизмами, содержимым, доступностью и правилами обработки информации."),
     p("4.3. Администрация не продаёт и не передаёт информацию Пользователей третьим лицам для самостоятельного использования в рекламных или иных посторонних целях."),
     p("4.4. Передача информации также возможна в случаях, когда это необходимо для обеспечения работы запрошенных Пользователем функций Сервиса либо предусмотрено применимыми требованиями."),
   ]},
   { title: "5. Хранение и защита данных", blocks: [
     p("5.1. Информация хранится в течение срока, необходимого для достижения целей её обработки, обеспечения работы Сервиса и предоставления Пользователю доступных функций."),
     p("5.2. Данные аккаунта и связанные с ним сведения хранятся до момента удаления аккаунта Пользователем либо до момента, когда необходимость их дальнейшего хранения отпадает."),
-    p("5.3. Пользователь может самостоятельно удалить свой аккаунт в настройках профиля YUME."),
-    p("После подтверждения удаления аккаунта удаляются учётная запись YUME и связанные с ней данные, включая:"),
+    p("5.3. Пользователь может самостоятельно удалить свой аккаунт в настройках профиля Yubera."),
+    p("После подтверждения удаления аккаунта удаляются учётная запись Yubera и связанные с ней данные, включая:"),
     list("сведения аккаунта, полученные при авторизации через Telegram;","сохранённые сеансы авторизации;","избранные тайтлы;","список «Смотреть позже»;","историю просмотров;","связанные с аккаунтом настройки уведомлений и другие записи профиля."),
-    p("Удаление аккаунта YUME не приводит к удалению самого аккаунта Пользователя в Telegram."),
-    p("Удаление аккаунта YUME является необратимым. Восстановление удалённых данных не предусмотрено."),
+    p("Удаление аккаунта Yubera не приводит к удалению самого аккаунта Пользователя в Telegram."),
+    p("Удаление аккаунта Yubera является необратимым. Восстановление удалённых данных не предусмотрено."),
     p("5.4. Администрация принимает разумные технические и организационные меры для защиты информации от неправомерного доступа, изменения, утраты или раскрытия."),
     p("5.5. Несмотря на принимаемые меры, Администрация не гарантирует абсолютную безопасность информации при её передаче и хранении с использованием сети Интернет."),
   ]},
@@ -61,11 +61,11 @@ const POLICY_RU: PolicySection[] = [
   ]},
   { title: "7. Изменения в Политике", blocks: [
     p("7.1. Администрация вправе вносить изменения и дополнения в настоящую Политику при изменении функциональности Сервиса, порядка обработки информации или условий его использования."),
-    p("7.2. Актуальная редакция Политики всегда размещается на сайте YUME."),
+    p("7.2. Актуальная редакция Политики всегда размещается на сайте Yubera."),
     p("7.3. Продолжение использования Сервиса после публикации изменений означает согласие Пользователя с новой редакцией Политики."),
   ]},
   { title: "8. Контакты", blocks: [
-    p("По вопросам, связанным с использованием Сервиса, обработкой информации и настоящей Политикой, Пользователь может обратиться к Администрации YUME следующими способами:"),
+    p("По вопросам, связанным с использованием Сервиса, обработкой информации и настоящей Политикой, Пользователь может обратиться к Администрации Yubera следующими способами:"),
     p("Электронная почта: yumesupport833@gmail.com"),
     p("Telegram службы поддержки: https://t.me/YumeSupport"),
   ]},
@@ -73,15 +73,15 @@ const POLICY_RU: PolicySection[] = [
 
 const POLICY_EN: PolicySection[] = [
   { title: "1. General provisions", blocks: [
-    p("1.1. This Privacy Policy (the “Policy”) governs the processing and protection of information provided by the User or collected when using the YUME website (the “Service”)."),
+    p("1.1. This Privacy Policy (the “Policy”) governs the processing and protection of information provided by the User or collected when using the Yubera website (the “Service”)."),
     p("1.2. By using the Service, the User confirms that they have read and accept this Policy. If the User does not agree with it, they must stop using the Service."),
-    p("1.3. This Policy applies to information received when visiting the website, signing in through Telegram, using a personal profile, and accessing other available YUME features."),
+    p("1.3. This Policy applies to information received when visiting the website, signing in through Telegram, using a personal profile, and accessing other available Yubera features."),
   ]},
   { title: "2. Information collection", blocks: [
     p("2.1. When using the Service, the following information may be collected and processed:"),
     list("Account data: Telegram ID, first name, last name, username, and language settings transmitted during Telegram authentication.","Technical information: IP address, browser, device and operating system details, date and time of access, technical request data, cookies, and similar technologies.","Service interaction information: Favorites, Watch Later list, viewing history, profile settings, and notification interactions.","Session data: technical identifiers required for authentication, maintaining account sign-in, and protecting the account."),
-    p("2.2. The Service does not require passport details, photographs of identity documents, bank details, residential address, or other personal information not required by YUME functionality."),
-    p("2.3. YUME does not collect user ratings or comments because these features are not part of the Service's current functionality."),
+    p("2.2. The Service does not require passport details, photographs of identity documents, bank details, residential address, or other personal information not required by Yubera functionality."),
+    p("2.3. Yubera does not collect user ratings or comments because these features are not part of the Service's current functionality."),
     p("2.4. Cookies and similar technologies"),
     p("The Service may use cookies and browser local storage to save user preferences, maintain authentication, provide security, and ensure that core features work correctly."),
     p("On the first visit, the User is shown a notice about cookies and similar technologies. The User may accept the proposed terms or refuse their use."),
@@ -94,19 +94,19 @@ const POLICY_EN: PolicySection[] = [
     p("3.2. The Administration does not use information for purposes unrelated to operating the Service without an appropriate basis and necessary notice to the User."),
   ]},
   { title: "4. Sharing information with third parties", blocks: [
-    p("4.1. YUME uses Telegram for authentication and account operation. When this feature is used, YUME interacts with Telegram and receives the User profile information required for the feature."),
-    p("4.2. When the embedded video player is used, the User's browser interacts with an external video module. This module operates independently of YUME. The Administration does not control its internal mechanisms, content, availability, or information-processing rules."),
+    p("4.1. Yubera uses Telegram for authentication and account operation. When this feature is used, Yubera interacts with Telegram and receives the User profile information required for the feature."),
+    p("4.2. When the embedded video player is used, the User's browser interacts with an external video module. This module operates independently of Yubera. The Administration does not control its internal mechanisms, content, availability, or information-processing rules."),
     p("4.3. The Administration does not sell User information or provide it to third parties for their independent use in advertising or other unrelated purposes."),
     p("4.4. Information may also be transferred when necessary to provide Service features requested by the User or where applicable requirements provide for it."),
   ]},
   { title: "5. Data storage and protection", blocks: [
     p("5.1. Information is stored for the period necessary to achieve its processing purposes, operate the Service, and provide available User features."),
     p("5.2. Account data and related information are stored until the User deletes the account or further storage is no longer necessary."),
-    p("5.3. The User may delete their account in the YUME profile settings."),
-    p("After account deletion is confirmed, the YUME account and associated data are deleted, including:"),
+    p("5.3. The User may delete their account in the Yubera profile settings."),
+    p("After account deletion is confirmed, the Yubera account and associated data are deleted, including:"),
     list("account information received through Telegram authentication;","saved authentication sessions;","Favorites;","the Watch Later list;","viewing history;","account-linked notification settings and other profile records."),
-    p("Deleting a YUME account does not delete the User's Telegram account."),
-    p("YUME account deletion is irreversible. Deleted data cannot be restored."),
+    p("Deleting a Yubera account does not delete the User's Telegram account."),
+    p("Yubera account deletion is irreversible. Deleted data cannot be restored."),
     p("5.4. The Administration takes reasonable technical and organizational measures to protect information against unauthorized access, alteration, loss, or disclosure."),
     p("5.5. Despite these measures, the Administration does not guarantee absolute security of information during transmission and storage over the Internet."),
   ]},
@@ -117,11 +117,11 @@ const POLICY_EN: PolicySection[] = [
   ]},
   { title: "7. Changes to the Policy", blocks: [
     p("7.1. The Administration may amend or supplement this Policy when Service functionality, information-processing procedures, or conditions of use change."),
-    p("7.2. The current version of the Policy is always published on the YUME website."),
+    p("7.2. The current version of the Policy is always published on the Yubera website."),
     p("7.3. Continued use of the Service after changes are published means the User agrees to the new version of the Policy."),
   ]},
   { title: "8. Contacts", blocks: [
-    p("For questions about use of the Service, information processing, or this Policy, the User may contact the YUME Administration using the following details:"),
+    p("For questions about use of the Service, information processing, or this Policy, the User may contact the Yubera Administration using the following details:"),
     p("Email: yumesupport833@gmail.com"),
     p("Telegram support: https://t.me/YumeSupport"),
   ]},
@@ -132,8 +132,8 @@ export function PrivacyPolicy() {
   const isRu = language === "ru";
   const sections = isRu ? POLICY_RU : POLICY_EN;
   const intro = isRu ? POLICY_RU_INTRO : [
-    "This Policy governs the collection, use, storage, and protection of information of users of the YUME service, available at https://yume-website.yumesupport833.workers.dev.",
-    "YUME may process account data, technical information, preferences, and interaction history. This information is used to operate the website, provide its features, maintain security, and communicate with Users.",
+    "This Policy governs the collection, use, storage, and protection of information of users of the Yubera service, available at https://yume-website.yumesupport833.workers.dev.",
+    "Yubera may process account data, technical information, preferences, and interaction history. This information is used to operate the website, provide its features, maintain security, and communicate with Users.",
     "Information is transferred to third parties only as described in this Policy, when necessary for individual Service features, or where required.",
   ];
   return (
