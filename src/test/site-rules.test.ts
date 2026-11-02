@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { SITE_RULES, SITE_RULES_LAST_UPDATED } from "@/data/site-rules";
 
-describe("YUME site rules", () => {
+describe("Yubera site rules", () => {
   it("contains 14 independently collapsible sections", () => {
     expect(SITE_RULES).toHaveLength(14);
     expect(SITE_RULES.map((section) => section.title)).toEqual([
