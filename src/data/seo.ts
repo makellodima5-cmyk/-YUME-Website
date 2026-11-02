@@ -1,8 +1,8 @@
 // Temporary public origin until the permanent domain is selected. Update this before the final SEO release.
 export const SITE_ORIGIN = "https://yume-website.yumesupport833.workers.dev";
-export const SITE_NAME = "YUME";
+export const SITE_NAME = "Yubera";
 export const DEFAULT_META_DESCRIPTION =
-  "YUME — каталог аниме с рейтингами, новинками и тематическими подборками.";
+  "Yubera — каталог аниме с рейтингами, новинками и тематическими подборками.";
 
 export function canonicalUrl(pathname: string): string {
   const input = typeof pathname === "string" ? pathname.trim() : "/";
