@@ -18,4 +18,4 @@ For subscription return handling, the bot must be an administrator of the channe
 }
 ```
 
-When a user sends `/start`, the bot sends a Russian welcome message and an inline `🎬 Открыть YUME` button that opens the Mini App at the deployed site URL. Membership updates let the bot edit the existing gate message when a subscriber leaves and restore it after they rejoin. The webhook checks Telegram's `X-Telegram-Bot-Api-Secret-Token` header before processing updates.
+When a user sends `/start`, the bot sends a Russian welcome message and an inline `🎬 Открыть Yubera` button that opens the Mini App at the deployed site URL. Membership updates let the bot edit the existing gate message when a subscriber leaves and restore it after they rejoin. The webhook checks Telegram's `X-Telegram-Bot-Api-Secret-Token` header before processing updates.
