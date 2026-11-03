@@ -259,6 +259,15 @@ export async function handleTelegramLibrary(request: Request): Promise<Response>
       }
       await mergeSavedIds(db, userId, "favorite", favoriteIds);
       await mergeSavedIds(db, userId, "watchlist", watchlistIds);
+      const syncedAt = Date.now();
+      for (const animeId of favoriteIds) {
+        await db.prepare("INSERT INTO yume_library_sync_items (user_id, item_type, anime_id, payload_json, updated_at_epoch_ms, deleted, source_id) VALUES (?, 'favorite', ?, ?, ?, 0, 'web') ON CONFLICT(user_id, item_type, anime_id) DO UPDATE SET payload_json = excluded.payload_json, updated_at_epoch_ms = MAX(excluded.updated_at_epoch_ms, yume_library_sync_items.updated_at_epoch_ms + 1), deleted = 0, source_id = 'web' ")
+          .bind(userId, animeId, JSON.stringify({ saved: true }), syncedAt).run();
+      }
+      for (const animeId of watchlistIds) {
+        await db.prepare("INSERT INTO yume_library_sync_items (user_id, item_type, anime_id, payload_json, updated_at_epoch_ms, deleted, source_id) VALUES (?, 'watchlist', ?, ?, ?, 0, 'web') ON CONFLICT(user_id, item_type, anime_id) DO UPDATE SET payload_json = excluded.payload_json, updated_at_epoch_ms = MAX(excluded.updated_at_epoch_ms, yume_library_sync_items.updated_at_epoch_ms + 1), deleted = 0, source_id = 'web' ")
+          .bind(userId, animeId, JSON.stringify({ saved: true }), syncedAt).run();
+      }
       return jsonResponse({ authenticated: true, ...(await readSavedLibrary(db, userId)) });
     }
 
@@ -289,6 +298,8 @@ export async function handleTelegramLibrary(request: Request): Promise<Response>
       await db.prepare("DELETE FROM yume_saved_anime WHERE user_id = ? AND list_type = ? AND anime_id = ?")
         .bind(userId, listType, animeId).run();
     }
+    await db.prepare("INSERT INTO yume_library_sync_items (user_id, item_type, anime_id, payload_json, updated_at_epoch_ms, deleted, source_id) VALUES (?, ?, ?, ?, ?, ?, 'web') ON CONFLICT(user_id, item_type, anime_id) DO UPDATE SET payload_json = excluded.payload_json, updated_at_epoch_ms = MAX(excluded.updated_at_epoch_ms, yume_library_sync_items.updated_at_epoch_ms + 1), deleted = excluded.deleted, source_id = 'web' ")
+      .bind(userId, listType, animeId, JSON.stringify({ saved }), Date.now(), saved ? 0 : 1).run();
     return jsonResponse({ authenticated: true, ...(await readSavedLibrary(db, userId)) });
   } catch (error) {
     console.error("[YUME] Telegram library request failed:", error);
