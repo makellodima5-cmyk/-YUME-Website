@@ -49,7 +49,6 @@ export const Route = createFileRoute("/api/mobile/catalog")({
   server: {
     handlers: {
       GET: ({ request }) => handleMobileCatalog(request),
-      HEAD: ({ request }) => handleMobileCatalog(request),
     },
   },
 });
