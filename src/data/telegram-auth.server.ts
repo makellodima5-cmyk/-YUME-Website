@@ -69,7 +69,7 @@ function randomToken(byteLength = 32): string {
   crypto.getRandomValues(bytes);
   let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/g, "");
+  return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/g, ""); // PKCE base64url
 }
 
 function readCookie(request: Request, name: string): string | null {
