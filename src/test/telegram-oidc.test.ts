@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { env as cloudflareEnv } from "cloudflare:workers";
-import { handleTelegramOidc } from "@/data/telegram-oidc.server";
+import { handleTelegramNativeOidcStart, handleTelegramOidc } from "@/data/telegram-oidc.server";
 
 type ExecutedStatement = { sql: string; values: unknown[] };
 
@@ -135,6 +135,38 @@ describe("Telegram OIDC browser binding", () => {
 
     expect(response.status).toBe(403);
     expect(await response.json()).toEqual({ error: "cross_origin_request" });
+    expect(db.executed).toHaveLength(0);
+  });
+});
+
+describe("Telegram native OIDC start", () => {
+  it("stores the app PKCE challenge and redirects through the existing Telegram callback", async () => {
+    const db = configure();
+    const state = "S".repeat(43);
+    const challenge = "C".repeat(43);
+    const response = await handleTelegramNativeOidcStart(new Request(
+      "https://yume.test/api/telegram/oidc?native=1&flow=login&state=" + state + "&code_challenge=" + challenge,
+    ));
+
+    expect(response.status).toBe(303);
+    const location = new URL(response.headers.get("location")!);
+    expect(location.origin).toBe("https://oauth.telegram.org");
+    expect(location.searchParams.get("redirect_uri")).toBe("https://yume.test/api/telegram/oidc/callback");
+    expect(response.headers.get("set-cookie")).toContain("__Host-yume-oidc-state=");
+    const insert = db.executed.find(statement => statement.sql.includes("INSERT INTO yume_telegram_oidc_states"));
+    expect(insert?.values[3]).toBe("login");
+    const verifierPayload = JSON.parse(String(insert?.values[2])) as { native?: boolean; codeChallenge?: string; appState?: string };
+    expect(verifierPayload.native).toBe(true);
+    expect(verifierPayload.codeChallenge).toBe(challenge);
+    expect(verifierPayload.appState).toBe(state);
+  });
+
+  it("requires registration consent and a valid S256 challenge", async () => {
+    const db = configure();
+    const response = await handleTelegramNativeOidcStart(new Request(
+      "https://yume.test/api/telegram/oidc?flow=register&state=" + "S".repeat(43) + "&code_challenge=" + "C".repeat(43),
+    ));
+    expect(response.status).toBe(400);
     expect(db.executed).toHaveLength(0);
   });
 });

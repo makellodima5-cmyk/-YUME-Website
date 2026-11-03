@@ -80,6 +80,26 @@ function readCookie(request: Request, name: string): string | null {
   return null;
 }
 
+function isBearerSessionRequest(request: Request): boolean {
+  return /^Bearer [A-Za-z0-9_-]{30,60}$/.test(request.headers.get("authorization") ?? "");
+}
+
+function readSessionToken(request: Request): string | null {
+  const authorization = request.headers.get("authorization") ?? "";
+  const bearer = /^Bearer ([A-Za-z0-9_-]{30,60})$/.exec(authorization);
+  return bearer?.[1] ?? readCookie(request, SESSION_COOKIE);
+}
+
+function isSameOriginOrBearer(request: Request): boolean {
+  return isBearerSessionRequest(request) || isSameOriginRequest(request);
+}
+
+function base64Url(bytes: Uint8Array): string {
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\\+/g, "-").replace(/\\//g, "_").replace(/=+$/g, "");
+}
+
 function sessionCookie(token: string): string {
   return SESSION_COOKIE + "=" + token + "; Path=/; Max-Age=" + SESSION_TTL_SECONDS + "; HttpOnly; Secure; SameSite=Lax";
 }
@@ -102,12 +122,17 @@ function jsonResponse(payload: unknown, status = 200, cookies: string[] = []): R
 // The clean yumedb schema is applied before deployment; runtime requests never mutate schema.
 function ensureSchema(_db: TelegramDatabase): Promise<void> { return Promise.resolve(); }
 
-async function createSession(db: TelegramDatabase, userId: string, secret: string): Promise<string> {
+async function createSessionToken(db: TelegramDatabase, userId: string, secret: string): Promise<{ token: string; expiresAt: number }> {
   const token = randomToken();
   const expiresAt = Date.now() + SESSION_TTL_SECONDS * 1000;
   await db.prepare("DELETE FROM yume_sessions WHERE expires_at <= ?").bind(Date.now()).run();
   await db.prepare("INSERT INTO yume_sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)").bind(await sessionTokenHash(token, secret), userId, expiresAt).run();
-  return sessionCookie(token);
+  return { token, expiresAt };
+}
+
+async function createSession(db: TelegramDatabase, userId: string, secret: string): Promise<string> {
+  const session = await createSessionToken(db, userId, secret);
+  return sessionCookie(session.token);
 }
 
 function userPayload(user: UserRow) {
@@ -156,7 +181,7 @@ type SavedAnimeRow = { anime_id: string };
 type AuthenticatedSessionRow = { user_id: string; expires_at: number };
 
 async function authenticatedTelegramUserId(request: Request, db: TelegramDatabase, secret: string): Promise<string | null> {
-  const token = readCookie(request, SESSION_COOKIE);
+  const token = readSessionToken(request);
   if (!token) return null;
   const tokenHash = await sessionTokenHash(token, secret);
   const session = await db.prepare(
@@ -195,7 +220,7 @@ export async function handleTelegramLibrary(request: Request): Promise<Response>
   if (request.method !== "GET" && request.method !== "POST") {
     return jsonResponse({ error: "method_not_allowed" }, 405);
   }
-  if (request.method === "POST" && !isSameOriginRequest(request)) {
+  if (request.method === "POST" && !isSameOriginOrBearer(request)) {
     return jsonResponse({ error: "cross_origin_request" }, 403);
   }
 
@@ -496,7 +521,7 @@ export async function handleTelegramBrowserAuth(request: Request): Promise<Respo
 /** Saves recently opened anime only for a verified, signed-in Telegram account. */
 export async function handleTelegramHistory(request: Request): Promise<Response> {
   if (request.method !== "GET" && request.method !== "POST" && request.method !== "DELETE") return jsonResponse({ error: "method_not_allowed" }, 405);
-  if ((request.method === "POST" || request.method === "DELETE") && !isSameOriginRequest(request)) return jsonResponse({ error: "cross_origin_request" }, 403);
+  if ((request.method === "POST" || request.method === "DELETE") && !isSameOriginOrBearer(request)) return jsonResponse({ error: "cross_origin_request" }, 403);
   const env = environment();
   const db = database(env);
   const secret = sessionSecret(env);
@@ -546,11 +571,11 @@ export async function handleTelegramHistory(request: Request): Promise<Response>
 /** Permanently removes the current account and all account-linked records. */
 export async function handleTelegramAccountDelete(request: Request): Promise<Response> {
   if (request.method !== "DELETE") return jsonResponse({ error: "method_not_allowed" }, 405);
-  if (!isSameOriginRequest(request)) return jsonResponse({ error: "cross_origin_request" }, 403);
+  if (!isSameOriginOrBearer(request)) return jsonResponse({ error: "cross_origin_request" }, 403);
   const env = environment();
   const db = database(env);
   const secret = sessionSecret(env);
-  const token = readCookie(request, SESSION_COOKIE);
+  const token = readSessionToken(request);
   if (!db || !secret) return jsonResponse({ error: "telegram_auth_not_configured" }, 503);
   if (!token) return jsonResponse({ error: "authentication_required" }, 401);
   try {
@@ -561,12 +586,12 @@ export async function handleTelegramAccountDelete(request: Request): Promise<Res
       .bind(tokenHash).first<AuthenticatedSessionRow>();
     if (!session || session.expires_at <= Date.now()) {
       await db.prepare("DELETE FROM yume_sessions WHERE token_hash = ?").bind(tokenHash).run();
-      return jsonResponse({ error: "authentication_required" }, 401, [clearSessionCookie()]);
+      return jsonResponse({ error: "authentication_required" }, 401, isBearerSessionRequest(request) ? [] : [clearSessionCookie()]);
     }
     const userId = session.user_id;
     const telegramUserId = await db.prepare("SELECT telegram_user_id FROM yume_users WHERE id = ?")
       .bind(userId).first<{ telegram_user_id: string }>();
-    if (!telegramUserId) return jsonResponse({ error: "account_not_found" }, 404, [clearSessionCookie()]);
+    if (!telegramUserId) return jsonResponse({ error: "account_not_found" }, 404, isBearerSessionRequest(request) ? [] : [clearSessionCookie()]);
 
     // Clear every account-owned relation, including tables that intentionally do
     // not use foreign keys, then anonymize retained audit/content records.
@@ -585,36 +610,104 @@ export async function handleTelegramAccountDelete(request: Request): Promise<Res
       db.prepare("DELETE FROM yume_sessions WHERE user_id = ?").bind(userId),
       db.prepare("DELETE FROM yume_users WHERE id = ?").bind(userId),
     ]);
-    return jsonResponse({ deleted: true }, 200, [clearSessionCookie()]);
+    return jsonResponse({ deleted: true }, 200, isBearerSessionRequest(request) ? [] : [clearSessionCookie()]);
   } catch (error) {
     console.error("[YUME] Account deletion failed:", error);
     return jsonResponse({ error: "account_deletion_failed" }, 503);
   }
 }
 
+
+/** Exchanges a one-time native OIDC code plus app-generated PKCE verifier for a revocable bearer session. */
+export async function handleTelegramMobileAuth(request: Request): Promise<Response> {
+  if (request.method !== "POST") return jsonResponse({ error: "method_not_allowed" }, 405);
+  if (!(request.headers.get("content-type") ?? "").toLowerCase().startsWith("application/json")) {
+    return jsonResponse({ error: "invalid_request" }, 400);
+  }
+  const env = environment();
+  const db = database(env);
+  const secret = sessionSecret(env);
+  if (!db || !secret) return jsonResponse({ error: "telegram_auth_not_configured" }, 503);
+
+  let input: Record<string, unknown>;
+  try {
+    const raw = await request.text();
+    if (raw.length > 2_048) return jsonResponse({ error: "request_too_large" }, 413);
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return jsonResponse({ error: "invalid_request" }, 400);
+    input = parsed as Record<string, unknown>;
+  } catch {
+    return jsonResponse({ error: "invalid_request" }, 400);
+  }
+  const code = input.code;
+  const verifier = input.codeVerifier;
+  if (typeof code !== "string" || !/^[A-Za-z0-9_-]{40,64}$/.test(code) ||
+      typeof verifier !== "string" || !/^[A-Za-z0-9._~-]{43,128}$/.test(verifier)) {
+    return jsonResponse({ error: "invalid_request" }, 400);
+  }
+
+  try {
+    await ensureSchema(db);
+    await ensureBrowserAuthSchema(db);
+    const codeHash = await sessionTokenHash(code, secret);
+    const challenge = base64Url(new Uint8Array(await crypto.subtle.digest("SHA-256", encoder.encode(verifier))));
+    const pending = await db.prepare("SELECT token_hash, flow, privacy_consent, terms_consent, confirmation_code_hash, telegram_user_id, status, user_id, error_code, expires_at FROM yume_browser_auth WHERE token_hash = ?")
+      .bind(codeHash).first<BrowserAuthRow>();
+    if (!pending || pending.status !== "ready" || !pending.user_id || !pending.telegram_user_id ||
+        pending.expires_at <= Date.now() || pending.confirmation_code_hash !== challenge) {
+      return jsonResponse({ error: "native_auth_code_invalid_or_expired" }, 401);
+    }
+    const claimed = await db.prepare("UPDATE yume_browser_auth SET status = 'consuming' WHERE token_hash = ? AND status = 'ready' AND confirmation_code_hash = ? AND expires_at > ?")
+      .bind(codeHash, challenge, Date.now()).run();
+    if (Number(claimed.meta?.changes ?? 0) !== 1) return jsonResponse({ error: "native_auth_code_already_used" }, 401);
+
+    const user = await db.prepare("SELECT id, telegram_user_id, telegram_first_name, telegram_last_name, telegram_username, telegram_language_code FROM yume_users WHERE id = ? AND telegram_user_id = ? AND provider = 'telegram'")
+      .bind(pending.user_id, pending.telegram_user_id).first<UserRow>();
+    if (!user) {
+      await db.prepare("DELETE FROM yume_browser_auth WHERE token_hash = ?").bind(codeHash).run();
+      return jsonResponse({ error: "account_not_found" }, 401);
+    }
+
+    const session = await createSessionToken(db, user.id, secret);
+    await db.prepare("DELETE FROM yume_browser_auth WHERE token_hash = ?").bind(codeHash).run();
+    return jsonResponse({
+      authenticated: true,
+      accessToken: session.token,
+      tokenType: "Bearer",
+      expiresAt: session.expiresAt,
+      user: userPayload(user),
+    });
+  } catch (error) {
+    console.error("[YUME] Native Telegram session exchange failed:", error);
+    return jsonResponse({ error: "native_auth_exchange_unavailable" }, 503);
+  }
+}
+
 export async function handleTelegramSession(request: Request): Promise<Response> {
   if (request.method === "DELETE") {
-    if (!isSameOriginRequest(request)) {
+    if (!isSameOriginOrBearer(request)) {
       return jsonResponse({ error: "cross_origin_request" }, 403);
     }
+    const bearer = isBearerSessionRequest(request);
     const env = environment();
     const db = database(env);
-    const token = readCookie(request, SESSION_COOKIE);
+    const token = readSessionToken(request);
     const secret = sessionSecret(env);
     if (db && token && secret) {
       try {
         await db.prepare("DELETE FROM yume_sessions WHERE token_hash = ?").bind(await sessionTokenHash(token, secret)).run();
       } catch {
-        return jsonResponse({ error: "session_unavailable" }, 503, [clearSessionCookie()]);
+        return jsonResponse({ error: "session_unavailable" }, 503, bearer ? [] : [clearSessionCookie()]);
       }
     }
-    return jsonResponse({ authenticated: false }, 200, [clearSessionCookie()]);
+    return jsonResponse({ authenticated: false }, 200, bearer ? [] : [clearSessionCookie()]);
   }
 
   if (request.method === "GET") {
     const env = environment();
     const db = database(env);
-    const token = readCookie(request, SESSION_COOKIE);
+    const bearer = isBearerSessionRequest(request);
+    const token = readSessionToken(request);
     const secret = sessionSecret(env);
     if (!db || !token) return jsonResponse({ authenticated: false }, 200);
     if (!secret) return jsonResponse({ error: "telegram_auth_not_configured" }, 503);
@@ -624,7 +717,7 @@ export async function handleTelegramSession(request: Request): Promise<Response>
         .bind(await sessionTokenHash(token, secret)).first<SessionRow>();
       if (!row || row.expires_at <= Date.now()) {
         if (row) await db.prepare("DELETE FROM yume_sessions WHERE token_hash = ?").bind(await sessionTokenHash(token, secret)).run();
-        return jsonResponse({ authenticated: false }, 200, [clearSessionCookie()]);
+        return jsonResponse({ authenticated: false }, 200, bearer ? [] : [clearSessionCookie()]);
       }
       return jsonResponse({ authenticated: true, user: userPayload(row) });
     } catch {

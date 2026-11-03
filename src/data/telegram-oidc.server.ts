@@ -104,6 +104,80 @@ async function verifyIdToken(token: string, clientId: string, nonce: string): Pr
   return claims;
 }
 
+
+type NativeOidcVerifierPayload = {
+  native: true;
+  telegramVerifier: string;
+  codeChallenge: string;
+  appState: string;
+};
+
+/** Starts the native-app PKCE handoff while keeping Telegram's OAuth callback on the website origin. */
+export async function handleTelegramNativeOidcStart(request: Request): Promise<Response> {
+  if (request.method !== "GET") return response({ error: "method_not_allowed" }, 405);
+  const url = new URL(request.url);
+  const flow = url.searchParams.get("flow");
+  const appState = url.searchParams.get("state") ?? "";
+  const codeChallenge = url.searchParams.get("code_challenge") ?? "";
+  const consent = url.searchParams.get("privacy_consent") === "true";
+  const termsConsent = url.searchParams.get("terms_accepted") === "true";
+  if ((flow !== "login" && flow !== "register") ||
+      !/^[A-Za-z0-9_-]{40,64}$/.test(appState) ||
+      !/^[A-Za-z0-9_-]{43}$/.test(codeChallenge) ||
+      (flow === "register" && (!consent || !termsConsent))) {
+    return response({ error: flow === "register" ? "consent_required_or_invalid_request" : "invalid_request" }, 400);
+  }
+
+  const environment = env();
+  const db = dbFor(environment);
+  const secret = secretFor(environment);
+  const clientId = typeof environment.TELEGRAM_OIDC_CLIENT_ID === "string" ? environment.TELEGRAM_OIDC_CLIENT_ID.trim() : "";
+  if (!db || !secret || !clientId || typeof environment.TELEGRAM_OIDC_CLIENT_SECRET !== "string" || !environment.TELEGRAM_OIDC_CLIENT_SECRET.trim()) {
+    return response({ error: "telegram_login_not_configured" }, 503);
+  }
+
+  const clientIp = request.headers.get("CF-Connecting-IP");
+  const limiter = environment.ADMIN_PASSWORD_RATE_LIMITER as { limit?: (input: { key: string }) => Promise<{ success: boolean }> } | undefined;
+  if (clientIp && limiter?.limit) {
+    try {
+      const limited = await limiter.limit({ key: "telegram-native-oidc:" + clientIp });
+      if (!limited.success) return response({ error: "rate_limited" }, 429);
+    } catch {
+      return response({ error: "rate_limit_unavailable" }, 503);
+    }
+  }
+
+  try {
+    await db.prepare("DELETE FROM yume_telegram_oidc_states WHERE expires_at <= ?").bind(Date.now()).run();
+    const oidcState = randomToken();
+    const nonce = randomToken();
+    const telegramVerifier = randomToken(48);
+    const verifierPayload: NativeOidcVerifierPayload = {
+      native: true,
+      telegramVerifier,
+      codeChallenge,
+      appState,
+    };
+    const stateHash = await keyedHash(oidcState, secret);
+    await db.prepare("INSERT INTO yume_telegram_oidc_states (state_hash, nonce, verifier, flow, privacy_consent, terms_consent, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
+      .bind(stateHash, nonce, JSON.stringify(verifierPayload), flow, consent ? 1 : 0, termsConsent ? 1 : 0, Date.now() + 10 * 60 * 1000).run();
+
+    const auth = new URL("https://oauth.telegram.org/auth");
+    auth.searchParams.set("client_id", clientId);
+    auth.searchParams.set("redirect_uri", url.origin + "/api/telegram/oidc/callback");
+    auth.searchParams.set("response_type", "code");
+    auth.searchParams.set("scope", "openid profile");
+    auth.searchParams.set("state", oidcState);
+    auth.searchParams.set("nonce", nonce);
+    auth.searchParams.set("code_challenge", b64url(await digest(telegramVerifier)));
+    auth.searchParams.set("code_challenge_method", "S256");
+    return redirect(auth, [oidcStateCookie(oidcState)], 303);
+  } catch (error) {
+    console.error("[YUME][TELEGRAM_OIDC] Native authorization start failed:", error);
+    return response({ error: "telegram_login_unavailable" }, 503);
+  }
+}
+
 /** Official Telegram OpenID Connect authorization-code flow with PKCE. */
 export async function handleTelegramOidc(request: Request): Promise<Response> {
   const url = new URL(request.url);
@@ -172,10 +246,22 @@ export async function handleTelegramOidc(request: Request): Promise<Response> {
       .bind(stateHash).first<StateRow>();
     if (!pending || pending.expires_at <= Date.now()) return errorRedirect(origin, "telegram_login_expired");
     await db.prepare("DELETE FROM yume_telegram_oidc_states WHERE state_hash = ?").bind(stateHash).run();
+    let nativePayload: NativeOidcVerifierPayload | null = null;
+    let telegramVerifier = pending.verifier;
+    try {
+      const parsed = JSON.parse(pending.verifier) as Partial<NativeOidcVerifierPayload>;
+      if (parsed.native === true && typeof parsed.telegramVerifier === "string" &&
+          typeof parsed.codeChallenge === "string" && typeof parsed.appState === "string") {
+        nativePayload = parsed as NativeOidcVerifierPayload;
+        telegramVerifier = nativePayload.telegramVerifier;
+      }
+    } catch {
+      // Browser OIDC states store the Telegram verifier as a plain string.
+    }
     const tokenResponse = await fetch("https://oauth.telegram.org/token", {
       method: "POST", cache: "no-store",
       headers: { "Content-Type": "application/x-www-form-urlencoded", Authorization: "Basic " + btoa(clientId + ":" + clientSecret) },
-      body: new URLSearchParams({ grant_type: "authorization_code", code, redirect_uri: redirectUri, client_id: clientId, code_verifier: pending.verifier }),
+      body: new URLSearchParams({ grant_type: "authorization_code", code, redirect_uri: redirectUri, client_id: clientId, code_verifier: telegramVerifier }),
       signal: AbortSignal.timeout(5_000),
     });
     if (!tokenResponse.ok) return errorRedirect(origin, "telegram_login_failed");
@@ -204,6 +290,23 @@ export async function handleTelegramOidc(request: Request): Promise<Response> {
       await db.prepare("UPDATE yume_users SET telegram_first_name = ?, telegram_last_name = ?, telegram_username = ? WHERE id = ?")
         .bind(firstName, lastName, username, userId).run();
     }
+    if (nativePayload) {
+      if (!/^[A-Za-z0-9_-]{43}$/.test(nativePayload.codeChallenge) ||
+          !/^[A-Za-z0-9_-]{40,64}$/.test(nativePayload.appState)) {
+        return errorRedirect(origin, "telegram_login_failed");
+      }
+      const exchangeCode = randomToken();
+      const exchangeExpiry = Date.now() + 5 * 60 * 1000;
+      await db.prepare("DELETE FROM yume_browser_auth WHERE expires_at <= ? OR status IN ('consumed','error')").bind(Date.now()).run();
+      await db.prepare("INSERT INTO yume_browser_auth (token_hash, flow, privacy_consent, terms_consent, confirmation_code_hash, telegram_user_id, status, user_id, expires_at) VALUES (?, ?, ?, ?, ?, ?, 'ready', ?, ?)")
+        .bind(await keyedHash(exchangeCode, secret), pending.flow, pending.privacy_consent, pending.terms_consent,
+          nativePayload.codeChallenge, telegramId, userId, exchangeExpiry).run();
+      const deepLink = new URL("yubera://auth/callback");
+      deepLink.searchParams.set("code", exchangeCode);
+      deepLink.searchParams.set("state", nativePayload.appState);
+      return redirect(deepLink, [clearOidcStateCookie()]);
+    }
+
     const cookie = await createSession(db, userId, secret);
     const success = new URL("/", origin);
     success.searchParams.set("section", "profile");

@@ -9,12 +9,14 @@ const SESSION_COOKIE="__Host-yume-session";
 function env():Env { try { return cloudflareEnv as unknown as Env; } catch { const e=(globalThis as typeof globalThis & {__YUME_RUNTIME_ENV__?:unknown}).__YUME_RUNTIME_ENV__; return e && typeof e==="object" ? e as Env : {}; } }
 function json(data:unknown,status=200){return new Response(JSON.stringify(data),{status,headers:{"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store","X-Content-Type-Options":"nosniff"}})}
 function cookie(request:Request){for(const p of (request.headers.get("cookie")??"").split(";")){const i=p.indexOf("=");if(i>=0&&p.slice(0,i).trim()===SESSION_COOKIE)return p.slice(i+1).trim()}return ""}
+function sessionToken(request:Request){const match=/^Bearer ([A-Za-z0-9_-]{30,60})$/.exec(request.headers.get("authorization")??"");return match?.[1]??cookie(request)}
+function isSameOriginOrBearer(request:Request){return /^Bearer [A-Za-z0-9_-]{30,60}$/.test(request.headers.get("authorization")??"")||isSameOriginRequest(request)}
 async function tokenHash(value:string,secret:string){const key=await crypto.subtle.importKey("raw",new TextEncoder().encode(secret),{name:"HMAC",hash:"SHA-256"},false,["sign"]);const bytes=new Uint8Array(await crypto.subtle.sign("HMAC",key,new TextEncoder().encode(value)));return Array.from(bytes,b=>b.toString(16).padStart(2,"0")).join("")}
-async function user(request:Request,db:DB,e:Env){const t=cookie(request),s=typeof e.YUME_AUTH_SESSION_SECRET==="string"&&e.YUME_AUTH_SESSION_SECRET.length>=32?e.YUME_AUTH_SESSION_SECRET:"";if(!t||!s)return null;const row=await db.prepare("SELECT s.user_id,s.expires_at FROM yume_sessions s JOIN yume_users u ON u.id=s.user_id WHERE s.token_hash=? AND u.provider='telegram'").bind(await tokenHash(t,s)).first<{user_id:string;expires_at:number}>();return row&&row.expires_at>Date.now()?row.user_id:null}
+async function user(request:Request,db:DB,e:Env){const t=sessionToken(request),s=typeof e.YUME_AUTH_SESSION_SECRET==="string"&&e.YUME_AUTH_SESSION_SECRET.length>=32?e.YUME_AUTH_SESSION_SECRET:"";if(!t||!s)return null;const row=await db.prepare("SELECT s.user_id,s.expires_at FROM yume_sessions s JOIN yume_users u ON u.id=s.user_id WHERE s.token_hash=? AND u.provider='telegram'").bind(await tokenHash(t,s)).first<{user_id:string;expires_at:number}>();return row&&row.expires_at>Date.now()?row.user_id:null}
 
 export async function handleAnimeSubscriptions(request:Request):Promise<Response>{
 if(!["GET","POST","DELETE"].includes(request.method))return json({error:"method_not_allowed"},405);
-if((request.method==="POST"||request.method==="DELETE")&&!isSameOriginRequest(request))return json({error:"cross_origin_request"},403);
+if((request.method==="POST"||request.method==="DELETE")&&!isSameOriginOrBearer(request))return json({error:"cross_origin_request"},403);
 const e=env(),db=e.YUME_DB as DB|undefined;if(!db||typeof db.prepare!=="function")return json({error:"database_unavailable"},503);
 try{const userId=await user(request,db,e);if(!userId)return json({error:"authentication_required"},401);
 const url=new URL(request.url);let animeId=url.searchParams.get("animeId")??"";
