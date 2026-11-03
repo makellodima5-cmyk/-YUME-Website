@@ -94,12 +94,6 @@ function isSameOriginOrBearer(request: Request): boolean {
   return isBearerSessionRequest(request) || isSameOriginRequest(request);
 }
 
-function base64Url(bytes: Uint8Array): string {
-  let binary = "";
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/\\+/g, "-").replace(/\\//g, "_").replace(/=+$/g, "");
-}
-
 function sessionCookie(token: string): string {
   return SESSION_COOKIE + "=" + token + "; Path=/; Max-Age=" + SESSION_TTL_SECONDS + "; HttpOnly; Secure; SameSite=Lax";
 }
@@ -650,7 +644,7 @@ export async function handleTelegramMobileAuth(request: Request): Promise<Respon
     await ensureSchema(db);
     await ensureBrowserAuthSchema(db);
     const codeHash = await sessionTokenHash(code, secret);
-    const challenge = base64Url(new Uint8Array(await crypto.subtle.digest("SHA-256", encoder.encode(verifier))));
+    const challenge = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", encoder.encode(verifier))), byte => byte.toString(16).padStart(2, "0")).join("");
     const pending = await db.prepare("SELECT token_hash, flow, privacy_consent, terms_consent, confirmation_code_hash, telegram_user_id, status, user_id, error_code, expires_at FROM yume_browser_auth WHERE token_hash = ?")
       .bind(codeHash).first<BrowserAuthRow>();
     if (!pending || pending.status !== "ready" || !pending.user_id || !pending.telegram_user_id ||

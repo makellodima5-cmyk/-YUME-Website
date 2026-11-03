@@ -123,7 +123,7 @@ export async function handleTelegramNativeOidcStart(request: Request): Promise<R
   const termsConsent = url.searchParams.get("terms_accepted") === "true";
   if ((flow !== "login" && flow !== "register") ||
       !/^[A-Za-z0-9_-]{40,64}$/.test(appState) ||
-      !/^[A-Za-z0-9_-]{43}$/.test(codeChallenge) ||
+      !/^[a-f0-9]{64}$/.test(codeChallenge) ||
       (flow === "register" && (!consent || !termsConsent))) {
     return response({ error: flow === "register" ? "consent_required_or_invalid_request" : "invalid_request" }, 400);
   }
@@ -291,7 +291,7 @@ export async function handleTelegramOidc(request: Request): Promise<Response> {
         .bind(firstName, lastName, username, userId).run();
     }
     if (nativePayload) {
-      if (!/^[A-Za-z0-9_-]{43}$/.test(nativePayload.codeChallenge) ||
+      if (!/^[a-f0-9]{64}$/.test(nativePayload.codeChallenge) ||
           !/^[A-Za-z0-9_-]{40,64}$/.test(nativePayload.appState)) {
         return errorRedirect(origin, "telegram_login_failed");
       }

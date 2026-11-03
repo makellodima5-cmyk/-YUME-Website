@@ -83,7 +83,7 @@ async function fetchSession(token: string): Promise<Response> {
 
 async function configure(verifier: string) {
   const code = "E".repeat(43);
-  const challenge = base64Url(new Uint8Array(await crypto.subtle.digest("SHA-256", encoder.encode(verifier))));
+  const challenge = sha256Hex(new Uint8Array(await crypto.subtle.digest("SHA-256", encoder.encode(verifier))));
   const db = new MobileAuthDb({
     token_hash: await hmacHex(code),
     flow: "login",

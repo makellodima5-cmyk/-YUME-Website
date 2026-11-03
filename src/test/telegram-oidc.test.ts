@@ -143,7 +143,7 @@ describe("Telegram native OIDC start", () => {
   it("stores the app PKCE challenge and redirects through the existing Telegram callback", async () => {
     const db = configure();
     const state = "S".repeat(43);
-    const challenge = "C".repeat(43);
+    const challenge = "c".repeat(64);
     const response = await handleTelegramNativeOidcStart(new Request(
       "https://yume.test/api/telegram/oidc?native=1&flow=login&state=" + state + "&code_challenge=" + challenge,
     ));
@@ -164,7 +164,7 @@ describe("Telegram native OIDC start", () => {
   it("requires registration consent and a valid S256 challenge", async () => {
     const db = configure();
     const response = await handleTelegramNativeOidcStart(new Request(
-      "https://yume.test/api/telegram/oidc?flow=register&state=" + "S".repeat(43) + "&code_challenge=" + "C".repeat(43),
+      "https://yume.test/api/telegram/oidc?flow=register&state=" + "S".repeat(43) + "&code_challenge=" + "c".repeat(64),
     ));
     expect(response.status).toBe(400);
     expect(db.executed).toHaveLength(0);
