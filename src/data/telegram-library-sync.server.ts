@@ -207,11 +207,19 @@ export async function handleTelegramLibrarySync(request: Request): Promise<Respo
           if (Number(count?.count ?? 0) >= MAX_SAVED_ANIME_IDS) return json({ error: "library_limit_reached", limit: MAX_SAVED_ANIME_IDS }, 409);
         }
       }
-      const accepted = await db.prepare(
-        "INSERT INTO yume_library_sync_items (user_id, item_type, anime_id, payload_json, updated_at_epoch_ms, deleted, source_id) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(user_id, item_type, anime_id) DO UPDATE SET payload_json = excluded.payload_json, updated_at_epoch_ms = excluded.updated_at_epoch_ms, deleted = excluded.deleted, source_id = excluded.source_id WHERE excluded.updated_at_epoch_ms > yume_library_sync_items.updated_at_epoch_ms OR (excluded.updated_at_epoch_ms = yume_library_sync_items.updated_at_epoch_ms AND excluded.source_id > yume_library_sync_items.source_id) RETURNING item_type",
-      ).bind(userId, item.itemType, item.animeId, JSON.stringify(item.payload), item.updatedAtEpochMillis, item.deleted ? 1 : 0, item.sourceId)
-        .first<{ item_type: string }>();
-      if (accepted) await applyLegacyView(db, userId, item);
+      await db.prepare(
+        "INSERT INTO yume_library_sync_items (user_id, item_type, anime_id, payload_json, updated_at_epoch_ms, deleted, source_id) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(user_id, item_type, anime_id) DO UPDATE SET payload_json = excluded.payload_json, updated_at_epoch_ms = excluded.updated_at_epoch_ms, deleted = excluded.deleted, source_id = excluded.source_id WHERE excluded.updated_at_epoch_ms > yume_library_sync_items.updated_at_epoch_ms OR (excluded.updated_at_epoch_ms = yume_library_sync_items.updated_at_epoch_ms AND excluded.source_id > yume_library_sync_items.source_id)",
+      ).bind(userId, item.itemType, item.animeId, JSON.stringify(item.payload), item.updatedAtEpochMillis, item.deleted ? 1 : 0, item.sourceId).run();
+      const canonical = await db.prepare(
+        "SELECT payload_json, deleted FROM yume_library_sync_items WHERE user_id = ? AND item_type = ? AND anime_id = ?",
+      ).bind(userId, item.itemType, item.animeId).first<{ payload_json: string; deleted: number }>();
+      if (canonical) {
+        await applyLegacyView(db, userId, {
+          ...item,
+          payload: JSON.parse(canonical.payload_json) as Record<string, unknown>,
+          deleted: canonical.deleted === 1,
+        });
+      }
     }
     return json({ authenticated: true, items: await readItems(db, userId) });
   } catch (error) {
