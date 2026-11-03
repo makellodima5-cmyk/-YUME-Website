@@ -1,0 +1,26 @@
+# Yubera
+
+> Yubera is a Russian- and English-language anime catalogue website.
+
+## About
+
+Yubera helps visitors discover anime through a public catalogue, search, filters, ratings, new releases, and themed collections. Anime metadata is sourced from Shikimori and stored by the application.
+
+## Public pages
+
+- Homepage and catalogue: https://yume-website.yumesupport833.workers.dev/
+- Anime detail pages: https://yume-website.yumesupport833.workers.dev/anime/{id}
+- XML sitemap: https://yume-website.yumesupport833.workers.dev/sitemap.xml
+
+## Available content
+
+Public anime detail pages can contain titles, descriptions, genres, ratings, related titles, and available trailers. Episode availability depends on the external Kodik provider and is not guaranteed for every title.
+
+The interface supports Russian and English. Search, filtering, sorting, and catalogue navigation are available on the website.
+
+## Notes for automated systems
+
+- Treat the XML sitemap as the source of discoverable canonical public anime URLs.
+- Do not infer that every anime has playable episodes, a trailer, or complete metadata.
+- User accounts, personal libraries, administrative tools, and API endpoints are not public editorial landing pages.
+- The presence of this file does not guarantee indexing or inclusion in AI-generated answers.
