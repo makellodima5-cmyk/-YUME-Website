@@ -1,4 +1,5 @@
 import { env as cloudflareEnv } from "cloudflare:workers";
+import { isSameOriginRequest } from "@/lib/request-security";
 
 type Env = Record<string, unknown> & { YUME_DB?: unknown; YUME_AUTH_SESSION_SECRET?: string };
 type Statement = {
@@ -96,10 +97,11 @@ export function normalizeTelegramLibrarySyncItems(value: unknown): SyncItem[] | 
     if ((type !== "favorite" && type !== "watchlist" && type !== "subscription" && type !== "progress") ||
         typeof animeId !== "string" || !/^\d{1,12}$/.test(animeId) ||
         !payload || typeof payload !== "object" || Array.isArray(payload) ||
-        typeof updatedAt !== "number" || !Number.isSafeInteger(updatedAt) || updatedAt < 0 || updatedAt > Date.now() + 86_400_000 ||
+        typeof updatedAt !== "number" || !Number.isSafeInteger(updatedAt) || updatedAt < 0 || updatedAt > Date.now() + 300_000 ||
         typeof deleted !== "boolean" ||
         typeof sourceId !== "string" || !/^[A-Za-z0-9_-]{1,64}$/.test(sourceId) ||
-        !validPayload(type, payload as Record<string, unknown>)) return null;
+        !validPayload(type, payload as Record<string, unknown>) ||
+        ((type === "favorite" || type === "watchlist") && deleted === true && (payload as Record<string, unknown>).saved === true)) return null;
     result.push({ itemType: type, animeId, payload: payload as Record<string, unknown>, updatedAtEpochMillis: updatedAt, deleted, sourceId });
   }
   return result;
@@ -164,7 +166,7 @@ async function applyLegacyView(db: Database, userId: string, item: SyncItem): Pr
 export async function handleTelegramLibrarySync(request: Request): Promise<Response> {
   if (request.method !== "GET" && request.method !== "POST") return json({ error: "method_not_allowed" }, 405);
   if (request.method === "POST" && !/^Bearer [A-Za-z0-9_-]{30,60}$/.test(request.headers.get("authorization") ?? "") &&
-      !request.headers.get("cookie")?.includes(COOKIE + "=")) return json({ error: "authentication_required" }, 401);
+      !isSameOriginRequest(request)) return json({ error: "cross_origin_request" }, 403);
 
   let items: SyncItem[] = [];
   if (request.method === "POST") {
