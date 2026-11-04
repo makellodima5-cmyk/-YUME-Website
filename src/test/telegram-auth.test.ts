@@ -38,6 +38,7 @@ type TestUserRow = {
   telegram_last_name: string | null;
   telegram_username: string | null;
   telegram_language_code: string | null;
+  created_at: string;
 };
 
 class FakeTelegramStatement {
@@ -82,6 +83,7 @@ class FakeTelegramDb {
     telegram_last_name: null,
     telegram_username: "yume_test",
     telegram_language_code: "ru",
+    created_at: "2026-10-24 09:15:00",
   };
   readonly executed: Array<{ sql: string; values: unknown[] }> = [];
 
@@ -158,11 +160,12 @@ describe("Telegram Mini App initData validation", () => {
         headers: { "Content-Type": "application/json", Origin: "https://yume.test" },
         body: JSON.stringify({ initData, mode: "login", privacyConsent: false }),
       }));
-      const payload = await response.json() as { authenticated?: boolean; user?: { id?: string } };
+      const payload = await response.json() as { authenticated?: boolean; user?: { id?: string; createdAt?: string } };
 
       expect(response.status).toBe(200);
       expect(payload.authenticated).toBe(true);
       expect(payload.user?.id).toBe("yume-user-test");
+      expect(payload.user?.createdAt).toBe("2026-10-24 09:15:00");
       expect(response.headers.get("set-cookie")).toContain("__Host-yume-session=");
       expect(db.executed.some((statement) =>
         statement.sql.includes("UPDATE yume_users") && statement.values.length === 9,

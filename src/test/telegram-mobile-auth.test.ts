@@ -65,6 +65,7 @@ class MobileAuthDb {
     telegram_last_name: null,
     telegram_username: "yume_test",
     telegram_language_code: "ru",
+    created_at: "2026-10-24 09:15:00",
   };
   readonly executed: Array<{ sql: string; values: unknown[] }> = [];
   readonly sessions = new Map<string, { userId: string; expiresAt: number }>();
@@ -112,20 +113,24 @@ describe("Telegram native app-session exchange", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ code, codeVerifier: verifier }),
     }));
-    const payload = await response.json() as { authenticated?: boolean; accessToken?: string; tokenType?: string; user?: { id?: string } };
+    const payload = await response.json() as { authenticated?: boolean; accessToken?: string; tokenType?: string; user?: { id?: string; createdAt?: string } };
 
     expect(response.status).toBe(200);
     expect(payload.authenticated).toBe(true);
     expect(payload.accessToken).toMatch(/^[A-Za-z0-9_-]{40,64}$/);
     expect(payload.tokenType).toBe("Bearer");
     expect(payload.user?.id).toBe("yume-user-test");
+    expect(payload.user?.createdAt).toBe("2026-10-24 09:15:00");
     expect(response.headers.get("set-cookie")).toBeNull();
     expect(db.pending).toBeNull();
     expect(db.executed.some(statement => statement.sql.includes("INSERT INTO yume_sessions"))).toBe(true);
 
     const sessionResponse = await fetchSession(payload.accessToken!);
     expect(sessionResponse.status).toBe(200);
-    expect(await sessionResponse.json()).toMatchObject({ authenticated: true, user: { id: "yume-user-test" } });
+    expect(await sessionResponse.json()).toMatchObject({
+      authenticated: true,
+      user: { id: "yume-user-test", createdAt: "2026-10-24 09:15:00" },
+    });
   });
 
   it("rejects a verifier that does not match the stored challenge", async () => {
