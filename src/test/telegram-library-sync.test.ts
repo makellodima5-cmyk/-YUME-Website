@@ -27,9 +27,7 @@ describe("Telegram library sync item validation", () => {
       durationMillis: 1_400_000,
       progressUpdatedAtEpochMillis: 1_800_000_000_000,
     });
-    expect(projectProgressToViewingHistory({ ...item, deleted: true })).toEqual(expect.objectContaining({
-      episodeNumber: 7,
-    }));
+    expect(projectProgressToViewingHistory({ ...item, deleted: true })).toBeNull();
   });
 
   it("rejects invalid IDs, item types and malformed progress", () => {

@@ -146,7 +146,7 @@ async function readItems(db: Database, userId: string): Promise<unknown[]> {
 }
 
 export function projectProgressToViewingHistory(item: SyncItem) {
-  if (item.itemType !== "progress") return null;
+  if (item.itemType !== "progress" || item.deleted) return null;
   return {
     viewedAt: new Date(item.updatedAtEpochMillis).toISOString(),
     seasonNumber: typeof item.payload.seasonNumber === "number" ? item.payload.seasonNumber : null,
