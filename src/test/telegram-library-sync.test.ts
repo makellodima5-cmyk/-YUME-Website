@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeTelegramLibrarySyncItems } from "@/data/telegram-library-sync.server";
+import { normalizeTelegramLibrarySyncItems, projectProgressToViewingHistory } from "@/data/telegram-library-sync.server";
 
 describe("Telegram library sync item validation", () => {
   it("accepts versioned favorite, subscription and progress records", () => {
@@ -10,6 +10,28 @@ describe("Telegram library sync item validation", () => {
       { itemType: "progress", animeId: "99", payload: { seasonNumber: null, episodeNumber: 3, positionMillis: 1200, durationMillis: 2400 }, updatedAtEpochMillis: timestamp + 2, deleted: false, sourceId: "android-a" },
     ])).toHaveLength(3);
   });
+  it("projects Android episode progress into the backward-compatible viewing history shape", () => {
+    const item = {
+      itemType: "progress" as const,
+      animeId: "99",
+      payload: { seasonNumber: 2, episodeNumber: 7, positionMillis: 125_000, durationMillis: 1_400_000 },
+      updatedAtEpochMillis: 1_800_000_000_000,
+      deleted: false,
+      sourceId: "android-a",
+    };
+    expect(projectProgressToViewingHistory(item)).toEqual({
+      viewedAt: new Date(1_800_000_000_000).toISOString(),
+      seasonNumber: 2,
+      episodeNumber: 7,
+      positionMillis: 125_000,
+      durationMillis: 1_400_000,
+      progressUpdatedAtEpochMillis: 1_800_000_000_000,
+    });
+    expect(projectProgressToViewingHistory({ ...item, deleted: true })).toEqual(expect.objectContaining({
+      episodeNumber: 7,
+    }));
+  });
+
   it("rejects invalid IDs, item types and malformed progress", () => {
     expect(normalizeTelegramLibrarySyncItems([{ itemType: "favorite", animeId: "../other", payload: { saved: true }, updatedAtEpochMillis: 1, deleted: false, sourceId: "android-a" }])).toBeNull();
     expect(normalizeTelegramLibrarySyncItems([{ itemType: "unknown", animeId: "20", payload: {}, updatedAtEpochMillis: 1, deleted: false, sourceId: "android-a" }])).toBeNull();
@@ -21,5 +43,10 @@ describe("Telegram library sync item validation", () => {
     expect(normalizeTelegramLibrarySyncItems([{ ...item, sourceId: "android device" }])).toBeNull();
     expect(normalizeTelegramLibrarySyncItems([{ ...item, updatedAtEpochMillis: Date.now() + 300_001 }])).toBeNull();
     expect(normalizeTelegramLibrarySyncItems([{ ...item, deleted: true }])).toBeNull();
+    expect(normalizeTelegramLibrarySyncItems([{
+      itemType: "progress", animeId: "20",
+      payload: { seasonNumber: null, episodeNumber: 4, positionMillis: 0, durationMillis: 1200 },
+      updatedAtEpochMillis: Date.now(), deleted: true, sourceId: "web",
+    }])).toHaveLength(1);
   });
 });

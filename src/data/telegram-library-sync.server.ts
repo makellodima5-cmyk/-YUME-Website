@@ -145,6 +145,18 @@ async function readItems(db: Database, userId: string): Promise<unknown[]> {
   }));
 }
 
+export function projectProgressToViewingHistory(item: SyncItem) {
+  if (item.itemType !== "progress") return null;
+  return {
+    viewedAt: new Date(item.updatedAtEpochMillis).toISOString(),
+    seasonNumber: typeof item.payload.seasonNumber === "number" ? item.payload.seasonNumber : null,
+    episodeNumber: typeof item.payload.episodeNumber === "number" ? item.payload.episodeNumber : null,
+    positionMillis: item.payload.positionMillis as number,
+    durationMillis: item.payload.durationMillis as number,
+    progressUpdatedAtEpochMillis: item.updatedAtEpochMillis,
+  };
+}
+
 async function applyLegacyView(db: Database, userId: string, item: SyncItem): Promise<void> {
   if (item.itemType === "favorite" || item.itemType === "watchlist") {
     if (!item.deleted && item.payload.saved === true) {
@@ -160,6 +172,17 @@ async function applyLegacyView(db: Database, userId: string, item: SyncItem): Pr
     await db.prepare(
       "INSERT INTO yume_anime_subscriptions (user_id, anime_id, active) VALUES (?, ?, ?) ON CONFLICT(user_id, anime_id) DO UPDATE SET active = excluded.active",
     ).bind(userId, item.animeId, item.deleted ? 0 : 1).run();
+  } else if (item.itemType === "progress") {
+    if (item.deleted) {
+      await db.prepare("DELETE FROM yume_view_history WHERE user_id = ? AND anime_id = ?")
+        .bind(userId, item.animeId).run();
+      return;
+    }
+    const progress = projectProgressToViewingHistory(item);
+    if (!progress) return;
+    await db.prepare(
+      "INSERT INTO yume_view_history (user_id, anime_id, viewed_at, view_count, season_number, episode_number, position_millis, duration_millis, progress_updated_at_epoch_ms) VALUES (?, ?, ?, 0, ?, ?, ?, ?, ?) ON CONFLICT(user_id, anime_id) DO UPDATE SET viewed_at = CASE WHEN julianday(excluded.viewed_at) >= julianday(yume_view_history.viewed_at) THEN excluded.viewed_at ELSE yume_view_history.viewed_at END, season_number = excluded.season_number, episode_number = excluded.episode_number, position_millis = excluded.position_millis, duration_millis = excluded.duration_millis, progress_updated_at_epoch_ms = excluded.progress_updated_at_epoch_ms WHERE yume_view_history.progress_updated_at_epoch_ms IS NULL OR excluded.progress_updated_at_epoch_ms >= yume_view_history.progress_updated_at_epoch_ms",
+    ).bind(userId, item.animeId, progress.viewedAt, progress.seasonNumber, progress.episodeNumber, progress.positionMillis, progress.durationMillis, progress.progressUpdatedAtEpochMillis).run();
   }
 }
 
@@ -211,13 +234,15 @@ export async function handleTelegramLibrarySync(request: Request): Promise<Respo
         "INSERT INTO yume_library_sync_items (user_id, item_type, anime_id, payload_json, updated_at_epoch_ms, deleted, source_id) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(user_id, item_type, anime_id) DO UPDATE SET payload_json = excluded.payload_json, updated_at_epoch_ms = excluded.updated_at_epoch_ms, deleted = excluded.deleted, source_id = excluded.source_id WHERE excluded.updated_at_epoch_ms > yume_library_sync_items.updated_at_epoch_ms OR (excluded.updated_at_epoch_ms = yume_library_sync_items.updated_at_epoch_ms AND excluded.source_id > yume_library_sync_items.source_id)",
       ).bind(userId, item.itemType, item.animeId, JSON.stringify(item.payload), item.updatedAtEpochMillis, item.deleted ? 1 : 0, item.sourceId).run();
       const canonical = await db.prepare(
-        "SELECT payload_json, deleted FROM yume_library_sync_items WHERE user_id = ? AND item_type = ? AND anime_id = ?",
-      ).bind(userId, item.itemType, item.animeId).first<{ payload_json: string; deleted: number }>();
+        "SELECT payload_json, updated_at_epoch_ms, deleted, source_id FROM yume_library_sync_items WHERE user_id = ? AND item_type = ? AND anime_id = ?",
+      ).bind(userId, item.itemType, item.animeId).first<{ payload_json: string; updated_at_epoch_ms: number; deleted: number; source_id: string }>();
       if (canonical) {
         await applyLegacyView(db, userId, {
           ...item,
           payload: JSON.parse(canonical.payload_json) as Record<string, unknown>,
+          updatedAtEpochMillis: canonical.updated_at_epoch_ms,
           deleted: canonical.deleted === 1,
+          sourceId: canonical.source_id,
         });
       }
     }

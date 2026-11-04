@@ -537,8 +537,8 @@ export async function handleTelegramHistory(request: Request): Promise<Response>
     const userId = await authenticatedTelegramUserId(request, db, secret);
     if (!userId) return jsonResponse({ error: "authentication_required" }, 401);
     if (request.method === "GET") {
-      const rows = await db.prepare("SELECT anime_id AS animeId, viewed_at AS viewedAt, view_count AS viewCount FROM yume_view_history WHERE user_id = ? ORDER BY viewed_at DESC LIMIT 100")
-        .bind(userId).all<{ animeId: string; viewedAt: string; viewCount: number }>();
+      const rows = await db.prepare("SELECT anime_id AS animeId, viewed_at AS viewedAt, view_count AS viewCount, season_number AS seasonNumber, episode_number AS episodeNumber, position_millis AS positionMillis, duration_millis AS durationMillis, progress_updated_at_epoch_ms AS progressUpdatedAtEpochMillis FROM yume_view_history WHERE user_id = ? ORDER BY viewed_at DESC LIMIT 100")
+        .bind(userId).all<{ animeId: string; viewedAt: string; viewCount: number; seasonNumber: number | null; episodeNumber: number | null; positionMillis: number; durationMillis: number; progressUpdatedAtEpochMillis: number | null }>();
       return jsonResponse({ authenticated: true, items: rows.results });
     }
 
@@ -555,6 +555,17 @@ export async function handleTelegramHistory(request: Request): Promise<Response>
     const animeId = input.animeId;
     if (typeof animeId !== "string" || !/^\d{1,12}$/.test(animeId)) return jsonResponse({ error: "invalid_anime_id" }, 400);
     if (request.method === "DELETE") {
+      const current = await db.prepare("SELECT payload_json, updated_at_epoch_ms FROM yume_library_sync_items WHERE user_id = ? AND item_type = 'progress' AND anime_id = ?")
+        .bind(userId, animeId).first<{ payload_json: string; updated_at_epoch_ms: number }>();
+      const timestamp = Math.max(Date.now(), (current?.updated_at_epoch_ms ?? 0) + 1);
+      const tombstonePayload = current?.payload_json ?? JSON.stringify({
+        seasonNumber: null,
+        episodeNumber: null,
+        positionMillis: 0,
+        durationMillis: 0,
+      });
+      await db.prepare("INSERT INTO yume_library_sync_items (user_id, item_type, anime_id, payload_json, updated_at_epoch_ms, deleted, source_id) VALUES (?, 'progress', ?, ?, ?, 1, 'web') ON CONFLICT(user_id, item_type, anime_id) DO UPDATE SET updated_at_epoch_ms = excluded.updated_at_epoch_ms, deleted = 1, source_id = 'web'")
+        .bind(userId, animeId, tombstonePayload, timestamp).run();
       await db.prepare("DELETE FROM yume_view_history WHERE user_id = ? AND anime_id = ?").bind(userId, animeId).run();
       return jsonResponse({ deleted: true });
     }
