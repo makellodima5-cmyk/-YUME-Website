@@ -730,7 +730,7 @@ function AnimeDetailPage() {
             </div>
             <div className="mx-auto w-full max-w-6xl min-w-0">
               {watchMode === "episodes" ? (kodikLoading ? (
-                <div role="status" className="mx-auto flex min-h-40 w-full max-w-6xl flex-col items-center justify-center rounded-2xl border border-white/10 bg-[#080710] p-6 text-center">
+                <div role="status" className="mx-auto flex min-h-40 w-full max-w-6xl flex-col items-center justify-center rounded-2xl border border-white/10 bg-[#101116] p-6 text-center">
                   <div className="mb-3 h-6 w-6 animate-spin rounded-full border-2 border-white/20 border-t-primary" aria-hidden="true" />
                   <p className="text-sm text-muted-foreground">{language === "en" ? "Checking episode availability…" : "Проверяем доступность серий…"}</p>
                 </div>
@@ -807,13 +807,13 @@ function AnimeDetailPage() {
                     ) : <p className="rounded-xl border border-border/70 bg-background/40 p-3 text-sm text-muted-foreground">{kodikError || (language === "en" ? "Episode list will appear here when available." : "Список серий появится здесь, когда будет доступен.")}</p>}
                     {kodikError && selectedKodikSource?.episodes.length ? <p role="status" className="mt-3 text-sm text-muted-foreground">{kodikError}</p> : null}
                   </div>
-                  <div className="relative mx-auto aspect-video w-full min-w-0 overflow-hidden rounded-2xl border border-white/10 bg-[#080710] shadow-2xl">
+                  <div className="relative mx-auto aspect-video w-full min-w-0 overflow-hidden rounded-2xl border border-white/10 bg-[#101116] shadow-2xl">
                     <div id="kodik-player-container" className="absolute inset-0 h-full w-full [&_iframe]:!absolute [&_iframe]:!inset-0 [&_iframe]:!h-full [&_iframe]:!w-full" />
                     {!kodikEmbedUrl && <div className="absolute inset-0 flex items-center justify-center p-5 text-center text-sm text-muted-foreground">{kodikError || (language === "en" ? "Loading Kodik player…" : "Загрузка плеера Kodik…")}</div>}
                   </div>
                 </div>
               )) : (anime.youtubeTrailerId ? (
-                <div className="relative mx-auto aspect-video w-full min-w-0 overflow-hidden rounded-2xl border border-white/10 bg-[#080710] shadow-2xl">
+                <div className="relative mx-auto aspect-video w-full min-w-0 overflow-hidden rounded-2xl border border-white/10 bg-[#101116] shadow-2xl">
                   <iframe
                     title={displayAnimeTitle(anime, language) + " — " + t("anime.trailerTitle")}
                     src={"https://www.youtube-nocookie.com/embed/" + anime.youtubeTrailerId + "?rel=0"}
@@ -826,8 +826,8 @@ function AnimeDetailPage() {
                 </div>
               ) : (
                 <div
-                  className="relative mx-auto flex aspect-video w-full min-w-0 flex-col items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-[#080710] p-5 text-center sm:min-h-[300px] lg:min-h-[420px]"
-                  style={{ background: "radial-gradient(ellipse at 50% 40%, oklch(0.19 0.025 " + anime.hue + ") 0%, #080710 63%)" }}
+                  className="relative mx-auto flex aspect-video w-full min-w-0 flex-col items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-[#101116] p-5 text-center sm:min-h-[300px] lg:min-h-[420px]"
+                  style={{ background: "radial-gradient(ellipse at 50% 40%, oklch(0.19 0.025 " + anime.hue + ") 0%, #101116 63%)" }}
                 >
                   <div aria-hidden="true" className="mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-rose-500/40 bg-rose-500/10 text-rose-400">
                     <X className="h-8 w-8" />
