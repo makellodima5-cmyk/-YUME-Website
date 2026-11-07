@@ -105,9 +105,12 @@ export const Route = createFileRoute("/")({
     rating: search.rating, kind: search.kind, age: search.age, lang: search.lang,
   }),
   loader: async ({ deps }) => {
-    // The admin screen loads its own bounded status/quality APIs. Fetching the
-    // complete public catalogue here only burns the Free Worker CPU budget.
-    if (deps.section === "admin") {
+    // Personal screens do not need the entire catalogue. Avoid an unnecessary R2 read
+    // every time a user opens Favorites, Watch Later, History, Profile or News.
+    // This also prevents a transient catalogue-store failure from breaking navigation
+    // into account-owned lists.
+    const catalogueIndependentSections = ["admin", "my", "profile", "favorites", "watchlist", "history", "notifications", "privacy", "privacy-policy", "rules", "rights", "news"];
+    if (catalogueIndependentSections.includes(deps.section ?? "")) {
       return {
         catalogMode: "paged",
         anime: [],
