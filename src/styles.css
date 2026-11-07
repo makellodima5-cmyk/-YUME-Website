@@ -959,7 +959,7 @@ html[data-theme="light"] .yubera-bottom-nav { background:rgba(247,245,246,.96); 
 
 /* Anime detail screen: compact poster + metadata, full-width action row and integrated player. */
 .yubera-anime-overview {
-  display:grid; grid-template-columns:minmax(112px,34%) minmax(0,1fr); gap:14px;
+  display:grid; grid-template-columns:minmax(112px,31%) minmax(0,1fr); gap:14px;
   align-items:start; padding:14px; border:1px solid var(--border); border-radius:22px;
   background:var(--card);
 }
@@ -967,7 +967,7 @@ html[data-theme="light"] .yubera-bottom-nav { background:rgba(247,245,246,.96); 
 .yubera-anime-overview .yubera-chip { min-height:30px; padding:.35rem .68rem; font-size:.75rem; }
 .yubera-anime-actions { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin-top:14px; }
 .yubera-anime-actions > button {
-  display:flex; min-width:0; min-height:70px; flex-direction:column; align-items:center;
+  display:flex; min-width:0; min-height:58px; flex-direction:column; align-items:center;
   justify-content:center; gap:6px; border-radius:22px; border:1px solid var(--border);
   background:var(--secondary); padding:9px 5px; font-size:11px; line-height:1.2;
 }
@@ -991,11 +991,11 @@ html[data-theme="light"] .yubera-bottom-nav { background:rgba(247,245,246,.96); 
 .yubera-detail-related-row { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; }
 .yubera-detail-related-card { position:relative; min-width:0; overflow:hidden; text-align:left; }
 @media(max-width:390px) {
-  .yubera-anime-overview { grid-template-columns:minmax(104px,34%) minmax(0,1fr); gap:11px; padding:11px; border-radius:18px; }
+  .yubera-anime-overview { grid-template-columns:minmax(104px,31%) minmax(0,1fr); gap:11px; padding:11px; border-radius:18px; }
   .yubera-anime-overview h1 { font-size:1.12rem; }
   .yubera-anime-overview .yubera-chip { min-height:27px; padding:.28rem .52rem; font-size:.68rem; }
   .yubera-anime-actions { gap:6px; }
-  .yubera-anime-actions > button { min-height:66px; border-radius:18px; font-size:10px; }
+  .yubera-anime-actions > button { min-height:54px; border-radius:18px; font-size:10px; }
   .yubera-player-options { gap:8px; padding:10px; }
   .yubera-player-options select { min-height:43px; padding-left:10px; font-size:12px; }
   .yubera-detail-related-row { gap:7px; }
