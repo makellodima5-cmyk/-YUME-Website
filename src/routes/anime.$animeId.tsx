@@ -482,7 +482,7 @@ function AnimeDetailPage() {
     );
   }
 
-  const needsDescriptionToggle = anime.description.trim().length > 76;
+  const needsDescriptionToggle = anime.description.trim().length > 190;
   const descriptionPreview =
     anime.description.trim().length > 76
       ? anime.description.trim().slice(0, 76).trimEnd() + "…"
@@ -532,11 +532,15 @@ function AnimeDetailPage() {
     </button>
   );
 
-  const episodeSubscriptionButton = anime.status === "Онгоинг" ? (
+  const canSubscribeToEpisodes = anime.status === "Онгоинг" &&
+    !(anime.episodes > 0 && (anime.episodesAired ?? 0) >= anime.episodes);
+  const episodeSubscriptionButton = (
     <button
       type="button"
-      disabled={subscriptionBusy}
+      disabled={!canSubscribeToEpisodes || subscriptionBusy}
+      title={!canSubscribeToEpisodes ? (language === "ru" ? "Новые серии для этого тайтла больше не выходят" : "No more episodes are expected for this title") : undefined}
       onClick={async () => {
+        if (!canSubscribeToEpisodes || subscriptionBusy) return;
         setSubscriptionBusy(true);
         try {
           const response = await fetch("/api/anime-subscriptions", {
@@ -560,12 +564,12 @@ function AnimeDetailPage() {
         }
       }}
       aria-pressed={episodeSubscribed}
-      className="inline-flex w-full min-w-0 flex-col items-center justify-center gap-1 rounded-full bg-secondary px-2 py-2.5 text-center text-[11px] font-semibold leading-tight ring-1 ring-border transition hover:bg-accent disabled:opacity-50 md:flex-row md:gap-2 md:px-4 md:py-2.5 md:text-sm md:leading-normal"
+      className="inline-flex w-full min-w-0 flex-col items-center justify-center gap-1 rounded-full bg-secondary px-2 py-2.5 text-center text-[11px] font-semibold leading-tight ring-1 ring-border transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-45 md:flex-row md:gap-2 md:px-4 md:py-2.5 md:text-sm md:leading-normal"
     >
       <Bell className={`h-4 w-4 ${episodeSubscribed ? "fill-current text-primary" : ""}`} />
-      {language === "en" ? "Follow new episodes" : "Следить за новыми сериями"}
+      {language === "en" ? "Follow new episodes" : "Отслеживать новые серии"}
     </button>
-  ) : null;
+  );
 
   const listButton = (
     <button
@@ -585,7 +589,7 @@ function AnimeDetailPage() {
 
   return (
     <div className="min-h-screen pb-8">
-      <Header setView={navigateToSection} />
+      <Header setView={navigateToSection} variant="detail" />
 
       <main id="main-content" className="px-3 pb-12 pt-[78px] sm:px-4 md:px-6 lg:px-8">
         {apiError && (
@@ -688,6 +692,37 @@ function AnimeDetailPage() {
                         <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                       </span>
                     </label>
+                  </div>
+                  <div className="yubera-episode-progress-list" aria-label={language === "en" ? "Episode progress" : "Прогресс серий"}>
+                    {selectedKodikSource?.episodes.map((episode) => {
+                      const progress = episodeProgress.find((entry) => entry.episode === episode.number);
+                      const estimatedDuration = progress?.durationSeconds ?? (anime.episodes > 1 ? 24 * 60 : null);
+                      const percent = progress
+                        ? progress.completed
+                          ? 100
+                          : estimatedDuration
+                            ? Math.max(0, Math.min(100, progress.positionSeconds / estimatedDuration * 100))
+                            : 0
+                        : 0;
+                      const active = episode.number === kodikEpisode;
+                      return (
+                        <button
+                          key={episode.number}
+                          type="button"
+                          aria-pressed={active}
+                          aria-label={(language === "en" ? "Episode " : "Серия ") + episode.number + (progress ? ", " + Math.round(percent) + "% " + (language === "en" ? "watched" : "просмотрено") : "")}
+                          onClick={() => {
+                            setKodikEpisode(episode.number);
+                            setResumeTargetEpisode(progress && !progress.completed ? episode.number : null);
+                            setResumeTargetSeconds(progress && !progress.completed ? progress.positionSeconds : 0);
+                          }}
+                          className={`yubera-episode-progress-item ${active ? "is-active" : ""}`}
+                        >
+                          <span>{episode.number}</span>
+                          <span className="yubera-episode-progress-track"><span style={{ width: percent + "%" }} /></span>
+                        </button>
+                      );
+                    })}
                   </div>
                   <div className="relative mx-auto aspect-video w-full min-w-0 overflow-hidden rounded-2xl border border-white/10 bg-[#101116] shadow-2xl">
                     <div id="kodik-player-container" className="absolute inset-0 h-full w-full [&_iframe]:!absolute [&_iframe]:!inset-0 [&_iframe]:!h-full [&_iframe]:!w-full" />
