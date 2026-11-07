@@ -10,6 +10,8 @@ import { AnimeCard } from "@/components/yume/Poster";
 import { CollectionsGrid, Grid, Hero, Row } from "@/components/yume/Sections";
 import { CatalogFilters, EMPTY_CATALOG_FILTERS, type CatalogFiltersValue } from "@/components/yume/CatalogFilters";
 import { Profile } from "@/components/yume/Profile";
+import { MyHub } from "@/components/yume/MyHub";
+import { News } from "@/components/yume/News";
 import { Footer } from "@/components/yume/Footer";
 import { HomeDepthAtmosphere } from "@/components/yume/HomeDepthAtmosphere";
 import "../home-depth.css";
@@ -1691,7 +1693,7 @@ function Index() {
   const totalAiringPages = Math.max(1, Math.ceil(airingAnime.length / catalogPageSize));
   const visibleAiringAnime = airingAnime.slice((airingPage - 1) * catalogPageSize, airingPage * catalogPageSize);
   return (
-    <div className="relative isolate min-h-screen pb-8">
+    <div className="relative isolate min-h-screen pb-8 yubera-with-bottom-nav">
       {view === "home" && <HomeDepthAtmosphere />}
       <div className="relative z-10">
       <Header view={view} setView={setView} onProfile={() => setView(telegramAuthReady ? "profile" : "login")} isAdmin={isAdmin} unreadNotificationCount={notificationStateLoaded && notificationRemoteAccount ? notificationItems.filter((item) => !notificationReadIds.includes(item.id) && !notificationDismissedIds.includes(item.id)).length : 0} />
@@ -2061,6 +2063,10 @@ function Index() {
             </>
           )}
         </main>
+      ) : view === "my" ? (
+        <MyHub onNavigate={setView} />
+      ) : view === "news" ? (
+        <News />
       ) : view === "profile" ? (
         <Profile animeList={ANIME} onSelect={select} onCatalog={() => setView("catalog")} />
       ) : view === "favorites" ? (
@@ -2464,8 +2470,22 @@ function Index() {
           )}
         </main>
       ) : null}
-      {!["profile", "favorites", "watchlist", "privacy", "privacy-policy", "rules", "rights", "login", "register"].includes(view) && (
+      {!["profile", "favorites", "watchlist", "history", "my", "news", "privacy", "privacy-policy", "rules", "rights", "login", "register"].includes(view) && (
         <Footer onNavigate={setView} />
+      )}
+      {!(["admin", "login", "register", "privacy", "privacy-policy", "rules", "rights"].includes(view)) && (
+        <nav className="yubera-bottom-nav" aria-label={language === "ru" ? "Основная навигация" : "Main navigation"}>
+          {[
+            { id: "home" as View, label: language === "ru" ? "Главная" : "Home", icon: HomeDepthAtmosphere },
+            { id: "catalog" as View, label: language === "ru" ? "Каталог" : "Catalog", icon: Search },
+            { id: "my" as View, label: language === "ru" ? "Моё" : "My", icon: Bookmark },
+            { id: "news" as View, label: language === "ru" ? "Новости" : "News", icon: Bell },
+            { id: "profile" as View, label: language === "ru" ? "Профиль" : "Profile", icon: UserRound },
+          ].map((item) => {
+            const Icon = item.icon;
+            return <button key={item.id} type="button" onClick={() => setView(item.id)} aria-current={view === item.id ? "page" : undefined}><Icon className="h-5 w-5" /><span>{item.label}</span></button>;
+          })}
+        </nav>
       )}
       </div>
     </div>
