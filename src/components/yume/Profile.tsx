@@ -63,9 +63,10 @@ type Props = {
   initialPanel?: ProfilePanel;
   isAdmin?: boolean;
   onAdmin?: () => void;
+  onHistory?: () => void;
 };
 
-export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overview", isAdmin = false, onAdmin }: Props) {
+export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overview", isAdmin = false, onAdmin, onHistory }: Props) {
   const { t, language } = useYumePreferences();
   const [panel, setPanel] = useState<ProfilePanel>(initialPanel);
   const [supportLinks, setSupportLinks] = useState<{ group: string | null; personal: string | null }>({ group: null, personal: null });
@@ -578,7 +579,7 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
                   </button>
                   <button
                     type="button"
-                    onClick={() => setHistoryCount(readPlaybackProgress().length)}
+                    onClick={() => onHistory?.()}
                     aria-label={String(historyCount) + " — " + (language === "ru" ? "эпизодов в истории" : "episodes in history")}
                     className="flex min-w-0 items-center gap-2 border-l border-border px-2 py-2.5 text-left transition hover:bg-white/[0.06] sm:gap-3 sm:px-4 sm:py-3.5"
                   >
