@@ -1,5 +1,5 @@
 import { Bookmark, Star } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type MouseEvent } from "react";
 import type { Anime } from "@/data/anime";
 import { useYumePreferences, displayAnimeTitle, displayGenre, displayAnimeKind, displayAnimeStatus } from "@/data/preferences";
 import { isNewRelease } from "@/data/anime-sections";
@@ -60,7 +60,7 @@ export function AnimeCard({ anime, onSelect }: { anime: Anime; onSelect: (a: Ani
     };
   }, [anime.id]);
 
-  const toggleBookmark = (event: React.MouseEvent<HTMLButtonElement>) => {
+  const toggleBookmark = (event: MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
     event.stopPropagation();
     setSaved(toggleSavedAnimeId(FAVORITES_STORAGE_KEY, anime.id));
