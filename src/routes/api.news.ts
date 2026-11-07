@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { readShikimoriSharedCache, writeShikimoriSharedCache } from "@/data/shikimori-kv-cache.server";
+import type { YuberaNewsArticle } from "@/data/news-types";
 
 type ShikimoriTopic = {
   id: number;
