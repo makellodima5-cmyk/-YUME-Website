@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import appPackage from "../../../package.json";
 import {
   ArrowLeft,
+  Bell,
   Bookmark,
   ChevronRight,
   ChevronDown,
