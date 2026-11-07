@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
-import { Home, LayoutGrid, Library, User, Menu, X, Bell, Moon, Sun, ShieldCheck, Heart, Clock3, Star, Languages, Bookmark, Megaphone, Radio, Sparkles } from "lucide-react"
+import { Home, LayoutGrid, Library, User, Menu, X, Bell, Moon, Sun, ShieldCheck, Heart, Clock3, Star, Languages, Bookmark, Megaphone, Radio, Sparkles, Newspaper } from "lucide-react"
 import { Logo } from "./Logo";
 import { useYumePreferences } from "@/data/preferences";
 import { getTelegramWebApp, telegramHapticImpact } from "@/lib/telegram-mini-app";
 import { TelegramStarsDonation } from "./TelegramStarsDonation";
 
-export type View = "home" | "admin" | "catalog" | "collections" | "profile" | "login" | "register" | "popular" | "new-releases" | "announcements" | "airing" | "favorites" | "watchlist" | "history" | "privacy" | "privacy-policy" | "rules" | "rights" | "notifications";
+export type View = "home" | "admin" | "catalog" | "collections" | "my" | "news" | "profile" | "login" | "register" | "popular" | "new-releases" | "announcements" | "airing" | "favorites" | "watchlist" | "history" | "privacy" | "privacy-policy" | "rules" | "rights" | "notifications";
 
 export const NAV: { id: View; label: string; icon: typeof Home }[] = [
   { id: "home", label: "Главная", icon: Home },
@@ -57,6 +57,9 @@ export function Header({ view, setView, onProfile, isAdmin = false, unreadNotifi
         home: "Главная",
         catalog: "Каталог",
         collections: "Подборки",
+        my: "Моё",
+        news: "Новости",
+        profile: "Профиль",
         popular: "Популярное",
         newReleases: "Новинки",
         announcements: "Анонсы",
@@ -75,6 +78,9 @@ export function Header({ view, setView, onProfile, isAdmin = false, unreadNotifi
         home: "Home",
         catalog: "Catalog",
         collections: "Collections",
+        my: "My",
+        news: "News",
+        profile: "Profile",
         popular: "Popular",
         newReleases: "New releases",
         announcements: "Announcements",
@@ -86,10 +92,13 @@ export function Header({ view, setView, onProfile, isAdmin = false, unreadNotifi
         theme: "Theme",
         language: "Language",
       };
-  const navLabels: Record<"home" | "catalog" | "collections", string> = {
+  const navLabels: Record<"home" | "catalog" | "collections" | "my" | "news" | "profile", string> = {
     home: navigationText.home,
     catalog: navigationText.catalog,
     collections: navigationText.collections,
+    my: navigationText.my,
+    news: navigationText.news,
+    profile: navigationText.profile,
   };
 
   useEffect(() => {
