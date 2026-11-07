@@ -42,7 +42,6 @@ function HomeSection({ title, action, icon, children }: {
 
 function HomeAnimeCard({ anime, onSelect }: { anime: Anime; onSelect: (anime: Anime) => void }) {
   const { language } = useYumePreferences();
-  const [saved, setSaved] = useState(false);
   return (
     <article className="yubera-home-anime-card">
       <button type="button" onClick={() => onSelect(anime)} className="absolute inset-0 z-[1] rounded-[18px] text-left" aria-label={displayAnimeTitle(anime, language)}>
@@ -50,9 +49,6 @@ function HomeAnimeCard({ anime, onSelect }: { anime: Anime; onSelect: (anime: An
         <span className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/5 to-black/10" />
         {anime.rating !== null && <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-black/70 px-2 py-1 text-[11px] font-bold text-white"><Star className="h-3.5 w-3.5 fill-[#FFC044] text-[#FFC044]" />{anime.rating.toFixed(1)}</span>}
         <span className="absolute inset-x-2 bottom-2 line-clamp-2 text-[13px] font-bold leading-tight text-white">{displayAnimeTitle(anime, language)}</span>
-      </button>
-      <button type="button" aria-label={language === "ru" ? "Добавить в избранное" : "Add to favorites"} aria-pressed={saved} onClick={() => setSaved(toggleSavedAnimeId(FAVORITES_STORAGE_KEY, anime.id))} className="absolute right-2 top-2 z-[2] grid h-8 w-8 place-items-center rounded-full border border-white/25 bg-black/65 text-white backdrop-blur-sm">
-        <Bookmark className={`h-4 w-4 ${saved ? "fill-current text-primary" : ""}`} />
       </button>
     </article>
   );
