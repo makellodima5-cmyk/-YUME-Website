@@ -10,7 +10,9 @@ export type View = "home" | "admin" | "catalog" | "collections" | "my" | "news" 
 export const NAV: { id: View; label: string; icon: typeof Home }[] = [
   { id: "home", label: "Главная", icon: Home },
   { id: "catalog", label: "Каталог", icon: LayoutGrid },
-  { id: "collections", label: "Подборки", icon: Library },
+  { id: "my", label: "Моё", icon: Library },
+  { id: "news", label: "Новости", icon: Newspaper },
+  { id: "profile", label: "Профиль", icon: User },
 ];
 
 type Props = {
@@ -226,6 +228,9 @@ export function Header({ view, setView, onProfile, isAdmin = false, unreadNotifi
                   </button>
                 );
               })}
+              <button type="button" onClick={() => { telegramHapticImpact("light"); goToView("collections"); }} aria-current={view === "collections" ? "page" : undefined} className={navButtonClass(view === "collections")}>
+                <Library className="h-5 w-5 shrink-0" /><span>{navigationText.collections}</span>
+              </button>
               {isAdmin && <button type="button" onClick={() => { telegramHapticImpact("light"); goToView("admin"); }} aria-current={view === "admin" ? "page" : undefined} className={navButtonClass(view === "admin")}><ShieldCheck className="h-5 w-5 shrink-0" /><span>{navigationText.adminPanel}</span></button>}
               <button type="button" onClick={() => { telegramHapticImpact("light"); goToView("popular"); }} className={navButtonClass(view === "popular")}>
                 <Star className="h-5 w-5 shrink-0" /><span>{navigationText.popular}</span>
