@@ -5,7 +5,7 @@ import {
   normalizePlaybackProgress,
   type PlaybackProgress,
 } from "@/data/profile-storage";
-import { markPlaybackEpisodeCompleted, PLAYBACK_PROGRESS_STORAGE_KEY, readPlaybackProgress, savePlaybackProgress } from "@/data/playback-progress";
+import { markPlaybackEpisodeCompleted, PLAYBACK_PROGRESS_STORAGE_KEY, readPlaybackProgress, removeAnimePlaybackProgress, savePlaybackProgress } from "@/data/playback-progress";
 
 const validProgress: PlaybackProgress = {
   animeId: "123",
@@ -136,5 +136,15 @@ describe("episode list playback progress", () => {
 
     expect(readPlaybackProgress().filter((item) => item.animeId === "123" && item.episode === 1)).toHaveLength(1);
     expect(readPlaybackProgress().find((item) => item.episode === 1)?.positionSeconds).toBe(240);
+  });
+
+  it("removes all saved episode progress for one anime without touching other titles", () => {
+    savePlaybackProgress(entry(1, 120));
+    savePlaybackProgress(entry(2, 240));
+    savePlaybackProgress({ ...entry(1, 90), animeId: "456", title: "Another anime" });
+
+    removeAnimePlaybackProgress("123");
+
+    expect(readPlaybackProgress().map((item) => item.animeId)).toEqual(["456"]);
   });
 });
