@@ -7,14 +7,27 @@ import { CatalogFilters, type CatalogFiltersValue } from "./CatalogFilters";
 import { useYumePreferences, displayAnimeTitle, type TranslationKey } from "@/data/preferences";
 import { telegramHapticImpact } from "@/lib/telegram-mini-app";
 
+export function SectionBanner({ title, subtitle, eyebrow = "YUBERA" }: { title: string; subtitle?: string; eyebrow?: string }) {
+  return (
+    <section className="yubera-section-banner mb-5" aria-label={title}>
+      <img src="/images/yubera/yubera_banner.webp" alt="" aria-hidden="true" width={2172} height={724} />
+      <div className="yubera-section-banner-content">
+        <span className="mb-2 text-[10px] font-bold uppercase tracking-[.18em] text-primary sm:text-xs">{eyebrow}</span>
+        <h1>{title}</h1>
+        {subtitle && <p>{subtitle}</p>}
+      </div>
+    </section>
+  );
+}
+
 export function Row({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
   return (
-    <section className="mt-10">
-      <div className="mb-4 flex items-end justify-between px-4 md:px-10">
-        <h2 className="text-lg font-semibold md:text-xl">{title}</h2>
+    <section className="mt-8">
+      <div className="mb-3 flex items-end justify-between px-4 md:px-10">
+        <h2 className="text-xl font-extrabold tracking-tight md:text-2xl">{title}</h2>
         {action}
       </div>
-      <div className="scrollbar-none flex gap-4 overflow-x-auto px-4 pb-2 md:px-10">{children}</div>
+      <div className="scrollbar-none flex gap-3 overflow-x-auto px-4 pb-2 md:gap-4 md:px-10">{children}</div>
     </section>
   );
 }
