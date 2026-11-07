@@ -29,6 +29,7 @@ import { USER_NOTIFICATIONS } from "@/data/notifications.shared";
 import { runAdminTrailerUpdate, type AdminTrailerStats } from "@/data/admin-trailer-update";
 import { hasAdminSession } from "@/lib/admin-access";
 import { normalizeInternalRedirect } from "@/lib/request-security";
+import { PLAYBACK_PROGRESS_UPDATED_EVENT, readPlaybackProgress, removeAnimePlaybackProgress } from "@/data/playback-progress";
 
 const NOTIFICATION_STORAGE_KEY = "yume-user-notifications-read-v1";
 const NOTIFICATION_DISMISSED_STORAGE_KEY = "yume-user-notifications-dismissed-v1";
@@ -387,6 +388,32 @@ function Index() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyAuthenticated, setHistoryAuthenticated] = useState(false);
   const [historyError, setHistoryError] = useState("");
+  const [localPlaybackProgress, setLocalPlaybackProgress] = useState<ReturnType<typeof readPlaybackProgress>>([]);
+  const localHistoryItems = useMemo(() => {
+    const grouped = new Map<string, { animeId: string; viewedAt: string; episodes: Set<number> }>();
+    for (const entry of localPlaybackProgress) {
+      const current = grouped.get(entry.animeId) ?? { animeId: entry.animeId, viewedAt: entry.updatedAt, episodes: new Set<number>() };
+      current.episodes.add(entry.episode);
+      if (entry.updatedAt > current.viewedAt) current.viewedAt = entry.updatedAt;
+      grouped.set(entry.animeId, current);
+    }
+    return Array.from(grouped.values()).map(item => ({
+      animeId: item.animeId,
+      viewedAt: item.viewedAt,
+      viewCount: item.episodes.size,
+    }));
+  }, [localPlaybackProgress]);
+  const combinedHistoryItems = useMemo(() => {
+    const merged = new Map<string, { animeId: string; viewedAt: string; viewCount: number }>();
+    for (const item of historyItems) merged.set(item.animeId, item);
+    for (const item of localHistoryItems) {
+      const current = merged.get(item.animeId);
+      merged.set(item.animeId, current
+        ? { animeId: item.animeId, viewedAt: item.viewedAt > current.viewedAt ? item.viewedAt : current.viewedAt, viewCount: Math.max(current.viewCount, item.viewCount) }
+        : item);
+    }
+    return Array.from(merged.values()).sort((a, b) => b.viewedAt.localeCompare(a.viewedAt));
+  }, [historyItems, localHistoryItems]);
 
   useEffect(() => {
     const detectTelegramMiniApp = () => {
@@ -1270,6 +1297,17 @@ function Index() {
   }, []);
 
   useEffect(() => {
+    const syncLocalProgress = () => setLocalPlaybackProgress(readPlaybackProgress());
+    syncLocalProgress();
+    window.addEventListener(PLAYBACK_PROGRESS_UPDATED_EVENT, syncLocalProgress);
+    window.addEventListener("storage", syncLocalProgress);
+    return () => {
+      window.removeEventListener(PLAYBACK_PROGRESS_UPDATED_EVENT, syncLocalProgress);
+      window.removeEventListener("storage", syncLocalProgress);
+    };
+  }, []);
+
+  useEffect(() => {
     if (view !== "history") return;
     let cancelled = false;
     setHistoryLoading(true);
@@ -1309,7 +1347,7 @@ function Index() {
   }, [view, language]);
 
   useEffect(() => {
-    const missing = historyItems
+    const missing = combinedHistoryItems
       .map(item => item.animeId)
       .filter(id => !ANIME.some(anime => anime.id === id) && !loadedHistoryAnime.some(anime => anime.id === id));
     if (!missing.length) return;
@@ -1324,28 +1362,28 @@ function Index() {
       })
       .catch(() => undefined);
     return () => { cancelled = true; };
-  }, [historyItems, loadedHistoryAnime]);
+  }, [combinedHistoryItems, loadedHistoryAnime]);
 
   const removeHistoryItem = async (item: { animeId: string; viewedAt: string; viewCount: number }) => {
     if (historyDeletingIds.includes(item.animeId)) return;
     setHistoryDeletingIds((current) => current.includes(item.animeId) ? current : [...current, item.animeId]);
-    setHistoryItems((current) => current.filter((entry) => entry.animeId !== item.animeId));
     setHistoryError("");
 
     try {
-      const response = await fetch("/api/telegram/history", {
-        method: "DELETE",
-        credentials: "same-origin",
-        cache: "no-store",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ animeId: item.animeId }),
-      });
-      const payload = await response.json().catch(() => ({})) as { deleted?: boolean; error?: string };
-      if (!response.ok || payload.deleted !== true) throw new Error(payload.error || "history_delete_failed");
+      if (historyAuthenticated) {
+        const response = await fetch("/api/telegram/history", {
+          method: "DELETE",
+          credentials: "same-origin",
+          cache: "no-store",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ animeId: item.animeId }),
+        });
+        const payload = await response.json().catch(() => ({})) as { deleted?: boolean; error?: string };
+        if (!response.ok || payload.deleted !== true) throw new Error(payload.error || "history_delete_failed");
+      }
+      setHistoryItems((current) => current.filter((entry) => entry.animeId !== item.animeId));
+      removeAnimePlaybackProgress(item.animeId);
     } catch {
-      setHistoryItems((current) => current.some((entry) => entry.animeId === item.animeId)
-        ? current
-        : [...current, item].sort((a, b) => b.viewedAt.localeCompare(a.viewedAt)));
       setHistoryError(language === "ru"
         ? "Не удалось удалить тайтл из истории. Попробуй ещё раз."
         : "Could not remove this title from history. Please try again.");
@@ -2298,7 +2336,7 @@ function Index() {
           <SectionBanner title={t("history.title")} subtitle={language === "ru" ? "Недавно просмотренные аниме и серии" : "Recently watched anime and episodes"} />
           {historyLoading ? (
             <p className="rounded-2xl border border-border bg-card/40 px-5 py-8 text-sm text-muted-foreground" role="status">{language === "ru" ? "Загружаем историю…" : "Loading history…"}</p>
-          ) : !historyAuthenticated ? (
+          ) : !historyAuthenticated && combinedHistoryItems.length === 0 ? (
             <section className="rounded-2xl border border-dashed border-border bg-card/40 px-5 py-8 text-center">
               <p className="text-sm text-muted-foreground">{historyError || (language === "ru" ? "История просмотров доступна только в аккаунте Yubera." : "Viewing history is available only in a Yubera account.")}</p>
               <div className="mt-4 flex flex-wrap justify-center gap-2">
@@ -2306,13 +2344,13 @@ function Index() {
                 <button type="button" onClick={() => setView("register")} className="rounded-xl border border-border px-4 py-2.5 text-sm font-semibold hover:bg-accent">{language === "ru" ? "Регистрация" : "Register"}</button>
               </div>
             </section>
-          ) : historyItems.length === 0 ? (
+          ) : combinedHistoryItems.length === 0 ? (
             <p className="rounded-2xl border border-dashed border-border bg-card/40 px-5 py-8 text-sm text-muted-foreground">{language === "ru" ? "История пока пуста. Открывай страницы аниме — они появятся здесь." : "Your history is empty. Open anime pages and they will appear here."}</p>
           ) : (
             <>
               {historyError && <p role="alert" className="mb-4 rounded-xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">{historyError}</p>}
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
-                {historyItems.map((item) => {
+                {combinedHistoryItems.map((item) => {
                   const anime = ANIME.find((entry) => entry.id === item.animeId) ?? loadedHistoryAnime.find((entry) => entry.id === item.animeId);
                   const deleting = historyDeletingIds.includes(item.animeId);
                   return (
