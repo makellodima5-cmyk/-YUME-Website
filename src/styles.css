@@ -882,3 +882,8 @@ html[data-theme="light"] .yubera-bottom-nav { background:rgba(247,245,246,.96); 
   .yubera-home-feature-poster { mask-image:linear-gradient(90deg,transparent 0%,black 18%); }
   .yubera-home-continue-card { min-width:250px; }
 }
+
+.yubera-anime-grid > div > article { width:100%; }
+@media(min-width:768px) {
+  .yubera-bottom-nav { grid-template-columns:repeat(5,minmax(88px,120px)); justify-content:center; }
+}
