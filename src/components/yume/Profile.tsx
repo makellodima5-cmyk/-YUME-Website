@@ -68,10 +68,9 @@ type Props = {
   isAdmin?: boolean;
   onAdmin?: () => void;
   onHistory?: () => void;
-  onTrackedTitles?: () => void;
 };
 
-export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overview", isAdmin = false, onAdmin, onHistory, onTrackedTitles }: Props) {
+export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overview", isAdmin = false, onAdmin, onHistory }: Props) {
   const { t, language, theme, setTheme, setLanguage } = useYumePreferences();
   const [panel, setPanel] = useState<ProfilePanel>(initialPanel);
   const [supportLinks, setSupportLinks] = useState<{ group: string | null; personal: string | null }>({ group: null, personal: null });
