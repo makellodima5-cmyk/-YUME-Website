@@ -5,6 +5,7 @@ import type { View } from "./Header";
 import { useYumePreferences } from "@/data/preferences";
 import { SectionBanner } from "./Sections";
 import { PosterArt } from "./Poster";
+import { getShikimoriAnimes } from "@/data/shikimori";
 
 type Props = {
   animeList: Anime[];
@@ -17,6 +18,7 @@ export function MyHub({ animeList, onNavigate, onSelect }: Props) {
   const ru = language === "ru";
   const [subscriptions, setSubscriptions] = useState<string[]>([]);
   const [subscriptionsLoaded, setSubscriptionsLoaded] = useState(false);
+  const [loadedSubscriptionAnime, setLoadedSubscriptionAnime] = useState<Anime[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -24,13 +26,29 @@ export function MyHub({ animeList, onNavigate, onSelect }: Props) {
       .then(async (response) => {
         const payload = await response.json().catch(() => ({})) as { subscriptions?: string[] };
         if (!cancelled && response.ok && Array.isArray(payload.subscriptions)) {
-          setSubscriptions(payload.subscriptions.filter((id): id is string => typeof id === "string").slice(0, 100));
+          setSubscriptions(payload.subscriptions.filter((id): id is string => /^\d+$/.test(id)).slice(0, 100));
         }
       })
       .catch(() => undefined)
       .finally(() => { if (!cancelled) setSubscriptionsLoaded(true); });
     return () => { cancelled = true; };
   }, []);
+
+  useEffect(() => {
+    const missing = subscriptions.filter(id => !animeList.some(anime => anime.id === id) && !loadedSubscriptionAnime.some(anime => anime.id === id));
+    if (!missing.length) return;
+    let cancelled = false;
+    const chunks: string[][] = [];
+    for (let index = 0; index < missing.length; index += 35) chunks.push(missing.slice(index, index + 35));
+    Promise.all(chunks.map(ids => getShikimoriAnimes({ data: { ids: ids.join(","), limit: ids.length, order: "ranked" } })))
+      .then(results => {
+        if (cancelled) return;
+        const fetched = results.flatMap(result => result.items);
+        setLoadedSubscriptionAnime(current => Array.from(new Map([...current, ...fetched].map(anime => [anime.id, anime])).values()));
+      })
+      .catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [subscriptions, animeList, loadedSubscriptionAnime]);
 
   const groups: { id: View; title: string; description: string; icon: typeof Heart; tone: string }[] = [
     { id: "favorites", title: ru ? "Избранное" : "Favorites", description: ru ? "Сохранённые тайтлы" : "Saved anime", icon: Heart, tone: "text-primary" },
@@ -40,7 +58,7 @@ export function MyHub({ animeList, onNavigate, onSelect }: Props) {
   ];
 
   const subscribedAnime = subscriptions
-    .map((id) => animeList.find((anime) => anime.id === id))
+    .map((id) => animeList.find((anime) => anime.id === id) ?? loadedSubscriptionAnime.find((anime) => anime.id === id))
     .filter((anime): anime is Anime => Boolean(anime));
 
   return (
