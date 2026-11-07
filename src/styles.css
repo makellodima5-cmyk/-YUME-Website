@@ -609,3 +609,14 @@ html[data-theme="light"] nav[aria-label="Main navigation"] button[aria-current="
 @media(prefers-reduced-motion:reduce) {
   .yubera-news-card,.yubera-primary-button { transition:none; }
 }
+
+
+/* The supplied wordmark has white lettering; frame it on a dark chip in light mode. */
+.yubera-wordmark {
+  display: block;
+}
+html[data-theme="light"] .yubera-wordmark {
+  border-radius: .5rem;
+  padding: .25rem .5rem;
+  background: #101116;
+}
