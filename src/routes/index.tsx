@@ -1570,7 +1570,6 @@ function Index() {
   const visibleAiringAnime = airingAnime.slice((airingPage - 1) * catalogPageSize, airingPage * catalogPageSize);
   return (
     <div className="relative isolate min-h-screen pb-8 yubera-with-bottom-nav">
-      {view === "home" && <HomeDepthAtmosphere />}
       <div className="relative z-10">
       <Header setView={setView} unreadNotificationCount={notificationStateLoaded && notificationRemoteAccount ? notificationItems.filter((item) => !notificationReadIds.includes(item.id) && !notificationDismissedIds.includes(item.id)).length : 0} />
       {isTelegramMiniApp && telegramConsentRequired && (
@@ -1836,7 +1835,7 @@ function Index() {
           )}
         </main>
       ) : view === "catalog" ? (
-        <main id="main-content" className="px-4 pt-36 md:px-10 md:pt-24">
+        <main id="main-content" className="yubera-with-bottom-nav px-3 pb-8 pt-[78px] sm:px-4 md:px-6 lg:px-8">
           <SectionBanner title={t("catalog.title")} subtitle={language === "ru" ? "Весь каталог аниме" : "Explore the full anime catalogue"} />
           {catalogLoadState === "error" && (
             <div role="alert" className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-400/25 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
@@ -1895,7 +1894,7 @@ function Index() {
           )}
         </main>
       ) : view === "collections" ? (
-        <main id="main-content" className="px-4 pt-36 md:px-10 md:pt-24">
+        <main id="main-content" className="yubera-with-bottom-nav px-3 pb-8 pt-[78px] sm:px-4 md:px-6 lg:px-8">
           {activeCollection ? (
             <>
               <button onClick={() => setCollection(null)} className="mb-3 text-sm text-muted-foreground hover:text-primary">← {t("collections.all")}</button>
@@ -2315,8 +2314,7 @@ function Index() {
             </>
           )}
         </main>
-      ) : null}
-}
+            ) : null}
       {!(["login", "register"].includes(view)) && (
         <nav className="yubera-bottom-nav" aria-label={language === "ru" ? "Основная навигация" : "Main navigation"}>
           {[
