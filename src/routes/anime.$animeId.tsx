@@ -763,7 +763,7 @@ function AnimeDetailPage() {
                 type="button"
                 onClick={() => setWatchMode("trailer")}
                 aria-pressed={watchMode === "trailer"}
-                className={"rounded-full border px-4 py-2 text-sm font-semibold transition " + (watchMode === "trailer" ? "border-primary/60 bg-secondary text-foreground shadow-[0_0_18px_rgba(207,95,255,0.12)]" : "border-border bg-card text-muted-foreground hover:bg-accent hover:text-foreground")}
+                className={"rounded-full border px-4 py-2 text-sm font-semibold transition " + (watchMode === "trailer" ? "border-primary/60 bg-secondary text-foreground shadow-[0_0_18px_rgba(255,90,61,0.12)]" : "border-border bg-card text-muted-foreground hover:bg-accent hover:text-foreground")}
               >
                 {language === "en" ? "Trailer" : "Трейлер"}
               </button>
@@ -835,7 +835,7 @@ function AnimeDetailPage() {
                                   isCompleted
                                     ? "bg-zinc-950/90 text-zinc-500 ring-1 ring-inset ring-white/5 " + (isSelected ? "ring-2 ring-primary/60" : "hover:bg-zinc-900")
                                     : isSelected
-                                      ? "bg-primary text-primary-foreground shadow-[0_0_18px_rgba(168,85,247,0.25)]"
+                                      ? "bg-primary text-primary-foreground shadow-[0_0_18px_rgba(255,90,61,0.18)]"
                                       : "bg-secondary text-foreground hover:bg-accent"
                                 )}
                               >
@@ -875,7 +875,7 @@ function AnimeDetailPage() {
               ) : (
                 <div
                   className="relative mx-auto flex aspect-video w-full min-w-0 flex-col items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-[#080710] p-5 text-center sm:min-h-[300px] lg:min-h-[420px]"
-                  style={{ background: "radial-gradient(ellipse at 50% 40%, oklch(0.19 0.08 " + anime.hue + ") 0%, #080710 63%)" }}
+                  style={{ background: "radial-gradient(ellipse at 50% 40%, oklch(0.19 0.025 " + anime.hue + ") 0%, #080710 63%)" }}
                 >
                   <div aria-hidden="true" className="mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-rose-500/40 bg-rose-500/10 text-rose-400">
                     <X className="h-8 w-8" />
