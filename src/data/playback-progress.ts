@@ -78,7 +78,7 @@ export function savePlaybackProgress(entry: PlaybackProgressEntry): void {
 
 /** Removes every locally saved episode-progress entry for one anime. */
 export function removeAnimePlaybackProgress(animeId: string): void {
-  if (typeof window === "undefined" || !/^\\d{1,12}$/.test(animeId)) return;
+  if (typeof window === "undefined" || !/^\d{1,12}$/.test(animeId)) return;
   const current = readPlaybackProgress();
   const next = current.filter((entry) => entry.animeId !== animeId);
   if (next.length !== current.length) writeProgress(next);
