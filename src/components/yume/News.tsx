@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArrowUpRight, Bookmark, CalendarDays, MessageCircle, Newspaper, RefreshCw, Search } from "lucide-react";
 import { useYumePreferences } from "@/data/preferences";
-import type { YuberaNewsArticle } from "@/routes/api.news";
+import type { YuberaNewsArticle } from "@/data/news-types";
 
 type Category = "ALL" | YuberaNewsArticle["category"];
 const CATEGORIES: { id: Category; ru: string; en: string }[] = [
