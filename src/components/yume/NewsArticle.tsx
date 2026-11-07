@@ -27,7 +27,7 @@ export function NewsArticle({ article, onBack }: { article: YuberaNewsArticle; o
     } catch { setBookmarked(false); }
   };
   return (
-    <main id="main-content" className="yubera-with-bottom-nav px-4 pt-24 md:px-10 md:pt-28">
+    <main id="main-content" className="px-3 pb-10 pt-[78px] sm:px-4 md:px-6">
       <article className="mx-auto max-w-3xl">
         <button type="button" onClick={onBack} className="mb-6 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary"><ArrowLeft className="h-4 w-4" />{ru ? "К новостям" : "Back to news"}</button>
         <p className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-[.14em] text-primary"><Newspaper className="h-4 w-4" /> Shikimori</p>
