@@ -471,11 +471,7 @@ function AnimeDetailPage() {
   if (!anime) {
     return (
       <div className="min-h-screen pb-24 md:pb-12">
-        <Header
-          view="catalog"
-          setView={navigateToSection}
-          onProfile={navigateToProfile}
-        />
+        <Header setView={navigateToSection} />
         <main id="main-content" className="px-4 pt-28 md:px-10 md:pt-32">
           <div className="mx-auto max-w-3xl rounded-3xl border border-border bg-card p-8 text-center">
             <h1 className="text-2xl font-bold">{t("anime.notFound")}</h1>
@@ -609,11 +605,7 @@ function AnimeDetailPage() {
 
   return (
     <div className="min-h-screen pb-8">
-      <Header
-        view="catalog"
-        setView={navigateToSection}
-        onProfile={() => navigateToSection("profile")}
-      />
+      <Header setView={navigateToSection} />
 
       <main id="main-content" className="px-3 pb-12 pt-[78px] sm:px-4 md:px-6 lg:px-8">
         {apiError && (
