@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowDownWideNarrow, ChevronDown, ChevronRight, Search, SlidersHorizontal, X, UserRound, ShieldCheck, Play, CircleCheck, Download, Database, Settings, History, Bell, CheckCheck, Sparkles, Home, LayoutGrid, Bookmark, Newspaper } from "lucide-react";
 import { COLLECTIONS, type Anime } from "@/data/anime";
-import { getShikimoriCatalog } from "@/data/shikimori";
+import { getShikimoriCatalog, getShikimoriAnimes } from "@/data/shikimori";
 import { getExactReleaseDate, isNewRelease, isUpcomingAnnouncement } from "@/data/anime-sections";
 import { Header, type View } from "@/components/yume/Header";
 import { HomeExperience } from "@/components/yume/HomeExperience";
@@ -105,9 +105,12 @@ export const Route = createFileRoute("/")({
     rating: search.rating, kind: search.kind, age: search.age, lang: search.lang,
   }),
   loader: async ({ deps }) => {
-    // The admin screen loads its own bounded status/quality APIs. Fetching the
-    // complete public catalogue here only burns the Free Worker CPU budget.
-    if (deps.section === "admin") {
+    // Personal screens do not need the entire catalogue. Avoid an unnecessary R2 read
+    // every time a user opens Favorites, Watch Later, History, Profile or News.
+    // This also prevents a transient catalogue-store failure from breaking navigation
+    // into account-owned lists.
+    const catalogueIndependentSections = ["admin", "my", "profile", "favorites", "watchlist", "history", "notifications", "privacy", "privacy-policy", "rules", "rights", "news"];
+    if (catalogueIndependentSections.includes(deps.section ?? "")) {
       return {
         catalogMode: "paged",
         anime: [],
@@ -379,6 +382,7 @@ function Index() {
   const [maintenanceMessage, setMaintenanceMessage] = useState("");
   const [expandedAdminSections, setExpandedAdminSections] = useState({import:false,deletion:false,metadata:false,quality:false,maintenance:false,audit:false,trailers:false,notifications:false});
   const [historyItems, setHistoryItems] = useState<{ animeId: string; viewedAt: string; viewCount: number }[]>([]);
+  const [loadedHistoryAnime, setLoadedHistoryAnime] = useState<Anime[]>([]);
   const [historyDeletingIds, setHistoryDeletingIds] = useState<string[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyAuthenticated, setHistoryAuthenticated] = useState(false);
@@ -1304,6 +1308,24 @@ function Index() {
     return () => { cancelled = true; };
   }, [view, language]);
 
+  useEffect(() => {
+    const missing = historyItems
+      .map(item => item.animeId)
+      .filter(id => !ANIME.some(anime => anime.id === id) && !loadedHistoryAnime.some(anime => anime.id === id));
+    if (!missing.length) return;
+    let cancelled = false;
+    const chunks: string[][] = [];
+    for (let index = 0; index < missing.length; index += 35) chunks.push(missing.slice(index, index + 35));
+    Promise.all(chunks.map(ids => getShikimoriAnimes({ data: { ids: ids.join(","), limit: ids.length, order: "ranked" } })))
+      .then(results => {
+        if (cancelled) return;
+        const fetched = results.flatMap(result => result.items);
+        setLoadedHistoryAnime(current => Array.from(new Map([...current, ...fetched].map(anime => [anime.id, anime])).values()));
+      })
+      .catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [historyItems, loadedHistoryAnime]);
+
   const removeHistoryItem = async (item: { animeId: string; viewedAt: string; viewCount: number }) => {
     if (historyDeletingIds.includes(item.animeId)) return;
     setHistoryDeletingIds((current) => current.includes(item.animeId) ? current : [...current, item.animeId]);
@@ -1920,7 +1942,7 @@ function Index() {
       ) : view === "news" ? (
         <News animeList={ANIME} onDetailChange={setNewsDetailOpen} />
       ) : view === "profile" ? (
-        <Profile animeList={ANIME} onSelect={select} onCatalog={() => setView("catalog")} isAdmin={isAdmin} onAdmin={() => setView("admin")} onHistory={() => setView("history")} />
+        <Profile animeList={ANIME} onSelect={select} onCatalog={() => setView("catalog")} isAdmin={isAdmin} onAdmin={() => setView("admin")} onHistory={() => setView("history")} onTrackedTitles={() => setView("my")} />
       ) : view === "favorites" ? (
         <Profile key="favorites" initialPanel="favorites" animeList={ANIME} onSelect={select} onCatalog={() => setView("catalog")} />
       ) : view === "watchlist" ? (
@@ -2291,7 +2313,7 @@ function Index() {
               {historyError && <p role="alert" className="mb-4 rounded-xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">{historyError}</p>}
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
                 {historyItems.map((item) => {
-                  const anime = ANIME.find((entry) => entry.id === item.animeId);
+                  const anime = ANIME.find((entry) => entry.id === item.animeId) ?? loadedHistoryAnime.find((entry) => entry.id === item.animeId);
                   const deleting = historyDeletingIds.includes(item.animeId);
                   return (
                     <div key={item.animeId} className="relative min-w-0">

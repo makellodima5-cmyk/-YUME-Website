@@ -887,3 +887,121 @@ html[data-theme="light"] .yubera-bottom-nav { background:rgba(247,245,246,.96); 
 @media(min-width:768px) {
   .yubera-bottom-nav { grid-template-columns:repeat(5,minmax(88px,120px)); justify-content:center; }
 }
+
+
+/* Reference-accurate YUBERA home shelves. */
+.yubera-home-page { padding-inline: clamp(12px,3.2vw,24px); }
+.yubera-home-hero {
+  position:relative; isolation:isolate; overflow:hidden; width:100%;
+  min-height:210px; aspect-ratio:2.55 / 1; max-height:300px;
+  border:1px solid var(--border); border-radius:24px; background:#171820;
+}
+.yubera-home-section { margin-top:26px; }
+.yubera-home-section-heading {
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  margin:0 0 12px; padding:0 1px;
+}
+.yubera-home-section-heading h2 { font-size:clamp(1.15rem,2.6vw,1.55rem); line-height:1.15; font-weight:800; letter-spacing:-.035em; }
+.yubera-home-section-mark { width:5px; height:27px; flex:0 0 5px; border-radius:999px; background:var(--primary); }
+.yubera-home-horizontal-row {
+  display:flex; gap:12px; overflow-x:auto; overscroll-behavior-x:contain;
+  scrollbar-width:none; padding:0 2px 3px;
+}
+.yubera-home-horizontal-row::-webkit-scrollbar,.yubera-home-announcements::-webkit-scrollbar { display:none; }
+.yubera-home-anime-card {
+  position:relative; flex:0 0 clamp(116px,28vw,205px); aspect-ratio:1.16 / 1;
+  overflow:hidden; border:1px solid var(--border); border-radius:18px; background:var(--card);
+}
+.yubera-home-announcements {
+  display:flex; gap:12px; overflow-x:auto; scrollbar-width:none; padding:0 2px 3px;
+}
+.yubera-home-announcement {
+  display:flex; align-items:center; gap:10px; flex:0 0 calc(50% - 6px); min-width:0;
+  height:104px; overflow:hidden; border:1px solid var(--border); border-radius:18px;
+  background:var(--card); text-align:left;
+}
+.yubera-home-collections {
+  display:grid; grid-auto-flow:column; grid-auto-columns:calc(33.333% - 7px);
+  grid-template-rows:1fr; gap:10px; overflow-x:auto; scrollbar-width:none; padding:0 2px 3px;
+}
+.yubera-home-collection {
+  display:flex; align-items:center; gap:10px; min-width:0; min-height:88px;
+  overflow:hidden; border:1px solid var(--border); border-radius:18px;
+  background:var(--card); text-align:left;
+}
+@media(min-width:640px) {
+  .yubera-home-hero { min-height:240px; }
+  .yubera-home-section { margin-top:30px; }
+  .yubera-home-announcement { flex-basis:calc(50% - 6px); }
+  .yubera-home-collections { grid-auto-columns:calc(33.333% - 7px); }
+}
+@media(max-width:420px) {
+  .yubera-home-hero { min-height:190px; aspect-ratio:2.25 / 1; border-radius:19px; }
+  .yubera-home-anime-card { flex-basis:clamp(116px,30vw,148px); }
+  .yubera-home-section { margin-top:23px; }
+  .yubera-home-section-heading { margin-bottom:10px; }
+  .yubera-home-announcement { min-width:0; height:94px; }
+  .yubera-home-collection { min-width:0; min-height:82px; }
+}
+
+/* Profile cover and saved-title shelf follow the Android composition. */
+.yubera-profile-cover { height:148px !important; }
+.yubera-profile-avatar { width:92px !important; height:92px !important; margin-top:-48px !important; }
+.yubera-profile-favorites { width:82px !important; }
+.yubera-profile-row { min-height:80px; border-radius:20px !important; padding:12px 14px !important; }
+.yubera-profile-row-icon { width:46px !important; height:46px !important; border-radius:50% !important; }
+@media(min-width:640px) {
+  .yubera-profile-cover { height:190px !important; }
+  .yubera-profile-avatar { width:112px !important; height:112px !important; margin-top:-58px !important; }
+  .yubera-profile-favorites { width:104px !important; }
+}
+
+
+/* Anime detail screen: compact poster + metadata, full-width action row and integrated player. */
+.yubera-anime-overview {
+  display:grid; grid-template-columns:minmax(112px,31%) minmax(0,1fr); gap:14px;
+  align-items:start; padding:14px; border:1px solid var(--border); border-radius:22px;
+  background:var(--card);
+}
+.yubera-anime-poster { min-width:0; }
+.yubera-anime-overview .yubera-chip { min-height:30px; padding:.35rem .68rem; font-size:.75rem; }
+.yubera-anime-actions { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin-top:14px; }
+.yubera-anime-actions > button {
+  display:flex; min-width:0; min-height:58px; flex-direction:column; align-items:center;
+  justify-content:center; gap:6px; border-radius:22px; border:1px solid var(--border);
+  background:var(--secondary); padding:9px 5px; font-size:11px; line-height:1.2;
+}
+.yubera-anime-actions > button svg { width:21px; height:21px; }
+.yubera-player-mode {
+  display:grid; grid-template-columns:1fr 1fr; gap:0; overflow:hidden; margin-bottom:12px;
+  border:1px solid var(--border); border-radius:999px; background:var(--card); padding:2px;
+}
+.yubera-player-mode button {
+  display:flex; min-width:0; min-height:42px; align-items:center; justify-content:center; gap:8px;
+  border:1px solid transparent; border-radius:999px; color:var(--muted-foreground);
+  font-size:13px; font-weight:700;
+}
+.yubera-player-mode button.is-active { border-color:var(--primary); background:var(--accent); color:var(--foreground); }
+.yubera-player-options {
+  display:grid; grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr); gap:10px;
+  margin-bottom:12px; padding:14px; border:1px solid var(--border); border-radius:20px;
+  background:var(--card);
+}
+.yubera-player-options select { min-height:46px; }
+.yubera-detail-related-row { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; }
+.yubera-detail-related-card { position:relative; min-width:0; overflow:hidden; text-align:left; }
+@media(max-width:390px) {
+  .yubera-anime-overview { grid-template-columns:minmax(104px,31%) minmax(0,1fr); gap:11px; padding:11px; border-radius:18px; }
+  .yubera-anime-overview h1 { font-size:1.12rem; }
+  .yubera-anime-overview .yubera-chip { min-height:27px; padding:.28rem .52rem; font-size:.68rem; }
+  .yubera-anime-actions { gap:6px; }
+  .yubera-anime-actions > button { min-height:54px; border-radius:18px; font-size:10px; }
+  .yubera-player-options { gap:8px; padding:10px; }
+  .yubera-player-options select { min-height:43px; padding-left:10px; font-size:12px; }
+  .yubera-detail-related-row { gap:7px; }
+}
+@media(min-width:640px) {
+  .yubera-anime-overview { grid-template-columns:minmax(190px,230px) minmax(0,1fr); gap:22px; padding:22px; }
+  .yubera-anime-actions > button { min-height:74px; flex-direction:row; font-size:13px; }
+  .yubera-detail-related-row { grid-template-columns:repeat(5,minmax(0,1fr)); gap:14px; }
+}
