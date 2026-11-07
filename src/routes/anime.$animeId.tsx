@@ -698,41 +698,11 @@ function AnimeDetailPage() {
             </div>
           </section>
 
-          {displayableScreenshots.length > 0 && (
-            <section aria-labelledby="anime-screenshots-title" className="relative z-10 mt-5 md:mt-6">
-              <h2 id="anime-screenshots-title" className="mb-3 text-xl font-bold md:text-2xl">
-                {language === "en" ? "Screenshots" : "Кадры"}
-              </h2>
-              <div className="scrollbar-none flex snap-x snap-mandatory gap-2 overflow-x-auto overscroll-x-contain px-0.5 pb-2">
-                {displayableScreenshots.map((screenshot, index) => (
-                  <button
-                    key={screenshot.originalUrl}
-                    type="button"
-                    onClick={(event) => {
-                      screenshotTriggerRef.current = event.currentTarget;
-                      setActiveScreenshotIndex(index);
-                    }}
-                    aria-label={language === "en" ? "Open screenshot " + (index + 1) : "Открыть кадр " + (index + 1)}
-                    className="group relative aspect-video w-[68vw] max-w-[280px] shrink-0 snap-start overflow-hidden rounded-xl border border-white/10 bg-card shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                  >
-                    <img
-                      src={screenshot.previewUrl}
-                      alt={language === "en" ? "Anime screenshot " + (index + 1) : "Кадр из аниме " + (index + 1)}
-                      loading="lazy"
-                      decoding="async"
-                      className="h-full w-full object-cover transition duration-200 group-hover:scale-[1.03]"
-                    />
-                  </button>
-                ))}
-              </div>
-            </section>
-          )}
-
           <section
             ref={playerSectionRef}
             id="watch"
             aria-labelledby="watch-title"
-            id="watch" className="mt-10 scroll-mt-24 md:mt-12"
+            className="mt-10 scroll-mt-24 md:mt-12"
           >
             <div className="mb-4">
               <h2 id="watch-title" className="text-2xl font-bold md:text-3xl">
@@ -868,6 +838,37 @@ function AnimeDetailPage() {
               ))}
             </div>
           </section>
+
+
+          {displayableScreenshots.length > 0 && (
+            <section aria-labelledby="anime-screenshots-title" className="relative z-10 mt-5 md:mt-6">
+              <h2 id="anime-screenshots-title" className="mb-3 text-xl font-bold md:text-2xl">
+                {language === "en" ? "Screenshots" : "Кадры"}
+              </h2>
+              <div className="scrollbar-none flex snap-x snap-mandatory gap-2 overflow-x-auto overscroll-x-contain px-0.5 pb-2">
+                {displayableScreenshots.map((screenshot, index) => (
+                  <button
+                    key={screenshot.originalUrl}
+                    type="button"
+                    onClick={(event) => {
+                      screenshotTriggerRef.current = event.currentTarget;
+                      setActiveScreenshotIndex(index);
+                    }}
+                    aria-label={language === "en" ? "Open screenshot " + (index + 1) : "Открыть кадр " + (index + 1)}
+                    className="group relative aspect-video w-[68vw] max-w-[280px] shrink-0 snap-start overflow-hidden rounded-xl border border-white/10 bg-card shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  >
+                    <img
+                      src={screenshot.previewUrl}
+                      alt={language === "en" ? "Anime screenshot " + (index + 1) : "Кадр из аниме " + (index + 1)}
+                      loading="lazy"
+                      decoding="async"
+                      className="h-full w-full object-cover transition duration-200 group-hover:scale-[1.03]"
+                    />
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
 
 
           <section id="similar" className="mt-8 scroll-mt-24">
