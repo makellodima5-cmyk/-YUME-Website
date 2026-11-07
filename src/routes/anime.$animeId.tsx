@@ -737,7 +737,7 @@ function AnimeDetailPage() {
                       setActiveScreenshotIndex(index);
                     }}
                     aria-label={language === "en" ? "Open screenshot " + (index + 1) : "Открыть кадр " + (index + 1)}
-                    className="group relative aspect-video w-[68vw] max-w-[280px] shrink-0 snap-start overflow-hidden rounded-xl border border-white/10 bg-card shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    className="group relative aspect-video w-[34vw] max-w-[220px] shrink-0 snap-start overflow-hidden rounded-xl border border-white/10 bg-card shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                   >
                     <img
                       src={screenshot.previewUrl}
