@@ -43,7 +43,7 @@ function relatedAnime(article: YuberaNewsArticle, animeList: Anime[]): Anime | u
   );
 }
 
-export function News({ animeList }: { animeList: Anime[] }) {
+export function News({ animeList, onDetailChange }: { animeList: Anime[]; onDetailChange?: (open: boolean) => void }) {
   const { language } = useYumePreferences();
   const [articles, setArticles] = useState<YuberaNewsArticle[]>([]);
   const [selectedArticle, setSelectedArticle] = useState<YuberaNewsArticle | null>(null);
@@ -80,6 +80,11 @@ export function News({ animeList }: { animeList: Anime[] }) {
     });
   }, [articles, bookmarks, category, language, query, savedOnly, ru]);
 
+  const openArticle = (article: YuberaNewsArticle) => {
+    onDetailChange?.(true);
+    setSelectedArticle(article);
+  };
+
   const toggleBookmark = (id: number) => {
     setBookmarks((current) => {
       const next = current.includes(id) ? current.filter((value) => value !== id) : [...current, id].slice(-300);
@@ -95,6 +100,7 @@ export function News({ animeList }: { animeList: Anime[] }) {
         onBack={() => {
           setBookmarks(readBookmarks());
           setSelectedArticle(null);
+          onDetailChange?.(false);
         }}
       />
     );
@@ -151,7 +157,7 @@ export function News({ animeList }: { animeList: Anime[] }) {
           <>
             <div className="grid gap-3 lg:grid-cols-[1.2fr_.8fr]">
               <article className="overflow-hidden rounded-[20px] border border-border bg-card">
-                <button type="button" onClick={() => setSelectedArticle(featured)} className="group block w-full text-left">
+                <button type="button" onClick={() => openArticle(featured)} className="group block w-full text-left">
                   <div className="relative aspect-[16/8] overflow-hidden bg-secondary">
                     {featuredAnime ? <PosterArt anime={featuredAnime} className="h-full w-full transition duration-500 group-hover:scale-[1.03]" /> : <img src="/images/yubera/yubera_banner.webp" alt="" className="h-full w-full object-cover" />}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/10 to-transparent" />
@@ -179,7 +185,7 @@ export function News({ animeList }: { animeList: Anime[] }) {
                   const saved = bookmarks.includes(article.id);
                   return (
                     <article key={article.id} className="flex min-h-[112px] gap-3 rounded-2xl border border-border bg-card p-2.5">
-                      <button type="button" onClick={() => setSelectedArticle(article)} className="h-[96px] w-[104px] shrink-0 overflow-hidden rounded-xl bg-secondary text-left">
+                      <button type="button" onClick={() => openArticle(article)} className="h-[96px] w-[104px] shrink-0 overflow-hidden rounded-xl bg-secondary text-left">
                         {related ? <PosterArt anime={related} className="h-full w-full" /> : <img src="/images/yubera/yubera_banner.webp" alt="" className="h-full w-full object-cover" />}
                       </button>
                       <div className="flex min-w-0 flex-1 flex-col justify-between py-0.5">
