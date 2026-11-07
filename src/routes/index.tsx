@@ -24,7 +24,7 @@ import {
   serializeCatalogReturnState,
   validateCatalogSearch,
 } from "@/data/catalog-search";
-const homeSocialImage = "/images/899F3B51-DD87-47F7-9DCF-C5A2B66892D0.webp";
+const homeSocialImage = "/images/yubera/yubera_banner.webp";
 import { absoluteImageUrl, canonicalUrl } from "@/data/seo";
 import { getTelegramWebApp, telegramHapticImpact } from "@/lib/telegram-mini-app";
 import { setProfileStorageAuthenticated, syncTelegramLibrary } from "@/data/profile-storage";
