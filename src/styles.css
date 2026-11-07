@@ -482,3 +482,130 @@ button.yume-tactile-control:has(.aspect-\\[2\\/3\\]) {
     animation: none;
   }
 }
+
+
+/* YUBERA visual system shared with the native Android client. */
+:root {
+  color-scheme: dark;
+  --radius: 1rem;
+  --background: #101116;
+  --foreground: #F6F4F5;
+  --card: #1A1B22;
+  --card-foreground: #F6F4F5;
+  --popover: #1A1B22;
+  --popover-foreground: #F6F4F5;
+  --primary: #FF5A3D;
+  --primary-foreground: #FFFFFF;
+  --secondary: #22232B;
+  --secondary-foreground: #F6F4F5;
+  --muted: #22232B;
+  --muted-foreground: #A4A1AA;
+  --accent: #34231F;
+  --accent-foreground: #FFFFFF;
+  --magenta: #FF764F;
+  --gold: #FFC36A;
+  --destructive: #E45B59;
+  --border: rgba(246,244,245,.10);
+  --input: rgba(246,244,245,.14);
+  --ring: #FF764F;
+  --gradient-neon: #FF5A3D;
+  --gradient-fade: linear-gradient(to top, var(--background), transparent);
+  --shadow-neon: 0 8px 24px rgba(255,90,61,.18);
+  --body-gradient: #101116;
+}
+html[data-theme="light"] {
+  color-scheme: light;
+  --background: #F7F5F6;
+  --foreground: #1B1920;
+  --card: #FFFFFF;
+  --card-foreground: #1B1920;
+  --popover: #FFFFFF;
+  --popover-foreground: #1B1920;
+  --primary: #D9472D;
+  --primary-foreground: #FFFFFF;
+  --secondary: #ECE9EC;
+  --secondary-foreground: #1B1920;
+  --muted: #ECE9EC;
+  --muted-foreground: #6C6872;
+  --accent: #F6E5E1;
+  --accent-foreground: #522319;
+  --magenta: #B94C38;
+  --gold: #D99125;
+  --destructive: #C53F42;
+  --border: rgba(27,25,32,.12);
+  --input: rgba(27,25,32,.16);
+  --ring: #D9472D;
+  --gradient-neon: #D9472D;
+  --gradient-fade: linear-gradient(to top, var(--background), transparent);
+  --shadow-neon: 0 8px 22px rgba(217,71,45,.12);
+  --body-gradient: #F7F5F6;
+}
+html body {
+  background: var(--background) !important;
+  background-image: none !important;
+  color: var(--foreground);
+}
+h1, h2, h3 { font-family: var(--font-sans); letter-spacing: -0.025em; }
+.bg-neon { background-image: none !important; background-color: var(--primary) !important; }
+.text-neon { background-image: none !important; color: var(--primary) !important; -webkit-text-fill-color: currentColor; }
+.shadow-neon { box-shadow: var(--shadow-neon) !important; }
+.bg-fade-up { background-image: var(--gradient-fade) !important; }
+.glass, .glass-search {
+  background: color-mix(in srgb, var(--card) 88%, transparent) !important;
+  border: 1px solid var(--border);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  box-shadow: none !important;
+}
+.glass-liquid, .glass-active {
+  background: color-mix(in srgb, var(--card) 94%, transparent) !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: 0 8px 28px rgba(0,0,0,.16) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(120%);
+  backdrop-filter: blur(18px) saturate(120%);
+}
+html[data-theme="light"] header {
+  color: var(--foreground) !important;
+  background: rgba(247,245,246,.92) !important;
+  border-color: var(--border) !important;
+}
+html[data-theme="dark"] header {
+  color: var(--foreground) !important;
+  background: rgba(16,17,22,.92) !important;
+  border-color: var(--border) !important;
+}
+html[data-theme="light"] nav[aria-label="Основная навигация"],
+html[data-theme="light"] nav[aria-label="Main navigation"] {
+  background: rgba(255,255,255,.96) !important;
+  border-color: var(--border) !important;
+}
+html[data-theme="light"] nav[aria-label="Основная навигация"] button,
+html[data-theme="light"] nav[aria-label="Main navigation"] button { color: var(--muted-foreground) !important; }
+html[data-theme="light"] nav[aria-label="Основная навигация"] button[aria-current="page"],
+html[data-theme="light"] nav[aria-label="Main navigation"] button[aria-current="page"] { color: var(--primary) !important; }
+.yubera-page-shell { width: min(100%, 1480px); margin-inline: auto; }
+.yubera-surface { background: var(--card); border: 1px solid var(--border); border-radius: 1.25rem; }
+.yubera-chip { display:inline-flex; align-items:center; gap:.35rem; border:1px solid var(--border); border-radius:999px; background:var(--secondary); padding:.4rem .75rem; color:var(--foreground); font-size:.82rem; }
+.yubera-primary-button { display:inline-flex; align-items:center; justify-content:center; gap:.55rem; border-radius:999px; background:var(--primary); color:var(--primary-foreground); padding:.78rem 1.2rem; font-size:.9rem; font-weight:700; transition:filter .15s, transform .15s; }
+.yubera-primary-button:hover { filter:brightness(1.06); }
+.yubera-detail-tabs { display:flex; gap:1rem; border-bottom:1px solid var(--border); overflow-x:auto; scrollbar-width:none; }
+.yubera-detail-tabs button { position:relative; flex:1; min-width:max-content; padding:.85rem .6rem; color:var(--muted-foreground); font-weight:600; }
+.yubera-detail-tabs button[aria-current="true"] { color:var(--primary); }
+.yubera-detail-tabs button[aria-current="true"]::after { content:""; position:absolute; inset-inline:0; bottom:-1px; height:3px; border-radius:3px 3px 0 0; background:var(--primary); }
+.yubera-news-card { display:grid; grid-template-columns: 1fr; gap:1rem; padding:1rem; border:1px solid var(--border); border-radius:1.15rem; background:var(--card); transition:border-color .18s, transform .18s; }
+.yubera-news-card:hover { border-color:color-mix(in srgb,var(--primary) 48%,var(--border)); transform:translateY(-1px); }
+.yubera-bottom-nav { position:fixed; z-index:45; inset-inline:0; bottom:0; display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:.2rem; padding:.55rem .55rem calc(.55rem + env(safe-area-inset-bottom)); border-top:1px solid var(--border); background:color-mix(in srgb,var(--background) 94%,transparent); -webkit-backdrop-filter:blur(18px); backdrop-filter:blur(18px); }
+.yubera-bottom-nav button { display:flex; min-width:0; flex-direction:column; align-items:center; justify-content:center; gap:.22rem; padding:.3rem .1rem; color:var(--muted-foreground); font-size:.65rem; font-weight:600; }
+.yubera-bottom-nav button[aria-current="page"] { color:var(--primary); }
+.yubera-bottom-nav button[aria-current="page"] svg { stroke-width:2.5; }
+.yubera-with-bottom-nav { padding-bottom:calc(5.1rem + env(safe-area-inset-bottom)); }
+@media(min-width:768px) {
+  .yubera-bottom-nav { display:none; }
+  .yubera-with-bottom-nav { padding-bottom:2rem; }
+}
+@media(min-width:640px) {
+  .yubera-news-card { grid-template-columns: 7rem minmax(0,1fr); }
+}
+@media(prefers-reduced-motion:reduce) {
+  .yubera-news-card,.yubera-primary-button { transition:none; }
+}
