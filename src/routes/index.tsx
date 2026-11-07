@@ -487,7 +487,13 @@ function Index() {
   }, [telegramDetectionComplete, language]);
 
   useEffect(() => {
-    if (!telegramAuthReady || telegramConsentRequired || telegramConsentPending) return;
+    if (!telegramAuthReady || telegramConsentRequired || telegramConsentPending) {
+      setIsAdmin(false);
+      setAdminPasswordConfirmed(false);
+      setAdminPasswordRequired(false);
+      setAdminCheckComplete(false);
+      return;
+    }
     let cancelled = false;
     setAdminCheckComplete(false);
     setIsAdmin(false);
