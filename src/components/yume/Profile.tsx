@@ -23,6 +23,9 @@ import {
   Trash2,
   X,
   LoaderCircle,
+  Clock3,
+  Settings,
+  Shield,
 } from "lucide-react";
 import type { Anime } from "@/data/anime";
 import { getShikimoriAnimes } from "@/data/shikimori";
@@ -31,6 +34,7 @@ import { PosterArt } from "./Poster";
 import { PrivacyPolicy } from "./PrivacyPolicy";
 import { getTelegramWebApp, telegramHapticImpact } from "@/lib/telegram-mini-app";
 import { Grid } from "./Sections";
+import { PLAYBACK_PROGRESS_UPDATED_EVENT, readPlaybackProgress } from "@/data/playback-progress";
 import { SITE_RULES, SITE_RULES_LAST_UPDATED } from "@/data/site-rules";
 import {
   FAVORITES_STORAGE_KEY,
@@ -57,9 +61,11 @@ type Props = {
   onSelect: (anime: Anime) => void;
   onCatalog: () => void;
   initialPanel?: ProfilePanel;
+  isAdmin?: boolean;
+  onAdmin?: () => void;
 };
 
-export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overview" }: Props) {
+export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overview", isAdmin = false, onAdmin }: Props) {
   const { t, language } = useYumePreferences();
   const [panel, setPanel] = useState<ProfilePanel>(initialPanel);
   const [supportLinks, setSupportLinks] = useState<{ group: string | null; personal: string | null }>({ group: null, personal: null });
@@ -71,12 +77,24 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
   const [accountBusy, setAccountBusy] = useState(false);
   const [accountMessage, setAccountMessage] = useState("");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [historyCount, setHistoryCount] = useState(0);
   const [telegramUser, setTelegramUser] = useState<{
     first_name?: string;
     last_name?: string;
     username?: string;
     photo_url?: string;
   } | null>(null);
+
+  useEffect(() => {
+    const syncHistory = () => setHistoryCount(readPlaybackProgress().length);
+    syncHistory();
+    window.addEventListener(PLAYBACK_PROGRESS_UPDATED_EVENT, syncHistory);
+    window.addEventListener("storage", syncHistory);
+    return () => {
+      window.removeEventListener(PLAYBACK_PROGRESS_UPDATED_EVENT, syncHistory);
+      window.removeEventListener("storage", syncHistory);
+    };
+  }, []);
 
   useEffect(() => setPanel(initialPanel), [initialPanel]);
   useEffect(() => {
@@ -450,8 +468,8 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
   );
 
   return (
-    <main id="main-content" className={`px-4 pb-12 md:px-10 md:pb-16 ${panel === "support" ? "pt-20 md:pt-24" : "pt-28 md:pt-28"}`}>
-      <div className="mx-auto max-w-6xl">
+    <main id="main-content" className={`px-3 pb-8 sm:px-4 md:px-6 lg:px-8 ${panel === "support" ? "pt-20" : "pt-[78px]"}`}>
+      <div className="mx-auto max-w-[1600px]">
         {!authChecked && (panel === "overview" || panel === "favorites" || panel === "watchlist") ? (
           <section className="mx-auto max-w-xl rounded-3xl border border-border bg-card/60 p-6 text-center sm:p-8" aria-live="polite" aria-busy="true">
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
@@ -522,13 +540,14 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
                     <h1 className="mt-1 break-words text-lg font-bold leading-tight text-white sm:text-2xl">
                       {telegramDisplayName}
                     </h1>
+                    {telegramUser?.username && <p className="mt-1 text-xs font-medium text-white/60">@{telegramUser.username}</p>}
                     <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-white/65 sm:text-sm">
                       {t("profile.subtitle")}
                     </p>
                   </div>
                 </div>
 
-                <div className="mt-4 grid grid-cols-2 overflow-hidden rounded-[18px] border border-border bg-black/20 sm:mt-5">
+                <div className="mt-4 grid grid-cols-3 overflow-hidden rounded-[18px] border border-border bg-black/20 sm:mt-5">
                   <button
                     type="button"
                     onClick={() => navigatePanel("favorites")}
@@ -555,6 +574,20 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
                     <span className="min-w-0">
                       <span className="block text-lg font-bold tabular-nums text-white sm:text-xl">{watchlist.length}</span>
                       <span className="mt-0.5 block text-[11px] leading-snug text-white/65 sm:text-sm">{t("profile.watchlistCount")}</span>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setHistoryCount(readPlaybackProgress().length)}
+                    aria-label={String(historyCount) + " — " + (language === "ru" ? "эпизодов в истории" : "episodes in history")}
+                    className="flex min-w-0 items-center gap-2 border-l border-border px-2 py-2.5 text-left transition hover:bg-white/[0.06] sm:gap-3 sm:px-4 sm:py-3.5"
+                  >
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#22232B] text-[#FF764F] sm:h-11 sm:w-11">
+                      <Clock3 className="h-5 w-5 sm:h-6 sm:w-6" strokeWidth={1.9} />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block text-lg font-bold tabular-nums text-white sm:text-xl">{historyCount}</span>
+                      <span className="mt-0.5 block text-[9px] leading-snug text-white/65 sm:text-xs">{language === "ru" ? "В истории" : "In history"}</span>
                     </span>
                   </button>
                 </div>
@@ -620,6 +653,16 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
               {profileRow(Bookmark, t("profile.watchlist"), t("profile.watchlistDescription"), "watchlist")}
               {profileRow(ShieldCheck, t("profile.legal"), t("profile.legalDescription"), "documents")}
               {profileRow(Info, t("profile.about"), t("profile.aboutDescription"), "about")}
+              <button type="button" onClick={() => window.dispatchEvent(new Event("yume-open-cookie-consent"))} className="flex w-full items-center gap-4 rounded-2xl border border-border bg-card p-3.5 text-left text-card-foreground shadow-sm transition hover:border-primary/35 hover:bg-accent/70 sm:p-4">
+                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#22232B] text-primary"><Settings className="h-6 w-6" /></span>
+                <span className="min-w-0 flex-1"><span className="block text-sm font-semibold">{language === "ru" ? "Настройки cookie" : "Cookie settings"}</span><span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">{language === "ru" ? "Управление согласием и необязательными cookie" : "Manage consent and optional cookies"}</span></span>
+                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+              </button>
+              {isAdmin && <button type="button" onClick={onAdmin} className="flex w-full items-center gap-4 rounded-2xl border border-primary/30 bg-primary/5 p-3.5 text-left text-card-foreground shadow-sm transition hover:border-primary/55 hover:bg-primary/10 sm:p-4">
+                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#22232B] text-primary"><Shield className="h-6 w-6" /></span>
+                <span className="min-w-0 flex-1"><span className="block text-sm font-semibold">{language === "ru" ? "Панель администратора" : "Admin panel"}</span><span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">{language === "ru" ? "Управление сайтом и каталогом" : "Manage the site and catalogue"}</span></span>
+                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+              </button>}
               {profileRow(LifeBuoy, t("profile.support"), t("profile.supportDescription"), "support")}
             </section>
             <section className="mt-6 rounded-2xl border border-border bg-card/50 p-4">
