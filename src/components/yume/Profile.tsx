@@ -682,7 +682,7 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
               </button>}
               {profileRow(LifeBuoy, t("profile.support"), t("profile.supportDescription"), "support")}
             </section>
-            <section className="mt-6 rounded-2xl border border-border bg-card p-4 sm:p-5">
+            <section id="app-settings" className="mt-6 rounded-2xl border border-border bg-card p-4 sm:p-5">
               <h2 className="text-base font-bold">{language === "ru" ? "Настройки приложения" : "App settings"}</h2>
               <button type="button" onClick={() => window.dispatchEvent(new Event("yume-open-cookie-consent"))} className="mt-4 flex w-full items-center gap-3 rounded-xl border border-border bg-secondary/50 px-3 py-3 text-left transition hover:border-primary/35">
                 <Settings className="h-5 w-5 shrink-0 text-primary" />
