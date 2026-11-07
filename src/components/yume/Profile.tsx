@@ -76,6 +76,12 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
   const { t, language, theme, setTheme, setLanguage } = useYumePreferences();
   const [panel, setPanel] = useState<ProfilePanel>(initialPanel);
   const [settingsExpanded, setSettingsExpanded] = useState(false);
+
+  useEffect(() => {
+    if (settingsExpanded) {
+      document.getElementById("app-settings")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  }, [settingsExpanded]);
   const [supportLinks, setSupportLinks] = useState<{ group: string | null; personal: string | null }>({ group: null, personal: null });
   const [supportLinksLoading, setSupportLinksLoading] = useState(false);
   const [supportLinksError, setSupportLinksError] = useState(false);
@@ -669,7 +675,7 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
                 <span className="min-w-0 flex-1"><span className="block text-sm font-semibold">{language === "ru" ? "Отслеживаемые тайтлы" : "Tracked anime"}</span><span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">{language === "ru" ? "Аниме, за выходом новых серий которых ты следишь" : "Anime with new episodes you follow"}</span></span>
                 <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
               </button>
-              <button type="button" onClick={() => setSettingsExpanded(current => !current)} className="yubera-profile-row flex w-full items-center gap-4 rounded-2xl border border-border bg-card text-left text-card-foreground shadow-sm transition hover:border-primary/35 hover:bg-accent/70">
+              <button type="button" onClick={() => setSettingsExpanded(current => !current)} aria-expanded={settingsExpanded} className="yubera-profile-row flex w-full items-center gap-4 rounded-2xl border border-border bg-card text-left text-card-foreground shadow-sm transition hover:border-primary/35 hover:bg-accent/70">
                 <span className="yubera-profile-row-icon flex shrink-0 items-center justify-center rounded-full bg-[#22232B] text-primary"><Settings className="h-6 w-6" /></span>
                 <span className="min-w-0 flex-1"><span className="block text-sm font-semibold">{language === "ru" ? "Настройки приложения" : "App settings"}</span><span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">{language === "ru" ? "Тема, язык и другие параметры" : "Theme, language and preferences"}</span></span>
                 <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
