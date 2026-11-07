@@ -4,7 +4,6 @@ import type { Anime } from "@/data/anime";
 import type { View } from "./Header";
 import { useYumePreferences } from "@/data/preferences";
 import { SectionBanner } from "./Sections";
-import { ContinueWatching } from "./HomeExperience";
 import { PosterArt } from "./Poster";
 
 type Props = {
@@ -70,8 +69,6 @@ export function MyHub({ animeList, onNavigate, onSelect }: Props) {
             );
           })}
         </div>
-
-        <ContinueWatching animeList={animeList} onSelect={onSelect} />
 
         <section className="mt-8">
           <div className="mb-3 flex items-center justify-between">
