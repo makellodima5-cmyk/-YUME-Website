@@ -2328,7 +2328,7 @@ function Index() {
             return <button key={item.id} type="button" onClick={() => setView(item.id)} aria-current={item.active ? "page" : undefined}><Icon className="h-5 w-5" /><span>{item.label}</span></button>;
           })}
         </nav>
-      )}}
+      )}
       </div>
     </div>
   );
