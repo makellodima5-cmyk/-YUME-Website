@@ -937,7 +937,7 @@ html[data-theme="light"] .yubera-bottom-nav { background:rgba(247,245,246,.96); 
 }
 @media(max-width:420px) {
   .yubera-home-hero { min-height:190px; aspect-ratio:2.25 / 1; border-radius:19px; }
-  .yubera-home-anime-card { flex-basis:clamp(148px,43vw,178px); }
+  .yubera-home-anime-card { flex-basis:clamp(116px,30vw,148px); }
   .yubera-home-section { margin-top:23px; }
   .yubera-home-section-heading { margin-bottom:10px; }
   .yubera-home-announcement { min-width:0; height:94px; }
