@@ -258,8 +258,8 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
     setSavedAnimeLoadError(false);
 
     const chunks: string[][] = [];
-    for (let index = 0; index < missingSavedIds.length; index += 50) {
-      chunks.push(missingSavedIds.slice(index, index + 50));
+    for (let index = 0; index < missingSavedIds.length; index += 35) {
+      chunks.push(missingSavedIds.slice(index, index + 35));
     }
 
     Promise.all(
