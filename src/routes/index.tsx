@@ -5,16 +5,14 @@ import { COLLECTIONS, type Anime } from "@/data/anime";
 import { getShikimoriCatalog } from "@/data/shikimori";
 import { getExactReleaseDate, isNewRelease, isUpcomingAnnouncement } from "@/data/anime-sections";
 import { Header, type View } from "@/components/yume/Header";
+import { HomeExperience } from "@/components/yume/HomeExperience";
 import { AuthPage } from "@/components/yume/AuthPage";
 import { AnimeCard } from "@/components/yume/Poster";
-import { CollectionsGrid, Grid, Hero, Row } from "@/components/yume/Sections";
+import { CollectionsGrid, Grid, SectionBanner } from "@/components/yume/Sections";
 import { CatalogFilters, EMPTY_CATALOG_FILTERS, type CatalogFiltersValue } from "@/components/yume/CatalogFilters";
 import { Profile } from "@/components/yume/Profile";
 import { MyHub } from "@/components/yume/MyHub";
 import { News } from "@/components/yume/News";
-import { Footer } from "@/components/yume/Footer";
-import { HomeDepthAtmosphere } from "@/components/yume/HomeDepthAtmosphere";
-import "../home-depth.css";
 import { useYumePreferences, displayGenre, type TranslationKey } from "@/data/preferences";
 import { filterAndSortCatalog, getCatalogPageCount, matchesCollectionGenres, paginateCatalog } from "@/data/catalog-utils";
 import {
@@ -252,118 +250,6 @@ function PageNavigation({
     </nav>
   );
 }
-function HomeQuickControls({ onProfile }: { onProfile: () => void }) {
-  const { t, language, setLanguage, theme, setTheme } = useYumePreferences();
-  const [openMenu, setOpenMenu] = useState<"language" | "theme" | null>(null);
-  const rootRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!openMenu) return;
-    const closeOnOutside = (event: PointerEvent) => {
-      if (event.target instanceof Node && !rootRef.current?.contains(event.target)) setOpenMenu(null);
-    };
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpenMenu(null);
-    };
-    document.addEventListener("pointerdown", closeOnOutside);
-    document.addEventListener("keydown", closeOnEscape);
-    return () => {
-      document.removeEventListener("pointerdown", closeOnOutside);
-      document.removeEventListener("keydown", closeOnEscape);
-    };
-  }, [openMenu]);
-
-  const languageOptions = [
-    { value: "ru" as const, label: "Русский", flag: "🇷🇺" },
-    { value: "en" as const, label: "English", flag: "🇬🇧" },
-  ];
-  const themeOptions = [
-    { value: "light" as const, label: t("settings.light"), icon: Sun },
-    { value: "dark" as const, label: t("settings.dark"), icon: Moon },
-    { value: "system" as const, label: t("settings.system"), icon: Monitor },
-  ];
-
-  return (
-    <div ref={rootRef} className="relative z-30 mx-4 my-3 grid grid-cols-3 items-start gap-2 md:mx-10 md:gap-3">
-      <button
-        type="button"
-        onClick={onProfile}
-        className="flex min-h-12 w-full items-center justify-center gap-2 whitespace-nowrap rounded-full border border-primary/35 bg-card/80 px-2 text-sm font-medium text-foreground shadow-[0_4px_18px_rgba(255,90,61,0.08)] transition hover:border-primary/70 hover:bg-accent/70 sm:text-base"
-      >
-        <UserRound className="h-4 w-4 shrink-0 sm:h-5 sm:w-5" />
-        <span>{t("nav.profileButton")}</span>
-      </button>
-
-      <div className="relative min-w-0">
-        <button
-          type="button"
-          aria-haspopup="listbox"
-          aria-expanded={openMenu === "language"}
-          onClick={() => setOpenMenu((current) => current === "language" ? null : "language")}
-          className={`flex min-h-12 w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-full border px-2 text-sm font-medium transition sm:gap-2 sm:text-base ${openMenu === "language" ? "border-primary bg-accent/70 shadow-neon" : "border-primary/35 bg-card/80 hover:border-primary/70 hover:bg-accent/70"}`}
-        >
-          <Globe className="h-4 w-4 shrink-0 sm:h-5 sm:w-5" />
-          <span className="whitespace-nowrap">{language === "ru" ? "Язык" : "Language"}</span>
-          <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${openMenu === "language" ? "rotate-180" : ""}`} />
-        </button>
-        {openMenu === "language" && (
-          <div role="listbox" aria-label={t("settings.language")} className="absolute left-0 top-[calc(100%+0.5rem)] z-50 min-w-[9.5rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-border bg-popover p-1.5 text-popover-foreground shadow-2xl backdrop-blur-xl">
-            {languageOptions.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                role="option"
-                aria-selected={language === option.value}
-                onClick={() => { setLanguage(option.value); setOpenMenu(null); }}
-                className={`flex w-full items-center gap-2 whitespace-nowrap rounded-xl px-2 py-2.5 text-left text-xs transition sm:text-sm ${language === option.value ? "bg-primary/20 text-popover-foreground" : "text-popover-foreground/85 hover:bg-accent/70"}`}
-              >
-                <span aria-hidden="true">{option.flag}</span>
-                <span className="min-w-0 flex-1 whitespace-nowrap">{option.label}</span>
-                <span className={`h-3.5 w-3.5 shrink-0 rounded-full border ${language === option.value ? "border-primary bg-primary shadow-[inset_0_0_0_3px_#171020]" : "border-muted-foreground/60"}`} />
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div className="relative min-w-0">
-        <button
-          type="button"
-          aria-haspopup="listbox"
-          aria-expanded={openMenu === "theme"}
-          onClick={() => setOpenMenu((current) => current === "theme" ? null : "theme")}
-          className={`flex min-h-12 w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-full border px-2 text-sm font-medium transition sm:gap-2 sm:text-base ${openMenu === "theme" ? "border-primary bg-accent/70 shadow-neon" : "border-primary/35 bg-card/80 hover:border-primary/70 hover:bg-accent/70"}`}
-        >
-          {theme === "light" ? <Sun className="h-4 w-4 shrink-0 sm:h-5 sm:w-5" /> : theme === "system" ? <Monitor className="h-4 w-4 shrink-0 sm:h-5 sm:w-5" /> : <Moon className="h-4 w-4 shrink-0 sm:h-5 sm:w-5" />}
-          <span className="whitespace-nowrap">{language === "ru" ? "Тема" : "Theme"}</span>
-          <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${openMenu === "theme" ? "rotate-180" : ""}`} />
-        </button>
-        {openMenu === "theme" && (
-          <div role="listbox" aria-label={t("settings.theme")} className="absolute right-0 top-[calc(100%+0.5rem)] z-50 min-w-[13rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-border bg-popover p-1.5 text-popover-foreground shadow-2xl backdrop-blur-xl">
-            {themeOptions.map((option) => {
-              const Icon = option.icon;
-              return (
-                <button
-                  key={option.value}
-                  type="button"
-                  role="option"
-                  aria-selected={theme === option.value}
-                  onClick={() => { setTheme(option.value); setOpenMenu(null); }}
-                  className={`flex w-full items-center gap-2 whitespace-nowrap rounded-xl px-2 py-2.5 text-left text-xs transition sm:text-sm ${theme === option.value ? "bg-primary/20 text-popover-foreground" : "text-popover-foreground/85 hover:bg-accent/70"}`}
-                >
-                  <Icon className="h-4 w-4 shrink-0" />
-                  <span className="min-w-0 flex-1">{option.label}</span>
-                  <span className={`h-3.5 w-3.5 shrink-0 rounded-full border ${theme === option.value ? "border-primary bg-primary shadow-[inset_0_0_0_3px_#171020]" : "border-muted-foreground/60"}`} />
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 function Index() {
   const { t, language } = useYumePreferences();
   const navigate = useNavigate();
@@ -1518,16 +1404,6 @@ function Index() {
         : "Sign-in did not finish: account data could not be loaded. Refresh and try again.");
     }
   }, [language, navigate]);
-  const random = () => {
-    const availableAnime = ANIME.filter(
-      (anime) => anime.status === "Онгоинг" || anime.status === "Вышел",
-    );
-    if (!availableAnime.length) return;
-    const anime = availableAnime[Math.floor(Math.random() * availableAnime.length)]!;
-    select(anime);
-  };
-
-
   const availableGenres = useMemo(() => catalogFacets?.genres ?? Array.from(new Set(ANIME.flatMap(a => a.genres))).sort((a,b)=>a.localeCompare(b,"ru")), [ANIME,catalogFacets]);
   const availableStatuses = useMemo(() => { if (catalogFacets) return catalogFacets.statuses; const found = new Set(ANIME.map(a=>a.status)); const order=["Онгоинг","Анонс","Вышел","Неизвестно"]; return Array.from(found).sort((a,b)=>order.indexOf(a)-order.indexOf(b)); }, [ANIME,catalogFacets]);
   const availableTypes = useMemo(() => catalogFacets?.types ?? Array.from(new Set(ANIME.map(a=>a.kind?.trim() || (a.episodes===1 ? "Фильм":"TV")))).filter(Boolean).sort((a,b)=>a.localeCompare(b,"ru")), [ANIME,catalogFacets]);
@@ -1696,7 +1572,7 @@ function Index() {
     <div className="relative isolate min-h-screen pb-8 yubera-with-bottom-nav">
       {view === "home" && <HomeDepthAtmosphere />}
       <div className="relative z-10">
-      <Header view={view} setView={setView} onProfile={() => setView(telegramAuthReady ? "profile" : "login")} isAdmin={isAdmin} unreadNotificationCount={notificationStateLoaded && notificationRemoteAccount ? notificationItems.filter((item) => !notificationReadIds.includes(item.id) && !notificationDismissedIds.includes(item.id)).length : 0} />
+      <Header setView={setView} unreadNotificationCount={notificationStateLoaded && notificationRemoteAccount ? notificationItems.filter((item) => !notificationReadIds.includes(item.id) && !notificationDismissedIds.includes(item.id)).length : 0} />
       {isTelegramMiniApp && telegramConsentRequired && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-background/85 px-4 py-6 backdrop-blur-md" role="dialog" aria-modal="true" aria-labelledby="telegram-consent-title">
           <section className="w-full max-w-md rounded-3xl border border-border bg-card p-6 shadow-2xl sm:p-8">
@@ -1769,42 +1645,16 @@ function Index() {
           )}
         </main>
       ) : view === "home" ? (
-        <main id="main-content" className="pt-16">
-          <Hero onCatalog={() => setView("catalog")} onRandom={random} query={query} setQuery={setQuery} onSubmitSearch={submitHomeSearch} filtersOpen={filtersOpen && (!needsFullCatalog || catalogLoadState === "loaded" || catalogLoadState === "error")} setFiltersOpen={setFiltersOpen} draftFilters={draftFilters} setDraftFilters={setDraftFilters} onApplyFilters={applyCatalogFilters} onResetFilters={resetCatalogFilters} activeFilterCount={activeFilterCount} genres={availableGenres} statuses={availableStatuses} types={availableTypes} ageRatings={availableAgeRatings} yearMin={catalogYearRange.min} yearMax={catalogYearRange.max} />
-          <HomeQuickControls onProfile={() => setView(telegramAuthReady ? "profile" : "login")} />
-          <div className="home-content-world mt-1 pb-12">
-            <div className="relative z-10">
-              {ANIME.length === 0 ? (
-                <section className="mx-4 mt-10 rounded-2xl border border-dashed border-white/15 bg-card/60 px-6 py-10 text-center md:mx-10">
-                  <p className="mx-auto max-w-xl text-muted-foreground">{t("home.dataUnavailable")}</p>
-                  <button type="button" onClick={() => window.location.reload()} className="mt-5 rounded-full bg-neon px-5 py-2.5 text-sm font-semibold text-primary-foreground transition hover:brightness-110">{t("home.retry")}</button>
-                </section>
-              ) : (
-                <>
-                  {popularCards.length > 0 && <Row title={t("home.popular")} action={<SeeAll onClick={() => setView("popular")} />}>
-                    {popularCards.map((a) => <AnimeCard key={a.id} anime={a} onSelect={select} />)}
-                  </Row>}
-                  {newReleaseCards.length > 0 && <Row title={t("home.newReleases")} action={<SeeAll onClick={() => setView("new-releases")} />}>
-                    {newReleaseCards.map((a) => <AnimeCard key={a.id} anime={a} onSelect={select} />)}
-                  </Row>}
-                  {announcementCards.length > 0 && <Row title={t("home.announcements")} action={<SeeAll onClick={() => setView("announcements")} />}>
-                    {announcementCards.map((a) => <AnimeCard key={a.id} anime={a} onSelect={select} />)}
-                  </Row>}
-                  {airingCards.length > 0 && <Row title={t("home.airing")} action={<SeeAll onClick={() => setView("airing")} />}>
-                    {airingCards.map((a) => <AnimeCard key={a.id} anime={a} onSelect={select} />)}
-                  </Row>}
-                  <section className="mt-10 px-4 md:px-10">
-                    <div className="mb-4 flex items-end justify-between">
-                      <h2 className="text-lg font-semibold md:text-xl">{t("home.collections")}</h2>
-                      <SeeAll onClick={() => setView("collections")} />
-                    </div>
-                    <CollectionsGrid animeList={ANIME} onOpen={(id) => { setCollection(id); setView("collections"); }} />
-                  </section>
-                </>
-              )}
-            </div>
-          </div>
-        </main>
+        <HomeExperience
+          animeList={ANIME}
+          popular={popularCards}
+          newReleases={newReleaseCards}
+          announcements={announcementCards}
+          airing={airingCards}
+          onSelect={select}
+          onSeeAll={setView}
+          onOpenCollection={(id) => { setCollection(id); setView("collections"); }}
+        />
       ) : view === "notifications" && notificationStateLoaded && !notificationRemoteAccount ? (
         <main id="main-content" className="px-4 pb-12 pt-24 md:px-10 md:pt-24">
           <section className="mx-auto max-w-lg rounded-3xl border border-border bg-card/70 p-6 text-center sm:p-8">
@@ -1910,8 +1760,8 @@ function Index() {
           </section>
         </main>
       ) : view === "popular" ? (
-        <main id="main-content" className="px-4 pt-24 md:px-10 md:pt-24">
-          <h1 className="mb-2 text-2xl font-bold md:text-3xl">{t("home.popular")}</h1>
+        <main id="main-content" className="yubera-with-bottom-nav px-3 pb-8 pt-[78px] sm:px-4 md:px-6 lg:px-8">
+          <SectionBanner title={t("home.popular")} />
           {needsFullCatalog && catalogLoadState !== "loaded" && catalogLoadState !== "error" ? (
             <CatalogSkeleton count={12} />
           ) : (
@@ -1929,7 +1779,7 @@ function Index() {
           )}
         </main>
       ) : view === "new-releases" ? (
-        <main id="main-content" className="px-4 pt-24 md:px-10 md:pt-24">
+        <main id="main-content" className="yubera-with-bottom-nav px-3 pb-8 pt-[78px] sm:px-4 md:px-6 lg:px-8">
           <h1 className="mb-2 text-2xl font-bold md:text-3xl">{t("home.newReleases")}</h1>
           <p className="mb-6 text-sm text-muted-foreground">{t("home.newReleasesDescription")}</p>
           {needsFullCatalog && catalogLoadState !== "loaded" && catalogLoadState !== "error" ? (
@@ -1949,7 +1799,7 @@ function Index() {
           )}
         </main>
       ) : view === "announcements" ? (
-        <main id="main-content" className="px-4 pt-24 md:px-10 md:pt-24">
+        <main id="main-content" className="yubera-with-bottom-nav px-3 pb-8 pt-[78px] sm:px-4 md:px-6 lg:px-8">
           <h1 className="mb-2 text-2xl font-bold md:text-3xl">{t("home.announcements")}</h1>
           <p className="mb-6 text-sm text-muted-foreground">{t("home.announcementsDescription")}</p>
           {needsFullCatalog && catalogLoadState !== "loaded" && catalogLoadState !== "error" ? (
@@ -1969,7 +1819,7 @@ function Index() {
           )}
         </main>
       ) : view === "airing" ? (
-        <main id="main-content" className="px-4 pt-24 md:px-10 md:pt-24">
+        <main id="main-content" className="yubera-with-bottom-nav px-3 pb-8 pt-[78px] sm:px-4 md:px-6 lg:px-8">
           <h1 className="mb-2 text-2xl font-bold md:text-3xl">{t("home.airing")}</h1>
           <p className="mb-6 text-sm text-muted-foreground">{t("home.airingDescription")}</p>
           {needsFullCatalog && catalogLoadState !== "loaded" && catalogLoadState !== "error" ? (
@@ -2064,11 +1914,11 @@ function Index() {
           )}
         </main>
       ) : view === "my" ? (
-        <MyHub onNavigate={setView} />
+        <MyHub animeList={ANIME} onNavigate={setView} onSelect={select} />
       ) : view === "news" ? (
-        <News />
+        <News animeList={ANIME} />
       ) : view === "profile" ? (
-        <Profile animeList={ANIME} onSelect={select} onCatalog={() => setView("catalog")} />
+        <Profile animeList={ANIME} onSelect={select} onCatalog={() => setView("catalog")} isAdmin={isAdmin} onAdmin={() => setView("admin")} />
       ) : view === "favorites" ? (
         <Profile key="favorites" initialPanel="favorites" animeList={ANIME} onSelect={select} onCatalog={() => setView("catalog")} />
       ) : view === "watchlist" ? (
@@ -2473,20 +2323,20 @@ function Index() {
       {!["profile", "favorites", "watchlist", "history", "my", "news", "privacy", "privacy-policy", "rules", "rights", "login", "register"].includes(view) && (
         <Footer onNavigate={setView} />
       )}
-      {!(["admin", "login", "register", "privacy", "privacy-policy", "rules", "rights"].includes(view)) && (
+      {!(["login", "register"].includes(view)) && (
         <nav className="yubera-bottom-nav" aria-label={language === "ru" ? "Основная навигация" : "Main navigation"}>
           {[
-            { id: "home" as View, label: language === "ru" ? "Главная" : "Home", icon: Home },
-            { id: "catalog" as View, label: language === "ru" ? "Каталог" : "Catalog", icon: LayoutGrid },
-            { id: "my" as View, label: language === "ru" ? "Моё" : "My", icon: Bookmark },
-            { id: "news" as View, label: language === "ru" ? "Новости" : "News", icon: Newspaper },
-            { id: "profile" as View, label: language === "ru" ? "Профиль" : "Profile", icon: UserRound },
+            { id: "home" as View, label: language === "ru" ? "Главная" : "Home", icon: Home, active: ["home", "popular", "new-releases", "announcements", "airing", "collections"].includes(view) },
+            { id: "catalog" as View, label: language === "ru" ? "Каталог" : "Catalog", icon: LayoutGrid, active: view === "catalog" },
+            { id: "my" as View, label: language === "ru" ? "Моё" : "My", icon: Bookmark, active: ["my", "favorites", "watchlist", "history", "notifications"].includes(view) },
+            { id: "news" as View, label: language === "ru" ? "Новости" : "News", icon: Newspaper, active: view === "news" },
+            { id: "profile" as View, label: language === "ru" ? "Профиль" : "Profile", icon: UserRound, active: ["profile", "admin", "privacy", "privacy-policy", "rules", "rights"].includes(view) },
           ].map((item) => {
             const Icon = item.icon;
-            return <button key={item.id} type="button" onClick={() => setView(item.id)} aria-current={view === item.id ? "page" : undefined}><Icon className="h-5 w-5" /><span>{item.label}</span></button>;
+            return <button key={item.id} type="button" onClick={() => setView(item.id)} aria-current={item.active ? "page" : undefined}><Icon className="h-5 w-5" /><span>{item.label}</span></button>;
           })}
         </nav>
-      )}
+      )}}
       </div>
     </div>
   );
