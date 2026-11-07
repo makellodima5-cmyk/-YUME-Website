@@ -1760,7 +1760,7 @@ function Index() {
           </section>
         </main>
       ) : view === "popular" ? (
-        <main id="main-content" className="yubera-with-bottom-nav px-3 pb-8 pt-[78px] sm:px-4 md:px-6 lg:px-8">
+        <main id="main-content" className="yubera-with-bottom-nav mx-auto w-full max-w-[1600px] px-3 pb-8 pt-[78px] sm:px-4 md:px-6 lg:px-8">
           <SectionBanner title={t("home.popular")} />
           {needsFullCatalog && catalogLoadState !== "loaded" && catalogLoadState !== "error" ? (
             <CatalogSkeleton count={12} />
@@ -1779,7 +1779,7 @@ function Index() {
           )}
         </main>
       ) : view === "new-releases" ? (
-        <main id="main-content" className="yubera-with-bottom-nav px-3 pb-8 pt-[78px] sm:px-4 md:px-6 lg:px-8">
+        <main id="main-content" className="yubera-with-bottom-nav mx-auto w-full max-w-[1600px] px-3 pb-8 pt-[78px] sm:px-4 md:px-6 lg:px-8">
           <SectionBanner title={t("home.newReleases")} subtitle={t("home.newReleasesDescription")} />
           {needsFullCatalog && catalogLoadState !== "loaded" && catalogLoadState !== "error" ? (
             <CatalogSkeleton count={12} />
@@ -1798,7 +1798,7 @@ function Index() {
           )}
         </main>
       ) : view === "announcements" ? (
-        <main id="main-content" className="yubera-with-bottom-nav px-3 pb-8 pt-[78px] sm:px-4 md:px-6 lg:px-8">
+        <main id="main-content" className="yubera-with-bottom-nav mx-auto w-full max-w-[1600px] px-3 pb-8 pt-[78px] sm:px-4 md:px-6 lg:px-8">
           <SectionBanner title={t("home.announcements")} subtitle={t("home.announcementsDescription")} />
           {needsFullCatalog && catalogLoadState !== "loaded" && catalogLoadState !== "error" ? (
             <CatalogSkeleton count={12} />
@@ -1817,7 +1817,7 @@ function Index() {
           )}
         </main>
       ) : view === "airing" ? (
-        <main id="main-content" className="yubera-with-bottom-nav px-3 pb-8 pt-[78px] sm:px-4 md:px-6 lg:px-8">
+        <main id="main-content" className="yubera-with-bottom-nav mx-auto w-full max-w-[1600px] px-3 pb-8 pt-[78px] sm:px-4 md:px-6 lg:px-8">
           <SectionBanner title={t("home.airing")} subtitle={t("home.airingDescription")} />
           {needsFullCatalog && catalogLoadState !== "loaded" && catalogLoadState !== "error" ? (
             <CatalogSkeleton count={12} />
@@ -1836,7 +1836,7 @@ function Index() {
           )}
         </main>
       ) : view === "catalog" ? (
-        <main id="main-content" className="yubera-with-bottom-nav px-3 pb-8 pt-[78px] sm:px-4 md:px-6 lg:px-8">
+        <main id="main-content" className="yubera-with-bottom-nav mx-auto w-full max-w-[1600px] px-3 pb-8 pt-[78px] sm:px-4 md:px-6 lg:px-8">
           <SectionBanner title={t("catalog.title")} subtitle={language === "ru" ? "Весь каталог аниме" : "Explore the full anime catalogue"} />
           {catalogLoadState === "error" && (
             <div role="alert" className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-400/25 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
@@ -1845,7 +1845,7 @@ function Index() {
             </div>
           )}
           <div data-filter-anchor className="relative z-30 mt-5 max-w-xl">
-            <div className="flex h-11 items-center rounded-xl border border-white/10 bg-[#171127]/75 shadow-lg shadow-black/10 backdrop-blur-xl focus-within:border-primary/60">
+            <div className="flex h-11 items-center rounded-xl border border-white/10 bg-card shadow-lg shadow-black/10 backdrop-blur-xl focus-within:border-primary/60">
               <Search className="ml-3 h-4 w-4 shrink-0 text-muted-foreground" />
               <input value={catalogQuery} onChange={(event) => { const value = event.target.value; setCatalogQuery(value); setCatalogPage(1); writeCatalogUrl({ q: value.trim() || undefined, page: 1 }); }} disabled={needsFullCatalog && catalogLoadState !== "loaded" && catalogLoadState !== "error"} placeholder={t("search.placeholder")} aria-label={t("catalog.search")} className="h-full min-w-0 flex-1 bg-transparent px-2.5 text-sm outline-none placeholder:text-muted-foreground" />
               {catalogQuery && <button type="button" aria-label={t("search.clear")} onClick={() => { setCatalogQuery(""); setCatalogPage(1); writeCatalogUrl({ q: undefined, page: 1 }); }} className="rounded-full p-1.5 text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>}
@@ -1895,7 +1895,7 @@ function Index() {
           )}
         </main>
       ) : view === "collections" ? (
-        <main id="main-content" className="yubera-with-bottom-nav px-3 pb-8 pt-[78px] sm:px-4 md:px-6 lg:px-8">
+        <main id="main-content" className="yubera-with-bottom-nav mx-auto w-full max-w-[1600px] px-3 pb-8 pt-[78px] sm:px-4 md:px-6 lg:px-8">
           {activeCollection ? (
             <>
               <button onClick={() => setCollection(null)} className="mb-3 text-sm text-muted-foreground hover:text-primary">← {t("collections.all")}</button>
@@ -1928,7 +1928,7 @@ function Index() {
       ) : view === "rights" ? (
         <Profile key="rights" initialPanel="rights" animeList={ANIME} onSelect={select} onCatalog={() => setView("catalog")} />
       ) : view === "admin" ? (
-        <main id="main-content" className="yubera-with-bottom-nav min-h-[70vh] px-3 pb-8 pt-[78px] sm:px-4 md:px-6 lg:px-8">
+        <main id="main-content" className="yubera-with-bottom-nav mx-auto min-h-[70vh] w-full max-w-[1600px] px-3 pb-8 pt-[78px] sm:px-4 md:px-6 lg:px-8">
           <div className="mx-auto max-w-5xl">
             <h1 className="mb-2 text-2xl font-bold md:text-3xl">{language === "ru" ? "Панель администратора" : "Admin panel"}</h1>
             <p className="mb-4 text-sm text-muted-foreground">{language === "ru" ? "Управление функциями и обслуживанием Yubera." : "Manage Yubera features and maintenance."}</p>
@@ -2269,7 +2269,7 @@ function Index() {
           </div>
         </main>
       ) : view === "history" ? (
-        <main id="main-content" className="yubera-with-bottom-nav px-3 pb-8 pt-[78px] sm:px-4 md:px-6 lg:px-8">
+        <main id="main-content" className="yubera-with-bottom-nav mx-auto w-full max-w-[1600px] px-3 pb-8 pt-[78px] sm:px-4 md:px-6 lg:px-8">
           <SectionBanner title={t("history.title")} subtitle={language === "ru" ? "Недавно просмотренные аниме и серии" : "Recently watched anime and episodes"} />
           {historyLoading ? (
             <p className="rounded-2xl border border-border bg-card/40 px-5 py-8 text-sm text-muted-foreground" role="status">{language === "ru" ? "Загружаем историю…" : "Loading history…"}</p>
