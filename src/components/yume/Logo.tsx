@@ -9,7 +9,7 @@ export function Logo() {
       alt="YUBERA"
       width={2172}
       height={724}
-      className="h-auto w-[124px] shrink-0 object-contain select-none md:w-[148px]"
+      className="yubera-wordmark h-auto w-[124px] shrink-0 object-contain select-none md:w-[148px]"
       draggable={false}
     />
   );
