@@ -691,11 +691,7 @@ function AnimeDetailPage() {
               </div>
             </div>
 
-            <div className="mt-5 yubera-detail-tabs" role="tablist" aria-label={language === "en" ? "Anime sections" : "Разделы страницы аниме"}>
-              <button type="button" role="tab" aria-current="true" onClick={() => document.getElementById("overview")?.scrollIntoView({ behavior: "smooth", block: "start" })}>{language === "en" ? "Overview" : "Обзор"}</button>
-              <button type="button" role="tab" aria-current="false" onClick={() => { setWatchMode("episodes"); scrollToPlayer(); }}>{language === "en" ? "Watch" : "Смотреть"}</button>
-              <button type="button" role="tab" aria-current="false" onClick={() => document.getElementById("similar")?.scrollIntoView({ behavior: "smooth", block: "start" })}>{language === "en" ? "Similar" : "Похожие"}</button>
-            </div>
+
           </section>
 
           <section
