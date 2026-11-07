@@ -74,8 +74,8 @@ export function Hero({
         className="absolute inset-0 h-full w-full object-cover object-[58%_center] md:object-center"
         />
       </picture>
-      <div className="absolute inset-0 bg-gradient-to-r from-[#090714]/80 via-[#090714]/40 to-transparent md:from-[#090714]/75 md:via-[#090714]/25 md:to-transparent" />
-      <div className="absolute inset-0 bg-gradient-to-t from-[#090714]/95 via-[#090714]/20 to-transparent md:from-transparent md:via-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-r from-[#101116]/90 via-[#101116]/50 to-transparent md:from-[#101116]/80 md:via-[#101116]/30 md:to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-t from-[#101116]/95 via-[#101116]/20 to-transparent md:from-transparent md:via-transparent" />
       <div data-filter-anchor className="absolute left-4 top-4 z-30 w-[min(76vw,360px)] md:left-8 md:top-7 md:w-[min(36vw,420px)]">
         <div className="flex h-11 items-center rounded-xl border border-white/25 bg-black/30 shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_8px_28px_rgba(0,0,0,0.18)] backdrop-blur-xl transition focus-within:border-white/55 focus-within:bg-black/40">
           <button type="button" onClick={() => { telegramHapticImpact("light"); onSubmitSearch(); }} aria-label={t("search.apply")} className="yume-tactile-control ml-3 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-white/80 transition hover:bg-white/10 hover:text-white"><Search className="h-4 w-4" /></button>
@@ -110,7 +110,7 @@ export function Hero({
           <button onClick={() => { telegramHapticImpact("light"); onRandom(); }} className="yume-tactile-control inline-flex w-fit items-center justify-center gap-1.5 rounded-full bg-neon px-3.5 py-2 text-xs font-semibold text-primary-foreground shadow-neon transition hover:brightness-110 sm:gap-2 sm:px-5 sm:py-2.5 sm:text-sm">
             <Play className="h-4 w-4 fill-current" /> {t("hero.random")}
           </button>
-          <button onClick={() => { telegramHapticImpact("light"); onCatalog(); }} className="yume-tactile-control inline-flex w-fit items-center justify-center gap-1.5 rounded-full bg-[#0b0a19]/65 px-3.5 py-2 text-xs font-semibold text-white ring-1 ring-white/25 backdrop-blur-md transition hover:bg-accent sm:gap-2 sm:px-5 sm:py-2.5 sm:text-sm">
+          <button onClick={() => { telegramHapticImpact("light"); onCatalog(); }} className="yume-tactile-control inline-flex w-fit items-center justify-center gap-1.5 rounded-full bg-[#1A1B22]/65 px-3.5 py-2 text-xs font-semibold text-white ring-1 ring-white/25 backdrop-blur-md transition hover:bg-accent sm:gap-2 sm:px-5 sm:py-2.5 sm:text-sm">
             <Shuffle className="h-4 w-4" /> {t("hero.catalog")}
           </button>
         </div>

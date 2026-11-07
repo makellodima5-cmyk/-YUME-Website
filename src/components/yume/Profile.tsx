@@ -482,7 +482,7 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
           </section>
         ) : panel === "overview" ? (
           <>
-            <div className="relative isolate overflow-hidden rounded-[20px] border border-primary/20 bg-[#08050f]/95 shadow-[0_10px_34px_rgba(0,0,0,0.24)]">
+            <div className="relative isolate overflow-hidden rounded-[20px] border border-border bg-card shadow-[0_10px_34px_rgba(0,0,0,0.24)]">
               <div className="relative h-28 overflow-hidden sm:h-40">
                 <img
                   src="/images/7E68AFCE-335A-41A6-826D-41E8674B7B0F.png"
@@ -500,7 +500,7 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
 
               <div className="relative -mt-6 rounded-[20px] bg-gradient-to-b from-[#1b0d2b]/42 via-[#140a20]/52 to-[#0d0916]/72 px-3 pb-3 pt-0 sm:px-5 sm:pb-5">
                 <div className="flex min-w-0 items-end gap-3 sm:gap-4">
-                  <div className="relative -mt-8 h-[78px] w-[78px] shrink-0 overflow-hidden rounded-full border-[2.5px] border-[#d98aff] bg-[#21102f] shadow-[0_0_20px_rgba(206,100,255,0.3)] sm:-mt-11 sm:h-28 sm:w-28">
+                  <div className="relative -mt-8 h-[78px] w-[78px] shrink-0 overflow-hidden rounded-full border-[2.5px] border-primary bg-secondary shadow-[0_0_18px_rgba(255,90,61,0.16)] sm:-mt-11 sm:h-28 sm:w-28">
                     {telegramUser?.photo_url ? (
                       <img
                         src={telegramUser.photo_url}
@@ -516,7 +516,7 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
                     )}
                   </div>
                   <div className="min-w-0 flex-1 pb-1 pt-3 sm:pb-2">
-                    <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-[#c16aff] sm:text-xs">
+                    <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-primary sm:text-xs">
                       {t("profile.space")}
                     </p>
                     <h1 className="mt-1 break-words text-lg font-bold leading-tight text-white sm:text-2xl">
@@ -805,7 +805,7 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
                       className="group overflow-hidden rounded-2xl border border-primary/25 bg-card/55 shadow-sm transition-colors open:border-primary/55 open:bg-card/75"
                     >
                       <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-4 text-left marker:hidden transition-colors hover:bg-primary/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary sm:px-5 [&::-webkit-details-marker]:hidden">
-                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-primary/10 text-sm font-bold text-primary">
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border bg-primary/10 text-sm font-bold text-primary">
                           {index + 1}
                         </span>
                         <span className="min-w-0 flex-1 text-sm font-semibold leading-snug text-foreground sm:text-base">
@@ -925,7 +925,7 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
                 <div className="mt-5 space-y-4 sm:mt-6 sm:space-y-5">
                   <article className="rounded-[22px] border border-[#33264B] bg-gradient-to-br from-[#0D0A14] to-[#08080D] p-4 shadow-[0_8px_24px_rgba(0,0,0,0.16)] sm:p-5">
                     <div className="flex items-start gap-3 sm:gap-4">
-                      <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[20px] bg-[#281747] text-[#C69BFF] sm:h-[72px] sm:w-[72px]">
+                      <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[20px] bg-[#281747] text-primary sm:h-[72px] sm:w-[72px]">
                         <UsersRound className="h-8 w-8 sm:h-9 sm:w-9" aria-hidden="true" />
                       </div>
                       <div className="min-w-0 flex-1 pt-1">
@@ -940,7 +940,7 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
                     </div>
                     <div className="mt-4 flex flex-wrap gap-2 text-xs sm:text-sm">
                       {(language === "ru" ? ["Предложения", "Вопросы по аниме", "Обсуждение"] : ["Suggestions", "Anime questions", "Discussion"]).map((label) => (
-                        <span key={label} className="rounded-full bg-[#21152F] px-3 py-1.5 font-medium text-[#C69BFF]">{label}</span>
+                        <span key={label} className="rounded-full bg-[#21152F] px-3 py-1.5 font-medium text-primary">{label}</span>
                       ))}
                     </div>
                     <button type="button" onClick={() => openSupportLink("group")} disabled={supportLinksLoading || !supportLinks.group} className="mt-4 flex min-h-12 w-full items-center justify-between gap-3 rounded-[16px] bg-gradient-to-r from-[#7829F5] to-[#5015C9] px-4 py-3 text-sm font-semibold text-white shadow-[0_5px_18px_rgba(103,35,222,0.18)] transition hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#B78AFF] disabled:cursor-not-allowed disabled:opacity-60 sm:min-h-[56px] sm:px-5 sm:text-base">

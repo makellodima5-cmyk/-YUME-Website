@@ -616,7 +616,7 @@ function AnimeDetailPage() {
         onProfile={() => navigateToSection("profile")}
       />
 
-      <main id="main-content" className="px-4 pt-24 md:px-10 md:pt-28">
+      <main id="main-content" className="px-4 pt-24 pb-20 md:px-10 md:pt-28 md:pb-12">
         {apiError && (
           <p role="status" className="mx-auto mb-4 max-w-7xl rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-muted-foreground">
             {language === "en"
@@ -625,90 +625,68 @@ function AnimeDetailPage() {
           </p>
         )}
         <div className="mx-auto max-w-screen-2xl">
-          <section className="relative isolate" aria-label={displayAnimeTitle(anime, language) + " — " + t("anime.sectionLabel")}>
-            {anime.bannerUrl?.startsWith("https://s4.anilist.co/") && (
-              <div className="pointer-events-none absolute inset-x-[-1rem] top-0 z-0 h-[680px] overflow-hidden md:inset-x-[-2.5rem] md:h-[620px]" aria-hidden="true">
-                <img src={anime.bannerUrl} alt="" loading="eager" decoding="async" className="h-full w-full scale-105 object-cover object-[center_30%] opacity-65 blur-[0.5px]" />
-                <div className="absolute inset-0 bg-gradient-to-b from-background/15 via-background/45 to-background" />
-                <div className="absolute inset-0 bg-gradient-to-r from-background/20 via-transparent to-background/35" />
-              </div>
-            )}
+          <section id="overview" className="relative isolate scroll-mt-24" aria-label={displayAnimeTitle(anime, language) + " — " + t("anime.sectionLabel")}>
             <button
               type="button"
               onClick={() => navigateToSection("catalog")}
-              className="relative z-10 mb-4 inline-flex items-center gap-1 text-sm text-muted-foreground transition hover:text-foreground"
+              className="mb-4 inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition hover:text-primary"
             >
               <ChevronLeft className="h-4 w-4" />
               {t("anime.backCatalog")}
             </button>
-            <div className="relative z-10 hidden items-start gap-6 p-5 md:grid md:grid-cols-[minmax(220px,280px)_minmax(0,1fr)] lg:gap-8 lg:p-8">
-              <div className="mx-auto w-full max-w-[280px]">
-                <PosterArt
-                  anime={anime}
-                  className="aspect-[2/3] w-full rounded-2xl ring-1 ring-white/10 shadow-[0_12px_36px_rgba(0,0,0,0.3)]"
-                />
+
+            <div className="yubera-surface grid gap-5 p-4 sm:grid-cols-[minmax(170px,230px)_minmax(0,1fr)] sm:gap-6 sm:p-6 lg:grid-cols-[250px_minmax(0,1fr)]">
+              <div className="mx-auto w-full max-w-[210px] sm:max-w-none">
+                <PosterArt anime={anime} className="aspect-[2/3] w-full rounded-2xl ring-1 ring-border shadow-lg" />
               </div>
 
-              <div className="min-w-0 py-1 lg:py-3">
-                <div className="mb-3 flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                  <span>{displayAnimeStatus(anime.status, language)}</span>
-                  <span className="h-1 w-1 rounded-full bg-primary" />
-                  <span>{anime.year || t("anime.yearUnknown")}</span>
+              <div className="min-w-0">
+                <div className="mb-2 flex flex-wrap items-center gap-2 text-xs font-semibold text-muted-foreground">
+                  <span className="yubera-chip">{displayAnimeStatus(anime.status, language)}</span>
+                  {anime.kind && <span className="yubera-chip">{displayAnimeKind(anime.kind, language)}</span>}
+                  {anime.year > 0 && <span className="yubera-chip">{anime.year}</span>}
+                  {anime.ageRating && <span className="yubera-chip">{anime.ageRating}</span>}
                 </div>
-                <h1 id="anime-title-desktop" className="max-w-4xl break-words text-3xl font-bold leading-tight lg:text-5xl">
+                <h1 id="anime-title-desktop" className="break-words text-2xl font-bold leading-tight sm:text-3xl lg:text-4xl">
                   {displayAnimeTitle(anime, language)}
                 </h1>
-                <p className="mt-2 text-sm text-muted-foreground lg:text-base">{anime.original}</p>
+                <p className="mt-1 break-words text-sm text-muted-foreground">{anime.original}</p>
 
                 <div className="mt-4 flex flex-wrap items-center gap-2">
                   {anime.rating !== null && (
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background/70 px-3 py-1.5 text-sm font-semibold">
-                      <Star className="h-4 w-4 fill-gold text-gold" />
+                    <span className="yubera-chip font-bold">
+                      <Star className="h-4 w-4 fill-current text-[#F1A92B]" />
                       {anime.rating.toFixed(1)}
                     </span>
                   )}
-                  <span className="rounded-full border border-border bg-background/70 px-3 py-1.5 text-sm">
-                    {anime.episodes > 0 ? anime.episodes + " " + t("anime.series") : t("anime.episodesUnknown")}
-                  </span>
-                  {anime.kind && (
-                    <span className="rounded-full border border-border bg-background/70 px-3 py-1.5 text-sm">
-                      {displayAnimeKind(anime.kind, language)}
-                    </span>
-                  )}
-                  {anime.ageRating && (
-                    <span className="rounded-full border border-border bg-background/70 px-3 py-1.5 text-sm">
-                      {anime.ageRating}
-                    </span>
-                  )}
-                  {anime.genres.map((genre) => (
-                    <span key={genre} className="rounded-full border border-border bg-background/70 px-3 py-1.5 text-sm">
-                      {displayGenre(genre, language)}
-                    </span>
-                  ))}
+                  {anime.episodes > 0 && <span className="yubera-chip">{anime.episodes} {t("anime.series")}</span>}
+                  {anime.episodesAired > 0 && <span className="yubera-chip">{language === "en" ? "Aired" : "Вышло"}: {anime.episodesAired}</span>}
                 </div>
 
-                {(formatAnimeDate(anime.airedOn, language) || formatAnimeDate(anime.nextEpisodeAt, language, true)) && (
-                  <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                    {formatAnimeDate(anime.airedOn, language) && (
-                      <span>{t("anime.releaseDate")}: {formatAnimeDate(anime.airedOn, language)}</span>
-                    )}
-                    {formatAnimeDate(anime.nextEpisodeAt, language, true) && (
-                      <span>{t("anime.nextEpisodeDate")}: {formatAnimeDate(anime.nextEpisodeAt, language, true)}</span>
-                    )}
+                {(formatAnimeDate(anime.airedOn, language) || formatAnimeDate(anime.nextEpisodeAt, language, true) || anime.studios?.length) && (
+                  <div className="mt-4 grid gap-2 rounded-xl border border-border bg-background/60 p-3 text-sm sm:grid-cols-2">
+                    {formatAnimeDate(anime.airedOn, language) && <div><span className="text-muted-foreground">{t("anime.releaseDate")}: </span>{formatAnimeDate(anime.airedOn, language)}</div>}
+                    {formatAnimeDate(anime.nextEpisodeAt, language, true) && <div><span className="text-muted-foreground">{t("anime.nextEpisodeDate")}: </span>{formatAnimeDate(anime.nextEpisodeAt, language, true)}</div>}
+                    {anime.studios?.length ? <div className="sm:col-span-2"><span className="text-muted-foreground">{language === "en" ? "Studio" : "Студия"}: </span>{anime.studios.join(", ")}</div> : null}
                   </div>
                 )}
 
-                {(anime.studios?.length || anime.episodesAired > 0) && (
-                  <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                    {anime.studios?.length ? <span>{language === "en" ? "Studio" : "Студия"}: {anime.studios.join(", ")}</span> : null}
-                    {anime.episodesAired > 0 ? <span>{language === "en" ? "Episodes aired" : "Серии"}: {anime.episodesAired}{anime.episodes > 0 ? (language === "en" ? " of " : " из ") + anime.episodes : ""}</span> : null}
+                {anime.genres.length > 0 && (
+                  <div className="mt-4 flex flex-wrap gap-2" aria-label={language === "en" ? "Genres" : "Жанры"}>
+                    {anime.genres.map((genre) => <span key={genre} className="yubera-chip">{displayGenre(genre, language)}</span>)}
                   </div>
                 )}
+
                 <div className="mt-5 max-w-3xl">
+                  <h2 className="mb-2 text-sm font-semibold">{t("anime.description")}</h2>
                   {descriptionText("anime-description-desktop")}
                 </div>
-                <div className="mt-6 flex flex-wrap gap-3">
-                  {watchButton}
+
+                <div className="mt-5 flex flex-wrap gap-2">
+                  <button type="button" onClick={() => { setWatchMode("episodes"); scrollToPlayer(); }} className="yubera-primary-button">
+                    <Play className="h-4 w-4 fill-current" />
+                    {language === "en" ? "Watch anime" : "Смотреть аниме"}
+                  </button>
                   {favoriteButton}
                   {listButton}
                   {episodeSubscriptionButton}
@@ -716,13 +694,9 @@ function AnimeDetailPage() {
                 {showListNote && (
                   <p className="mt-3 text-xs text-muted-foreground" aria-live="polite">
                     {authRequired
-                      ? (language === "ru"
-                        ? "Избранное и «Смотреть позже» доступны после входа в аккаунт."
-                        : "Favorites and Watch Later are available after signing in.")
+                      ? (language === "ru" ? "Избранное и «Смотреть позже» доступны после входа в аккаунт." : "Favorites and Watch Later are available after signing in.")
                       : saveSyncError
-                        ? (language === "ru"
-                          ? "Не удалось синхронизировать список с аккаунтом. Проверь соединение и повтори действие."
-                          : "Could not sync this list to your account. Check your connection and try again.")
+                        ? (language === "ru" ? "Не удалось синхронизировать список с аккаунтом. Проверь соединение и повтори действие." : "Could not sync this list to your account. Check your connection and try again.")
                         : (language === "ru" ? "Сохранено в аккаунте Yubera." : "Saved to your Yubera account.")}
                     {authRequired && (
                       <span className="mt-2 flex flex-wrap gap-2">
@@ -735,87 +709,10 @@ function AnimeDetailPage() {
               </div>
             </div>
 
-            <div className="relative z-10 md:hidden">
-              <div className="flex items-start gap-4">
-                <div className="w-[38%] max-w-[190px] shrink-0">
-                  <PosterArt anime={anime} className="aspect-[2/3] w-full rounded-2xl ring-1 ring-white/10 shadow-[0_12px_36px_rgba(0,0,0,0.3)]" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-primary">
-                    {displayAnimeStatus(anime.status, language)} · {anime.year || t("anime.yearUnknown")}
-                  </div>
-                  <h1 id="anime-title-mobile" className="break-words text-2xl font-bold leading-tight">
-                    {displayAnimeTitle(anime, language)}
-                  </h1>
-                  <p className="mt-1 break-words text-xs text-muted-foreground">{anime.original}</p>
-                  <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs">
-                    {anime.rating !== null && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2 py-1 font-semibold">
-                        <Star className="h-3 w-3 fill-gold text-gold" />
-                        {anime.rating.toFixed(1)}
-                      </span>
-                    )}
-                    <span className="rounded-full bg-secondary px-2 py-1">{anime.episodes > 0 ? anime.episodes + " " + t("anime.series") : t("anime.episodesUnknown")}</span>
-                  </div>
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {anime.genres.map((genre) => (
-                      <span key={genre} className="rounded-full border border-border px-2 py-1 text-[11px] text-muted-foreground">
-                        {displayGenre(genre, language)}
-                      </span>
-                    ))}
-                    {anime.kind && <span className="rounded-full border border-border px-2 py-1 text-[11px] text-muted-foreground">{anime.kind}</span>}
-                    {anime.ageRating && <span className="rounded-full border border-border px-2 py-1 text-[11px] text-muted-foreground">{anime.ageRating}</span>}
-                  </div>
-                  {(anime.studios?.length || anime.episodesAired > 0) && (
-                    <div className="mt-2 space-y-1 text-[11px] leading-relaxed text-muted-foreground">
-                      {anime.studios?.length ? <p>{language === "en" ? "Studio" : "Студия"}: {anime.studios.join(", ")}</p> : null}
-                      {anime.episodesAired > 0 ? <p>{language === "en" ? "Episodes aired" : "Серии"}: {anime.episodesAired}{anime.episodes > 0 ? (language === "en" ? " of " : " из ") + anime.episodes : ""}</p> : null}
-                    </div>
-                  )}
-                  {(formatAnimeDate(anime.airedOn, language) || formatAnimeDate(anime.nextEpisodeAt, language, true)) && (
-                    <div className="mt-3 space-y-1 text-xs text-muted-foreground">
-                      {formatAnimeDate(anime.airedOn, language) && (
-                        <p>{t("anime.releaseDate")}: {formatAnimeDate(anime.airedOn, language)}</p>
-                      )}
-                      {formatAnimeDate(anime.nextEpisodeAt, language, true) && (
-                        <p>{t("anime.nextEpisodeDate")}: {formatAnimeDate(anime.nextEpisodeAt, language, true)}</p>
-                      )}
-                    </div>
-                  )}
-
-                </div>
-              </div>
-              <div className="mt-4 grid gap-2">
-                {watchButton}
-                <div className={"grid gap-2 " + (episodeSubscriptionButton ? "grid-cols-3" : "grid-cols-2")}>
-                  {favoriteButton}
-                  {listButton}
-                  {episodeSubscriptionButton}
-                </div>
-              </div>
-              {showListNote && (
-                <p className="mt-3 text-xs text-muted-foreground" aria-live="polite">
-                  {authRequired
-                    ? (language === "ru"
-                      ? "Избранное и «Смотреть позже» доступны после входа в аккаунт."
-                      : "Favorites and Watch Later are available after signing in.")
-                    : saveSyncError
-                      ? (language === "ru"
-                        ? "Не удалось синхронизировать список с аккаунтом. Проверь соединение и повтори действие."
-                        : "Could not sync this list to your account. Check your connection and try again.")
-                      : t("anime.savedLocally")}
-                  {authRequired && (
-                    <span className="mt-2 flex flex-wrap gap-2">
-                      <button type="button" onClick={() => requestAuth("login")} className="font-semibold text-primary underline underline-offset-4">{language === "ru" ? "Войти через Telegram" : "Sign in with Telegram"}</button>
-                      <button type="button" onClick={() => requestAuth("register")} className="font-semibold text-primary underline underline-offset-4">{language === "ru" ? "Регистрация" : "Register"}</button>
-                    </span>
-                  )}
-                </p>
-              )}
-              <div className="mt-5 rounded-2xl border border-white/10 bg-card/70 p-4">
-                <h2 className="mb-2 text-sm font-semibold">{t("anime.description")}</h2>
-                {descriptionText("anime-description-mobile")}
-              </div>
+            <div className="mt-5 yubera-detail-tabs" role="tablist" aria-label={language === "en" ? "Anime sections" : "Разделы страницы аниме"}>
+              <button type="button" role="tab" aria-current="true" onClick={() => document.getElementById("overview")?.scrollIntoView({ behavior: "smooth", block: "start" })}>{language === "en" ? "Overview" : "Обзор"}</button>
+              <button type="button" role="tab" aria-current="false" onClick={() => { setWatchMode("episodes"); scrollToPlayer(); }}>{language === "en" ? "Watch" : "Смотреть"}</button>
+              <button type="button" role="tab" aria-current="false" onClick={() => document.getElementById("similar")?.scrollIntoView({ behavior: "smooth", block: "start" })}>{language === "en" ? "Similar" : "Похожие"}</button>
             </div>
           </section>
 
@@ -853,7 +750,7 @@ function AnimeDetailPage() {
             ref={playerSectionRef}
             id="watch"
             aria-labelledby="watch-title"
-            className="mt-10 scroll-mt-24 md:mt-12"
+            id="watch" className="mt-10 scroll-mt-24 md:mt-12"
           >
             <div className="mb-4">
               <h2 id="watch-title" className="text-2xl font-bold md:text-3xl">
@@ -991,7 +888,7 @@ function AnimeDetailPage() {
           </section>
 
 
-          <section className="mt-8">
+          <section id="similar" className="mt-8 scroll-mt-24">
             <div className="mb-4 flex items-end justify-between">
               <div>
                 <h2 className="text-xl font-bold md:text-2xl">{t("anime.similar")}</h2>
