@@ -27,15 +27,17 @@ export function Header({ setView, unreadNotificationCount = 0, variant = "app" }
   return (
     <header className="yubera-topbar">
       <div className="yubera-topbar-inner">
-        {variant === "detail" && <button type="button" onClick={() => setView("catalog")} aria-label={ru ? "Назад в каталог" : "Back to catalog"} className="grid h-10 w-8 shrink-0 place-items-center text-foreground"><ArrowLeft className="h-6 w-6" /></button>}
-        <button
-          type="button"
-          onClick={() => { telegramHapticImpact("light"); setView("home"); }}
-          aria-label="YUBERA — главная"
-          className="shrink-0 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-        >
-          <Logo />
-        </button>
+        <div className="flex min-w-0 items-center gap-3">
+          {variant === "detail" && <button type="button" onClick={() => setView("catalog")} aria-label={ru ? "Назад в каталог" : "Back to catalog"} className="grid h-10 w-8 shrink-0 place-items-center text-foreground"><ArrowLeft className="h-6 w-6" /></button>}
+          <button
+            type="button"
+            onClick={() => { telegramHapticImpact("light"); setView("home"); }}
+            aria-label="YUBERA — главная"
+            className="shrink-0 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            <Logo />
+          </button>
+        </div>
 
         {variant === "app" && <div className="flex items-center gap-1.5">
           <button
