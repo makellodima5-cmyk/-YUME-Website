@@ -384,6 +384,7 @@ function Index() {
   const [expandedAdminSections, setExpandedAdminSections] = useState({import:false,deletion:false,metadata:false,quality:false,maintenance:false,audit:false,trailers:false,notifications:false});
   const [historyItems, setHistoryItems] = useState<{ animeId: string; viewedAt: string; viewCount: number }[]>([]);
   const [loadedHistoryAnime, setLoadedHistoryAnime] = useState<Anime[]>([]);
+  const historyAnimeLookupAttempted = useRef(new Set<string>());
   const [historyDeletingIds, setHistoryDeletingIds] = useState<string[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyAuthenticated, setHistoryAuthenticated] = useState(false);
@@ -1349,8 +1350,9 @@ function Index() {
   useEffect(() => {
     const missing = combinedHistoryItems
       .map(item => item.animeId)
-      .filter(id => !ANIME.some(anime => anime.id === id) && !loadedHistoryAnime.some(anime => anime.id === id));
+      .filter(id => !ANIME.some(anime => anime.id === id) && !loadedHistoryAnime.some(anime => anime.id === id) && !historyAnimeLookupAttempted.current.has(id));
     if (!missing.length) return;
+    missing.forEach(id => historyAnimeLookupAttempted.current.add(id));
     let cancelled = false;
     const chunks: string[][] = [];
     for (let index = 0; index < missing.length; index += 35) chunks.push(missing.slice(index, index + 35));
