@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { ArrowLeft, ArrowUpRight, Bookmark, CalendarDays, MessageCircle, Newspaper } from "lucide-react";
 import type { YuberaNewsArticle } from "@/routes/api.news";
 import { useYumePreferences } from "@/data/preferences";
@@ -13,7 +14,7 @@ function isBookmarked(id: number): boolean {
 export function NewsArticle({ article, onBack }: { article: YuberaNewsArticle; onBack: () => void }) {
   const { language } = useYumePreferences();
   const date = new Date(article.createdAt);
-  const [bookmarked, setBookmarked] = React.useState(() => isBookmarked(article.id));
+  const [bookmarked, setBookmarked] = useState(() => isBookmarked(article.id));
   const ru = language === "ru";
   const toggleBookmark = () => {
     try {
