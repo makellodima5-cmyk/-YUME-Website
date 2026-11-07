@@ -107,7 +107,7 @@ export function HomeExperience({
               const matches = animeList.filter(anime => matchesCollectionGenres(anime.genres, collection.genres)).sort((a,b) => (b.rating ?? -1) - (a.rating ?? -1));
               const preview = matches[0];
               return <button key={collection.id} type="button" onClick={() => onOpenCollection(collection.id)} className="yubera-home-collection">
-                {preview ? <PosterArt anime={preview} className="h-[68px] w-[68px] shrink-0 rounded-[13px]" /> : <span className="h-[68px] w-[68px] shrink-0 rounded-[13px] bg-secondary" />}
+                {preview ? <PosterArt anime={preview} className="h-[44px] w-[44px] shrink-0 rounded-[13px]" /> : <span className="h-[44px] w-[44px] shrink-0 rounded-[13px] bg-secondary" />}
                 <span className="min-w-0 flex-1 text-left"><span className="line-clamp-2 block text-xs font-bold leading-snug sm:text-sm">{t((`collection.${collection.id}.title`) as TranslationKey)}</span><span className="mt-1 block text-[10px] text-muted-foreground">{matches.length} {ru ? "тайтлов" : "titles"}</span></span>
                 <ChevronRight className="mr-2 h-4 w-4 shrink-0 text-muted-foreground" />
               </button>;
