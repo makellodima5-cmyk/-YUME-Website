@@ -1932,10 +1932,7 @@ function Index() {
           <div className="mx-auto max-w-[1600px]">
             <SectionBanner title={language === "ru" ? "Панель администратора" : "Admin panel"} subtitle={language === "ru" ? "Управление функциями и обслуживанием YUBERA" : "Manage YUBERA features and maintenance"} />
             
-            {!telegramDetectionComplete || (isTelegramMiniApp && (
-              (!telegramAuthReady && !telegramAuthError) ||
-              (telegramAuthReady && !telegramConsentRequired && !telegramConsentPending && !adminCheckComplete)
-            )) ? (
+            {!telegramDetectionComplete || (isTelegramMiniApp && !telegramAuthReady && !telegramAuthError) || (telegramAuthReady && !telegramConsentRequired && !telegramConsentPending && !adminCheckComplete) ? (
               <p role="status" className="rounded-xl border border-border bg-card/60 p-4 text-sm text-muted-foreground">
                 {language === "ru" ? "Проверяем права администратора…" : "Checking administrator access…"}
               </p>
