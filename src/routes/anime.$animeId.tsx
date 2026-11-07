@@ -21,7 +21,6 @@ import {
   CATALOG_SCROLL_RESTORE_STORAGE_KEY,
   parseCatalogReturnState,
 } from "@/data/catalog-search";
-import { Footer } from "@/components/yume/Footer";
 import { AnimeCard, PosterArt } from "@/components/yume/Poster";
 import { useYumePreferences, displayAnimeTitle, displayAnimeStatus, displayGenre, displayAnimeKind } from "@/data/preferences";
 import {
@@ -585,7 +584,7 @@ function AnimeDetailPage() {
         }
       }}
       aria-pressed={episodeSubscribed}
-      className="inline-flex w-full min-w-0 flex-col items-center justify-center gap-1 rounded-full bg-secondary px-2 py-2.5 text-center text-[11px] font-semibold leading-tight ring-1 ring-border transition hover:bg-accent disabled:opacity-50 md:w-auto md:flex-row md:gap-2 md:px-4 md:py-2.5 md:text-sm md:leading-normal"
+      className="hidden inline-flex w-full min-w-0 flex-col items-center justify-center gap-1 rounded-full bg-secondary px-2 py-2.5 text-center text-[11px] font-semibold leading-tight ring-1 ring-border transition hover:bg-accent disabled:opacity-50 md:w-auto md:flex-row md:gap-2 md:px-4 md:py-2.5 md:text-sm md:leading-normal"
     >
       <Bell className={`h-4 w-4 ${episodeSubscribed ? "fill-current text-primary" : ""}`} />
       {language === "en" ? "Follow new episodes" : "Следить за новыми сериями"}
@@ -609,14 +608,14 @@ function AnimeDetailPage() {
   );
 
   return (
-    <div className="min-h-screen pb-28 md:pb-12">
+    <div className="min-h-screen pb-8">
       <Header
         view="catalog"
         setView={navigateToSection}
         onProfile={() => navigateToSection("profile")}
       />
 
-      <main id="main-content" className="px-4 pt-24 pb-20 md:px-10 md:pt-28 md:pb-12">
+      <main id="main-content" className="px-3 pb-12 pt-[78px] sm:px-4 md:px-6 lg:px-8">
         {apiError && (
           <p role="status" className="mx-auto mb-4 max-w-7xl rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-muted-foreground">
             {language === "en"
@@ -624,7 +623,7 @@ function AnimeDetailPage() {
               : "Shikimori временно недоступен. Показана сохранённая информация; дата серии скрыта, если она уже прошла."}
           </p>
         )}
-        <div className="mx-auto max-w-screen-2xl">
+        <div className="mx-auto max-w-[1600px]">
           <section id="overview" className="relative isolate scroll-mt-24" aria-label={displayAnimeTitle(anime, language) + " — " + t("anime.sectionLabel")}>
             <button
               type="button"
@@ -941,7 +940,6 @@ function AnimeDetailPage() {
         </div>
       )}
 
-      <Footer onNavigate={navigateToSection} />
 
     </div>
   );
