@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Bookmark, ChevronRight, Play, Star, Megaphone, Radio } from "lucide-react";
 import type { Anime } from "@/data/anime";
 import { COLLECTIONS } from "@/data/anime";
@@ -21,9 +21,9 @@ type HomeExperienceProps = {
 
 function HomeSection({ title, action, icon, children }: {
   title: string;
-  action: React.ReactNode;
+  action: ReactNode;
   icon?: "announcements" | "airing";
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   const Icon = icon === "announcements" ? Megaphone : icon === "airing" ? Radio : null;
   return (
@@ -97,7 +97,7 @@ export function HomeExperience({
 
         {newReleases.length > 0 && <HomeSection title={ru ? "Новинки" : "New releases"} action={seeAll("new-releases")}><div className="yubera-home-horizontal-row">{newReleases.slice(0, 14).map(anime => <HomeAnimeCard key={anime.id} anime={anime} onSelect={onSelect} />)}</div></HomeSection>}
 
-        {announcements.length > 0 && <HomeSection title={ru ? "Анонсы" : "Announcements"} action={seeAll("announcements")} icon="announcements"><div className="yubera-home-announcements">{announcements.slice(0, 8).map(anime => <button key={anime.id} type="button" onClick={() => onSelect(anime)} className="yubera-home-announcement"><PosterArt anime={anime} className="h-full w-[34%] shrink-0 rounded-[15px]" /><span className="min-w-0 flex-1 py-2 pr-2"><span className="block line-clamp-2 text-sm font-bold leading-snug">{displayAnimeTitle(anime, language)}</span><span className="mt-2 flex flex-wrap items-center gap-2"><span className="rounded-full bg-secondary px-2.5 py-1 text-[10px] font-bold text-muted-foreground">{displayAnimeKind(anime.kind, language)}</span><span className="rounded-full bg-primary/15 px-2.5 py-1 text-[10px] font-bold text-primary">{ru ? "Анонс" : "Announced"}</span></span></span></button>)}</div></HomeSection>}
+        {announcements.length > 0 && <HomeSection title={ru ? "Анонсы" : "Announcements"} action={seeAll("announcements")} icon="announcements"><div className="yubera-home-announcements">{announcements.slice(0, 8).map(anime => <button key={anime.id} type="button" onClick={() => onSelect(anime)} className="yubera-home-announcement"><PosterArt anime={anime} className="h-full w-[34%] shrink-0 rounded-[15px]" /><span className="min-w-0 flex-1 py-2 pr-2"><span className="block line-clamp-2 text-sm font-bold leading-snug">{displayAnimeTitle(anime, language)}</span><span className="mt-2 flex flex-wrap items-center gap-2"><span className="rounded-full bg-secondary px-2.5 py-1 text-[10px] font-bold text-muted-foreground">{displayAnimeKind(anime.kind || "TV", language)}</span><span className="rounded-full bg-primary/15 px-2.5 py-1 text-[10px] font-bold text-primary">{ru ? "Анонс" : "Announced"}</span></span></span></button>)}</div></HomeSection>}
 
         {airing.length > 0 && <HomeSection title={ru ? "Сейчас выходит" : "Currently airing"} action={seeAll("airing")} icon="airing"><div className="yubera-home-horizontal-row">{airing.slice(0, 14).map(anime => <HomeAnimeCard key={anime.id} anime={anime} onSelect={onSelect} />)}</div></HomeSection>}
 
