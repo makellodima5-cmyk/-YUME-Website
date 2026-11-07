@@ -1,4 +1,5 @@
 import { env as cloudflareEnv } from "cloudflare:workers";
+import { ensureTelegramLibrarySyncSchema } from "@/data/telegram-library-schema.server";
 import { isSameOriginRequest } from "@/lib/request-security";
 
 type Env = Record<string, unknown> & { YUME_DB?: unknown; YUME_AUTH_SESSION_SECRET?: string };
@@ -213,6 +214,7 @@ export async function handleTelegramLibrarySync(request: Request): Promise<Respo
   if (!db || typeof db.prepare !== "function" || !secret) return json({ error: "sync_unavailable" }, 503);
 
   try {
+    await ensureTelegramLibrarySyncSchema(db);
     const userId = await authenticatedUserId(request, db, secret);
     if (!userId) return json({ error: "authentication_required" }, 401);
     if (request.method === "GET") {
