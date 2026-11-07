@@ -485,7 +485,7 @@ function AnimeDetailPage() {
   const needsDescriptionToggle = anime.description.trim().length > 190;
   const descriptionPreview =
     anime.description.trim().length > 76
-      ? anime.description.trim().slice(0, 76).trimEnd() + "…"
+      ? anime.description.trim().slice(0, 190).trimEnd() + "…"
       : anime.description;
   const descriptionControl = (id: string) => (
     <button
