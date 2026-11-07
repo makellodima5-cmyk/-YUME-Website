@@ -1,4 +1,5 @@
 import { env as cloudflareEnv } from "cloudflare:workers";
+import { ensureTelegramLibrarySyncSchema } from "@/data/telegram-library-schema.server";
 import { validateTelegramInitData, type TelegramValidatedUser } from "@/data/telegram-init-data";
 import { MAX_SAVED_ANIME_IDS, normalizeSavedAnimeIds } from "@/data/telegram-library.shared";
 import { isSameOriginRequest } from "@/lib/request-security";
@@ -114,8 +115,11 @@ function jsonResponse(payload: unknown, status = 200, cookies: string[] = []): R
   return new Response(JSON.stringify(payload), { status, headers });
 }
 
-// The clean yumedb schema is applied before deployment; runtime requests never mutate schema.
-function ensureSchema(_db: TelegramDatabase): Promise<void> { return Promise.resolve(); }
+// The clean migration remains canonical; this additive guard repairs a missing
+// sync table in an older remote D1 database without changing existing account data.
+function ensureSchema(db: TelegramDatabase): Promise<void> {
+  return ensureTelegramLibrarySyncSchema(db);
+}
 
 async function createSessionToken(db: TelegramDatabase, userId: string, secret: string): Promise<{ token: string; expiresAt: number }> {
   const token = randomToken();
