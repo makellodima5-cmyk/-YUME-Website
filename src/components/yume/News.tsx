@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ArrowUpRight, Bookmark, CalendarDays, MessageCircle, Newspaper, RefreshCw, Search } from "lucide-react";
 import { useYumePreferences } from "@/data/preferences";
 import type { YuberaNewsArticle } from "@/data/news-types";
+import { NewsArticle } from "./NewsArticle";
 
 type Category = "ALL" | YuberaNewsArticle["category"];
 const CATEGORIES: { id: Category; ru: string; en: string }[] = [
@@ -30,9 +31,10 @@ function categoryLabel(category: YuberaNewsArticle["category"], language: "ru" |
   return CATEGORIES.find((item) => item.id === category)?.[language] ?? (language === "en" ? "Industry" : "Индустрия");
 }
 
-export function News({ onOpenArticle }: { onOpenArticle?: (article: YuberaNewsArticle) => void }) {
+export function News() {
   const { language } = useYumePreferences();
   const [articles, setArticles] = useState<YuberaNewsArticle[]>([]);
+  const [selectedArticle, setSelectedArticle] = useState<YuberaNewsArticle | null>(null);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<Category>("ALL");
   const [savedOnly, setSavedOnly] = useState(false);
@@ -72,6 +74,18 @@ export function News({ onOpenArticle }: { onOpenArticle?: (article: YuberaNewsAr
       return next;
     });
   };
+
+  if (selectedArticle) {
+    return (
+      <NewsArticle
+        article={selectedArticle}
+        onBack={() => {
+          setBookmarks(readBookmarks());
+          setSelectedArticle(null);
+        }}
+      />
+    );
+  }
 
   const text = language === "en"
     ? { title: "Anime news", subtitle: "Announcements and publications from Shikimori", source: "Source: Shikimori. This is one source's feed, not a complete overview of the anime industry.", search: "Search titles, previews, authors and anime", saved: "Bookmarks", empty: "No publications found", retry: "Reload page", open: "Read on Shikimori", noSummary: "No preview is available. Open the original publication for the full material.", comments: "comments" }
@@ -115,7 +129,7 @@ export function News({ onOpenArticle }: { onOpenArticle?: (article: YuberaNewsAr
                     <span className="yubera-chip">{categoryLabel(article.category, language)}</span>
                     {article.linkedTitle && <span className="text-xs text-muted-foreground">{article.linkedTitle}</span>}
                   </div>
-                  <h2 className="text-lg font-semibold leading-snug">{article.title}</h2>
+                  <h2 className="text-lg font-semibold leading-snug"><button type="button" onClick={() => setSelectedArticle(article)} className="text-left transition hover:text-primary focus-visible:rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">{article.title}</button></h2>
                   <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-muted-foreground">{article.summary || text.noSummary}</p>
                   <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-muted-foreground">
                     <span className="inline-flex items-center gap-1"><CalendarDays className="h-3.5 w-3.5" />{formatDate(article.createdAt, language)}</span>
