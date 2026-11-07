@@ -476,7 +476,7 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
   );
 
   return (
-    <main id="main-content" className={`px-3 pb-8 sm:px-4 md:px-6 lg:px-8 ${panel === "support" ? "pt-20" : "pt-[78px]"}`}>
+    <main id="main-content" className={`yubera-with-bottom-nav px-3 pb-8 sm:px-4 md:px-6 lg:px-8 ${panel === "support" ? "pt-20" : "pt-[78px]"}`}>
       <div className="mx-auto max-w-[1600px]">
         {!authChecked && (panel === "overview" || panel === "favorites" || panel === "watchlist") ? (
           <section className="mx-auto max-w-xl rounded-3xl border border-border bg-card/60 p-6 text-center sm:p-8" aria-live="polite" aria-busy="true">
