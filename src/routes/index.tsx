@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowDownWideNarrow, ChevronDown, ChevronRight, Search, SlidersHorizontal, X, UserRound, Globe, Sun, Moon, Monitor, ShieldCheck, Play, ListChecks, CircleCheck, Clock3, Download, Database, Settings, History, Bell, CheckCheck, Sparkles } from "lucide-react";
+import { ArrowDownWideNarrow, ChevronDown, ChevronRight, Search, SlidersHorizontal, X, UserRound, Globe, Sun, Moon, Monitor, ShieldCheck, Play, ListChecks, CircleCheck, Clock3, Download, Database, Settings, History, Bell, CheckCheck, Sparkles, Home, LayoutGrid, Bookmark, Newspaper } from "lucide-react";
 import { COLLECTIONS, type Anime } from "@/data/anime";
 import { getShikimoriCatalog } from "@/data/shikimori";
 import { getExactReleaseDate, isNewRelease, isUpcomingAnnouncement } from "@/data/anime-sections";
@@ -10,6 +10,8 @@ import { AnimeCard } from "@/components/yume/Poster";
 import { CollectionsGrid, Grid, Hero, Row } from "@/components/yume/Sections";
 import { CatalogFilters, EMPTY_CATALOG_FILTERS, type CatalogFiltersValue } from "@/components/yume/CatalogFilters";
 import { Profile } from "@/components/yume/Profile";
+import { MyHub } from "@/components/yume/MyHub";
+import { News } from "@/components/yume/News";
 import { Footer } from "@/components/yume/Footer";
 import { HomeDepthAtmosphere } from "@/components/yume/HomeDepthAtmosphere";
 import "../home-depth.css";
@@ -22,7 +24,7 @@ import {
   serializeCatalogReturnState,
   validateCatalogSearch,
 } from "@/data/catalog-search";
-const homeSocialImage = "/images/899F3B51-DD87-47F7-9DCF-C5A2B66892D0.webp";
+const homeSocialImage = "/images/yubera/yubera_banner.webp";
 import { absoluteImageUrl, canonicalUrl } from "@/data/seo";
 import { getTelegramWebApp, telegramHapticImpact } from "@/lib/telegram-mini-app";
 import { setProfileStorageAuthenticated, syncTelegramLibrary } from "@/data/profile-storage";
@@ -286,7 +288,7 @@ function HomeQuickControls({ onProfile }: { onProfile: () => void }) {
       <button
         type="button"
         onClick={onProfile}
-        className="flex min-h-12 w-full items-center justify-center gap-2 whitespace-nowrap rounded-full border border-primary/35 bg-card/80 px-2 text-sm font-medium text-foreground shadow-[0_4px_18px_rgba(156,92,255,0.08)] transition hover:border-primary/70 hover:bg-accent/70 sm:text-base"
+        className="flex min-h-12 w-full items-center justify-center gap-2 whitespace-nowrap rounded-full border border-primary/35 bg-card/80 px-2 text-sm font-medium text-foreground shadow-[0_4px_18px_rgba(255,90,61,0.08)] transition hover:border-primary/70 hover:bg-accent/70 sm:text-base"
       >
         <UserRound className="h-4 w-4 shrink-0 sm:h-5 sm:w-5" />
         <span>{t("nav.profileButton")}</span>
@@ -1691,7 +1693,7 @@ function Index() {
   const totalAiringPages = Math.max(1, Math.ceil(airingAnime.length / catalogPageSize));
   const visibleAiringAnime = airingAnime.slice((airingPage - 1) * catalogPageSize, airingPage * catalogPageSize);
   return (
-    <div className="relative isolate min-h-screen pb-8">
+    <div className="relative isolate min-h-screen pb-8 yubera-with-bottom-nav">
       {view === "home" && <HomeDepthAtmosphere />}
       <div className="relative z-10">
       <Header view={view} setView={setView} onProfile={() => setView(telegramAuthReady ? "profile" : "login")} isAdmin={isAdmin} unreadNotificationCount={notificationStateLoaded && notificationRemoteAccount ? notificationItems.filter((item) => !notificationReadIds.includes(item.id) && !notificationDismissedIds.includes(item.id)).length : 0} />
@@ -2061,6 +2063,10 @@ function Index() {
             </>
           )}
         </main>
+      ) : view === "my" ? (
+        <MyHub onNavigate={setView} />
+      ) : view === "news" ? (
+        <News />
       ) : view === "profile" ? (
         <Profile animeList={ANIME} onSelect={select} onCatalog={() => setView("catalog")} />
       ) : view === "favorites" ? (
@@ -2464,8 +2470,22 @@ function Index() {
           )}
         </main>
       ) : null}
-      {!["profile", "favorites", "watchlist", "privacy", "privacy-policy", "rules", "rights", "login", "register"].includes(view) && (
+      {!["profile", "favorites", "watchlist", "history", "my", "news", "privacy", "privacy-policy", "rules", "rights", "login", "register"].includes(view) && (
         <Footer onNavigate={setView} />
+      )}
+      {!(["admin", "login", "register", "privacy", "privacy-policy", "rules", "rights"].includes(view)) && (
+        <nav className="yubera-bottom-nav" aria-label={language === "ru" ? "Основная навигация" : "Main navigation"}>
+          {[
+            { id: "home" as View, label: language === "ru" ? "Главная" : "Home", icon: Home },
+            { id: "catalog" as View, label: language === "ru" ? "Каталог" : "Catalog", icon: LayoutGrid },
+            { id: "my" as View, label: language === "ru" ? "Моё" : "My", icon: Bookmark },
+            { id: "news" as View, label: language === "ru" ? "Новости" : "News", icon: Newspaper },
+            { id: "profile" as View, label: language === "ru" ? "Профиль" : "Profile", icon: UserRound },
+          ].map((item) => {
+            const Icon = item.icon;
+            return <button key={item.id} type="button" onClick={() => setView(item.id)} aria-current={view === item.id ? "page" : undefined}><Icon className="h-5 w-5" /><span>{item.label}</span></button>;
+          })}
+        </nav>
       )}
       </div>
     </div>

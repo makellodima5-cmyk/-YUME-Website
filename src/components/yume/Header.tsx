@@ -1,16 +1,18 @@
 import { useEffect, useState } from "react";
-import { Home, LayoutGrid, Library, User, Menu, X, Bell, Moon, Sun, ShieldCheck, Heart, Clock3, Star, Languages, Bookmark, Megaphone, Radio, Sparkles } from "lucide-react"
+import { Home, LayoutGrid, Library, User, Menu, X, Bell, Moon, Sun, ShieldCheck, Heart, Clock3, Star, Languages, Bookmark, Megaphone, Radio, Sparkles, Newspaper } from "lucide-react"
 import { Logo } from "./Logo";
 import { useYumePreferences } from "@/data/preferences";
 import { getTelegramWebApp, telegramHapticImpact } from "@/lib/telegram-mini-app";
 import { TelegramStarsDonation } from "./TelegramStarsDonation";
 
-export type View = "home" | "admin" | "catalog" | "collections" | "profile" | "login" | "register" | "popular" | "new-releases" | "announcements" | "airing" | "favorites" | "watchlist" | "history" | "privacy" | "privacy-policy" | "rules" | "rights" | "notifications";
+export type View = "home" | "admin" | "catalog" | "collections" | "my" | "news" | "profile" | "login" | "register" | "popular" | "new-releases" | "announcements" | "airing" | "favorites" | "watchlist" | "history" | "privacy" | "privacy-policy" | "rules" | "rights" | "notifications";
 
 export const NAV: { id: View; label: string; icon: typeof Home }[] = [
   { id: "home", label: "Главная", icon: Home },
   { id: "catalog", label: "Каталог", icon: LayoutGrid },
-  { id: "collections", label: "Подборки", icon: Library },
+  { id: "my", label: "Моё", icon: Library },
+  { id: "news", label: "Новости", icon: Newspaper },
+  { id: "profile", label: "Профиль", icon: User },
 ];
 
 type Props = {
@@ -57,6 +59,9 @@ export function Header({ view, setView, onProfile, isAdmin = false, unreadNotifi
         home: "Главная",
         catalog: "Каталог",
         collections: "Подборки",
+        my: "Моё",
+        news: "Новости",
+        profile: "Профиль",
         popular: "Популярное",
         newReleases: "Новинки",
         announcements: "Анонсы",
@@ -75,6 +80,9 @@ export function Header({ view, setView, onProfile, isAdmin = false, unreadNotifi
         home: "Home",
         catalog: "Catalog",
         collections: "Collections",
+        my: "My",
+        news: "News",
+        profile: "Profile",
         popular: "Popular",
         newReleases: "New releases",
         announcements: "Announcements",
@@ -86,10 +94,13 @@ export function Header({ view, setView, onProfile, isAdmin = false, unreadNotifi
         theme: "Theme",
         language: "Language",
       };
-  const navLabels: Record<"home" | "catalog" | "collections", string> = {
+  const navLabels: Record<"home" | "catalog" | "collections" | "my" | "news" | "profile", string> = {
     home: navigationText.home,
     catalog: navigationText.catalog,
     collections: navigationText.collections,
+    my: navigationText.my,
+    news: navigationText.news,
+    profile: navigationText.profile,
   };
 
   useEffect(() => {
@@ -133,7 +144,7 @@ export function Header({ view, setView, onProfile, isAdmin = false, unreadNotifi
           </button>
           <div className="hidden min-w-0 flex-1 md:block" />
           <div className="ml-auto mt-5 flex items-center gap-1 sm:gap-2">
-            {isTelegramMiniApp && <button type="button" onClick={() => { telegramHapticImpact("light"); setDonationOpen(true); }} aria-label="Поддержать Yubera" title="Поддержать Yubera" className="yume-tactile-control flex h-10 w-10 items-center justify-center rounded-2xl border border-fuchsia-400/40 bg-gradient-to-br from-violet-500/25 to-fuchsia-500/20 text-amber-300 shadow-[0_0_18px_rgba(192,90,255,0.2)] transition hover:border-fuchsia-300 hover:from-violet-500/40 hover:to-fuchsia-500/30"><Star className="h-6 w-6 fill-amber-300 drop-shadow-[0_0_7px_rgba(255,190,70,0.65)]" /></button>}
+            {isTelegramMiniApp && <button type="button" onClick={() => { telegramHapticImpact("light"); setDonationOpen(true); }} aria-label="Поддержать Yubera" title="Поддержать Yubera" className="yume-tactile-control flex h-10 w-10 items-center justify-center rounded-2xl border border-primary/35 bg-primary/10 text-primary transition hover:bg-primary/15"><Star className="h-6 w-6 fill-current" /></button>}
             <button
               type="button"
               onClick={() => { telegramHapticImpact("light"); setView("notifications"); }}
@@ -217,6 +228,9 @@ export function Header({ view, setView, onProfile, isAdmin = false, unreadNotifi
                   </button>
                 );
               })}
+              <button type="button" onClick={() => { telegramHapticImpact("light"); goToView("collections"); }} aria-current={view === "collections" ? "page" : undefined} className={navButtonClass(view === "collections")}>
+                <Library className="h-5 w-5 shrink-0" /><span>{navigationText.collections}</span>
+              </button>
               {isAdmin && <button type="button" onClick={() => { telegramHapticImpact("light"); goToView("admin"); }} aria-current={view === "admin" ? "page" : undefined} className={navButtonClass(view === "admin")}><ShieldCheck className="h-5 w-5 shrink-0" /><span>{navigationText.adminPanel}</span></button>}
               <button type="button" onClick={() => { telegramHapticImpact("light"); goToView("popular"); }} className={navButtonClass(view === "popular")}>
                 <Star className="h-5 w-5 shrink-0" /><span>{navigationText.popular}</span>

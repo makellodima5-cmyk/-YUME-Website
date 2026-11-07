@@ -1,7 +1,5 @@
 import type { ReactNode } from "react";
 import { Play, Search, Shuffle, SlidersHorizontal, X } from "lucide-react";
-import heroArtwork from "@/assets/yume-desktop.webp";
-import mobileHeroArtwork from "@/assets/yume-mobile.webp";
 import { type Anime, CONTINUE, COLLECTIONS, byId } from "@/data/anime";
 import { matchesCollectionGenres } from "@/data/catalog-utils";
 import { AnimeCard, PosterArt } from "./Poster";
@@ -63,19 +61,18 @@ export function Hero({
   const { t } = useYumePreferences();
   return (
     <section className="relative mx-3 mt-3 isolate h-[360px] min-h-[360px] w-[calc(100%-1.5rem)] max-w-[1920px] overflow-hidden rounded-2xl ring-1 ring-border sm:mx-4 sm:h-[390px] sm:w-[calc(100%-2rem)] md:mx-auto md:mt-3 md:h-[400px] md:min-h-[400px] md:w-[calc(100%-2.5rem)] lg:h-[440px]">
-      <picture className="absolute inset-0 block h-full w-full">
-        <source media="(max-width: 767px)" srcSet={mobileHeroArtwork} />
-        <img
-        src={heroArtwork}
-        alt={t("hero.artAlt")}
-        width={1600}
-        height={640}
+      <img
+        src="/images/yubera/yubera_banner.webp"
+        alt=""
+        aria-hidden="true"
+        width={2172}
+        height={724}
         fetchPriority="high"
-        className="absolute inset-0 h-full w-full object-cover object-[58%_center] md:object-center"
-        />
-      </picture>
-      <div className="absolute inset-0 bg-gradient-to-r from-[#090714]/80 via-[#090714]/40 to-transparent md:from-[#090714]/75 md:via-[#090714]/25 md:to-transparent" />
-      <div className="absolute inset-0 bg-gradient-to-t from-[#090714]/95 via-[#090714]/20 to-transparent md:from-transparent md:via-transparent" />
+        decoding="async"
+        className="absolute inset-0 h-full w-full object-cover object-[center_42%]"
+      />
+      <div className="absolute inset-0 bg-gradient-to-r from-[#101116]/90 via-[#101116]/50 to-transparent md:from-[#101116]/80 md:via-[#101116]/30 md:to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-t from-[#101116]/95 via-[#101116]/20 to-transparent md:from-transparent md:via-transparent" />
       <div data-filter-anchor className="absolute left-4 top-4 z-30 w-[min(76vw,360px)] md:left-8 md:top-7 md:w-[min(36vw,420px)]">
         <div className="flex h-11 items-center rounded-xl border border-white/25 bg-black/30 shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_8px_28px_rgba(0,0,0,0.18)] backdrop-blur-xl transition focus-within:border-white/55 focus-within:bg-black/40">
           <button type="button" onClick={() => { telegramHapticImpact("light"); onSubmitSearch(); }} aria-label={t("search.apply")} className="yume-tactile-control ml-3 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-white/80 transition hover:bg-white/10 hover:text-white"><Search className="h-4 w-4" /></button>
@@ -97,10 +94,10 @@ export function Hero({
       </div>
       <div className="relative z-10 flex h-full flex-col items-start justify-end px-5 pb-5 pt-20 sm:pb-8 md:max-w-[760px] md:justify-center md:px-10 md:pb-8 md:pt-8 lg:px-12">
         <img
-          src="/images/899F3B51-DD87-47F7-9DCF-C5A2B66892D0.webp"
-          alt="Yubera — Больше, чем аниме"
-          width={1920}
-          height={1024}
+          src="/images/yubera/yubera_logo.webp"
+          alt="YUBERA"
+          width={2172}
+          height={724}
           fetchPriority="high"
           decoding="async"
           draggable={false}
@@ -110,7 +107,7 @@ export function Hero({
           <button onClick={() => { telegramHapticImpact("light"); onRandom(); }} className="yume-tactile-control inline-flex w-fit items-center justify-center gap-1.5 rounded-full bg-neon px-3.5 py-2 text-xs font-semibold text-primary-foreground shadow-neon transition hover:brightness-110 sm:gap-2 sm:px-5 sm:py-2.5 sm:text-sm">
             <Play className="h-4 w-4 fill-current" /> {t("hero.random")}
           </button>
-          <button onClick={() => { telegramHapticImpact("light"); onCatalog(); }} className="yume-tactile-control inline-flex w-fit items-center justify-center gap-1.5 rounded-full bg-[#0b0a19]/65 px-3.5 py-2 text-xs font-semibold text-white ring-1 ring-white/25 backdrop-blur-md transition hover:bg-accent sm:gap-2 sm:px-5 sm:py-2.5 sm:text-sm">
+          <button onClick={() => { telegramHapticImpact("light"); onCatalog(); }} className="yume-tactile-control inline-flex w-fit items-center justify-center gap-1.5 rounded-full bg-[#1A1B22]/65 px-3.5 py-2 text-xs font-semibold text-white ring-1 ring-white/25 backdrop-blur-md transition hover:bg-accent sm:gap-2 sm:px-5 sm:py-2.5 sm:text-sm">
             <Shuffle className="h-4 w-4" /> {t("hero.catalog")}
           </button>
         </div>
@@ -163,7 +160,7 @@ export function CollectionsGrid({ onOpen, animeList }: { onOpen: (id: string) =>
             key={c.id}
             onClick={() => { telegramHapticImpact("light"); onOpen(c.id); }}
             className="yume-tactile-control group relative h-44 overflow-hidden rounded-2xl p-5 text-left ring-1 ring-border transition hover:shadow-neon"
-            style={{ background: "linear-gradient(135deg, oklch(0.35 0.16 " + c.hue + "), oklch(0.15 0.05 285))" }}
+            style={{ background: "linear-gradient(145deg, var(--secondary), var(--card))" }}
           >
             <div className="absolute -right-3 bottom-3 flex max-w-[54%]">
               {posters.map((anime) => (

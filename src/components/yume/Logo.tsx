@@ -1,16 +1,15 @@
-import logoArtwork from "@/assets/DF5D40FA-7E17-4527-9130-E3E489578CD8.webp";
-
 /**
- * Yubera wordmark artwork: Yubera wordmark without tagline.
+ * Shared YUBERA wordmark used by the website and Telegram Mini App.
+ * The source is the optimized transparent WebP asset committed under public/images.
  */
 export function Logo() {
   return (
     <img
-      src={logoArtwork}
-      alt="Yubera"
-      width={500}
-      height={200}
-      className="h-auto w-[124px] shrink-0 object-contain select-none md:w-[148px]"
+      src="/images/yubera/yubera_logo.webp"
+      alt="YUBERA"
+      width={2172}
+      height={724}
+      className="yubera-wordmark h-auto w-[124px] shrink-0 object-contain select-none md:w-[148px]"
       draggable={false}
     />
   );
