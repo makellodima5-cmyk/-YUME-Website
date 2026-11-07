@@ -142,7 +142,7 @@ export function Header({ view, setView, onProfile, isAdmin = false, unreadNotifi
           </button>
           <div className="hidden min-w-0 flex-1 md:block" />
           <div className="ml-auto mt-5 flex items-center gap-1 sm:gap-2">
-            {isTelegramMiniApp && <button type="button" onClick={() => { telegramHapticImpact("light"); setDonationOpen(true); }} aria-label="Поддержать Yubera" title="Поддержать Yubera" className="yume-tactile-control flex h-10 w-10 items-center justify-center rounded-2xl border border-fuchsia-400/40 bg-gradient-to-br from-violet-500/25 to-fuchsia-500/20 text-amber-300 shadow-[0_0_18px_rgba(192,90,255,0.2)] transition hover:border-fuchsia-300 hover:from-violet-500/40 hover:to-fuchsia-500/30"><Star className="h-6 w-6 fill-amber-300 drop-shadow-[0_0_7px_rgba(255,190,70,0.65)]" /></button>}
+            {isTelegramMiniApp && <button type="button" onClick={() => { telegramHapticImpact("light"); setDonationOpen(true); }} aria-label="Поддержать Yubera" title="Поддержать Yubera" className="yume-tactile-control flex h-10 w-10 items-center justify-center rounded-2xl border border-primary/35 bg-primary/10 text-primary transition hover:bg-primary/15"><Star className="h-6 w-6 fill-current" /></button>}
             <button
               type="button"
               onClick={() => { telegramHapticImpact("light"); setView("notifications"); }}
