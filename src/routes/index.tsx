@@ -1914,7 +1914,7 @@ function Index() {
       ) : view === "news" ? (
         <News animeList={ANIME} onDetailChange={setNewsDetailOpen} />
       ) : view === "profile" ? (
-        <Profile animeList={ANIME} onSelect={select} onCatalog={() => setView("catalog")} isAdmin={isAdmin} onAdmin={() => setView("admin")} />
+        <Profile animeList={ANIME} onSelect={select} onCatalog={() => setView("catalog")} isAdmin={isAdmin} onAdmin={() => setView("admin")} onHistory={() => setView("history")} />
       ) : view === "favorites" ? (
         <Profile key="favorites" initialPanel="favorites" animeList={ANIME} onSelect={select} onCatalog={() => setView("catalog")} />
       ) : view === "watchlist" ? (
