@@ -407,7 +407,7 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
       onClick={() => navigatePanel(next)}
       className="flex w-full items-center gap-4 rounded-2xl border border-border bg-card p-3.5 text-left text-card-foreground shadow-sm transition hover:border-primary/35 hover:bg-accent/70 sm:p-4"
     >
-      <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#1b1028] text-primary">
+      <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#22232B] text-primary">
         {(() => {
           const Icon = icon;
           return <Icon className="h-6 w-6" />;
@@ -485,20 +485,20 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
             <div className="relative isolate overflow-hidden rounded-[20px] border border-border bg-card shadow-[0_10px_34px_rgba(0,0,0,0.24)]">
               <div className="relative h-28 overflow-hidden sm:h-40">
                 <img
-                  src="/images/7E68AFCE-335A-41A6-826D-41E8674B7B0F.png"
+                  src="/images/yubera/yubera_banner.webp"
                   alt=""
                   aria-hidden="true"
-                  width={1536}
-                  height={723}
+                  width={2172}
+                  height={724}
                   fetchPriority="high"
                   decoding="async"
                   className="absolute inset-0 h-full w-full object-cover object-[center_38%]"
                 />
-                <div className="absolute inset-0 bg-gradient-to-b from-black/5 via-[#10071b]/5 to-[#10071b]/70" />
-                <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-[#10071b]/80 to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-b from-black/5 via-[#101116]/5 to-[#101116]/70" />
+                <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-[#101116]/80 to-transparent" />
               </div>
 
-              <div className="relative -mt-6 rounded-[20px] bg-gradient-to-b from-[#1b0d2b]/42 via-[#140a20]/52 to-[#0d0916]/72 px-3 pb-3 pt-0 sm:px-5 sm:pb-5">
+              <div className="relative -mt-6 rounded-[20px] bg-gradient-to-b from-[#1A1B22]/42 via-[#1A1B22]/52 to-[#101116]/72 px-3 pb-3 pt-0 sm:px-5 sm:pb-5">
                 <div className="flex min-w-0 items-end gap-3 sm:gap-4">
                   <div className="relative -mt-8 h-[78px] w-[78px] shrink-0 overflow-hidden rounded-full border-[2.5px] border-primary bg-secondary shadow-[0_0_18px_rgba(255,90,61,0.16)] sm:-mt-11 sm:h-28 sm:w-28">
                     {telegramUser?.photo_url ? (
@@ -510,7 +510,7 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
                         className="h-full w-full object-cover"
                       />
                     ) : (
-                      <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[#482465] to-[#150c22]">
+                      <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[#FF5A3D] to-[#101116]">
                         <UserRound className="h-11 w-11 text-white sm:h-14 sm:w-14" aria-hidden="true" />
                       </div>
                     )}
@@ -528,14 +528,14 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
                   </div>
                 </div>
 
-                <div className="mt-4 grid grid-cols-2 overflow-hidden rounded-[18px] border border-[#8d51bd]/40 bg-black/20 sm:mt-5">
+                <div className="mt-4 grid grid-cols-2 overflow-hidden rounded-[18px] border border-border bg-black/20 sm:mt-5">
                   <button
                     type="button"
                     onClick={() => navigatePanel("favorites")}
                     aria-label={`${favorites.length} — ${t("profile.favoritesCount")}`}
                     className="flex min-w-0 items-center gap-2.5 px-2.5 py-2.5 text-left transition hover:bg-white/[0.06] sm:gap-4 sm:px-5 sm:py-3.5"
                   >
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#241035] text-[#e58aff] sm:h-12 sm:w-12">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#22232B] text-[#FF764F] sm:h-12 sm:w-12">
                       <Heart className="h-5 w-5 sm:h-6 sm:w-6" strokeWidth={1.9} />
                     </span>
                     <span className="min-w-0">
@@ -547,9 +547,9 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
                     type="button"
                     onClick={() => navigatePanel("watchlist")}
                     aria-label={`${watchlist.length} — ${t("profile.watchlistCount")}`}
-                    className="flex min-w-0 items-center gap-2.5 border-l border-[#8d51bd]/40 px-2.5 py-2.5 text-left transition hover:bg-white/[0.06] sm:gap-4 sm:px-5 sm:py-3.5"
+                    className="flex min-w-0 items-center gap-2.5 border-l border-border px-2.5 py-2.5 text-left transition hover:bg-white/[0.06] sm:gap-4 sm:px-5 sm:py-3.5"
                   >
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#241035] text-primary sm:h-12 sm:w-12">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#22232B] text-primary sm:h-12 sm:w-12">
                       <Bookmark className="h-5 w-5 sm:h-6 sm:w-6" strokeWidth={1.9} />
                     </span>
                     <span className="min-w-0">
@@ -923,9 +923,9 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
                 </p>
 
                 <div className="mt-5 space-y-4 sm:mt-6 sm:space-y-5">
-                  <article className="rounded-[22px] border border-[#33264B] bg-gradient-to-br from-[#0D0A14] to-[#08080D] p-4 shadow-[0_8px_24px_rgba(0,0,0,0.16)] sm:p-5">
+                  <article className="rounded-[22px] border border-[var(--border)] bg-gradient-to-br from-[#1A1B22] to-[#101116] p-4 shadow-[0_8px_24px_rgba(0,0,0,0.16)] sm:p-5">
                     <div className="flex items-start gap-3 sm:gap-4">
-                      <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[20px] bg-[#281747] text-primary sm:h-[72px] sm:w-[72px]">
+                      <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[20px] bg-[#34231F] text-primary sm:h-[72px] sm:w-[72px]">
                         <UsersRound className="h-8 w-8 sm:h-9 sm:w-9" aria-hidden="true" />
                       </div>
                       <div className="min-w-0 flex-1 pt-1">
@@ -940,10 +940,10 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
                     </div>
                     <div className="mt-4 flex flex-wrap gap-2 text-xs sm:text-sm">
                       {(language === "ru" ? ["Предложения", "Вопросы по аниме", "Обсуждение"] : ["Suggestions", "Anime questions", "Discussion"]).map((label) => (
-                        <span key={label} className="rounded-full bg-[#21152F] px-3 py-1.5 font-medium text-primary">{label}</span>
+                        <span key={label} className="rounded-full bg-[#34231F] px-3 py-1.5 font-medium text-primary">{label}</span>
                       ))}
                     </div>
-                    <button type="button" onClick={() => openSupportLink("group")} disabled={supportLinksLoading || !supportLinks.group} className="mt-4 flex min-h-12 w-full items-center justify-between gap-3 rounded-[16px] bg-gradient-to-r from-[#7829F5] to-[#5015C9] px-4 py-3 text-sm font-semibold text-white shadow-[0_5px_18px_rgba(103,35,222,0.18)] transition hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#B78AFF] disabled:cursor-not-allowed disabled:opacity-60 sm:min-h-[56px] sm:px-5 sm:text-base">
+                    <button type="button" onClick={() => openSupportLink("group")} disabled={supportLinksLoading || !supportLinks.group} className="mt-4 flex min-h-12 w-full items-center justify-between gap-3 rounded-[16px] bg-gradient-to-r from-[#FF5A3D] to-[#FF764F] px-4 py-3 text-sm font-semibold text-white shadow-[0_5px_18px_rgba(255,90,61,0.18)] transition hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF764F] disabled:cursor-not-allowed disabled:opacity-60 sm:min-h-[56px] sm:px-5 sm:text-base">
                       <span className="flex min-w-0 items-center gap-3"><Send className="h-5 w-5 shrink-0" aria-hidden="true" /><span>{language === "ru" ? "Перейти в группу" : "Join the group"}</span></span>
                       <ChevronRight className="h-5 w-5 shrink-0" aria-hidden="true" />
                     </button>
