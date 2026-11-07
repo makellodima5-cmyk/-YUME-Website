@@ -119,7 +119,7 @@ export function CatalogFilters({
               const active = draft.genres.includes(genre);
               return (
                 <label key={genre} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-2 text-sm text-foreground hover:bg-accent hover:text-accent-foreground">
-                  <input type="checkbox" checked={active} onChange={() => { telegramHapticSelection(); toggleGenre(genre); }} className="h-4 w-4 shrink-0 accent-fuchsia-400" />
+                  <input type="checkbox" checked={active} onChange={() => { telegramHapticSelection(); toggleGenre(genre); }} className="h-4 w-4 shrink-0 accent-primary" />
                   <span>{displayGenre(genre, language)}</span>
                 </label>
               );

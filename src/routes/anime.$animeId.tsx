@@ -21,7 +21,6 @@ import {
   CATALOG_SCROLL_RESTORE_STORAGE_KEY,
   parseCatalogReturnState,
 } from "@/data/catalog-search";
-import { Footer } from "@/components/yume/Footer";
 import { AnimeCard, PosterArt } from "@/components/yume/Poster";
 import { useYumePreferences, displayAnimeTitle, displayAnimeStatus, displayGenre, displayAnimeKind } from "@/data/preferences";
 import {
@@ -456,28 +455,15 @@ function AnimeDetailPage() {
     void navigate({ to: "/", search: { section: "home" } });
   };
 
-  const navigateToProfile = () => {
-    void fetch("/api/telegram/init-data", { credentials: "same-origin", cache: "no-store" })
-      .then(async (response) => {
-        const result = await response.json().catch(() => ({})) as { authenticated?: boolean };
-        navigateToSection(response.ok && result.authenticated === true ? "profile" : "login");
-      })
-      .catch(() => navigateToSection("login"));
-  };
-
   const scrollToPlayer = () => {
     playerSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
   if (!anime) {
     return (
-      <div className="min-h-screen pb-24 md:pb-12">
-        <Header
-          view="catalog"
-          setView={navigateToSection}
-          onProfile={navigateToProfile}
-        />
-        <main id="main-content" className="px-4 pt-28 md:px-10 md:pt-32">
+      <div className="min-h-screen pb-8">
+        <Header setView={navigateToSection} />
+        <main id="main-content" className="px-3 pb-10 pt-[78px] sm:px-4 md:px-6 lg:px-8">
           <div className="mx-auto max-w-3xl rounded-3xl border border-border bg-card p-8 text-center">
             <h1 className="text-2xl font-bold">{t("anime.notFound")}</h1>
             <p className="mt-2 text-sm text-muted-foreground">
@@ -585,7 +571,7 @@ function AnimeDetailPage() {
         }
       }}
       aria-pressed={episodeSubscribed}
-      className="inline-flex w-full min-w-0 flex-col items-center justify-center gap-1 rounded-full bg-secondary px-2 py-2.5 text-center text-[11px] font-semibold leading-tight ring-1 ring-border transition hover:bg-accent disabled:opacity-50 md:w-auto md:flex-row md:gap-2 md:px-4 md:py-2.5 md:text-sm md:leading-normal"
+      className="hidden inline-flex w-full min-w-0 flex-col items-center justify-center gap-1 rounded-full bg-secondary px-2 py-2.5 text-center text-[11px] font-semibold leading-tight ring-1 ring-border transition hover:bg-accent disabled:opacity-50 md:w-auto md:flex-row md:gap-2 md:px-4 md:py-2.5 md:text-sm md:leading-normal"
     >
       <Bell className={`h-4 w-4 ${episodeSubscribed ? "fill-current text-primary" : ""}`} />
       {language === "en" ? "Follow new episodes" : "Следить за новыми сериями"}
@@ -609,14 +595,10 @@ function AnimeDetailPage() {
   );
 
   return (
-    <div className="min-h-screen pb-28 md:pb-12">
-      <Header
-        view="catalog"
-        setView={navigateToSection}
-        onProfile={() => navigateToSection("profile")}
-      />
+    <div className="min-h-screen pb-8">
+      <Header setView={navigateToSection} />
 
-      <main id="main-content" className="px-4 pt-24 pb-20 md:px-10 md:pt-28 md:pb-12">
+      <main id="main-content" className="px-3 pb-12 pt-[78px] sm:px-4 md:px-6 lg:px-8">
         {apiError && (
           <p role="status" className="mx-auto mb-4 max-w-7xl rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-muted-foreground">
             {language === "en"
@@ -624,7 +606,7 @@ function AnimeDetailPage() {
               : "Shikimori временно недоступен. Показана сохранённая информация; дата серии скрыта, если она уже прошла."}
           </p>
         )}
-        <div className="mx-auto max-w-screen-2xl">
+        <div className="mx-auto max-w-[1600px]">
           <section id="overview" className="relative isolate scroll-mt-24" aria-label={displayAnimeTitle(anime, language) + " — " + t("anime.sectionLabel")}>
             <button
               type="button"
@@ -709,48 +691,14 @@ function AnimeDetailPage() {
               </div>
             </div>
 
-            <div className="mt-5 yubera-detail-tabs" role="tablist" aria-label={language === "en" ? "Anime sections" : "Разделы страницы аниме"}>
-              <button type="button" role="tab" aria-current="true" onClick={() => document.getElementById("overview")?.scrollIntoView({ behavior: "smooth", block: "start" })}>{language === "en" ? "Overview" : "Обзор"}</button>
-              <button type="button" role="tab" aria-current="false" onClick={() => { setWatchMode("episodes"); scrollToPlayer(); }}>{language === "en" ? "Watch" : "Смотреть"}</button>
-              <button type="button" role="tab" aria-current="false" onClick={() => document.getElementById("similar")?.scrollIntoView({ behavior: "smooth", block: "start" })}>{language === "en" ? "Similar" : "Похожие"}</button>
-            </div>
-          </section>
 
-          {displayableScreenshots.length > 0 && (
-            <section aria-labelledby="anime-screenshots-title" className="relative z-10 mt-5 md:mt-6">
-              <h2 id="anime-screenshots-title" className="mb-3 text-xl font-bold md:text-2xl">
-                {language === "en" ? "Screenshots" : "Кадры"}
-              </h2>
-              <div className="scrollbar-none flex snap-x snap-mandatory gap-2 overflow-x-auto overscroll-x-contain px-0.5 pb-2">
-                {displayableScreenshots.map((screenshot, index) => (
-                  <button
-                    key={screenshot.originalUrl}
-                    type="button"
-                    onClick={(event) => {
-                      screenshotTriggerRef.current = event.currentTarget;
-                      setActiveScreenshotIndex(index);
-                    }}
-                    aria-label={language === "en" ? "Open screenshot " + (index + 1) : "Открыть кадр " + (index + 1)}
-                    className="group relative aspect-video w-[68vw] max-w-[280px] shrink-0 snap-start overflow-hidden rounded-xl border border-white/10 bg-card shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                  >
-                    <img
-                      src={screenshot.previewUrl}
-                      alt={language === "en" ? "Anime screenshot " + (index + 1) : "Кадр из аниме " + (index + 1)}
-                      loading="lazy"
-                      decoding="async"
-                      className="h-full w-full object-cover transition duration-200 group-hover:scale-[1.03]"
-                    />
-                  </button>
-                ))}
-              </div>
-            </section>
-          )}
+          </section>
 
           <section
             ref={playerSectionRef}
             id="watch"
             aria-labelledby="watch-title"
-            id="watch" className="mt-10 scroll-mt-24 md:mt-12"
+            className="mt-10 scroll-mt-24 md:mt-12"
           >
             <div className="mb-4">
               <h2 id="watch-title" className="text-2xl font-bold md:text-3xl">
@@ -778,7 +726,7 @@ function AnimeDetailPage() {
             </div>
             <div className="mx-auto w-full max-w-6xl min-w-0">
               {watchMode === "episodes" ? (kodikLoading ? (
-                <div role="status" className="mx-auto flex min-h-40 w-full max-w-6xl flex-col items-center justify-center rounded-2xl border border-white/10 bg-[#080710] p-6 text-center">
+                <div role="status" className="mx-auto flex min-h-40 w-full max-w-6xl flex-col items-center justify-center rounded-2xl border border-white/10 bg-[#101116] p-6 text-center">
                   <div className="mb-3 h-6 w-6 animate-spin rounded-full border-2 border-white/20 border-t-primary" aria-hidden="true" />
                   <p className="text-sm text-muted-foreground">{language === "en" ? "Checking episode availability…" : "Проверяем доступность серий…"}</p>
                 </div>
@@ -855,13 +803,13 @@ function AnimeDetailPage() {
                     ) : <p className="rounded-xl border border-border/70 bg-background/40 p-3 text-sm text-muted-foreground">{kodikError || (language === "en" ? "Episode list will appear here when available." : "Список серий появится здесь, когда будет доступен.")}</p>}
                     {kodikError && selectedKodikSource?.episodes.length ? <p role="status" className="mt-3 text-sm text-muted-foreground">{kodikError}</p> : null}
                   </div>
-                  <div className="relative mx-auto aspect-video w-full min-w-0 overflow-hidden rounded-2xl border border-white/10 bg-[#080710] shadow-2xl">
+                  <div className="relative mx-auto aspect-video w-full min-w-0 overflow-hidden rounded-2xl border border-white/10 bg-[#101116] shadow-2xl">
                     <div id="kodik-player-container" className="absolute inset-0 h-full w-full [&_iframe]:!absolute [&_iframe]:!inset-0 [&_iframe]:!h-full [&_iframe]:!w-full" />
                     {!kodikEmbedUrl && <div className="absolute inset-0 flex items-center justify-center p-5 text-center text-sm text-muted-foreground">{kodikError || (language === "en" ? "Loading Kodik player…" : "Загрузка плеера Kodik…")}</div>}
                   </div>
                 </div>
               )) : (anime.youtubeTrailerId ? (
-                <div className="relative mx-auto aspect-video w-full min-w-0 overflow-hidden rounded-2xl border border-white/10 bg-[#080710] shadow-2xl">
+                <div className="relative mx-auto aspect-video w-full min-w-0 overflow-hidden rounded-2xl border border-white/10 bg-[#101116] shadow-2xl">
                   <iframe
                     title={displayAnimeTitle(anime, language) + " — " + t("anime.trailerTitle")}
                     src={"https://www.youtube-nocookie.com/embed/" + anime.youtubeTrailerId + "?rel=0"}
@@ -874,8 +822,8 @@ function AnimeDetailPage() {
                 </div>
               ) : (
                 <div
-                  className="relative mx-auto flex aspect-video w-full min-w-0 flex-col items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-[#080710] p-5 text-center sm:min-h-[300px] lg:min-h-[420px]"
-                  style={{ background: "radial-gradient(ellipse at 50% 40%, oklch(0.19 0.025 " + anime.hue + ") 0%, #080710 63%)" }}
+                  className="relative mx-auto flex aspect-video w-full min-w-0 flex-col items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-[#101116] p-5 text-center sm:min-h-[300px] lg:min-h-[420px]"
+                  style={{ background: "radial-gradient(ellipse at 50% 40%, oklch(0.19 0.025 " + anime.hue + ") 0%, #101116 63%)" }}
                 >
                   <div aria-hidden="true" className="mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-rose-500/40 bg-rose-500/10 text-rose-400">
                     <X className="h-8 w-8" />
@@ -886,6 +834,37 @@ function AnimeDetailPage() {
               ))}
             </div>
           </section>
+
+
+          {displayableScreenshots.length > 0 && (
+            <section aria-labelledby="anime-screenshots-title" className="relative z-10 mt-5 md:mt-6">
+              <h2 id="anime-screenshots-title" className="mb-3 text-xl font-bold md:text-2xl">
+                {language === "en" ? "Screenshots" : "Кадры"}
+              </h2>
+              <div className="scrollbar-none flex snap-x snap-mandatory gap-2 overflow-x-auto overscroll-x-contain px-0.5 pb-2">
+                {displayableScreenshots.map((screenshot, index) => (
+                  <button
+                    key={screenshot.originalUrl}
+                    type="button"
+                    onClick={(event) => {
+                      screenshotTriggerRef.current = event.currentTarget;
+                      setActiveScreenshotIndex(index);
+                    }}
+                    aria-label={language === "en" ? "Open screenshot " + (index + 1) : "Открыть кадр " + (index + 1)}
+                    className="group relative aspect-video w-[68vw] max-w-[280px] shrink-0 snap-start overflow-hidden rounded-xl border border-white/10 bg-card shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  >
+                    <img
+                      src={screenshot.previewUrl}
+                      alt={language === "en" ? "Anime screenshot " + (index + 1) : "Кадр из аниме " + (index + 1)}
+                      loading="lazy"
+                      decoding="async"
+                      className="h-full w-full object-cover transition duration-200 group-hover:scale-[1.03]"
+                    />
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
 
 
           <section id="similar" className="mt-8 scroll-mt-24">
@@ -941,7 +920,6 @@ function AnimeDetailPage() {
         </div>
       )}
 
-      <Footer onNavigate={navigateToSection} />
 
     </div>
   );

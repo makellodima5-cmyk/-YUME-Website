@@ -7,14 +7,27 @@ import { CatalogFilters, type CatalogFiltersValue } from "./CatalogFilters";
 import { useYumePreferences, displayAnimeTitle, type TranslationKey } from "@/data/preferences";
 import { telegramHapticImpact } from "@/lib/telegram-mini-app";
 
+export function SectionBanner({ title, subtitle, eyebrow = "YUBERA" }: { title: string; subtitle?: string; eyebrow?: string }) {
+  return (
+    <section className="yubera-section-banner mb-5" aria-label={title}>
+      <img src="/images/yubera/yubera_banner.webp" alt="" aria-hidden="true" width={2172} height={724} />
+      <div className="yubera-section-banner-content">
+        <span className="mb-2 text-[10px] font-bold uppercase tracking-[.18em] text-primary sm:text-xs">{eyebrow}</span>
+        <h1>{title}</h1>
+        {subtitle && <p>{subtitle}</p>}
+      </div>
+    </section>
+  );
+}
+
 export function Row({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
   return (
-    <section className="mt-10">
-      <div className="mb-4 flex items-end justify-between px-4 md:px-10">
-        <h2 className="text-lg font-semibold md:text-xl">{title}</h2>
+    <section className="mt-8">
+      <div className="mb-3 flex items-end justify-between px-4 md:px-10">
+        <h2 className="text-xl font-extrabold tracking-tight md:text-2xl">{title}</h2>
         {action}
       </div>
-      <div className="scrollbar-none flex gap-4 overflow-x-auto px-4 pb-2 md:px-10">{children}</div>
+      <div className="scrollbar-none flex gap-3 overflow-x-auto px-4 pb-2 md:gap-4 md:px-10">{children}</div>
     </section>
   );
 }
@@ -190,7 +203,7 @@ export function Grid({ items, onSelect, empty, onRemove, removeLabel }: {
   if (!items.length)
     return <div className="rounded-2xl border border-dashed p-10 text-center text-muted-foreground">{empty}</div>;
   return (
-    <div className="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+    <div className="yubera-anime-grid grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
       {items.map((anime) => (
         <div key={anime.id} className="relative min-w-0 w-full [&>button:first-child]:w-full">
           <AnimeCard anime={anime} onSelect={onSelect} />
@@ -200,7 +213,7 @@ export function Grid({ items, onSelect, empty, onRemove, removeLabel }: {
               aria-label={removeLabel ?? (language === "ru" ? "Убрать из списка" : "Remove from list")}
               title={removeLabel ?? (language === "ru" ? "Убрать из списка" : "Remove from list")}
               onClick={(event) => { event.preventDefault(); event.stopPropagation(); onRemove(anime); }}
-              className="absolute right-2 top-2 z-20 flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-red-600 text-white shadow-[0_0_0_2px_rgba(0,0,0,0.7),0_4px_12px_rgba(0,0,0,0.65)] transition hover:scale-105 hover:bg-red-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-red-300"
+              className="absolute left-2 top-2 z-20 flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-red-600 text-white shadow-[0_0_0_2px_rgba(0,0,0,0.7),0_4px_12px_rgba(0,0,0,0.65)] transition hover:scale-105 hover:bg-red-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-red-300"
             >
               <X className="h-5 w-5" strokeWidth={3} aria-hidden="true" />
             </button>

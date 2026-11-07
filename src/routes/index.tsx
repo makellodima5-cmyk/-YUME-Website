@@ -1,20 +1,17 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowDownWideNarrow, ChevronDown, ChevronRight, Search, SlidersHorizontal, X, UserRound, Globe, Sun, Moon, Monitor, ShieldCheck, Play, ListChecks, CircleCheck, Clock3, Download, Database, Settings, History, Bell, CheckCheck, Sparkles, Home, LayoutGrid, Bookmark, Newspaper } from "lucide-react";
+import { ArrowDownWideNarrow, ChevronDown, ChevronRight, Search, SlidersHorizontal, X, UserRound, ShieldCheck, Play, CircleCheck, Download, Database, Settings, History, Bell, CheckCheck, Sparkles, Home, LayoutGrid, Bookmark, Newspaper } from "lucide-react";
 import { COLLECTIONS, type Anime } from "@/data/anime";
 import { getShikimoriCatalog } from "@/data/shikimori";
 import { getExactReleaseDate, isNewRelease, isUpcomingAnnouncement } from "@/data/anime-sections";
 import { Header, type View } from "@/components/yume/Header";
+import { HomeExperience } from "@/components/yume/HomeExperience";
 import { AuthPage } from "@/components/yume/AuthPage";
-import { AnimeCard } from "@/components/yume/Poster";
-import { CollectionsGrid, Grid, Hero, Row } from "@/components/yume/Sections";
+import { CollectionsGrid, Grid, SectionBanner } from "@/components/yume/Sections";
 import { CatalogFilters, EMPTY_CATALOG_FILTERS, type CatalogFiltersValue } from "@/components/yume/CatalogFilters";
 import { Profile } from "@/components/yume/Profile";
 import { MyHub } from "@/components/yume/MyHub";
 import { News } from "@/components/yume/News";
-import { Footer } from "@/components/yume/Footer";
-import { HomeDepthAtmosphere } from "@/components/yume/HomeDepthAtmosphere";
-import "../home-depth.css";
 import { useYumePreferences, displayGenre, type TranslationKey } from "@/data/preferences";
 import { filterAndSortCatalog, getCatalogPageCount, matchesCollectionGenres, paginateCatalog } from "@/data/catalog-utils";
 import {
@@ -252,118 +249,6 @@ function PageNavigation({
     </nav>
   );
 }
-function HomeQuickControls({ onProfile }: { onProfile: () => void }) {
-  const { t, language, setLanguage, theme, setTheme } = useYumePreferences();
-  const [openMenu, setOpenMenu] = useState<"language" | "theme" | null>(null);
-  const rootRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!openMenu) return;
-    const closeOnOutside = (event: PointerEvent) => {
-      if (event.target instanceof Node && !rootRef.current?.contains(event.target)) setOpenMenu(null);
-    };
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpenMenu(null);
-    };
-    document.addEventListener("pointerdown", closeOnOutside);
-    document.addEventListener("keydown", closeOnEscape);
-    return () => {
-      document.removeEventListener("pointerdown", closeOnOutside);
-      document.removeEventListener("keydown", closeOnEscape);
-    };
-  }, [openMenu]);
-
-  const languageOptions = [
-    { value: "ru" as const, label: "Русский", flag: "🇷🇺" },
-    { value: "en" as const, label: "English", flag: "🇬🇧" },
-  ];
-  const themeOptions = [
-    { value: "light" as const, label: t("settings.light"), icon: Sun },
-    { value: "dark" as const, label: t("settings.dark"), icon: Moon },
-    { value: "system" as const, label: t("settings.system"), icon: Monitor },
-  ];
-
-  return (
-    <div ref={rootRef} className="relative z-30 mx-4 my-3 grid grid-cols-3 items-start gap-2 md:mx-10 md:gap-3">
-      <button
-        type="button"
-        onClick={onProfile}
-        className="flex min-h-12 w-full items-center justify-center gap-2 whitespace-nowrap rounded-full border border-primary/35 bg-card/80 px-2 text-sm font-medium text-foreground shadow-[0_4px_18px_rgba(255,90,61,0.08)] transition hover:border-primary/70 hover:bg-accent/70 sm:text-base"
-      >
-        <UserRound className="h-4 w-4 shrink-0 sm:h-5 sm:w-5" />
-        <span>{t("nav.profileButton")}</span>
-      </button>
-
-      <div className="relative min-w-0">
-        <button
-          type="button"
-          aria-haspopup="listbox"
-          aria-expanded={openMenu === "language"}
-          onClick={() => setOpenMenu((current) => current === "language" ? null : "language")}
-          className={`flex min-h-12 w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-full border px-2 text-sm font-medium transition sm:gap-2 sm:text-base ${openMenu === "language" ? "border-primary bg-accent/70 shadow-neon" : "border-primary/35 bg-card/80 hover:border-primary/70 hover:bg-accent/70"}`}
-        >
-          <Globe className="h-4 w-4 shrink-0 sm:h-5 sm:w-5" />
-          <span className="whitespace-nowrap">{language === "ru" ? "Язык" : "Language"}</span>
-          <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${openMenu === "language" ? "rotate-180" : ""}`} />
-        </button>
-        {openMenu === "language" && (
-          <div role="listbox" aria-label={t("settings.language")} className="absolute left-0 top-[calc(100%+0.5rem)] z-50 min-w-[9.5rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-border bg-popover p-1.5 text-popover-foreground shadow-2xl backdrop-blur-xl">
-            {languageOptions.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                role="option"
-                aria-selected={language === option.value}
-                onClick={() => { setLanguage(option.value); setOpenMenu(null); }}
-                className={`flex w-full items-center gap-2 whitespace-nowrap rounded-xl px-2 py-2.5 text-left text-xs transition sm:text-sm ${language === option.value ? "bg-primary/20 text-popover-foreground" : "text-popover-foreground/85 hover:bg-accent/70"}`}
-              >
-                <span aria-hidden="true">{option.flag}</span>
-                <span className="min-w-0 flex-1 whitespace-nowrap">{option.label}</span>
-                <span className={`h-3.5 w-3.5 shrink-0 rounded-full border ${language === option.value ? "border-primary bg-primary shadow-[inset_0_0_0_3px_#171020]" : "border-muted-foreground/60"}`} />
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div className="relative min-w-0">
-        <button
-          type="button"
-          aria-haspopup="listbox"
-          aria-expanded={openMenu === "theme"}
-          onClick={() => setOpenMenu((current) => current === "theme" ? null : "theme")}
-          className={`flex min-h-12 w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-full border px-2 text-sm font-medium transition sm:gap-2 sm:text-base ${openMenu === "theme" ? "border-primary bg-accent/70 shadow-neon" : "border-primary/35 bg-card/80 hover:border-primary/70 hover:bg-accent/70"}`}
-        >
-          {theme === "light" ? <Sun className="h-4 w-4 shrink-0 sm:h-5 sm:w-5" /> : theme === "system" ? <Monitor className="h-4 w-4 shrink-0 sm:h-5 sm:w-5" /> : <Moon className="h-4 w-4 shrink-0 sm:h-5 sm:w-5" />}
-          <span className="whitespace-nowrap">{language === "ru" ? "Тема" : "Theme"}</span>
-          <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${openMenu === "theme" ? "rotate-180" : ""}`} />
-        </button>
-        {openMenu === "theme" && (
-          <div role="listbox" aria-label={t("settings.theme")} className="absolute right-0 top-[calc(100%+0.5rem)] z-50 min-w-[13rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-border bg-popover p-1.5 text-popover-foreground shadow-2xl backdrop-blur-xl">
-            {themeOptions.map((option) => {
-              const Icon = option.icon;
-              return (
-                <button
-                  key={option.value}
-                  type="button"
-                  role="option"
-                  aria-selected={theme === option.value}
-                  onClick={() => { setTheme(option.value); setOpenMenu(null); }}
-                  className={`flex w-full items-center gap-2 whitespace-nowrap rounded-xl px-2 py-2.5 text-left text-xs transition sm:text-sm ${theme === option.value ? "bg-primary/20 text-popover-foreground" : "text-popover-foreground/85 hover:bg-accent/70"}`}
-                >
-                  <Icon className="h-4 w-4 shrink-0" />
-                  <span className="min-w-0 flex-1">{option.label}</span>
-                  <span className={`h-3.5 w-3.5 shrink-0 rounded-full border ${theme === option.value ? "border-primary bg-primary shadow-[inset_0_0_0_3px_#171020]" : "border-muted-foreground/60"}`} />
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 function Index() {
   const { t, language } = useYumePreferences();
   const navigate = useNavigate();
@@ -404,6 +289,7 @@ function Index() {
   const ANIME = catalogAnime;
   // Initialize view before effects that read it during server-side rendering.
   const [view, setViewRaw] = useState<View>(section ?? "home");
+  const [newsDetailOpen, setNewsDetailOpen] = useState(false);
 
 
   useEffect(() => {
@@ -601,7 +487,13 @@ function Index() {
   }, [telegramDetectionComplete, language]);
 
   useEffect(() => {
-    if (!isTelegramMiniApp || !telegramAuthReady || telegramConsentRequired || telegramConsentPending) return;
+    if (!telegramAuthReady || telegramConsentRequired || telegramConsentPending) {
+      setIsAdmin(false);
+      setAdminPasswordConfirmed(false);
+      setAdminPasswordRequired(false);
+      setAdminCheckComplete(false);
+      return;
+    }
     let cancelled = false;
     setAdminCheckComplete(false);
     setIsAdmin(false);
@@ -1441,6 +1333,7 @@ function Index() {
   };
 
   const setView = (v: View) => {
+    setNewsDetailOpen(false);
     telegramHapticImpact("light");
     if (v === "login" || v === "register") {
       setViewRaw(v);
@@ -1518,16 +1411,6 @@ function Index() {
         : "Sign-in did not finish: account data could not be loaded. Refresh and try again.");
     }
   }, [language, navigate]);
-  const random = () => {
-    const availableAnime = ANIME.filter(
-      (anime) => anime.status === "Онгоинг" || anime.status === "Вышел",
-    );
-    if (!availableAnime.length) return;
-    const anime = availableAnime[Math.floor(Math.random() * availableAnime.length)]!;
-    select(anime);
-  };
-
-
   const availableGenres = useMemo(() => catalogFacets?.genres ?? Array.from(new Set(ANIME.flatMap(a => a.genres))).sort((a,b)=>a.localeCompare(b,"ru")), [ANIME,catalogFacets]);
   const availableStatuses = useMemo(() => { if (catalogFacets) return catalogFacets.statuses; const found = new Set(ANIME.map(a=>a.status)); const order=["Онгоинг","Анонс","Вышел","Неизвестно"]; return Array.from(found).sort((a,b)=>order.indexOf(a)-order.indexOf(b)); }, [ANIME,catalogFacets]);
   const availableTypes = useMemo(() => catalogFacets?.types ?? Array.from(new Set(ANIME.map(a=>a.kind?.trim() || (a.episodes===1 ? "Фильм":"TV")))).filter(Boolean).sort((a,b)=>a.localeCompare(b,"ru")), [ANIME,catalogFacets]);
@@ -1694,9 +1577,8 @@ function Index() {
   const visibleAiringAnime = airingAnime.slice((airingPage - 1) * catalogPageSize, airingPage * catalogPageSize);
   return (
     <div className="relative isolate min-h-screen pb-8 yubera-with-bottom-nav">
-      {view === "home" && <HomeDepthAtmosphere />}
       <div className="relative z-10">
-      <Header view={view} setView={setView} onProfile={() => setView(telegramAuthReady ? "profile" : "login")} isAdmin={isAdmin} unreadNotificationCount={notificationStateLoaded && notificationRemoteAccount ? notificationItems.filter((item) => !notificationReadIds.includes(item.id) && !notificationDismissedIds.includes(item.id)).length : 0} />
+      <Header setView={setView} unreadNotificationCount={notificationStateLoaded && notificationRemoteAccount ? notificationItems.filter((item) => !notificationReadIds.includes(item.id) && !notificationDismissedIds.includes(item.id)).length : 0} />
       {isTelegramMiniApp && telegramConsentRequired && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-background/85 px-4 py-6 backdrop-blur-md" role="dialog" aria-modal="true" aria-labelledby="telegram-consent-title">
           <section className="w-full max-w-md rounded-3xl border border-border bg-card p-6 shadow-2xl sm:p-8">
@@ -1739,7 +1621,7 @@ function Index() {
           onComplete={handleAuthComplete}
         />
       ) : searching ? (
-        <main id="main-content" className="px-4 pt-36 md:px-10 md:pt-24">
+        <main id="main-content" className="yubera-with-bottom-nav px-3 pb-8 pt-[78px] sm:px-4 md:px-6 lg:px-8">
           <div className="mb-6 flex items-center justify-between">
             <h1 className="text-xl font-semibold">{submittedQuery ? `${t("catalog.results")}: «${submittedQuery}»` : t("catalog.filterResults")} <span className="text-muted-foreground">· {needsFullCatalog && catalogLoadState !== "loaded" && catalogLoadState !== "error" ? "…" : catalogResults.length}</span></h1>
             <button onClick={() => { setQuery(""); setSubmittedQuery(""); setDraftFilters(EMPTY_CATALOG_FILTERS); setActiveFilters(EMPTY_CATALOG_FILTERS); setFiltersOpen(false); setCatalogPage(1); }} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"><X className="h-4 w-4" />{t("catalog.reset")}</button>
@@ -1769,42 +1651,16 @@ function Index() {
           )}
         </main>
       ) : view === "home" ? (
-        <main id="main-content" className="pt-16">
-          <Hero onCatalog={() => setView("catalog")} onRandom={random} query={query} setQuery={setQuery} onSubmitSearch={submitHomeSearch} filtersOpen={filtersOpen && (!needsFullCatalog || catalogLoadState === "loaded" || catalogLoadState === "error")} setFiltersOpen={setFiltersOpen} draftFilters={draftFilters} setDraftFilters={setDraftFilters} onApplyFilters={applyCatalogFilters} onResetFilters={resetCatalogFilters} activeFilterCount={activeFilterCount} genres={availableGenres} statuses={availableStatuses} types={availableTypes} ageRatings={availableAgeRatings} yearMin={catalogYearRange.min} yearMax={catalogYearRange.max} />
-          <HomeQuickControls onProfile={() => setView(telegramAuthReady ? "profile" : "login")} />
-          <div className="home-content-world mt-1 pb-12">
-            <div className="relative z-10">
-              {ANIME.length === 0 ? (
-                <section className="mx-4 mt-10 rounded-2xl border border-dashed border-white/15 bg-card/60 px-6 py-10 text-center md:mx-10">
-                  <p className="mx-auto max-w-xl text-muted-foreground">{t("home.dataUnavailable")}</p>
-                  <button type="button" onClick={() => window.location.reload()} className="mt-5 rounded-full bg-neon px-5 py-2.5 text-sm font-semibold text-primary-foreground transition hover:brightness-110">{t("home.retry")}</button>
-                </section>
-              ) : (
-                <>
-                  {popularCards.length > 0 && <Row title={t("home.popular")} action={<SeeAll onClick={() => setView("popular")} />}>
-                    {popularCards.map((a) => <AnimeCard key={a.id} anime={a} onSelect={select} />)}
-                  </Row>}
-                  {newReleaseCards.length > 0 && <Row title={t("home.newReleases")} action={<SeeAll onClick={() => setView("new-releases")} />}>
-                    {newReleaseCards.map((a) => <AnimeCard key={a.id} anime={a} onSelect={select} />)}
-                  </Row>}
-                  {announcementCards.length > 0 && <Row title={t("home.announcements")} action={<SeeAll onClick={() => setView("announcements")} />}>
-                    {announcementCards.map((a) => <AnimeCard key={a.id} anime={a} onSelect={select} />)}
-                  </Row>}
-                  {airingCards.length > 0 && <Row title={t("home.airing")} action={<SeeAll onClick={() => setView("airing")} />}>
-                    {airingCards.map((a) => <AnimeCard key={a.id} anime={a} onSelect={select} />)}
-                  </Row>}
-                  <section className="mt-10 px-4 md:px-10">
-                    <div className="mb-4 flex items-end justify-between">
-                      <h2 className="text-lg font-semibold md:text-xl">{t("home.collections")}</h2>
-                      <SeeAll onClick={() => setView("collections")} />
-                    </div>
-                    <CollectionsGrid animeList={ANIME} onOpen={(id) => { setCollection(id); setView("collections"); }} />
-                  </section>
-                </>
-              )}
-            </div>
-          </div>
-        </main>
+        <HomeExperience
+          animeList={ANIME}
+          popular={popularCards}
+          newReleases={newReleaseCards}
+          announcements={announcementCards}
+          airing={airingCards}
+          onSelect={select}
+          onSeeAll={setView}
+          onOpenCollection={(id) => { setCollection(id); setView("collections"); }}
+        />
       ) : view === "notifications" && notificationStateLoaded && !notificationRemoteAccount ? (
         <main id="main-content" className="px-4 pb-12 pt-24 md:px-10 md:pt-24">
           <section className="mx-auto max-w-lg rounded-3xl border border-border bg-card/70 p-6 text-center sm:p-8">
@@ -1910,8 +1766,8 @@ function Index() {
           </section>
         </main>
       ) : view === "popular" ? (
-        <main id="main-content" className="px-4 pt-24 md:px-10 md:pt-24">
-          <h1 className="mb-2 text-2xl font-bold md:text-3xl">{t("home.popular")}</h1>
+        <main id="main-content" className="yubera-with-bottom-nav mx-auto w-full max-w-[1600px] px-3 pb-8 pt-[78px] sm:px-4 md:px-6 lg:px-8">
+          <SectionBanner title={t("home.popular")} />
           {needsFullCatalog && catalogLoadState !== "loaded" && catalogLoadState !== "error" ? (
             <CatalogSkeleton count={12} />
           ) : (
@@ -1929,9 +1785,8 @@ function Index() {
           )}
         </main>
       ) : view === "new-releases" ? (
-        <main id="main-content" className="px-4 pt-24 md:px-10 md:pt-24">
-          <h1 className="mb-2 text-2xl font-bold md:text-3xl">{t("home.newReleases")}</h1>
-          <p className="mb-6 text-sm text-muted-foreground">{t("home.newReleasesDescription")}</p>
+        <main id="main-content" className="yubera-with-bottom-nav mx-auto w-full max-w-[1600px] px-3 pb-8 pt-[78px] sm:px-4 md:px-6 lg:px-8">
+          <SectionBanner title={t("home.newReleases")} subtitle={t("home.newReleasesDescription")} />
           {needsFullCatalog && catalogLoadState !== "loaded" && catalogLoadState !== "error" ? (
             <CatalogSkeleton count={12} />
           ) : (
@@ -1949,9 +1804,8 @@ function Index() {
           )}
         </main>
       ) : view === "announcements" ? (
-        <main id="main-content" className="px-4 pt-24 md:px-10 md:pt-24">
-          <h1 className="mb-2 text-2xl font-bold md:text-3xl">{t("home.announcements")}</h1>
-          <p className="mb-6 text-sm text-muted-foreground">{t("home.announcementsDescription")}</p>
+        <main id="main-content" className="yubera-with-bottom-nav mx-auto w-full max-w-[1600px] px-3 pb-8 pt-[78px] sm:px-4 md:px-6 lg:px-8">
+          <SectionBanner title={t("home.announcements")} subtitle={t("home.announcementsDescription")} />
           {needsFullCatalog && catalogLoadState !== "loaded" && catalogLoadState !== "error" ? (
             <CatalogSkeleton count={12} />
           ) : (
@@ -1969,9 +1823,8 @@ function Index() {
           )}
         </main>
       ) : view === "airing" ? (
-        <main id="main-content" className="px-4 pt-24 md:px-10 md:pt-24">
-          <h1 className="mb-2 text-2xl font-bold md:text-3xl">{t("home.airing")}</h1>
-          <p className="mb-6 text-sm text-muted-foreground">{t("home.airingDescription")}</p>
+        <main id="main-content" className="yubera-with-bottom-nav mx-auto w-full max-w-[1600px] px-3 pb-8 pt-[78px] sm:px-4 md:px-6 lg:px-8">
+          <SectionBanner title={t("home.airing")} subtitle={t("home.airingDescription")} />
           {needsFullCatalog && catalogLoadState !== "loaded" && catalogLoadState !== "error" ? (
             <CatalogSkeleton count={12} />
           ) : (
@@ -1989,8 +1842,8 @@ function Index() {
           )}
         </main>
       ) : view === "catalog" ? (
-        <main id="main-content" className="px-4 pt-36 md:px-10 md:pt-24">
-          <h1 className="text-2xl font-bold md:text-3xl">{t("catalog.title")}</h1>
+        <main id="main-content" className="yubera-with-bottom-nav mx-auto w-full max-w-[1600px] px-3 pb-8 pt-[78px] sm:px-4 md:px-6 lg:px-8">
+          <SectionBanner title={t("catalog.title")} subtitle={language === "ru" ? "Весь каталог аниме" : "Explore the full anime catalogue"} />
           {catalogLoadState === "error" && (
             <div role="alert" className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-400/25 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
               <span>{t("catalog.loadError")}</span>
@@ -1998,7 +1851,7 @@ function Index() {
             </div>
           )}
           <div data-filter-anchor className="relative z-30 mt-5 max-w-xl">
-            <div className="flex h-11 items-center rounded-xl border border-white/10 bg-[#171127]/75 shadow-lg shadow-black/10 backdrop-blur-xl focus-within:border-primary/60">
+            <div className="flex h-11 items-center rounded-xl border border-white/10 bg-card shadow-lg shadow-black/10 backdrop-blur-xl focus-within:border-primary/60">
               <Search className="ml-3 h-4 w-4 shrink-0 text-muted-foreground" />
               <input value={catalogQuery} onChange={(event) => { const value = event.target.value; setCatalogQuery(value); setCatalogPage(1); writeCatalogUrl({ q: value.trim() || undefined, page: 1 }); }} disabled={needsFullCatalog && catalogLoadState !== "loaded" && catalogLoadState !== "error"} placeholder={t("search.placeholder")} aria-label={t("catalog.search")} className="h-full min-w-0 flex-1 bg-transparent px-2.5 text-sm outline-none placeholder:text-muted-foreground" />
               {catalogQuery && <button type="button" aria-label={t("search.clear")} onClick={() => { setCatalogQuery(""); setCatalogPage(1); writeCatalogUrl({ q: undefined, page: 1 }); }} className="rounded-full p-1.5 text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>}
@@ -2048,27 +1901,26 @@ function Index() {
           )}
         </main>
       ) : view === "collections" ? (
-        <main id="main-content" className="px-4 pt-36 md:px-10 md:pt-24">
+        <main id="main-content" className="yubera-with-bottom-nav mx-auto w-full max-w-[1600px] px-3 pb-8 pt-[78px] sm:px-4 md:px-6 lg:px-8">
           {activeCollection ? (
             <>
               <button onClick={() => setCollection(null)} className="mb-3 text-sm text-muted-foreground hover:text-primary">← {t("collections.all")}</button>
-              <h1 className="text-2xl font-bold md:text-3xl">{t((`collection.${activeCollection.id}.title`) as TranslationKey)}</h1>
-              <p className="mb-6 text-muted-foreground">{t((`collection.${activeCollection.id}.subtitle`) as TranslationKey)}</p>
+              <SectionBanner title={t((`collection.${activeCollection.id}.title`) as TranslationKey)} subtitle={t((`collection.${activeCollection.id}.subtitle`) as TranslationKey)} />
               <Grid items={activeCollectionAnime} onSelect={select} empty={t("collections.empty")} />
             </>
           ) : (
             <>
-              <h1 className="mb-6 text-2xl font-bold md:text-3xl">{t("collections.title")}</h1>
+              <SectionBanner title={t("collections.title")} subtitle={language === "ru" ? "Подборки аниме по настроению и жанрам" : "Anime collections by mood and genre"} />
               <CollectionsGrid animeList={ANIME} onOpen={setCollection} />
             </>
           )}
         </main>
       ) : view === "my" ? (
-        <MyHub onNavigate={setView} />
+        <MyHub animeList={ANIME} onNavigate={setView} onSelect={select} />
       ) : view === "news" ? (
-        <News />
+        <News animeList={ANIME} onDetailChange={setNewsDetailOpen} />
       ) : view === "profile" ? (
-        <Profile animeList={ANIME} onSelect={select} onCatalog={() => setView("catalog")} />
+        <Profile animeList={ANIME} onSelect={select} onCatalog={() => setView("catalog")} isAdmin={isAdmin} onAdmin={() => setView("admin")} onHistory={() => setView("history")} />
       ) : view === "favorites" ? (
         <Profile key="favorites" initialPanel="favorites" animeList={ANIME} onSelect={select} onCatalog={() => setView("catalog")} />
       ) : view === "watchlist" ? (
@@ -2082,19 +1934,16 @@ function Index() {
       ) : view === "rights" ? (
         <Profile key="rights" initialPanel="rights" animeList={ANIME} onSelect={select} onCatalog={() => setView("catalog")} />
       ) : view === "admin" ? (
-        <main id="main-content" className="min-h-[70vh] bg-[#050408] px-4 pt-20 pb-8 md:px-10 md:pt-24">
-          <div className="mx-auto max-w-5xl">
-            <h1 className="mb-2 text-2xl font-bold md:text-3xl">{language === "ru" ? "Панель администратора" : "Admin panel"}</h1>
-            <p className="mb-4 text-sm text-muted-foreground">{language === "ru" ? "Управление функциями и обслуживанием Yubera." : "Manage Yubera features and maintenance."}</p>
-            {!telegramDetectionComplete || (isTelegramMiniApp && (
-              (!telegramAuthReady && !telegramAuthError) ||
-              (telegramAuthReady && !telegramConsentRequired && !telegramConsentPending && !adminCheckComplete)
-            )) ? (
+        <main id="main-content" className="yubera-with-bottom-nav mx-auto min-h-[70vh] w-full max-w-[1600px] px-3 pb-8 pt-[78px] sm:px-4 md:px-6 lg:px-8">
+          <div className="mx-auto max-w-[1600px]">
+            <SectionBanner title={language === "ru" ? "Панель администратора" : "Admin panel"} subtitle={language === "ru" ? "Управление функциями и обслуживанием YUBERA" : "Manage YUBERA features and maintenance"} />
+            
+            {!telegramDetectionComplete || (isTelegramMiniApp && !telegramAuthReady && !telegramAuthError) || (telegramAuthReady && !telegramConsentRequired && !telegramConsentPending && !adminCheckComplete) ? (
               <p role="status" className="rounded-xl border border-border bg-card/60 p-4 text-sm text-muted-foreground">
                 {language === "ru" ? "Проверяем права администратора…" : "Checking administrator access…"}
               </p>
             ) : adminPasswordRequired ? (
-              <form className="mx-auto grid max-w-md gap-4 rounded-2xl border border-[#8D3DD6]/50 bg-[#0D0A13] p-5 shadow-[0_0_24px_rgba(157,64,245,0.12)]" onSubmit={async event => {
+              <form className="mx-auto grid max-w-md gap-4 rounded-2xl border border-[#FF5A3D]/50 bg-[#101116] p-5 shadow-[0_0_24px_rgba(157,64,245,0.12)]" onSubmit={async event => {
                 event.preventDefault();
                 if (adminPasswordBusy || !adminPassword) return;
                 setAdminPasswordBusy(true);
@@ -2147,15 +1996,15 @@ function Index() {
             ) : isAdmin ? (
               <>
               <section className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-3" aria-label={language === "ru" ? "Актуальные показатели каталога" : "Current catalog metrics"}>
-                <div className="rounded-xl border border-[#382D46] bg-[#0C0C16] p-3">
-                  <span className="flex items-center gap-2.5"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#271024]"><Play className="h-5 w-5 fill-[#FF3D91] text-[#FF3D91]"/></span><span className="text-xs text-[#D3C3D7]">{language==="ru"?"Без трейлера":"Missing trailer"}</span></span>
-                  <span className="mt-1 block text-xl font-bold tabular-nums text-[#FF3D91]">{adminStats ? adminStats.missing.toLocaleString(language==="ru"?"ru-RU":"en-US") : "—"}</span>
+                <div className="rounded-xl border border-[#22232B] bg-[#101116] p-3">
+                  <span className="flex items-center gap-2.5"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#34231F]"><Play className="h-5 w-5 fill-[#FF5A3D] text-[#FF5A3D]"/></span><span className="text-xs text-[#D3C3D7]">{language==="ru"?"Без трейлера":"Missing trailer"}</span></span>
+                  <span className="mt-1 block text-xl font-bold tabular-nums text-[#FF5A3D]">{adminStats ? adminStats.missing.toLocaleString(language==="ru"?"ru-RU":"en-US") : "—"}</span>
                 </div>
-                <div className="rounded-xl border border-[#382D46] bg-[#0C0C16] p-3">
+                <div className="rounded-xl border border-[#22232B] bg-[#101116] p-3">
                   <span className="flex items-center gap-2.5"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#0C1F3D]"><Database className="h-5 w-5 text-[#4FC8F3]"/></span><span className="text-xs text-[#C3D3E1]">{language==="ru"?"Всего в каталоге":"Total in catalog"}</span></span>
                   <span className="mt-1 block text-xl font-bold tabular-nums text-[#B8D7FF]">{adminStats ? adminStats.total.toLocaleString(language==="ru"?"ru-RU":"en-US") : "—"}</span>
                 </div>
-                <div className="rounded-xl border border-[#382D46] bg-[#0C0C16] p-3">
+                <div className="rounded-xl border border-[#22232B] bg-[#101116] p-3">
                   <span className="flex items-center gap-2.5"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#0D2621]"><CircleCheck className="h-5 w-5 fill-[#36EBA6] text-[#36EBA6]"/></span><span className="text-xs text-[#C3D8D0]">{language==="ru"?"С трейлером":"With trailer"}</span></span>
                   <span className="mt-1 block text-xl font-bold tabular-nums text-[#36EBA6]">{adminStats ? adminStats.found.toLocaleString(language==="ru"?"ru-RU":"en-US") : "—"}</span>
                 </div>
@@ -2168,9 +2017,9 @@ function Index() {
                 </span>
                 {(adminMessage || adminImportMessage || metadataRefreshMessage) && <p className="w-full border-t border-border/70 pt-2 text-xs text-muted-foreground" role="status">{adminMessage || adminImportMessage || metadataRefreshMessage}</p>}
               </section>
-              <details open={expandedAdminSections.notifications} onToggle={event => { const isOpen = event.currentTarget.open; setExpandedAdminSections(current => current.notifications === isOpen ? current : {...current, notifications: isOpen}); }} className="group mb-3 overflow-hidden rounded-2xl border border-[#382846] bg-[#0C0A12]" aria-label={language === "ru" ? "Уведомления пользователям" : "User notifications"}>
+              <details open={expandedAdminSections.notifications} onToggle={event => { const isOpen = event.currentTarget.open; setExpandedAdminSections(current => current.notifications === isOpen ? current : {...current, notifications: isOpen}); }} className="group mb-3 overflow-hidden rounded-2xl border border-[#22232B] bg-[#101116]" aria-label={language === "ru" ? "Уведомления пользователям" : "User notifications"}>
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 hover:bg-card/80 [&::-webkit-details-marker]:hidden">
-                  <span className="flex items-center gap-3"><Bell className="h-5 w-5 text-[#BE65FF]"/><span><span className="block font-semibold">{language === "ru" ? "Уведомления пользователям" : "Notify users"}</span><span className="mt-1 block text-xs text-muted-foreground">{language === "ru" ? "Опубликовать сообщение для всех аккаунтов" : "Publish a message for all accounts"}</span></span></span><ChevronDown className="h-4 w-4 text-muted-foreground transition-transform group-open:rotate-180"/>
+                  <span className="flex items-center gap-3"><Bell className="h-5 w-5 text-[#FF764F]"/><span><span className="block font-semibold">{language === "ru" ? "Уведомления пользователям" : "Notify users"}</span><span className="mt-1 block text-xs text-muted-foreground">{language === "ru" ? "Опубликовать сообщение для всех аккаунтов" : "Publish a message for all accounts"}</span></span></span><ChevronDown className="h-4 w-4 text-muted-foreground transition-transform group-open:rotate-180"/>
                 </summary>
                 <form className="grid gap-3 border-t border-border/70 p-4" onSubmit={async event => { event.preventDefault(); if (!isAdmin || notificationPublishBusy) return; setNotificationPublishBusy(true); setAdminMessage(""); try { const response = await fetch("/api/admin-notifications", { method:"POST", credentials:"same-origin", cache:"no-store", headers:{"Content-Type":"application/json"}, body:JSON.stringify({title:notificationDraftTitle,body:notificationDraftBody,targetUrl:notificationDraftTarget || null}) }); const payload = await response.json().catch(()=>({})) as {error?:string;notification?:{id:string;title:string;body:string;targetUrl:string|null}}; if (!response.ok || !payload.notification) throw new Error(payload.error || "publish_failed"); const n = payload.notification; setNotificationItems(current => [{id:n.id,publishedAt:new Date().toISOString(),title:{ru:n.title,en:n.title},description:{ru:n.body,en:n.body},targetUrl:n.targetUrl,dynamic:true},...current]); setNotificationDraftTitle(""); setNotificationDraftBody(""); setNotificationDraftTarget(""); setAdminMessage(language === "ru" ? "Уведомление опубликовано для всех пользователей." : "Notification published for all users."); } catch { setAdminMessage(language === "ru" ? "Не удалось опубликовать уведомление. Проверь подключение и права администратора." : "Could not publish notification. Check connection and admin access."); } finally { setNotificationPublishBusy(false); } }}>
                   <label className="grid gap-1 text-sm"><span>{language === "ru" ? "Заголовок" : "Title"}</span><input required maxLength={120} value={notificationDraftTitle} onChange={event=>setNotificationDraftTitle(event.target.value)} className="rounded-lg border border-border bg-background px-3 py-2" placeholder={language === "ru" ? "Например, технические работы" : "For example, scheduled maintenance"}/></label>
@@ -2179,15 +2028,15 @@ function Index() {
                   <button type="submit" disabled={notificationPublishBusy || !notificationDraftTitle.trim() || !notificationDraftBody.trim()} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">{notificationPublishBusy ? (language === "ru" ? "Публикуем…" : "Publishing…") : (language === "ru" ? "Отправить всем пользователям" : "Send to all users")}</button>
                 </form>
               </details>
-              <details open={expandedAdminSections.import} onToggle={event => { const isOpen = event.currentTarget.open; setExpandedAdminSections(current => current.import === isOpen ? current : {...current, import: isOpen}); }} className="group mb-3 overflow-hidden rounded-2xl border border-[#8D3DD6] bg-[#0D0A13] shadow-[0_0_18px_rgba(157,64,245,0.10)]" aria-label={language === "ru" ? "Пополнение каталога" : "Catalog import"}>
+              <details open={expandedAdminSections.import} onToggle={event => { const isOpen = event.currentTarget.open; setExpandedAdminSections(current => current.import === isOpen ? current : {...current, import: isOpen}); }} className="group mb-3 overflow-hidden rounded-2xl border border-[#FF5A3D] bg-[#101116] shadow-[0_0_18px_rgba(157,64,245,0.10)]" aria-label={language === "ru" ? "Пополнение каталога" : "Catalog import"}>
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 hover:bg-card/80 [&::-webkit-details-marker]:hidden">
-                  <span className="flex min-w-0 items-center gap-2.5"><Download className="h-5 w-5 shrink-0 text-[#BE65FF]" /><span className="min-w-0"><span className="block font-semibold text-[#F8F4FF]">{language === "ru" ? "Пополнение каталога из Shikimori" : "Import catalogue from Shikimori"}</span><span className="mt-0.5 block text-xs text-muted-foreground">{language === "ru" ? "Добавлено " : "Added "}{adminImport.added} / {adminImport.target} · {language === "ru" ? "страница " : "page "}{adminImport.cursor}</span></span></span>
+                  <span className="flex min-w-0 items-center gap-2.5"><Download className="h-5 w-5 shrink-0 text-[#FF764F]" /><span className="min-w-0"><span className="block font-semibold text-[#F6F4F5]">{language === "ru" ? "Пополнение каталога из Shikimori" : "Import catalogue from Shikimori"}</span><span className="mt-0.5 block text-xs text-muted-foreground">{language === "ru" ? "Добавлено " : "Added "}{adminImport.added} / {adminImport.target} · {language === "ru" ? "страница " : "page "}{adminImport.cursor}</span></span></span>
                   <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
                 </summary>
                 <div className="border-t border-border/70 p-3 sm:p-4">
                   <p className="text-xs leading-relaxed text-muted-foreground">{language === "ru" ? "Можно добавить аниме по названию или оставить импорт по количеству. Оба режима сохраняют метаданные, постер и доступные скриншоты из Shikimori." : "Add anime by title or keep using the quantity-based importer. Both modes save metadata, poster and available Shikimori screenshots."}</p>
-                  <section className="mt-4 rounded-xl border border-[#3B294B] bg-[#08070D] p-3 sm:p-4" aria-label={language === "ru" ? "Импорт аниме по названию" : "Import anime by title"}>
-                    <h3 className="text-sm font-semibold text-[#F8F4FF]">{language === "ru" ? "Добавить по названию" : "Import by title"}</h3>
+                  <section className="mt-4 rounded-xl border border-[#22232B] bg-[#101116] p-3 sm:p-4" aria-label={language === "ru" ? "Импорт аниме по названию" : "Import anime by title"}>
+                    <h3 className="text-sm font-semibold text-[#F6F4F5]">{language === "ru" ? "Добавить по названию" : "Import by title"}</h3>
                     <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{language === "ru" ? "Введи русское, английское или японское название. Поиск покажет варианты, чтобы ты выбрал правильный сезон или фильм." : "Search using the Russian, English or Japanese title. Choose the exact season or movie from the results."}</p>
                     <form className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]" onSubmit={event => { event.preventDefault(); void searchCatalogTitle(); }}>
                       <input
@@ -2199,12 +2048,12 @@ function Index() {
                         placeholder={language === "ru" ? "Например: Frieren, フリーレン, Фрирен" : "For example: Frieren, フリーレン"}
                         aria-label={language === "ru" ? "Название аниме для поиска" : "Anime title to search"}
                         disabled={adminTitleSearchBusy || Boolean(adminTitleImportBusy) || adminImportRunning || metadataRefreshRunning}
-                        className="h-11 min-w-0 rounded-xl border border-[#453452] bg-[#050408] px-3 text-sm text-white placeholder:text-muted-foreground focus:border-[#BE65FF] focus:outline-none focus:ring-1 focus:ring-[#BE65FF] disabled:opacity-60"
+                        className="h-11 min-w-0 rounded-xl border border-[#22232B] bg-[#101116] px-3 text-sm text-white placeholder:text-muted-foreground focus:border-[#FF764F] focus:outline-none focus:ring-1 focus:ring-[#FF764F] disabled:opacity-60"
                       />
                       <button
                         type="submit"
                         disabled={adminTitleSearchBusy || Boolean(adminTitleImportBusy) || adminImportRunning || metadataRefreshRunning || adminImportTitleQuery.trim().length < 2}
-                        className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#7750A0] px-4 py-2 text-sm font-semibold text-[#E7CEFF] transition hover:bg-[#241431] disabled:cursor-wait disabled:opacity-50"
+                        className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#FF764F] px-4 py-2 text-sm font-semibold text-[#F6F4F5] transition hover:bg-[#22232B] disabled:cursor-wait disabled:opacity-50"
                       >
                         <Search className="h-4 w-4" />
                         {adminTitleSearchBusy ? (language === "ru" ? "Ищем…" : "Searching…") : (language === "ru" ? "Найти тайтл" : "Search title")}
@@ -2214,7 +2063,7 @@ function Index() {
                     {adminTitleSearchResults.length > 0 && (
                       <div className="mt-3 space-y-2">
                         {adminTitleSearchResults.map(item => (
-                          <article key={item.id} className="flex min-w-0 items-center gap-3 rounded-xl border border-[#30263A] bg-[#0D0A13] p-2.5 sm:p-3">
+                          <article key={item.id} className="flex min-w-0 items-center gap-3 rounded-xl border border-[#30263A] bg-[#101116] p-2.5 sm:p-3">
                             {item.posterUrl ? (
                               <img src={item.posterUrl} alt="" loading="lazy" decoding="async" className="h-16 w-11 shrink-0 rounded-md object-cover bg-black/30" />
                             ) : (
@@ -2248,11 +2097,11 @@ function Index() {
                   <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
                     <label className="text-sm">
                       <span className="mb-1 block text-xs text-muted-foreground">{language === "ru" ? "Количество новых записей" : "Number of new records"}</span>
-                      <input type="number" min={1} step={1} value={adminImportTarget} onChange={event => setAdminImportTarget(event.target.value)} disabled={adminImportRunning || adminImport.state === "running"} className="h-10 w-full rounded-xl border border-[#453452] bg-[#050408] px-3 text-[#FFFFFF] focus:border-[#BE65FF] focus:outline-none focus:ring-1 focus:ring-[#BE65FF]" />
+                      <input type="number" min={1} step={1} value={adminImportTarget} onChange={event => setAdminImportTarget(event.target.value)} disabled={adminImportRunning || adminImport.state === "running"} className="h-10 w-full rounded-xl border border-[#22232B] bg-[#101116] px-3 text-[#FFFFFF] focus:border-[#FF764F] focus:outline-none focus:ring-1 focus:ring-[#FF764F]" />
                     </label>
                     <label className="text-sm">
                       <span className="mb-1 block text-xs text-muted-foreground">{language === "ru" ? "Статус для массового импорта" : "Bulk import status"}</span>
-                      <select value={adminImportStatusFilter} onChange={event => setAdminImportStatusFilter(event.target.value)} disabled={adminImportRunning || adminImport.state === "running"} className="h-10 w-full rounded-xl border border-[#453452] bg-[#050408] px-3 text-[#FFFFFF] focus:border-[#BE65FF] focus:outline-none focus:ring-1 focus:ring-[#BE65FF]">
+                      <select value={adminImportStatusFilter} onChange={event => setAdminImportStatusFilter(event.target.value)} disabled={adminImportRunning || adminImport.state === "running"} className="h-10 w-full rounded-xl border border-[#22232B] bg-[#101116] px-3 text-[#FFFFFF] focus:border-[#FF764F] focus:outline-none focus:ring-1 focus:ring-[#FF764F]">
                         <option value="">{language === "ru" ? "Любой статус" : "Any status"}</option>
                         <option value="ongoing">{language === "ru" ? "Онгоинг" : "Ongoing"}</option>
                         <option value="anons">{language === "ru" ? "Анонс" : "Announced"}</option>
@@ -2266,16 +2115,16 @@ function Index() {
                   <label className="mt-3 flex cursor-pointer items-start gap-3 rounded-xl border border-[#49375A] bg-[#100B17] p-3">
                     <input type="checkbox" checked={adminBulkBlock18Plus} onChange={event => { void saveAdminBulkImportFilter(event.target.checked); }} disabled={adminBulkFilterBusy || adminImportRunning || adminImport.state === "running" || metadataRefreshRunning} className="mt-1 h-4 w-4 shrink-0 accent-fuchsia-400 disabled:opacity-50"/>
                     <span className="min-w-0 flex-1">
-                      <span className="block text-sm font-semibold text-[#F8F4FF]">{language==="ru" ? "Исключать рейтинг 18+ при импорте по количеству" : "Exclude 18+ ratings from quantity imports"}</span>
+                      <span className="block text-sm font-semibold text-[#F6F4F5]">{language==="ru" ? "Исключать рейтинг 18+ при импорте по количеству" : "Exclude 18+ ratings from quantity imports"}</span>
                       <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">{language==="ru" ? "Включено: тайтлы с рейтингом RX (18+) пропускаются. Хентай, яой и юри запрещены для массовой загрузки всегда. Поиск и ручной импорт по названию этими правилами не ограничиваются." : "When enabled, RX (18+) titles are skipped. Hentai, yaoi and yuri are always excluded from bulk imports. Title search and manual title imports are not affected."}</span>
                       {adminBulkFilterBusy && <span className="mt-1 block text-xs text-[#D0A8FF]">{language==="ru" ? "Сохраняем настройку…" : "Saving setting…"}</span>}
                     </span>
                   </label>
                   <div className="mt-3 grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
-                    <div className="rounded-lg border border-[#243D35] bg-[#050408] p-2.5"><span className="block text-xs text-[#A89CB8]">{language === "ru" ? "Добавлено" : "Added"}</span><strong className="tabular-nums text-[#36EBA6]">{adminImport.added} / {adminImport.target}</strong></div>
-                    <div className="rounded-lg border border-[#27374A] bg-[#050408] p-2.5"><span className="block text-xs text-[#A89CB8]">{language === "ru" ? "Дубликаты" : "Duplicates"}</span><strong className="tabular-nums text-[#91CFFF]">{adminImport.skipped}</strong></div>
-                    <div className="rounded-lg border border-[#493A27] bg-[#050408] p-2.5"><span className="block text-xs text-[#A89CB8]">{language === "ru" ? "Неполные записи" : "Incomplete records"}</span><strong className="tabular-nums text-[#FFAA43]">{adminImport.incomplete}</strong></div>
-                    <div className="rounded-lg border border-[#492638] bg-[#050408] p-2.5"><span className="block text-xs text-[#A89CB8]">{language === "ru" ? "Ошибки источника" : "Source errors"}</span><strong className="tabular-nums text-[#FF4A68]">{adminImport.errors}</strong></div>
+                    <div className="rounded-lg border border-[#243D35] bg-[#101116] p-2.5"><span className="block text-xs text-[#A89CB8]">{language === "ru" ? "Добавлено" : "Added"}</span><strong className="tabular-nums text-[#36EBA6]">{adminImport.added} / {adminImport.target}</strong></div>
+                    <div className="rounded-lg border border-[#27374A] bg-[#101116] p-2.5"><span className="block text-xs text-[#A89CB8]">{language === "ru" ? "Дубликаты" : "Duplicates"}</span><strong className="tabular-nums text-[#91CFFF]">{adminImport.skipped}</strong></div>
+                    <div className="rounded-lg border border-[#493A27] bg-[#101116] p-2.5"><span className="block text-xs text-[#A89CB8]">{language === "ru" ? "Неполные записи" : "Incomplete records"}</span><strong className="tabular-nums text-[#FFAA43]">{adminImport.incomplete}</strong></div>
+                    <div className="rounded-lg border border-[#492638] bg-[#101116] p-2.5"><span className="block text-xs text-[#A89CB8]">{language === "ru" ? "Ошибки источника" : "Source errors"}</span><strong className="tabular-nums text-[#FF4A68]">{adminImport.errors}</strong></div>
                   </div>
                   {adminImportRunning && <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted" role="progressbar" aria-valuemin={0} aria-valuemax={adminImport.target || 1} aria-valuenow={adminImport.added}><div className="h-full rounded-full bg-gradient-to-r from-[#A83BFA] to-[#D08AFF] transition-all" style={{width:`${adminImport.target ? Math.min(100,adminImport.added/adminImport.target*100) : 0}%`}} /></div>}
                   <p className="mt-2 text-xs text-muted-foreground">{language === "ru" ? `Состояние: ${adminImport.state}. Страница Shikimori: ${adminImport.cursor}.` : `Status: ${adminImport.state}. Shikimori page: ${adminImport.cursor}.`}</p>
@@ -2290,7 +2139,7 @@ function Index() {
                 <div className="border-t border-border/70 p-3 sm:p-4">
                   <p className="mb-3 text-xs leading-relaxed text-muted-foreground">{language==="ru" ? "Поиск выполняется только по текущему каталогу, включая русское, английское и оригинальное названия. Удалённый тайтл будет пропущен массовым импортом. Его можно добавить снова только явным импортом по названию." : "Searches only the current catalog using Russian, English and original titles. Bulk import will skip a deleted title. It can be restored only with an explicit title import."}</p>
                   <form className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]" onSubmit={event=>{event.preventDefault();void searchCatalogDeletionTitle();}}>
-                    <input type="search" value={adminDeleteQuery} onChange={event=>{setAdminDeleteQuery(event.target.value);setAdminDeleteResults([]);setAdminDeleteMessage("");}} minLength={2} maxLength={120} placeholder={language==="ru" ? "Название тайтла для удаления" : "Title to delete"} aria-label={language==="ru" ? "Название тайтла для удаления" : "Title to delete"} disabled={adminDeleteSearchBusy || Boolean(adminDeleteBusy) || adminImportRunning || metadataRefreshRunning} className="h-11 min-w-0 rounded-xl border border-[#59303B] bg-[#050408] px-3 text-sm text-white placeholder:text-muted-foreground focus:border-[#FF758B] focus:outline-none focus:ring-1 focus:ring-[#FF758B] disabled:opacity-60"/>
+                    <input type="search" value={adminDeleteQuery} onChange={event=>{setAdminDeleteQuery(event.target.value);setAdminDeleteResults([]);setAdminDeleteMessage("");}} minLength={2} maxLength={120} placeholder={language==="ru" ? "Название тайтла для удаления" : "Title to delete"} aria-label={language==="ru" ? "Название тайтла для удаления" : "Title to delete"} disabled={adminDeleteSearchBusy || Boolean(adminDeleteBusy) || adminImportRunning || metadataRefreshRunning} className="h-11 min-w-0 rounded-xl border border-[#59303B] bg-[#101116] px-3 text-sm text-white placeholder:text-muted-foreground focus:border-[#FF758B] focus:outline-none focus:ring-1 focus:ring-[#FF758B] disabled:opacity-60"/>
                     <button type="submit" disabled={adminDeleteSearchBusy || Boolean(adminDeleteBusy) || adminImportRunning || metadataRefreshRunning || adminDeleteQuery.trim().length<2} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#A64B5D] px-4 py-2 text-sm font-semibold text-[#FFD8DF] transition hover:bg-[#2B1119] disabled:cursor-wait disabled:opacity-50"><Search className="h-4 w-4"/>{adminDeleteSearchBusy ? (language==="ru" ? "Ищем…" : "Searching…") : (language==="ru" ? "Найти в каталоге" : "Search catalog")}</button>
                   </form>
                   {adminDeleteMessage && <p role="status" className="mt-3 rounded-lg border border-border bg-background/60 p-2.5 text-xs text-muted-foreground">{adminDeleteMessage}</p>}
@@ -2303,9 +2152,9 @@ function Index() {
                   )}</div>}
                 </div>
               </details>
-              <details open={false} className="group mb-3 overflow-hidden rounded-2xl border border-[#6C3E91] bg-[#0D0A13]" aria-label={language === "ru" ? "Ручное обновление разделов" : "Manual section refresh"}>
+              <details open={false} className="group mb-3 overflow-hidden rounded-2xl border border-[#6C3E91] bg-[#101116]" aria-label={language === "ru" ? "Ручное обновление разделов" : "Manual section refresh"}>
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 hover:bg-card/80 [&::-webkit-details-marker]:hidden">
-                  <span className="flex min-w-0 items-center gap-2.5"><Database className="h-5 w-5 shrink-0 text-[#BE65FF]" /><span><span className="block font-semibold text-[#F8F4FF]">{language === "ru" ? "Обновление разделов главной" : "Home section metadata refresh"}</span><span className="mt-1 block text-xs text-muted-foreground">{language === "ru" ? "Только выбранный раздел и три поля метаданных" : "Only the selected section and three metadata fields"}</span></span></span><ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180"/>
+                  <span className="flex min-w-0 items-center gap-2.5"><Database className="h-5 w-5 shrink-0 text-[#FF764F]" /><span><span className="block font-semibold text-[#F6F4F5]">{language === "ru" ? "Обновление разделов главной" : "Home section metadata refresh"}</span><span className="mt-1 block text-xs text-muted-foreground">{language === "ru" ? "Только выбранный раздел и три поля метаданных" : "Only the selected section and three metadata fields"}</span></span></span><ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180"/>
                 </summary>
                 <div className="grid gap-3 border-t border-border/70 p-4">
                   <label className="grid gap-1.5 text-sm"><span>{language === "ru" ? "Раздел для обновления" : "Section to refresh"}</span><select value={sectionMetadataTarget} onChange={event=>setSectionMetadataTarget(event.target.value as "ongoing" | "announcements")} className="min-h-11 rounded-lg border border-border bg-background px-3 py-2"><option value="ongoing">{language === "ru" ? "Сейчас выходит" : "Currently airing"}</option><option value="announcements">{language === "ru" ? "Анонсы" : "Announcements"}</option></select></label>
@@ -2313,9 +2162,9 @@ function Index() {
                   <button type="button" disabled={sectionMetadataBusy || metadataRefreshRunning || adminImportRunning} onClick={async()=>{if(!isAdmin||sectionMetadataBusy)return;setSectionMetadataBusy(true);setAdminMessage("");try{const response=await fetch("/api/admin/catalog-import",{method:"POST",credentials:"same-origin",cache:"no-store",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"refresh_section_metadata",statusFilter:sectionMetadataTarget})});const payload=await response.json().catch(()=>({})) as {isAdmin?:boolean;error?:string;message?:string;total?:number;updated?:number};if(!response.ok||payload.isAdmin!==true)throw new Error(payload.message||payload.error||(language==="ru"?"Не удалось обновить раздел.":"Could not refresh section."));setAdminMessage(language==="ru"?(payload.total===0?"В выбранном разделе нет тайтлов.":`Готово: проверено ${payload.total}, обновлено ${payload.updated??0}.`):`Done: checked ${payload.total??0}, updated ${payload.updated??0}.`);}catch(error){setAdminMessage(error instanceof Error?error.message:(language==="ru"?"Ошибка обновления раздела.":"Section refresh failed."));}finally{setSectionMetadataBusy(false);}}} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">{sectionMetadataBusy?(language==="ru"?"Обновляем…":"Refreshing…"):(language==="ru"?"Обновить выбранный раздел":"Refresh selected section")}</button>
                 </div>
               </details>
-              <details open={expandedAdminSections.metadata} onToggle={event => { const isOpen = event.currentTarget.open; setExpandedAdminSections(current => current.metadata === isOpen ? current : {...current, metadata: isOpen}); }} style={{display:"none"}} className="group mb-3 overflow-hidden rounded-2xl border border-[#6C3E91] bg-[#0D0A13]" aria-label={language === "ru" ? "Обновление метаданных каталога" : "Refresh catalogue metadata"}>
+              <details open={expandedAdminSections.metadata} onToggle={event => { const isOpen = event.currentTarget.open; setExpandedAdminSections(current => current.metadata === isOpen ? current : {...current, metadata: isOpen}); }} style={{display:"none"}} className="group mb-3 overflow-hidden rounded-2xl border border-[#6C3E91] bg-[#101116]" aria-label={language === "ru" ? "Обновление метаданных каталога" : "Refresh catalogue metadata"}>
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 hover:bg-card/80 [&::-webkit-details-marker]:hidden">
-                  <span className="flex min-w-0 items-center gap-2.5"><Database className="h-5 w-5 shrink-0 text-[#BE65FF]" /><span className="min-w-0"><span className="block font-semibold text-[#F8F4FF]">{language === "ru" ? "Обновление метаданных каталога" : "Refresh catalogue metadata"}</span><span className="mt-0.5 block text-xs text-muted-foreground">{language === "ru" ? "Прогресс сохраняется; можно сбросить и начать проверку заново" : "Progress is saved; reset it to start a fresh scan"}</span></span></span>
+                  <span className="flex min-w-0 items-center gap-2.5"><Database className="h-5 w-5 shrink-0 text-[#FF764F]" /><span className="min-w-0"><span className="block font-semibold text-[#F6F4F5]">{language === "ru" ? "Обновление метаданных каталога" : "Refresh catalogue metadata"}</span><span className="mt-0.5 block text-xs text-muted-foreground">{language === "ru" ? "Прогресс сохраняется; можно сбросить и начать проверку заново" : "Progress is saved; reset it to start a fresh scan"}</span></span></span>
                   <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
                 </summary>
                 <div className="border-t border-border/70 p-3 sm:p-4">
@@ -2357,9 +2206,9 @@ function Index() {
                   )}
                 </div>
               </details>
-              <details open={expandedAdminSections.quality} onToggle={event => { const isOpen = event.currentTarget.open; setExpandedAdminSections(current => current.quality === isOpen ? current : {...current, quality: isOpen}); }} className="group mb-3 overflow-hidden rounded-2xl border border-[#382846] bg-[#0C0A12]" aria-label={language === "ru" ? "Качество каталога" : "Catalog quality"}>
+              <details open={expandedAdminSections.quality} onToggle={event => { const isOpen = event.currentTarget.open; setExpandedAdminSections(current => current.quality === isOpen ? current : {...current, quality: isOpen}); }} className="group mb-3 overflow-hidden rounded-2xl border border-[#22232B] bg-[#101116]" aria-label={language === "ru" ? "Качество каталога" : "Catalog quality"}>
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 hover:bg-card/80 [&::-webkit-details-marker]:hidden">
-                  <span className="flex min-w-0 items-center gap-3"><Database className="h-6 w-6 shrink-0 text-[#BE65FF]"/><span className="min-w-0"><span className="block font-semibold text-[#F8F4FF]">{language === "ru" ? "Качество каталога" : "Catalog quality"}</span><span className="mt-0.5 block text-xs text-[#A89CB8]">{language === "ru" ? "Неполных записей: " : "Incomplete records: "}{catalogQualitySummary.incomplete}</span></span></span><span className="rounded-full bg-[#1D1729] px-3 py-1 text-xs text-[#DCC8F8]">{language === "ru" ? "Всего: " : "Total: "}{catalogQualitySummary.total}</span>
+                  <span className="flex min-w-0 items-center gap-3"><Database className="h-6 w-6 shrink-0 text-[#FF764F]"/><span className="min-w-0"><span className="block font-semibold text-[#F6F4F5]">{language === "ru" ? "Качество каталога" : "Catalog quality"}</span><span className="mt-0.5 block text-xs text-[#A89CB8]">{language === "ru" ? "Неполных записей: " : "Incomplete records: "}{catalogQualitySummary.incomplete}</span></span></span><span className="rounded-full bg-[#1D1729] px-3 py-1 text-xs text-[#DCC8F8]">{language === "ru" ? "Всего: " : "Total: "}{catalogQualitySummary.total}</span>
                   <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
                 </summary>
                 <div className="border-t border-border/70 p-3 sm:p-4">
@@ -2395,9 +2244,9 @@ function Index() {
                   </div>
                 </div>
               </details>
-              <details open={expandedAdminSections.maintenance} onToggle={event => { const isOpen = event.currentTarget.open; setExpandedAdminSections(current => current.maintenance === isOpen ? current : {...current, maintenance: isOpen}); }} className="group mb-3 overflow-hidden rounded-2xl border border-[#382846] bg-[#0C0A12]" aria-label={language === "ru" ? "Обслуживание" : "Maintenance"}>
+              <details open={expandedAdminSections.maintenance} onToggle={event => { const isOpen = event.currentTarget.open; setExpandedAdminSections(current => current.maintenance === isOpen ? current : {...current, maintenance: isOpen}); }} className="group mb-3 overflow-hidden rounded-2xl border border-[#22232B] bg-[#101116]" aria-label={language === "ru" ? "Обслуживание" : "Maintenance"}>
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 hover:bg-card/80 [&::-webkit-details-marker]:hidden">
-                  <span className="flex min-w-0 items-center gap-3"><Settings className="h-6 w-6 shrink-0 text-[#BE65FF]"/><span><span className="block font-semibold text-[#F8F4FF]">{language==="ru"?"Обслуживание":"Maintenance"}</span><span className="mt-0.5 block text-xs text-[#A89CB8]">{language==="ru"?"Проверка подключения к D1":"D1 connectivity check"}</span></span></span>
+                  <span className="flex min-w-0 items-center gap-3"><Settings className="h-6 w-6 shrink-0 text-[#FF764F]"/><span><span className="block font-semibold text-[#F6F4F5]">{language==="ru"?"Обслуживание":"Maintenance"}</span><span className="mt-0.5 block text-xs text-[#A89CB8]">{language==="ru"?"Проверка подключения к D1":"D1 connectivity check"}</span></span></span>
                   <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
                 </summary>
                 <div className="border-t border-border/70 p-3 sm:p-4">
@@ -2406,9 +2255,9 @@ function Index() {
                   {maintenanceMessage && <p role="status" className="mt-3 rounded-lg bg-background/60 p-3 text-xs">{maintenanceMessage}</p>}
                 </div>
               </details>
-              <details open={expandedAdminSections.audit} onToggle={event => { const isOpen = event.currentTarget.open; setExpandedAdminSections(current => current.audit === isOpen ? current : {...current, audit: isOpen}); }} className="group mb-3 overflow-hidden rounded-2xl border border-[#382846] bg-[#0C0A12]" aria-label={language==="ru"?"История административных операций":"Admin operation history"}>
+              <details open={expandedAdminSections.audit} onToggle={event => { const isOpen = event.currentTarget.open; setExpandedAdminSections(current => current.audit === isOpen ? current : {...current, audit: isOpen}); }} className="group mb-3 overflow-hidden rounded-2xl border border-[#22232B] bg-[#101116]" aria-label={language==="ru"?"История административных операций":"Admin operation history"}>
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 hover:bg-card/80 [&::-webkit-details-marker]:hidden">
-                  <span className="flex min-w-0 items-center gap-3"><History className="h-6 w-6 shrink-0 text-[#BE65FF]"/><span><span className="block font-semibold text-[#F8F4FF]">{language==="ru"?"История операций":"Operation history"}</span><span className="mt-0.5 block text-xs text-[#A89CB8]">{language==="ru"?"Последние 30 событий":"Latest 30 events"}</span></span></span>
+                  <span className="flex min-w-0 items-center gap-3"><History className="h-6 w-6 shrink-0 text-[#FF764F]"/><span><span className="block font-semibold text-[#F6F4F5]">{language==="ru"?"История операций":"Operation history"}</span><span className="mt-0.5 block text-xs text-[#A89CB8]">{language==="ru"?"Последние 30 событий":"Latest 30 events"}</span></span></span>
                   <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
                 </summary>
                 <div className="border-t border-border/70 p-3 sm:p-4">
@@ -2423,8 +2272,8 @@ function Index() {
           </div>
         </main>
       ) : view === "history" ? (
-        <main id="main-content" className="px-4 pt-24 md:px-10 md:pt-24">
-          <h1 className="mb-3 text-2xl font-bold md:text-3xl">{t("history.title")}</h1>
+        <main id="main-content" className="yubera-with-bottom-nav mx-auto w-full max-w-[1600px] px-3 pb-8 pt-[78px] sm:px-4 md:px-6 lg:px-8">
+          <SectionBanner title={t("history.title")} subtitle={language === "ru" ? "Недавно просмотренные аниме и серии" : "Recently watched anime and episodes"} />
           {historyLoading ? (
             <p className="rounded-2xl border border-border bg-card/40 px-5 py-8 text-sm text-muted-foreground" role="status">{language === "ru" ? "Загружаем историю…" : "Loading history…"}</p>
           ) : !historyAuthenticated ? (
@@ -2469,21 +2318,18 @@ function Index() {
             </>
           )}
         </main>
-      ) : null}
-      {!["profile", "favorites", "watchlist", "history", "my", "news", "privacy", "privacy-policy", "rules", "rights", "login", "register"].includes(view) && (
-        <Footer onNavigate={setView} />
-      )}
-      {!(["admin", "login", "register", "privacy", "privacy-policy", "rules", "rights"].includes(view)) && (
+            ) : null}
+      {!newsDetailOpen && !(["login", "register"].includes(view)) && (
         <nav className="yubera-bottom-nav" aria-label={language === "ru" ? "Основная навигация" : "Main navigation"}>
           {[
-            { id: "home" as View, label: language === "ru" ? "Главная" : "Home", icon: Home },
-            { id: "catalog" as View, label: language === "ru" ? "Каталог" : "Catalog", icon: LayoutGrid },
-            { id: "my" as View, label: language === "ru" ? "Моё" : "My", icon: Bookmark },
-            { id: "news" as View, label: language === "ru" ? "Новости" : "News", icon: Newspaper },
-            { id: "profile" as View, label: language === "ru" ? "Профиль" : "Profile", icon: UserRound },
+            { id: "home" as View, label: language === "ru" ? "Главная" : "Home", icon: Home, active: ["home", "popular", "new-releases", "announcements", "airing", "collections"].includes(view) },
+            { id: "catalog" as View, label: language === "ru" ? "Каталог" : "Catalog", icon: LayoutGrid, active: view === "catalog" },
+            { id: "my" as View, label: language === "ru" ? "Моё" : "My", icon: Bookmark, active: ["my", "favorites", "watchlist", "history", "notifications"].includes(view) },
+            { id: "news" as View, label: language === "ru" ? "Новости" : "News", icon: Newspaper, active: view === "news" },
+            { id: "profile" as View, label: language === "ru" ? "Профиль" : "Profile", icon: UserRound, active: ["profile", "admin", "privacy", "privacy-policy", "rules", "rights"].includes(view) },
           ].map((item) => {
             const Icon = item.icon;
-            return <button key={item.id} type="button" onClick={() => setView(item.id)} aria-current={view === item.id ? "page" : undefined}><Icon className="h-5 w-5" /><span>{item.label}</span></button>;
+            return <button key={item.id} type="button" onClick={() => setView(item.id)} aria-current={item.active ? "page" : undefined}><Icon className="h-5 w-5" /><span>{item.label}</span></button>;
           })}
         </nav>
       )}
