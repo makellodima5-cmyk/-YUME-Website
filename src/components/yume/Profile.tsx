@@ -75,6 +75,7 @@ type Props = {
 export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overview", isAdmin = false, onAdmin, onHistory, onTrackedTitles }: Props) {
   const { t, language, theme, setTheme, setLanguage } = useYumePreferences();
   const [panel, setPanel] = useState<ProfilePanel>(initialPanel);
+  const [settingsExpanded, setSettingsExpanded] = useState(false);
   const [supportLinks, setSupportLinks] = useState<{ group: string | null; personal: string | null }>({ group: null, personal: null });
   const [supportLinksLoading, setSupportLinksLoading] = useState(false);
   const [supportLinksError, setSupportLinksError] = useState(false);
@@ -668,7 +669,7 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
                 <span className="min-w-0 flex-1"><span className="block text-sm font-semibold">{language === "ru" ? "Отслеживаемые тайтлы" : "Tracked anime"}</span><span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">{language === "ru" ? "Аниме, за выходом новых серий которых ты следишь" : "Anime with new episodes you follow"}</span></span>
                 <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
               </button>
-              <button type="button" onClick={() => document.getElementById("app-settings")?.scrollIntoView({ behavior: "smooth", block: "center" })} className="yubera-profile-row flex w-full items-center gap-4 rounded-2xl border border-border bg-card text-left text-card-foreground shadow-sm transition hover:border-primary/35 hover:bg-accent/70">
+              <button type="button" onClick={() => setSettingsExpanded(current => !current)} className="yubera-profile-row flex w-full items-center gap-4 rounded-2xl border border-border bg-card text-left text-card-foreground shadow-sm transition hover:border-primary/35 hover:bg-accent/70">
                 <span className="yubera-profile-row-icon flex shrink-0 items-center justify-center rounded-full bg-[#22232B] text-primary"><Settings className="h-6 w-6" /></span>
                 <span className="min-w-0 flex-1"><span className="block text-sm font-semibold">{language === "ru" ? "Настройки приложения" : "App settings"}</span><span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">{language === "ru" ? "Тема, язык и другие параметры" : "Theme, language and preferences"}</span></span>
                 <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -682,40 +683,42 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
               </button>}
               {profileRow(LifeBuoy, t("profile.support"), t("profile.supportDescription"), "support")}
             </section>
-            <section id="app-settings" className="mt-6 rounded-2xl border border-border bg-card p-4 sm:p-5">
-              <h2 className="text-base font-bold">{language === "ru" ? "Настройки приложения" : "App settings"}</h2>
-              <button type="button" onClick={() => window.dispatchEvent(new Event("yume-open-cookie-consent"))} className="mt-4 flex w-full items-center gap-3 rounded-xl border border-border bg-secondary/50 px-3 py-3 text-left transition hover:border-primary/35">
-                <Settings className="h-5 w-5 shrink-0 text-primary" />
-                <span className="min-w-0 flex-1"><span className="block text-sm font-semibold">{language === "ru" ? "Настройки cookie" : "Cookie settings"}</span><span className="block text-xs text-muted-foreground">{language === "ru" ? "Управление согласием и необязательными cookie" : "Manage consent and optional cookies"}</span></span>
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
-              </button>
-              <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-center gap-3">
-                  <span className="grid h-10 w-10 place-items-center rounded-xl bg-secondary text-primary"><Sun className="h-5 w-5" /></span>
-                  <span><span className="block text-sm font-semibold">{language === "ru" ? "Тема оформления" : "Appearance"}</span><span className="block text-xs text-muted-foreground">{language === "ru" ? "Светлая, тёмная или системная" : "Light, dark or system"}</span></span>
+            {settingsExpanded && (
+              <section id="app-settings" className="mt-6 rounded-2xl border border-border bg-card p-4 sm:p-5">
+                <h2 className="text-base font-bold">{language === "ru" ? "Настройки приложения" : "App settings"}</h2>
+                <button type="button" onClick={() => window.dispatchEvent(new Event("yume-open-cookie-consent"))} className="mt-4 flex w-full items-center gap-3 rounded-xl border border-border bg-secondary/50 px-3 py-3 text-left transition hover:border-primary/35">
+                  <Settings className="h-5 w-5 shrink-0 text-primary" />
+                  <span className="min-w-0 flex-1"><span className="block text-sm font-semibold">{language === "ru" ? "Настройки cookie" : "Cookie settings"}</span><span className="block text-xs text-muted-foreground">{language === "ru" ? "Управление согласием и необязательными cookie" : "Manage consent and optional cookies"}</span></span>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                </button>
+                <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className="grid h-10 w-10 place-items-center rounded-xl bg-secondary text-primary"><Sun className="h-5 w-5" /></span>
+                    <span><span className="block text-sm font-semibold">{language === "ru" ? "Тема оформления" : "Appearance"}</span><span className="block text-xs text-muted-foreground">{language === "ru" ? "Светлая, тёмная или системная" : "Light, dark or system"}</span></span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { id: "dark" as const, label: language === "ru" ? "Тёмная" : "Dark", icon: Moon },
+                      { id: "light" as const, label: language === "ru" ? "Светлая" : "Light", icon: Sun },
+                      { id: "system" as const, label: language === "ru" ? "Система" : "System", icon: Monitor },
+                    ].map((item) => {
+                      const Icon = item.icon;
+                      return <button key={item.id} type="button" aria-pressed={theme === item.id} onClick={() => setTheme(item.id)} className={`inline-flex min-h-9 items-center gap-1.5 rounded-xl border px-3 text-xs font-semibold transition ${theme === item.id ? "border-primary bg-primary/10 text-primary" : "border-border bg-secondary text-muted-foreground hover:text-foreground"}`}><Icon className="h-3.5 w-3.5" />{item.label}</button>;
+                    })}
+                  </div>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    { id: "dark" as const, label: language === "ru" ? "Тёмная" : "Dark", icon: Moon },
-                    { id: "light" as const, label: language === "ru" ? "Светлая" : "Light", icon: Sun },
-                    { id: "system" as const, label: language === "ru" ? "Система" : "System", icon: Monitor },
-                  ].map((item) => {
-                    const Icon = item.icon;
-                    return <button key={item.id} type="button" aria-pressed={theme === item.id} onClick={() => setTheme(item.id)} className={`inline-flex min-h-9 items-center gap-1.5 rounded-xl border px-3 text-xs font-semibold transition ${theme === item.id ? "border-primary bg-primary/10 text-primary" : "border-border bg-secondary text-muted-foreground hover:text-foreground"}`}><Icon className="h-3.5 w-3.5" />{item.label}</button>;
-                  })}
+                <div className="mt-4 flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className="grid h-10 w-10 place-items-center rounded-xl bg-secondary text-primary"><Languages className="h-5 w-5" /></span>
+                    <span><span className="block text-sm font-semibold">{language === "ru" ? "Язык приложения" : "App language"}</span><span className="block text-xs text-muted-foreground">{language === "ru" ? "Выберите язык интерфейса" : "Choose the interface language"}</span></span>
+                  </div>
+                  <div className="flex gap-2">
+                    <button type="button" aria-pressed={language === "ru"} onClick={() => setLanguage("ru")} className={`min-h-9 rounded-xl border px-4 text-xs font-semibold ${language === "ru" ? "border-primary bg-primary/10 text-primary" : "border-border bg-secondary text-muted-foreground"}`}>Русский</button>
+                    <button type="button" aria-pressed={language === "en"} onClick={() => setLanguage("en")} className={`min-h-9 rounded-xl border px-4 text-xs font-semibold ${language === "en" ? "border-primary bg-primary/10 text-primary" : "border-border bg-secondary text-muted-foreground"}`}>English</button>
+                  </div>
                 </div>
-              </div>
-              <div className="mt-4 flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-center gap-3">
-                  <span className="grid h-10 w-10 place-items-center rounded-xl bg-secondary text-primary"><Languages className="h-5 w-5" /></span>
-                  <span><span className="block text-sm font-semibold">{language === "ru" ? "Язык приложения" : "App language"}</span><span className="block text-xs text-muted-foreground">{language === "ru" ? "Выберите язык интерфейса" : "Choose the interface language"}</span></span>
-                </div>
-                <div className="flex gap-2">
-                  <button type="button" aria-pressed={language === "ru"} onClick={() => setLanguage("ru")} className={`min-h-9 rounded-xl border px-4 text-xs font-semibold ${language === "ru" ? "border-primary bg-primary/10 text-primary" : "border-border bg-secondary text-muted-foreground"}`}>Русский</button>
-                  <button type="button" aria-pressed={language === "en"} onClick={() => setLanguage("en")} className={`min-h-9 rounded-xl border px-4 text-xs font-semibold ${language === "en" ? "border-primary bg-primary/10 text-primary" : "border-border bg-secondary text-muted-foreground"}`}>English</button>
-                </div>
-              </div>
-            </section>
+              </section>
+              )}
             <section className="mt-6 rounded-2xl border border-border bg-card/50 p-4">
               <h2 className="text-base font-semibold">{language === "ru" ? "Аккаунт Telegram" : "Telegram account"}</h2>
               <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
