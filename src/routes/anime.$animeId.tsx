@@ -571,7 +571,7 @@ function AnimeDetailPage() {
         }
       }}
       aria-pressed={episodeSubscribed}
-      className="hidden inline-flex w-full min-w-0 flex-col items-center justify-center gap-1 rounded-full bg-secondary px-2 py-2.5 text-center text-[11px] font-semibold leading-tight ring-1 ring-border transition hover:bg-accent disabled:opacity-50 md:w-auto md:flex-row md:gap-2 md:px-4 md:py-2.5 md:text-sm md:leading-normal"
+      className="inline-flex w-full min-w-0 flex-col items-center justify-center gap-1 rounded-full bg-secondary px-2 py-2.5 text-center text-[11px] font-semibold leading-tight ring-1 ring-border transition hover:bg-accent disabled:opacity-50 md:flex-row md:gap-2 md:px-4 md:py-2.5 md:text-sm md:leading-normal"
     >
       <Bell className={`h-4 w-4 ${episodeSubscribed ? "fill-current text-primary" : ""}`} />
       {language === "en" ? "Follow new episodes" : "Следить за новыми сериями"}
@@ -764,23 +764,17 @@ function AnimeDetailPage() {
           )}
 
 
-          <section id="similar" className="mt-8 scroll-mt-24">
-            <div className="mb-4 flex items-end justify-between">
-              <div>
-                <h2 className="text-xl font-bold md:text-2xl">{t("anime.similar")}</h2>
-                <p className="mt-1 text-sm text-muted-foreground">{t("anime.similarSubtitle")}</p>
-              </div>
+          <section id="similar" className="mt-7 scroll-mt-24">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h2 className="text-xl font-bold md:text-2xl">{t("anime.similar")}</h2>
+              <button type="button" onClick={() => navigateToSection("popular")} className="inline-flex items-center gap-1 text-sm font-bold text-primary">{language === "ru" ? "Все" : "See all"} <ChevronRight className="h-4 w-4" /></button>
             </div>
-            <div className="scrollbar-none flex gap-4 overflow-x-auto pb-3">
-              {relatedAnime.map((item) => (
-                <AnimeCard
-                  key={item.id}
-                  anime={item}
-                  onSelect={(nextAnime) =>
-                    navigate({ to: "/anime/$animeId", params: { animeId: nextAnime.id } })
-                  }
-                />
-              ))}
+            <div className="yubera-detail-related-row">
+              {relatedAnime.map(item => <button key={item.id} type="button" onClick={() => navigate({ to: "/anime/$animeId", params: { animeId: item.id } })} className="yubera-detail-related-card">
+                <PosterArt anime={item} className="aspect-[2/3] w-full rounded-[12px]" />
+                {item.rating !== null && <span className="absolute left-1.5 top-1.5 inline-flex items-center gap-1 rounded-full bg-black/70 px-1.5 py-1 text-[10px] font-bold text-white"><Star className="h-3 w-3 fill-[#FFC044] text-[#FFC044]" />{item.rating.toFixed(1)}</span>}
+                <span className="mt-1.5 line-clamp-2 text-[11px] font-semibold leading-tight">{displayAnimeTitle(item, language)}</span>
+              </button>)}
             </div>
           </section>
         </div>
