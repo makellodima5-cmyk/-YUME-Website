@@ -1615,7 +1615,7 @@ function Index() {
           onComplete={handleAuthComplete}
         />
       ) : searching ? (
-        <main id="main-content" className="px-4 pt-36 md:px-10 md:pt-24">
+        <main id="main-content" className="yubera-with-bottom-nav px-3 pb-8 pt-[78px] sm:px-4 md:px-6 lg:px-8">
           <div className="mb-6 flex items-center justify-between">
             <h1 className="text-xl font-semibold">{submittedQuery ? `${t("catalog.results")}: «${submittedQuery}»` : t("catalog.filterResults")} <span className="text-muted-foreground">· {needsFullCatalog && catalogLoadState !== "loaded" && catalogLoadState !== "error" ? "…" : catalogResults.length}</span></h1>
             <button onClick={() => { setQuery(""); setSubmittedQuery(""); setDraftFilters(EMPTY_CATALOG_FILTERS); setActiveFilters(EMPTY_CATALOG_FILTERS); setFiltersOpen(false); setCatalogPage(1); }} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"><X className="h-4 w-4" />{t("catalog.reset")}</button>
@@ -1780,8 +1780,7 @@ function Index() {
         </main>
       ) : view === "new-releases" ? (
         <main id="main-content" className="yubera-with-bottom-nav px-3 pb-8 pt-[78px] sm:px-4 md:px-6 lg:px-8">
-          <h1 className="mb-2 text-2xl font-bold md:text-3xl">{t("home.newReleases")}</h1>
-          <p className="mb-6 text-sm text-muted-foreground">{t("home.newReleasesDescription")}</p>
+          <SectionBanner title={t("home.newReleases")} subtitle={t("home.newReleasesDescription")} />
           {needsFullCatalog && catalogLoadState !== "loaded" && catalogLoadState !== "error" ? (
             <CatalogSkeleton count={12} />
           ) : (
@@ -1800,8 +1799,7 @@ function Index() {
         </main>
       ) : view === "announcements" ? (
         <main id="main-content" className="yubera-with-bottom-nav px-3 pb-8 pt-[78px] sm:px-4 md:px-6 lg:px-8">
-          <h1 className="mb-2 text-2xl font-bold md:text-3xl">{t("home.announcements")}</h1>
-          <p className="mb-6 text-sm text-muted-foreground">{t("home.announcementsDescription")}</p>
+          <SectionBanner title={t("home.announcements")} subtitle={t("home.announcementsDescription")} />
           {needsFullCatalog && catalogLoadState !== "loaded" && catalogLoadState !== "error" ? (
             <CatalogSkeleton count={12} />
           ) : (
@@ -1820,8 +1818,7 @@ function Index() {
         </main>
       ) : view === "airing" ? (
         <main id="main-content" className="yubera-with-bottom-nav px-3 pb-8 pt-[78px] sm:px-4 md:px-6 lg:px-8">
-          <h1 className="mb-2 text-2xl font-bold md:text-3xl">{t("home.airing")}</h1>
-          <p className="mb-6 text-sm text-muted-foreground">{t("home.airingDescription")}</p>
+          <SectionBanner title={t("home.airing")} subtitle={t("home.airingDescription")} />
           {needsFullCatalog && catalogLoadState !== "loaded" && catalogLoadState !== "error" ? (
             <CatalogSkeleton count={12} />
           ) : (
@@ -1840,7 +1837,7 @@ function Index() {
         </main>
       ) : view === "catalog" ? (
         <main id="main-content" className="px-4 pt-36 md:px-10 md:pt-24">
-          <h1 className="text-2xl font-bold md:text-3xl">{t("catalog.title")}</h1>
+          <SectionBanner title={t("catalog.title")} subtitle={language === "ru" ? "Весь каталог аниме" : "Explore the full anime catalogue"} />
           {catalogLoadState === "error" && (
             <div role="alert" className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-400/25 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
               <span>{t("catalog.loadError")}</span>
@@ -1902,13 +1899,12 @@ function Index() {
           {activeCollection ? (
             <>
               <button onClick={() => setCollection(null)} className="mb-3 text-sm text-muted-foreground hover:text-primary">← {t("collections.all")}</button>
-              <h1 className="text-2xl font-bold md:text-3xl">{t((`collection.${activeCollection.id}.title`) as TranslationKey)}</h1>
-              <p className="mb-6 text-muted-foreground">{t((`collection.${activeCollection.id}.subtitle`) as TranslationKey)}</p>
+              <SectionBanner title={t((`collection.${activeCollection.id}.title`) as TranslationKey)} subtitle={t((`collection.${activeCollection.id}.subtitle`) as TranslationKey)} />
               <Grid items={activeCollectionAnime} onSelect={select} empty={t("collections.empty")} />
             </>
           ) : (
             <>
-              <h1 className="mb-6 text-2xl font-bold md:text-3xl">{t("collections.title")}</h1>
+              <SectionBanner title={t("collections.title")} subtitle={language === "ru" ? "Подборки аниме по настроению и жанрам" : "Anime collections by mood and genre"} />
               <CollectionsGrid animeList={ANIME} onOpen={setCollection} />
             </>
           )}
@@ -1932,7 +1928,7 @@ function Index() {
       ) : view === "rights" ? (
         <Profile key="rights" initialPanel="rights" animeList={ANIME} onSelect={select} onCatalog={() => setView("catalog")} />
       ) : view === "admin" ? (
-        <main id="main-content" className="min-h-[70vh] bg-[#050408] px-4 pt-20 pb-8 md:px-10 md:pt-24">
+        <main id="main-content" className="yubera-with-bottom-nav min-h-[70vh] px-3 pb-8 pt-[78px] sm:px-4 md:px-6 lg:px-8">
           <div className="mx-auto max-w-5xl">
             <h1 className="mb-2 text-2xl font-bold md:text-3xl">{language === "ru" ? "Панель администратора" : "Admin panel"}</h1>
             <p className="mb-4 text-sm text-muted-foreground">{language === "ru" ? "Управление функциями и обслуживанием Yubera." : "Manage Yubera features and maintenance."}</p>
@@ -2273,8 +2269,8 @@ function Index() {
           </div>
         </main>
       ) : view === "history" ? (
-        <main id="main-content" className="px-4 pt-24 md:px-10 md:pt-24">
-          <h1 className="mb-3 text-2xl font-bold md:text-3xl">{t("history.title")}</h1>
+        <main id="main-content" className="yubera-with-bottom-nav px-3 pb-8 pt-[78px] sm:px-4 md:px-6 lg:px-8">
+          <SectionBanner title={t("history.title")} subtitle={language === "ru" ? "Недавно просмотренные аниме и серии" : "Recently watched anime and episodes"} />
           {historyLoading ? (
             <p className="rounded-2xl border border-border bg-card/40 px-5 py-8 text-sm text-muted-foreground" role="status">{language === "ru" ? "Загружаем историю…" : "Loading history…"}</p>
           ) : !historyAuthenticated ? (
@@ -2320,9 +2316,7 @@ function Index() {
           )}
         </main>
       ) : null}
-      {!["profile", "favorites", "watchlist", "history", "my", "news", "privacy", "privacy-policy", "rules", "rights", "login", "register"].includes(view) && (
-        <Footer onNavigate={setView} />
-      )}
+}
       {!(["login", "register"].includes(view)) && (
         <nav className="yubera-bottom-nav" aria-label={language === "ru" ? "Основная навигация" : "Main navigation"}>
           {[
