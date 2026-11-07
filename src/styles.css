@@ -1005,3 +1005,88 @@ html[data-theme="light"] .yubera-bottom-nav { background:rgba(247,245,246,.96); 
   .yubera-anime-actions > button { min-height:74px; flex-direction:row; font-size:13px; }
   .yubera-detail-related-row { grid-template-columns:repeat(5,minmax(0,1fr)); gap:14px; }
 }
+
+
+/* Keep the original comfortable shelf sizing on narrow Telegram viewports. */
+.yubera-home-anime-card { flex-basis:clamp(132px,32vw,205px); aspect-ratio:1.12 / 1; }
+.yubera-home-collections { grid-auto-columns:clamp(128px,34vw,190px); }
+.yubera-home-collection { min-height:92px; }
+@media(max-width:420px) {
+  .yubera-home-anime-card { flex-basis:clamp(132px,34vw,154px); }
+  .yubera-home-collections { grid-auto-columns:clamp(128px,36vw,150px); }
+  .yubera-home-collection { min-height:92px; }
+}
+
+/* Compact the anime overview to match the reference without squeezing metadata. */
+.yubera-anime-overview {
+  grid-template-columns:minmax(104px,29%) minmax(0,1fr);
+  gap:12px;
+  padding:12px;
+}
+.yubera-anime-overview h1 { font-size:clamp(1.08rem,4.2vw,1.5rem); line-height:1.12; }
+.yubera-anime-overview .yubera-chip {
+  min-height:28px;
+  padding:.3rem .56rem;
+  font-size:.7rem;
+  line-height:1.15;
+}
+.yubera-anime-overview .yubera-primary-button { min-height:48px; margin-top:12px; font-size:.92rem; }
+.yubera-anime-actions { margin-top:12px; gap:7px; }
+.yubera-anime-actions > button { min-height:64px; padding:8px 4px; font-size:10px; }
+.yubera-anime-actions > button:disabled { opacity:.45; }
+#anime-description-desktop, #anime-description { line-height:1.55; }
+.yubera-episode-progress-list {
+  display:flex;
+  gap:7px;
+  overflow-x:auto;
+  overscroll-behavior-x:contain;
+  scrollbar-width:none;
+  padding:0 1px 4px;
+}
+.yubera-episode-progress-list::-webkit-scrollbar { display:none; }
+.yubera-episode-progress-item {
+  display:flex;
+  min-width:48px;
+  flex:0 0 48px;
+  flex-direction:column;
+  align-items:center;
+  gap:6px;
+  padding:8px 6px 7px;
+  border:1px solid var(--border);
+  border-radius:12px;
+  background:var(--card);
+  color:var(--muted-foreground);
+  font-size:12px;
+  font-weight:700;
+}
+.yubera-episode-progress-item.is-active {
+  border-color:var(--primary);
+  background:color-mix(in srgb,var(--primary) 12%,var(--card));
+  color:var(--foreground);
+}
+.yubera-episode-progress-track {
+  display:block;
+  width:100%;
+  height:3px;
+  overflow:hidden;
+  border-radius:999px;
+  background:rgba(255,255,255,.16);
+}
+.yubera-episode-progress-track > span {
+  display:block;
+  height:100%;
+  border-radius:999px;
+  background:var(--primary);
+}
+@media(max-width:390px) {
+  .yubera-anime-overview { grid-template-columns:minmax(96px,28%) minmax(0,1fr); gap:10px; padding:10px; }
+  .yubera-anime-overview h1 { font-size:1.06rem; }
+  .yubera-anime-overview .yubera-chip { min-height:26px; padding:.26rem .48rem; font-size:.66rem; }
+  .yubera-anime-actions > button { min-height:60px; font-size:9.5px; }
+}
+@media(min-width:640px) {
+  .yubera-anime-overview { grid-template-columns:minmax(190px,230px) minmax(0,1fr); gap:22px; padding:22px; }
+  .yubera-anime-overview h1 { font-size:clamp(1.5rem,2.4vw,2rem); }
+  .yubera-anime-overview .yubera-chip { font-size:.8rem; }
+  .yubera-anime-actions > button { min-height:74px; flex-direction:row; font-size:13px; }
+}
