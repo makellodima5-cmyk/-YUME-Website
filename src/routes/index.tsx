@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowDownWideNarrow, ChevronDown, ChevronRight, Search, SlidersHorizontal, X, UserRound, Globe, Sun, Moon, Monitor, ShieldCheck, Play, ListChecks, CircleCheck, Clock3, Download, Database, Settings, History, Bell, CheckCheck, Sparkles, Home, LayoutGrid, Bookmark } from "lucide-react";
+import { ArrowDownWideNarrow, ChevronDown, ChevronRight, Search, SlidersHorizontal, X, UserRound, Globe, Sun, Moon, Monitor, ShieldCheck, Play, ListChecks, CircleCheck, Clock3, Download, Database, Settings, History, Bell, CheckCheck, Sparkles, Home, LayoutGrid, Bookmark, Newspaper } from "lucide-react";
 import { COLLECTIONS, type Anime } from "@/data/anime";
 import { getShikimoriCatalog } from "@/data/shikimori";
 import { getExactReleaseDate, isNewRelease, isUpcomingAnnouncement } from "@/data/anime-sections";
@@ -2479,7 +2479,7 @@ function Index() {
             { id: "home" as View, label: language === "ru" ? "Главная" : "Home", icon: Home },
             { id: "catalog" as View, label: language === "ru" ? "Каталог" : "Catalog", icon: LayoutGrid },
             { id: "my" as View, label: language === "ru" ? "Моё" : "My", icon: Bookmark },
-            { id: "news" as View, label: language === "ru" ? "Новости" : "News", icon: Bell },
+            { id: "news" as View, label: language === "ru" ? "Новости" : "News", icon: Newspaper },
             { id: "profile" as View, label: language === "ru" ? "Профиль" : "Profile", icon: UserRound },
           ].map((item) => {
             const Icon = item.icon;
