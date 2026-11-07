@@ -1929,9 +1929,9 @@ function Index() {
         <Profile key="rights" initialPanel="rights" animeList={ANIME} onSelect={select} onCatalog={() => setView("catalog")} />
       ) : view === "admin" ? (
         <main id="main-content" className="yubera-with-bottom-nav mx-auto min-h-[70vh] w-full max-w-[1600px] px-3 pb-8 pt-[78px] sm:px-4 md:px-6 lg:px-8">
-          <div className="mx-auto max-w-5xl">
-            <h1 className="mb-2 text-2xl font-bold md:text-3xl">{language === "ru" ? "Панель администратора" : "Admin panel"}</h1>
-            <p className="mb-4 text-sm text-muted-foreground">{language === "ru" ? "Управление функциями и обслуживанием Yubera." : "Manage Yubera features and maintenance."}</p>
+          <div className="mx-auto max-w-[1600px]">
+            <SectionBanner title={language === "ru" ? "Панель администратора" : "Admin panel"} subtitle={language === "ru" ? "Управление функциями и обслуживанием YUBERA" : "Manage YUBERA features and maintenance"} />
+            
             {!telegramDetectionComplete || (isTelegramMiniApp && (
               (!telegramAuthReady && !telegramAuthError) ||
               (telegramAuthReady && !telegramConsentRequired && !telegramConsentPending && !adminCheckComplete)
