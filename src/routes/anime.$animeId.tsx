@@ -616,7 +616,7 @@ function AnimeDetailPage() {
         onProfile={() => navigateToSection("profile")}
       />
 
-      <main id="main-content" className="px-4 pt-24 md:px-10 md:pt-28">
+      <main id="main-content" className="px-4 pt-24 pb-20 md:px-10 md:pt-28 md:pb-12">
         {apiError && (
           <p role="status" className="mx-auto mb-4 max-w-7xl rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-muted-foreground">
             {language === "en"
@@ -750,7 +750,7 @@ function AnimeDetailPage() {
             ref={playerSectionRef}
             id="watch"
             aria-labelledby="watch-title"
-            className="mt-10 scroll-mt-24 md:mt-12"
+            id="watch" className="mt-10 scroll-mt-24 md:mt-12"
           >
             <div className="mb-4">
               <h2 id="watch-title" className="text-2xl font-bold md:text-3xl">
@@ -888,7 +888,7 @@ function AnimeDetailPage() {
           </section>
 
 
-          <section className="mt-8">
+          <section id="similar" className="mt-8 scroll-mt-24">
             <div className="mb-4 flex items-end justify-between">
               <div>
                 <h2 className="text-xl font-bold md:text-2xl">{t("anime.similar")}</h2>
