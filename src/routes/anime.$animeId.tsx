@@ -21,7 +21,7 @@ import {
   CATALOG_SCROLL_RESTORE_STORAGE_KEY,
   parseCatalogReturnState,
 } from "@/data/catalog-search";
-import { AnimeCard, PosterArt } from "@/components/yume/Poster";
+import { PosterArt } from "@/components/yume/Poster";
 import { useYumePreferences, displayAnimeTitle, displayAnimeStatus, displayGenre, displayAnimeKind } from "@/data/preferences";
 import {
   FAVORITES_STORAGE_KEY,
@@ -514,17 +514,6 @@ function AnimeDetailPage() {
       </p>
       {needsDescriptionToggle && descriptionControl(id)}
     </>
-  );
-
-  const watchButton = (
-    <button
-      type="button"
-      onClick={scrollToPlayer}
-      className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-neon px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-neon transition hover:brightness-110 md:w-auto"
-    >
-      <Play className="h-4 w-4 fill-current" />
-      {language === "en" ? "Watch" : "Смотреть"}
-    </button>
   );
 
   const favoriteButton = (
