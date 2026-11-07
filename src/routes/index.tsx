@@ -288,7 +288,7 @@ function HomeQuickControls({ onProfile }: { onProfile: () => void }) {
       <button
         type="button"
         onClick={onProfile}
-        className="flex min-h-12 w-full items-center justify-center gap-2 whitespace-nowrap rounded-full border border-primary/35 bg-card/80 px-2 text-sm font-medium text-foreground shadow-[0_4px_18px_rgba(156,92,255,0.08)] transition hover:border-primary/70 hover:bg-accent/70 sm:text-base"
+        className="flex min-h-12 w-full items-center justify-center gap-2 whitespace-nowrap rounded-full border border-primary/35 bg-card/80 px-2 text-sm font-medium text-foreground shadow-[0_4px_18px_rgba(255,90,61,0.08)] transition hover:border-primary/70 hover:bg-accent/70 sm:text-base"
       >
         <UserRound className="h-4 w-4 shrink-0 sm:h-5 sm:w-5" />
         <span>{t("nav.profileButton")}</span>
