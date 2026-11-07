@@ -290,6 +290,7 @@ function Index() {
   const ANIME = catalogAnime;
   // Initialize view before effects that read it during server-side rendering.
   const [view, setViewRaw] = useState<View>(section ?? "home");
+  const [newsDetailOpen, setNewsDetailOpen] = useState(false);
 
 
   useEffect(() => {
@@ -1911,7 +1912,7 @@ function Index() {
       ) : view === "my" ? (
         <MyHub animeList={ANIME} onNavigate={setView} onSelect={select} />
       ) : view === "news" ? (
-        <News animeList={ANIME} />
+        <News animeList={ANIME} onDetailChange={setNewsDetailOpen} />
       ) : view === "profile" ? (
         <Profile animeList={ANIME} onSelect={select} onCatalog={() => setView("catalog")} isAdmin={isAdmin} onAdmin={() => setView("admin")} />
       ) : view === "favorites" ? (
@@ -2315,7 +2316,7 @@ function Index() {
           )}
         </main>
             ) : null}
-      {!(["login", "register"].includes(view)) && (
+      {!newsDetailOpen && !(["login", "register"].includes(view)) && (
         <nav className="yubera-bottom-nav" aria-label={language === "ru" ? "Основная навигация" : "Main navigation"}>
           {[
             { id: "home" as View, label: language === "ru" ? "Главная" : "Home", icon: Home, active: ["home", "popular", "new-releases", "announcements", "airing", "collections"].includes(view) },
