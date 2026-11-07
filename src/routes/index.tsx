@@ -488,7 +488,7 @@ function Index() {
   }, [telegramDetectionComplete, language]);
 
   useEffect(() => {
-    if (!isTelegramMiniApp || !telegramAuthReady || telegramConsentRequired || telegramConsentPending) return;
+    if (!telegramAuthReady || telegramConsentRequired || telegramConsentPending) return;
     let cancelled = false;
     setAdminCheckComplete(false);
     setIsAdmin(false);
