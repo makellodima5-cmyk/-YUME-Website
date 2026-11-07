@@ -19,7 +19,7 @@ type HomeExperienceProps = {
   onOpenCollection: (id: string) => void;
 };
 
-function ContinueWatching({ animeList, onSelect }: { animeList: Anime[]; onSelect: (anime: Anime) => void }) {
+export function ContinueWatching({ animeList, onSelect }: { animeList: Anime[]; onSelect: (anime: Anime) => void }) {
   const { language } = useYumePreferences();
   const [progress, setProgress] = useState<PlaybackProgressEntry[]>([]);
 
