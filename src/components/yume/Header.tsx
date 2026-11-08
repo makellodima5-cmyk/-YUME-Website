@@ -7,7 +7,7 @@ export type View =
   | "home" | "admin" | "catalog" | "collections" | "my" | "news" | "profile"
   | "login" | "register" | "popular" | "new-releases" | "announcements" | "airing"
   | "favorites" | "watchlist" | "history" | "privacy" | "privacy-policy" | "rules"
-  | "rights" | "notifications";
+  | "rights" | "notifications" | "tracked-titles";
 
 type Props = {
   setView: (view: View) => void;
