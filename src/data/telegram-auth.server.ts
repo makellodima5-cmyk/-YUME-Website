@@ -604,7 +604,7 @@ export async function handleTelegramHistory(request: Request): Promise<Response>
         .bind(userId, animeId, now, episodeNumber, positionMillis, durationMillis, Date.now()).run();
     await db.prepare("DELETE FROM yume_view_history WHERE user_id = ? AND anime_id NOT IN (SELECT anime_id FROM yume_view_history WHERE user_id = ? ORDER BY viewed_at DESC LIMIT 100)")
         .bind(userId, userId).run();
-      return jsonResponse({ saved: true, event: "opened" });
+      return jsonResponse({ saved: true, event: input.event });
     }
 
     const watchedSeconds = input.watchedSeconds;
