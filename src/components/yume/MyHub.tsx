@@ -85,7 +85,7 @@ export function MyHub({ animeList, onNavigate, onSelect }: Props) {
         const ids = payload.items.flatMap(item => {
           if (!item || typeof item !== "object") return [];
           const animeId = (item as { animeId?: unknown }).animeId;
-          return typeof animeId === "string" && /^\\d{1,12}$/.test(animeId) ? [animeId] : [];
+          return typeof animeId === "string" && /^\d{1,12}$/.test(animeId) ? [animeId] : [];
         });
         setHistoryIds(Array.from(new Set(ids)));
       })
