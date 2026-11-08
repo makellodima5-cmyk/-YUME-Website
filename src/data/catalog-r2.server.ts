@@ -18,7 +18,8 @@ export type R2CatalogResult = { items: Anime[]; revision: number; updatedAt: str
 // The public catalogue is immutable between published revisions. Reuse the parsed
 // snapshot in a warm Website isolate instead of parsing the same multi-megabyte
 // JSON response for every route/server-function invocation.
-const CATALOG_STATE_CACHE_TTL_MS = 5_000;
+const CATALOG_STATE_CACHE_TTL_MS = 60_000;
+const ADMIN_CATALOG_STATE_CACHE_TTL_MS = 5_000;
 type CachedCatalogState = { state: CatalogState; expiresAt: number };
 let catalogStateCache: CachedCatalogState | null = null;
 let catalogStateRequest: Promise<CatalogState> | null = null;
@@ -115,7 +116,7 @@ async function readCachedCatalogState(useAdminCheckpoint: boolean, forceFresh: b
     const state = await request;
     if (useAdminCheckpoint) {
       if (adminCatalogStateGeneration === nextGeneration) {
-        adminCatalogStateCache = { state, expiresAt: Date.now() + CATALOG_STATE_CACHE_TTL_MS };
+        adminCatalogStateCache = { state, expiresAt: Date.now() + ADMIN_CATALOG_STATE_CACHE_TTL_MS };
       }
     } else if (catalogStateGeneration === nextGeneration) {
       catalogStateCache = { state, expiresAt: Date.now() + CATALOG_STATE_CACHE_TTL_MS };
