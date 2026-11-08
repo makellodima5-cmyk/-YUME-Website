@@ -109,7 +109,7 @@ describe("collection catalogue pages", () => {
       .map((collection) => ({ collection, members: getCollectionAnime(items, collection.genres) }))
       .filter(({ members }) => members.length > 0);
     expect(visible.map(({ collection }) => collection.id)).toEqual(["c1", "c3"]);
-    expect(visible.every(({ members }) => members.length <= 3 || members.every((item) => items.includes(item)))).toBe(true);
+    expect(visible.every(({ members }) => members.slice(0, 3).every((item) => items.includes(item)))).toBe(true);
     expect(visible.every(({ members }) => members.every((item) => items.includes(item)))).toBe(true);
   });
   it.each([[501,26,20],[326,17,20],[287,15,20],[246,13,20],[198,10,20],[27,2,7],[20,1,20],[12,1,12]])(
