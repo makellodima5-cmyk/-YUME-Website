@@ -1183,3 +1183,106 @@ html[data-theme="light"] .yubera-bottom-nav { background:rgba(247,245,246,.96); 
     padding:7px 5px 6px;
   }
 }
+
+
+/* Compact viewing controls: voice-over and episodes share one panel. */
+.yubera-player-options {
+  display:flex;
+  flex-direction:column;
+  gap:9px;
+  margin:0 0 12px;
+  padding:10px 12px;
+  border:1px solid var(--border);
+  border-radius:17px;
+  background:var(--card);
+}
+.yubera-player-voice {
+  display:grid;
+  grid-template-columns:76px minmax(0,1fr);
+  align-items:center;
+  gap:10px;
+}
+.yubera-player-voice > span:first-child { margin-bottom:0; }
+.yubera-player-voice select {
+  min-height:40px;
+  padding-block:8px;
+  font-size:13px;
+}
+.yubera-player-episodes {
+  min-width:0;
+  padding-top:9px;
+  border-top:1px solid var(--border);
+}
+.yubera-player-episodes-heading {
+  margin-bottom:8px;
+  color:var(--muted-foreground);
+  font-size:12px;
+  font-weight:650;
+}
+.yubera-episode-progress-list {
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(52px,1fr));
+  gap:6px;
+  max-height:166px;
+  overflow-x:hidden;
+  overflow-y:auto;
+  overscroll-behavior-y:contain;
+  scrollbar-width:thin;
+  padding:7px;
+  border:1px solid var(--border);
+  border-radius:14px;
+  background:color-mix(in srgb,var(--background) 34%,var(--card));
+}
+.yubera-episode-progress-item {
+  min-height:46px;
+  gap:5px;
+  padding:6px 5px 5px;
+  border-radius:11px;
+  font-size:11px;
+}
+.yubera-episode-progress-track { height:3px; }
+
+@media(max-width:390px) {
+  .yubera-player-options { gap:8px; padding:9px 10px; }
+  .yubera-player-voice { grid-template-columns:66px minmax(0,1fr); gap:8px; }
+  .yubera-episode-progress-list {
+    grid-template-columns:repeat(5,minmax(0,1fr));
+    max-height:154px;
+    gap:5px;
+    padding:6px;
+  }
+  .yubera-episode-progress-item { min-height:43px; padding:5px 4px; }
+}
+
+/* Related titles are a swipeable horizontal shelf, not a multi-row grid. */
+.yubera-detail-related-row {
+  display:flex;
+  gap:12px;
+  overflow-x:auto;
+  overflow-y:hidden;
+  overscroll-behavior-x:contain;
+  scrollbar-width:none;
+  scroll-snap-type:x mandatory;
+  padding:0 1px 7px;
+}
+.yubera-detail-related-row::-webkit-scrollbar { display:none; }
+.yubera-detail-related-card {
+  flex:0 0 clamp(136px,36vw,172px);
+  scroll-snap-align:start;
+}
+@media(min-width:640px) {
+  .yubera-detail-related-card { flex-basis:180px; }
+}
+
+/* Announcement cards keep their compact metadata layout, with enough room for titles. */
+.yubera-home-announcement {
+  flex:0 0 min(70vw,340px);
+  height:116px;
+}
+.yubera-home-announcement > span { padding-block:9px; }
+@media(max-width:420px) {
+  .yubera-home-announcement {
+    flex-basis:min(76vw,320px);
+    height:112px;
+  }
+}

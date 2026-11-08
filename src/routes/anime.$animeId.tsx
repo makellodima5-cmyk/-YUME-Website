@@ -701,6 +701,37 @@ function AnimeDetailPage() {
             </div>
           </section>
 
+          {displayableScreenshots.length > 0 && (
+            <section aria-labelledby="anime-screenshots-title" className="relative z-10 mt-5 md:mt-6">
+              <h2 id="anime-screenshots-title" className="mb-3 text-xl font-bold md:text-2xl">
+                {language === "en" ? "Screenshots" : "Кадры"}
+              </h2>
+              <div className="scrollbar-none flex snap-x snap-mandatory gap-2 overflow-x-auto overscroll-x-contain px-0.5 pb-2">
+                {displayableScreenshots.map((screenshot, index) => (
+                  <button
+                    key={screenshot.originalUrl}
+                    type="button"
+                    onClick={(event) => {
+                      screenshotTriggerRef.current = event.currentTarget;
+                      setActiveScreenshotIndex(index);
+                    }}
+                    aria-label={language === "en" ? "Open screenshot " + (index + 1) : "Открыть кадр " + (index + 1)}
+                    className="group relative aspect-video w-[34vw] max-w-[220px] shrink-0 snap-start overflow-hidden rounded-xl border border-white/10 bg-card shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  >
+                    <img
+                      src={screenshot.previewUrl}
+                      alt={language === "en" ? "Anime screenshot " + (index + 1) : "Кадр из аниме " + (index + 1)}
+                      loading="lazy"
+                      decoding="async"
+                      className="h-full w-full object-cover transition duration-200 group-hover:scale-[1.03]"
+                    />
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
+
+
           <section
             ref={playerSectionRef}
             id="watch"
@@ -738,8 +769,8 @@ function AnimeDetailPage() {
               ) : (
                 <div className="space-y-4">
                   <div className="yubera-player-options">
-                    <label className="min-w-0">
-                      <span className="mb-2 block text-sm font-medium text-muted-foreground">{language === "en" ? "Voice-over" : "Озвучка"}</span>
+                    <label className="yubera-player-voice min-w-0">
+                      <span className="block text-sm font-medium text-muted-foreground">{language === "en" ? "Voice-over" : "Озвучка"}</span>
                       <span className="relative block">
                         <select id="kodik-translation" value={kodikTranslationId} onChange={(event) => { const next = kodikSources.find(source => source.id === event.target.value); setKodikTranslationId(event.target.value); setKodikEpisode(next?.episodes.some(episode => episode.number === kodikEpisode) ? kodikEpisode : (next?.episodes[0]?.number ?? 1)); }} disabled={!kodikSources.length} className="w-full appearance-none rounded-full border border-border bg-secondary px-4 py-3 pr-10 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-60">
                           {!kodikSources.length && <option value="">{language === "en" ? "Loading voice-overs…" : "Загрузка озвучек…"}</option>}
@@ -748,38 +779,40 @@ function AnimeDetailPage() {
                         <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                       </span>
                     </label>
-                  </div>
-                  <div className="mb-2 text-sm font-medium text-muted-foreground">{language === "en" ? "Episodes" : "Серии"}</div>
-                  <div className="yubera-episode-progress-list" aria-label={language === "en" ? "Episode progress" : "Прогресс серий"}>
-                    {selectedKodikSource?.episodes.map((episode) => {
-                      const progress = episodeProgress.find((entry) => entry.episode === episode.number);
-                      const estimatedDuration = progress?.durationSeconds ?? (anime.episodes > 1 ? 24 * 60 : null);
-                      const percent = progress
-                        ? progress.completed
-                          ? 100
-                          : estimatedDuration
-                            ? Math.max(0, Math.min(100, progress.positionSeconds / estimatedDuration * 100))
-                            : 0
-                        : 0;
-                      const active = episode.number === kodikEpisode;
-                      return (
-                        <button
-                          key={episode.number}
-                          type="button"
-                          aria-pressed={active}
-                          aria-label={(language === "en" ? "Episode " : "Серия ") + episode.number + (progress ? ", " + Math.round(percent) + "% " + (language === "en" ? "watched" : "просмотрено") : "")}
-                          onClick={() => {
-                            setKodikEpisode(episode.number);
-                            setResumeTargetEpisode(progress && !progress.completed ? episode.number : null);
-                            setResumeTargetSeconds(progress && !progress.completed ? progress.positionSeconds : 0);
-                          }}
-                          className={`yubera-episode-progress-item ${active ? "is-active" : ""}`}
-                        >
-                          <span>{episode.number}</span>
-                          <span className="yubera-episode-progress-track"><span style={{ width: percent + "%" }} /></span>
-                        </button>
-                      );
-                    })}
+                    <div className="yubera-player-episodes">
+                      <div className="yubera-player-episodes-heading">{language === "en" ? "Episodes" : "Серии"}</div>
+                      <div className="yubera-episode-progress-list" aria-label={language === "en" ? "Episode progress" : "Прогресс серий"}>
+                        {selectedKodikSource?.episodes.map((episode) => {
+                          const progress = episodeProgress.find((entry) => entry.episode === episode.number);
+                          const estimatedDuration = progress?.durationSeconds ?? (anime.episodes > 1 ? 24 * 60 : null);
+                          const percent = progress
+                            ? progress.completed
+                              ? 100
+                              : estimatedDuration
+                                ? Math.max(0, Math.min(100, progress.positionSeconds / estimatedDuration * 100))
+                                : 0
+                            : 0;
+                          const active = episode.number === kodikEpisode;
+                          return (
+                            <button
+                              key={episode.number}
+                              type="button"
+                              aria-pressed={active}
+                              aria-label={(language === "en" ? "Episode " : "Серия ") + episode.number + (progress ? ", " + Math.round(percent) + "% " + (language === "en" ? "watched" : "просмотрено") : "")}
+                              onClick={() => {
+                                setKodikEpisode(episode.number);
+                                setResumeTargetEpisode(progress && !progress.completed ? episode.number : null);
+                                setResumeTargetSeconds(progress && !progress.completed ? progress.positionSeconds : 0);
+                              }}
+                              className={`yubera-episode-progress-item ${active ? "is-active" : ""}`}
+                            >
+                              <span>{episode.number}</span>
+                              <span className="yubera-episode-progress-track"><span style={{ width: percent + "%" }} /></span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
                   </div>
                   <div className="relative mx-auto aspect-video w-full min-w-0 overflow-hidden rounded-2xl border border-white/10 bg-[#101116] shadow-2xl">
                     <div id="kodik-player-container" className="absolute inset-0 h-full w-full [&_iframe]:!absolute [&_iframe]:!inset-0 [&_iframe]:!h-full [&_iframe]:!w-full" />
@@ -814,41 +847,10 @@ function AnimeDetailPage() {
           </section>
 
 
-          {displayableScreenshots.length > 0 && (
-            <section aria-labelledby="anime-screenshots-title" className="relative z-10 mt-5 md:mt-6">
-              <h2 id="anime-screenshots-title" className="mb-3 text-xl font-bold md:text-2xl">
-                {language === "en" ? "Screenshots" : "Кадры"}
-              </h2>
-              <div className="scrollbar-none flex snap-x snap-mandatory gap-2 overflow-x-auto overscroll-x-contain px-0.5 pb-2">
-                {displayableScreenshots.map((screenshot, index) => (
-                  <button
-                    key={screenshot.originalUrl}
-                    type="button"
-                    onClick={(event) => {
-                      screenshotTriggerRef.current = event.currentTarget;
-                      setActiveScreenshotIndex(index);
-                    }}
-                    aria-label={language === "en" ? "Open screenshot " + (index + 1) : "Открыть кадр " + (index + 1)}
-                    className="group relative aspect-video w-[34vw] max-w-[220px] shrink-0 snap-start overflow-hidden rounded-xl border border-white/10 bg-card shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                  >
-                    <img
-                      src={screenshot.previewUrl}
-                      alt={language === "en" ? "Anime screenshot " + (index + 1) : "Кадр из аниме " + (index + 1)}
-                      loading="lazy"
-                      decoding="async"
-                      className="h-full w-full object-cover transition duration-200 group-hover:scale-[1.03]"
-                    />
-                  </button>
-                ))}
-              </div>
-            </section>
-          )}
-
-
           <section id="similar" className="mt-7 scroll-mt-24">
             <div className="mb-3 flex items-center justify-between gap-3">
               <h2 className="text-xl font-bold md:text-2xl">{t("anime.similar")}</h2>
-              <button type="button" onClick={() => navigateToSection("popular")} className="inline-flex items-center gap-1 text-sm font-bold text-primary">{language === "ru" ? "Все" : "See all"} <ChevronRight className="h-4 w-4" /></button>
+              <button type="button" onClick={() => navigate({ to: "/anime/$animeId/similar", params: { animeId } })} className="inline-flex items-center gap-1 text-sm font-bold text-primary">{language === "ru" ? "Все" : "See all"} <ChevronRight className="h-4 w-4" /></button>
             </div>
             <div className="yubera-detail-related-row">
               {relatedAnime.map(item => <button key={item.id} type="button" onClick={() => navigate({ to: "/anime/$animeId", params: { animeId: item.id } })} className="yubera-detail-related-card">
