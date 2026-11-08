@@ -7,7 +7,6 @@ import { SectionBanner } from "./Sections";
 import { PosterArt } from "./Poster";
 import { getShikimoriAnimes } from "@/data/shikimori";
 import { FAVORITES_STORAGE_KEY, PROFILE_UPDATED_EVENT, readSavedAnimeIds, WATCHLIST_STORAGE_KEY } from "@/data/profile-storage";
-import { PLAYBACK_PROGRESS_UPDATED_EVENT, readPlaybackProgress } from "@/data/playback-progress";
 
 type Props = { animeList: Anime[]; onNavigate: (view: View) => void; onSelect: (anime: Anime) => void };
 const PREVIEW_KEY = "yubera-my-preview-v1";
@@ -57,19 +56,43 @@ export function MyHub({ animeList, onNavigate, onSelect }: Props) {
   
   useEffect(() => {
     const sync = () => {
-      setFavoriteIds(readSavedAnimeIds(FAVORITES_STORAGE_KEY));
-      setWatchIds(readSavedAnimeIds(WATCHLIST_STORAGE_KEY));
-      setHistoryIds(Array.from(new Set(readPlaybackProgress().map(item => item.animeId))));
+      setFavoriteIds(Array.from(new Set(readSavedAnimeIds(FAVORITES_STORAGE_KEY))));
+      setWatchIds(Array.from(new Set(readSavedAnimeIds(WATCHLIST_STORAGE_KEY))));
     };
     sync();
     window.addEventListener(PROFILE_UPDATED_EVENT, sync);
-    window.addEventListener(PLAYBACK_PROGRESS_UPDATED_EVENT, sync);
     window.addEventListener("storage", sync);
     return () => {
       window.removeEventListener(PROFILE_UPDATED_EVENT, sync);
-      window.removeEventListener(PLAYBACK_PROGRESS_UPDATED_EVENT, sync);
       window.removeEventListener("storage", sync);
     };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/telegram/history", {
+      credentials: "same-origin",
+      cache: "no-store",
+      headers: { Accept: "application/json" },
+    })
+      .then(async response => {
+        const payload = await response.json().catch(() => null) as { authenticated?: unknown; items?: unknown } | null;
+        if (cancelled) return;
+        if (!response.ok || payload?.authenticated !== true || !Array.isArray(payload.items)) {
+          setHistoryIds([]);
+          return;
+        }
+        const ids = payload.items.flatMap(item => {
+          if (!item || typeof item !== "object") return [];
+          const animeId = (item as { animeId?: unknown }).animeId;
+          return typeof animeId === "string" && /^\d{1,12}$/.test(animeId) ? [animeId] : [];
+        });
+        setHistoryIds(Array.from(new Set(ids)));
+      })
+      .catch(() => {
+        if (!cancelled) setHistoryIds([]);
+      });
+    return () => { cancelled = true; };
   }, []);
 
   useEffect(() => { setWatchPreviewIds(stablePreviewIds("watchlist", watchIds)); }, [watchIds]);
@@ -120,7 +143,7 @@ export function MyHub({ animeList, onNavigate, onSelect }: Props) {
         <div className="scrollbar-none flex gap-3 overflow-x-auto pb-2">{favorites.slice(0, 8).map(anime => <button key={anime.id} type="button" onClick={() => onSelect(anime)} className="w-[104px] shrink-0 text-left"><PosterArt anime={anime} className="aspect-[2/3] w-full rounded-[16px] border border-border" /><span className="mt-2 block line-clamp-2 min-h-8 text-[12px] leading-snug">{displayAnimeTitle(anime, language)}</span></button>)}</div>}
     </section>
     <div className="mt-5 grid gap-3">
-      {watchIds.length > 0 && listCard("watchlist", ru ? "Смотреть позже" : "Watch later", ru ? "Отложенные аниме" : "Anime saved for later", Bookmark, watchIds.length, watchlistPreview)}
+      {listCard("watchlist", ru ? "Смотреть позже" : "Watch later", ru ? "Отложенные аниме" : "Anime saved for later", Bookmark, watchIds.length, watchlistPreview)}
       {historyIds.length > 0 && listCard("history", ru ? "История просмотра" : "Viewing history", ru ? "Ранее просмотренные" : "Previously watched anime", Clock3, historyIds.length, historyPreview)}
       <button type="button" onClick={() => onNavigate("tracked-titles")} className="flex min-h-[96px] w-full items-center gap-3 rounded-[22px] border border-border bg-card/90 px-4 py-4 text-left shadow-sm transition hover:border-primary/40">
         <span className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-[#292A31] text-primary"><Radio className="h-7 w-7" /></span>

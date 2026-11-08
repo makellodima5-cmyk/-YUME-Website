@@ -57,6 +57,13 @@ type ProfilePanel =
   | "about"
   | "support";
 
+type TelegramProfileUser = {
+  first_name?: string;
+  last_name?: string;
+  username?: string;
+  photo_url?: string;
+};
+
 type Props = {
   animeList: Anime[];
   onSelect: (anime: Anime) => void;
@@ -80,6 +87,7 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
   const [supportLinksLoading, setSupportLinksLoading] = useState(false);
   const [supportLinksError, setSupportLinksError] = useState(false);
   const [isTelegramMiniApp, setIsTelegramMiniApp] = useState(false);
+  const [telegramUser, setTelegramUser] = useState<TelegramProfileUser | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
   const [accountBusy, setAccountBusy] = useState(false);
@@ -323,7 +331,7 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
   const panelTitles: Record<ProfilePanel, string> = {
     overview: t("profile.title"),
     favorites: t("profile.favorites"),
-    watchlist: t("profile.watchlist"),
+    watchlist: language === "ru" ? "Смотреть позже" : "Watch Later",
     documents: t("profile.documents"),
     privacy: t("profile.privacy"),
     rules: t("profile.rules"),
@@ -479,7 +487,7 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
   return (
     <main id="main-content" className={`yubera-with-bottom-nav px-3 pb-8 sm:px-4 md:px-6 lg:px-8 ${panel === "support" ? "pt-20" : "pt-[78px]"}`}>
       <div className="mx-auto max-w-[1600px]">
-        {!authChecked && (panel === "overview" || panel === "favorites" || panel === "watchlist") ? (
+        {!authChecked && (panel === "overview" || panel === "favorites") ? (
           <section className="mx-auto max-w-xl rounded-3xl border border-border bg-card/60 p-6 text-center sm:p-8" aria-live="polite" aria-busy="true">
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
               <LoaderCircle className="h-6 w-6 animate-spin" aria-hidden="true" />
@@ -488,7 +496,7 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
               {language === "ru" ? "Проверяем авторизацию…" : "Checking your session…"}
             </p>
           </section>
-        ) : authChecked && !isAuthenticated && (panel === "overview" || panel === "favorites" || panel === "watchlist") ? (
+        ) : authChecked && !isAuthenticated && (panel === "overview" || panel === "favorites") ? (
           <section className="mx-auto max-w-xl rounded-3xl border border-border bg-card/80 p-6 text-center shadow-xl sm:p-8">
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
               <ShieldCheck className="h-7 w-7" />
