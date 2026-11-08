@@ -1,26 +1,33 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { readShikimoriSharedCache, writeShikimoriSharedCache } from "@/data/shikimori-kv-cache.server";
-import type { YuberaNewsArticle } from "@/data/news-types";
+import type { YuberaNewsArticle, YuberaNewsArticleDetails } from "@/data/news-types";
 
 type ShikimoriTopic = {
   id: number;
   topic_title: string;
   body?: string | null;
+  html_body?: string | null;
   created_at: string;
-  comments_count?: number | null;
   user?: { nickname?: string | null } | null;
-  linked?: { name?: string | null; russian?: string | null } | null;
+  linked_id?: number | null;
+  linked_type?: string | null;
+  linked?: {
+    id?: number | null;
+    name?: string | null;
+    russian?: string | null;
+    image?: { original?: string | null; preview?: string | null; x96?: string | null; x48?: string | null } | null;
+  } | null;
 };
-
-
 
 type NewsResponse = { articles: YuberaNewsArticle[]; source: "Shikimori"; limited: true; updatedAt: string };
 
 const CACHE_KEY = "news:forum:page-1:limit-30";
 const CACHE_TTL_MS = 10 * 60 * 1000;
+const ARTICLE_CACHE_TTL_MS = 60 * 60 * 1000;
 const UPSTREAM_TIMEOUT_MS = 8000;
+const SUMMARY_LIMIT = 520;
 
-function plainText(value: string | null | undefined): string {
+function plainText(value: string | null | undefined, limit = SUMMARY_LIMIT): string {
   return (value ?? "")
     .replace(/<[^>]*>/g, " ")
     .replace(/\[[^\]]*\]/g, " ")
@@ -28,9 +35,11 @@ function plainText(value: string | null | undefined): string {
     .replace(/&amp;/gi, "&")
     .replace(/&quot;/gi, '"')
     .replace(/&#39;/gi, "'")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
     .replace(/\s+/g, " ")
     .trim()
-    .slice(0, 420);
+    .slice(0, limit);
 }
 
 function classify(title: string, summary: string): YuberaNewsArticle["category"] {
@@ -42,18 +51,56 @@ function classify(title: string, summary: string): YuberaNewsArticle["category"]
   return "INDUSTRY";
 }
 
+function safeHttpUrl(value: string | null | undefined): string | null {
+  if (!value?.trim()) return null;
+  try {
+    const url = new URL(value.trim().startsWith("//") ? "https:" + value.trim() : value.trim());
+    return url.protocol === "https:" || url.protocol === "http:" ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+function youtubeVideoId(value: string | null | undefined): string | null {
+  if (!value) return null;
+  try {
+    const url = new URL(value.trim().startsWith("//") ? "https:" + value.trim() : value.trim());
+    const host = url.hostname.toLowerCase().replace(/^www\./, "");
+    let id = "";
+    if (host === "youtu.be") id = url.pathname.split("/").filter(Boolean)[0] ?? "";
+    else if (["youtube.com", "m.youtube.com", "youtube-nocookie.com"].includes(host)) {
+      if (url.pathname === "/watch") id = url.searchParams.get("v") ?? "";
+      else id = /^\/(?:embed|shorts|live|v)\/([^/?#]+)/.exec(url.pathname)?.[1] ?? "";
+    }
+    return /^[A-Za-z0-9_-]{11}$/.test(id) ? id : null;
+  } catch {
+    return null;
+  }
+}
+
+function extractYoutubeVideo(html: string): { id: string | null; embedded: boolean } {
+  const iframeSources = Array.from(html.matchAll(/<iframe\b[^>]*\bsrc\s*=\s*["']([^"']+)["'][^>]*>/gi), (match) => match[1]);
+  const embeddedId = iframeSources.map(youtubeVideoId).find(Boolean) ?? null;
+  if (embeddedId) return { id: embeddedId, embedded: true };
+  const links = Array.from(html.matchAll(/(?:href|src)\s*=\s*["']([^"']*(?:youtube\.com|youtu\.be)[^"']*)["']/gi), (match) => match[1]);
+  const linkedId = links.map(youtubeVideoId).find(Boolean) ?? null;
+  return { id: linkedId, embedded: false };
+}
+
 function mapTopic(topic: ShikimoriTopic): YuberaNewsArticle | null {
   if (!Number.isSafeInteger(topic.id) || topic.id <= 0 || !topic.topic_title?.trim()) return null;
   const title = topic.topic_title.trim().slice(0, 500);
   const summary = plainText(topic.body);
+  const linkedId = Number(topic.linked_id ?? topic.linked?.id);
   return {
     id: topic.id,
     title,
     summary,
     createdAt: topic.created_at,
-    commentsCount: Math.max(0, Number(topic.comments_count) || 0),
     authorName: (topic.user?.nickname ?? "").slice(0, 120),
     linkedTitle: (topic.linked?.russian || topic.linked?.name || "").trim() || null,
+    linkedId: Number.isSafeInteger(linkedId) && linkedId > 0 ? linkedId : null,
+    linkedType: topic.linked_type ?? null,
     category: classify(title, summary),
     sourceUrl: `https://shikimori.io/forum/news/${topic.id}`,
     sourceName: "Shikimori",
@@ -69,6 +116,36 @@ function json(data: unknown, status = 200): Response {
       "X-Content-Type-Options": "nosniff",
     },
   });
+}
+
+async function fetchShikimoriTopic(id: number): Promise<ShikimoriTopic> {
+  const response = await fetch(`https://shikimori.io/api/topics/${id}`, {
+    headers: { Accept: "application/json", "User-Agent": "YUBERA/1.0 (+https://yubera.app)" },
+    signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+  });
+  if (!response.ok) throw new Error(`Shikimori topic request failed with ${response.status}`);
+  const topic = await response.json() as ShikimoriTopic;
+  if (!topic || topic.id !== id || !topic.topic_title) throw new Error("Shikimori returned an invalid topic.");
+  return topic;
+}
+
+async function loadNewsArticle(id: number): Promise<YuberaNewsArticleDetails> {
+  const cacheKey = `news:article:${id}`;
+  const cached = await readShikimoriSharedCache<YuberaNewsArticleDetails>(cacheKey);
+  if (cached) return cached;
+  const topic = await fetchShikimoriTopic(id);
+  const bodyHtml = typeof topic.html_body === "string" ? topic.html_body : "";
+  const bodyText = plainText(topic.body, 100000);
+  const video = extractYoutubeVideo(bodyHtml + " " + (topic.body ?? ""));
+  const detail: YuberaNewsArticleDetails = {
+    id,
+    bodyHtml,
+    bodyText,
+    youtubeVideoId: video.id,
+    youtubeEmbedInBody: video.embedded,
+  };
+  await writeShikimoriSharedCache(cacheKey, detail, ARTICLE_CACHE_TTL_MS);
+  return detail;
 }
 
 async function loadNews(): Promise<NewsResponse> {
@@ -103,7 +180,20 @@ async function loadNews(): Promise<NewsResponse> {
   return result;
 }
 
-async function handleNews(): Promise<Response> {
+async function handleNews(request: Request): Promise<Response> {
+  const idValue = new URL(request.url).searchParams.get("id");
+  if (idValue !== null) {
+    if (!/^\d{1,12}$/.test(idValue)) return json({ error: "invalid_news_id" }, 400);
+    const id = Number(idValue);
+    try {
+      return json(await loadNewsArticle(id));
+    } catch {
+      const stale = await readShikimoriSharedCache<YuberaNewsArticleDetails>(`news:article:${id}`);
+      if (stale) return json(stale);
+      return json({ error: "news_article_temporarily_unavailable" }, 503);
+    }
+  }
+
   try {
     return json(await loadNews());
   } catch {
@@ -122,5 +212,5 @@ async function handleNews(): Promise<Response> {
 }
 
 export const Route = createFileRoute("/api/news")({
-  server: { handlers: { GET: () => handleNews() } },
+  server: { handlers: { GET: ({ request }) => handleNews(request) } },
 });
