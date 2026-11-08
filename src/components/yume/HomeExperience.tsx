@@ -97,7 +97,7 @@ export function HomeExperience({
   const seeAll = (view: View) => <button type="button" onClick={() => onSeeAll(view)} className="inline-flex shrink-0 items-center gap-1 text-sm font-bold text-primary">{ru ? "Все" : "See all"} <ChevronRight className="h-4 w-4" /></button>;
 
   return (
-    <main id="main-content" className="yubera-with-bottom-nav yubera-home-page px-3 pb-10 pt-[78px] sm:px-4">
+    <main id="main-content" className="yubera-with-bottom-nav yubera-home-page px-3 pb-10 pt-0 sm:px-4">
       <div className="mx-auto w-full max-w-[1120px]">
         {featured && (
           <section className="yubera-home-hero" aria-label={ru ? "Рекомендуемое аниме" : "Featured anime"}>
