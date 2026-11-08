@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ANIME } from "@/data/anime";
 import { EMPTY_CATALOG_FILTERS, type CatalogFiltersValue } from "@/components/yume/CatalogFilters";
-import { filterAndSortCatalog, getCatalogPageCount, matchesCollectionGenres, paginateCatalog } from "@/data/catalog-utils";
+import { filterAndSortCatalog, getCatalogPageCount, getCollectionAnime, matchesCollectionGenres, paginateCatalog } from "@/data/catalog-utils";
 import type { Language } from "@/data/preferences";
 
 const translateGenre = (genre: string, language: Language) => language === "en" ? ({
@@ -89,4 +89,26 @@ describe("collection genre matching", () => {
     expect(matchesCollectionGenres(["  сверхъестественное  "], ["Сверхъестественное"])).toBe(true);
     expect(matchesCollectionGenres(["Романтика"], ["Сверхъестественное", "Мистика"])).toBe(false);
   });
+});
+
+
+describe("collection catalogue pages", () => {
+  it("keeps genre-specific membership and allows an anime in multiple collections", () => {
+    const fixture = { ...ANIME[0]!, id: "action-fantasy", genres: ["Экшен", "Фэнтези"] };
+    expect(getCollectionAnime([fixture], ["Экшен"])).toEqual([fixture]);
+    expect(getCollectionAnime([fixture], ["Фэнтези"])).toEqual([fixture]);
+    expect(getCollectionAnime([fixture], ["Романтика"])).toEqual([]);
+  });
+  it.each([[501,26,20],[326,17,20],[287,15,20],[246,13,20],[198,10,20],[27,2,7],[20,1,20],[12,1,12]])(
+    "calculates %i titles over %i pages with %i items on the last page", (total, pages, lastCount) => {
+      const items = Array.from({ length: total }, (_, index) => index + 1);
+      expect(getCatalogPageCount(total, 20)).toBe(pages);
+      expect(paginateCatalog(items, 1, 20)).toHaveLength(Math.min(20, total));
+      expect(paginateCatalog(items, pages, 20)).toHaveLength(lastCount);
+      if (pages > 1) {
+        expect(paginateCatalog(items, 2, 20)[0]).toBe(21);
+        expect(paginateCatalog(items, 1, 20).some((id) => paginateCatalog(items, 2, 20).includes(id))).toBe(false);
+      }
+    },
+  );
 });
