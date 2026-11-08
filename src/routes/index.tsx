@@ -1243,12 +1243,6 @@ function Index() {
       void navigate({ to: "/", replace: true, search: { section: "collections", collection: urlCollection, page: loadedCatalogPage === 1 ? undefined : loadedCatalogPage } });
     }
   }, [view, urlCollection, urlPage, loadedCatalogPage, navigate]);
-  useEffect(() => {
-    if (view !== "collections" || !urlCollection) return;
-    if ((urlPage ?? 1) !== loadedCatalogPage) {
-      void navigate({ to: "/", replace: true, search: { section: "collections", collection: urlCollection, page: loadedCatalogPage === 1 ? undefined : loadedCatalogPage } });
-    }
-  }, [view, urlCollection, urlPage, loadedCatalogPage, navigate]);
 
   // Catalog seeding/expansion is an explicit admin operation, not a user-page side effect.
 
