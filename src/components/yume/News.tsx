@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowUpRight, Bookmark, CalendarDays, MessageCircle, Newspaper, RefreshCw, Search } from "lucide-react";
+import { ArrowUpRight, Bookmark, CalendarDays, Newspaper, RefreshCw, Search } from "lucide-react";
 import type { Anime } from "@/data/anime";
 import { displayAnimeTitle, useYumePreferences } from "@/data/preferences";
 import type { YuberaNewsArticle } from "@/data/news-types";
@@ -34,6 +34,11 @@ function categoryLabel(category: YuberaNewsArticle["category"], language: "ru" |
   return CATEGORIES.find((item) => item.id === category)?.[language] ?? (language === "en" ? "Industry" : "Индустрия");
 }
 function relatedAnime(article: YuberaNewsArticle, animeList: Anime[]): Anime | undefined {
+  const linkedId = article.linkedId ? String(article.linkedId) : null;
+  if (linkedId) {
+    const byId = animeList.find((anime) => anime.id === linkedId);
+    if (byId) return byId;
+  }
   const needle = article.linkedTitle?.trim().toLocaleLowerCase();
   if (!needle) return undefined;
   return animeList.find((anime) =>
@@ -97,6 +102,7 @@ export function News({ animeList, onDetailChange }: { animeList: Anime[]; onDeta
     return (
       <NewsArticle
         article={selectedArticle}
+        animeList={animeList}
         onBack={() => {
           setBookmarks(readBookmarks());
           setSelectedArticle(null);
@@ -107,8 +113,8 @@ export function News({ animeList, onDetailChange }: { animeList: Anime[]; onDeta
   }
 
   const text = ru
-    ? { title: "Новости", subtitle: "Главные события мира аниме", source: "Источник: Shikimori. Это лента одного источника, а не полный обзор новостей индустрии.", search: "Поиск новостей", saved: "Закладки", empty: "Публикаций не найдено", retry: "Обновить", open: "Открыть публикацию", comments: "комментариев" }
-    : { title: "Anime news", subtitle: "The latest anime industry stories", source: "Source: Shikimori. This is one source's feed, not a complete overview of the industry.", search: "Search news", saved: "Bookmarks", empty: "No publications found", retry: "Reload", open: "Open publication", comments: "comments" };
+    ? { title: "Новости", subtitle: "Главные события мира аниме", source: "Источник: Shikimori. Это лента одного источника, а не полный обзор новостей индустрии.", search: "Поиск новостей", saved: "Закладки", empty: "Публикаций не найдено", retry: "Обновить", open: "Открыть публикацию" }
+    : { title: "Anime news", subtitle: "The latest anime industry stories", source: "Source: Shikimori. This is one source's feed, not a complete overview of the industry.", search: "Search news", saved: "Bookmarks", empty: "No publications found", retry: "Reload", open: "Open publication" };
   const featured = filtered[0] ?? null;
   const remaining = featured ? filtered.slice(1) : [];
   const featuredAnime = featured ? relatedAnime(featured, animeList) : undefined;
@@ -159,7 +165,7 @@ export function News({ animeList, onDetailChange }: { animeList: Anime[]; onDeta
               <article className="overflow-hidden rounded-[20px] border border-border bg-card">
                 <button type="button" onClick={() => openArticle(featured)} className="group block w-full text-left">
                   <div className="relative aspect-[16/8] overflow-hidden bg-secondary">
-                    {featuredAnime ? <PosterArt anime={featuredAnime} className="h-full w-full transition duration-500 group-hover:scale-[1.03]" /> : <img src="/images/yubera/yubera_banner.webp" alt="" className="h-full w-full object-cover" />}
+                    {featuredAnime ? <PosterArt anime={featuredAnime} className="h-full w-full transition duration-500 group-hover:scale-[1.03]" /> : featured.linkedPosterUrl ? <img src={featured.linkedPosterUrl} alt="" className="h-full w-full object-cover" /> : <img src="/images/yubera/yubera_banner.webp" alt="" className="h-full w-full object-cover" />}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/10 to-transparent" />
                     <span className="absolute left-4 top-4 rounded-full bg-primary px-3 py-1 text-[10px] font-bold text-white">{categoryLabel(featured.category, language)}</span>
                     <div className="absolute inset-x-4 bottom-4">
@@ -171,7 +177,6 @@ export function News({ animeList, onDetailChange }: { animeList: Anime[]; onDeta
                 <div className="flex items-center justify-between gap-3 px-4 py-3">
                   <span className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
                     <span className="inline-flex items-center gap-1"><CalendarDays className="h-3.5 w-3.5" />{formatDate(featured.createdAt, language)}</span>
-                    {featured.commentsCount > 0 && <span className="inline-flex items-center gap-1"><MessageCircle className="h-3.5 w-3.5" />{featured.commentsCount}</span>}
                   </span>
                   <button type="button" onClick={() => toggleBookmark(featured.id)} aria-label={bookmarks.includes(featured.id) ? (ru ? "Убрать из закладок" : "Remove bookmark") : (ru ? "Добавить в закладки" : "Bookmark")} aria-pressed={bookmarks.includes(featured.id)} className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-border bg-secondary text-foreground">
                     <Bookmark className={`h-4 w-4 ${bookmarks.includes(featured.id) ? "fill-current text-primary" : ""}`} />
@@ -186,7 +191,7 @@ export function News({ animeList, onDetailChange }: { animeList: Anime[]; onDeta
                   return (
                     <article key={article.id} className="flex min-h-[112px] gap-3 rounded-2xl border border-border bg-card p-2.5">
                       <button type="button" onClick={() => openArticle(article)} className="h-[96px] w-[104px] shrink-0 overflow-hidden rounded-xl bg-secondary text-left">
-                        {related ? <PosterArt anime={related} className="h-full w-full" /> : <img src="/images/yubera/yubera_banner.webp" alt="" className="h-full w-full object-cover" />}
+                        {related ? <PosterArt anime={related} className="h-full w-full" /> : article.linkedPosterUrl ? <img src={article.linkedPosterUrl} alt="" className="h-full w-full object-cover" /> : <img src="/images/yubera/yubera_banner.webp" alt="" className="h-full w-full object-cover" />}
                       </button>
                       <div className="flex min-w-0 flex-1 flex-col justify-between py-0.5">
                         <button type="button" onClick={() => setSelectedArticle(article)} className="text-left">
@@ -216,7 +221,7 @@ export function News({ animeList, onDetailChange }: { animeList: Anime[]; onDeta
                     return (
                       <article key={article.id} className="flex gap-3 rounded-2xl border border-border bg-card p-3">
                         <button type="button" onClick={() => setSelectedArticle(article)} className="h-[88px] w-[88px] shrink-0 overflow-hidden rounded-xl bg-secondary">
-                          {related ? <PosterArt anime={related} className="h-full w-full" /> : <img src="/images/yubera/yubera_banner.webp" alt="" className="h-full w-full object-cover" />}
+                          {related ? <PosterArt anime={related} className="h-full w-full" /> : article.linkedPosterUrl ? <img src={article.linkedPosterUrl} alt="" className="h-full w-full object-cover" /> : <img src="/images/yubera/yubera_banner.webp" alt="" className="h-full w-full object-cover" />}
                         </button>
                         <div className="min-w-0 flex-1">
                           <span className="text-[9px] font-bold uppercase tracking-wide text-primary">{categoryLabel(article.category, language)}</span>
@@ -233,7 +238,7 @@ export function News({ animeList, onDetailChange }: { animeList: Anime[]; onDeta
               </section>
             )}
             <p className="mt-6 flex items-center justify-center gap-2 text-xs text-muted-foreground">
-              {ru ? "Полные публикации доступны в первоисточнике" : "Full stories remain available at the original source"}
+              {ru ? "Новостные публикации Shikimori" : "News publications from Shikimori"}
               <a href={featured.sourceUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-semibold text-primary">{ru ? "Shikimori" : "Shikimori"} <ArrowUpRight className="h-3 w-3" /></a>
             </p>
           </>
