@@ -33,10 +33,7 @@ function stablePreviewIds(key: string, ids: string[]): string[] {
 function MiniPosterStack({ items, onSelect }: { items: Anime[]; onSelect: (anime: Anime) => void }) {
   if (!items.length) return <span className="grid h-[92px] w-[112px] shrink-0 place-items-center rounded-xl bg-black/15 text-xs text-muted-foreground">—</span>;
   return <span className="relative flex h-[104px] w-[148px] shrink-0 items-center justify-center">
-    {items.slice(0, 3).map((anime, index) => <button key={anime.id} type="button" onClick={event => { event.stopPropagation(); onSelect(anime); }} aria-label={anime.title}
-      className={`absolute top-1 h-[88px] w-[60px] overflow-hidden rounded-xl border border-white/15 shadow-lg ${index === 1 ? "left-1/2 z-20 -translate-x-1/2 scale-110" : index === 0 ? "left-2 z-10 -rotate-[12deg]" : "right-2 z-10 rotate-[12deg]"}`}>
-      <PosterArt anime={anime} className="h-full w-full" />
-    </button>)}
+    {items.slice(0, 3).map((anime, index) => <span key={anime.id} className={`absolute top-1 h-[88px] w-[60px] overflow-hidden rounded-xl border border-white/15 shadow-lg ${index === 1 ? "left-1/2 z-20 -translate-x-1/2 scale-110" : index === 0 ? "left-2 z-10 -rotate-[12deg]" : "right-2 z-10 rotate-[12deg]"}`}><PosterArt anime={anime} className="h-full w-full" /></span>)}
   </span>;
 }
 
@@ -120,7 +117,7 @@ export function MyHub({ animeList, onNavigate, onSelect }: Props) {
       {listCard("history", ru ? "История просмотра" : "Viewing history", ru ? "Ранее просмотренные" : "Previously watched anime", Clock3, historyIds, viewed)}
       <button type="button" onClick={() => onNavigate("tracked-titles")} className="flex min-h-[96px] w-full items-center gap-3 rounded-[22px] border border-border bg-card/90 px-4 py-4 text-left shadow-sm transition hover:border-primary/40">
         <span className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-[#292A31] text-primary"><Radio className="h-7 w-7" /></span>
-        <span className="min-w-0 flex-1"><span className="block text-[17px] font-bold">{ru ? "Подписки на новые серии" : "New episode subscriptions"}</span><span className="mt-1 block text-sm text-muted-foreground">{ru ? "Аниме, за выходом которых ты следишь" : "Anime whose new episodes you follow"}</span><span className="mt-2 block text-sm font-semibold">{subscriptionsLoaded ? subscriptionIds.length : "—"} {ru ? "тайтлов" : "titles"}</span></span>
+        <span className="min-w-0 flex-1"><span className="block text-[17px] font-bold">{ru ? "Подписки на новые серии" : "New episode subscriptions"}</span><span className="mt-1 block text-sm text-muted-foreground">{ru ? "Аниме, за выходом которых ты следишь" : "Anime whose new episodes you follow"}</span></span>
         <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" />
       </button>
     </div>
