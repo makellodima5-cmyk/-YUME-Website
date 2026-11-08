@@ -132,7 +132,9 @@ function AnimeDetailPage() {
   const [watchMode, setWatchMode] = useState<"trailer" | "episodes">("episodes");
   const [screenshots, setScreenshots] = useState<ShikimoriScreenshot[]>([]);
   const [activeScreenshotIndex, setActiveScreenshotIndex] = useState<number | null>(null);
+  const [posterOpen, setPosterOpen] = useState(false);
   const screenshotTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const posterTriggerRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
     if (anime) document.title = displayAnimeTitle(anime, language) + (language === "en" ? " — watch anime | Yubera" : " — смотреть аниме | Yubera");
@@ -379,6 +381,23 @@ function AnimeDetailPage() {
   }, [activeScreenshotIndex, displayableScreenshots.length]);
 
   useEffect(() => {
+    if (!posterOpen) {
+      posterTriggerRef.current?.focus();
+      return;
+    }
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setPosterOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [posterOpen]);
+
+  useEffect(() => {
     setDescriptionExpanded(false);
     setInList(readSavedAnimeIds(WATCHLIST_STORAGE_KEY).includes(animeId));
     setIsFavorite(readSavedAnimeIds(FAVORITES_STORAGE_KEY).includes(animeId));
@@ -566,7 +585,7 @@ function AnimeDetailPage() {
         }
       }}
       aria-pressed={episodeSubscribed}
-      className="inline-flex w-full min-w-0 flex-col items-center justify-center gap-1 rounded-full bg-secondary px-2 py-2.5 text-center text-[11px] font-semibold leading-tight ring-1 ring-border transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-45 md:flex-row md:gap-2 md:px-4 md:py-2.5 md:text-sm md:leading-normal"
+      className="hidden inline-flex w-full min-w-0 flex-col items-center justify-center gap-1 rounded-full bg-secondary px-2 py-2.5 text-center text-[11px] font-semibold leading-tight ring-1 ring-border transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-45 md:flex-row md:gap-2 md:px-4 md:py-2.5 md:text-sm md:leading-normal"
     >
       <Bell className={`h-4 w-4 ${episodeSubscribed ? "fill-current text-primary" : ""}`} />
       {language === "en" ? "Follow new episodes" : "Отслеживать новые серии"}
@@ -605,7 +624,15 @@ function AnimeDetailPage() {
           <section id="overview" className="relative isolate scroll-mt-24" aria-label={displayAnimeTitle(anime, language) + " — " + t("anime.sectionLabel")}>
             <div className="yubera-anime-overview">
               <div className="yubera-anime-poster">
-                <PosterArt anime={anime} className="aspect-[2/3] w-full rounded-[18px] ring-1 ring-border shadow-lg" />
+                <button
+                  ref={posterTriggerRef}
+                  type="button"
+                  onClick={() => setPosterOpen(true)}
+                  aria-label={language === "en" ? "View full-size poster" : "Открыть постер на весь экран"}
+                  className="block w-full overflow-hidden rounded-[18px] text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                >
+                  <PosterArt anime={anime} className="aspect-[2/3] w-full ring-1 ring-border shadow-lg" />
+                </button>
               </div>
               <div className="min-w-0">
                 <h1 id="anime-title-desktop" className="break-words text-[clamp(1.15rem,3.4vw,2rem)] font-extrabold leading-[1.08]">{displayAnimeTitle(anime, language)}</h1>
@@ -797,6 +824,27 @@ function AnimeDetailPage() {
           </section>
         </div>
       </main>
+
+      {posterOpen && (
+        <div
+          className="fixed inset-0 z-[69] flex items-center justify-center bg-black/90 p-3 backdrop-blur-sm sm:p-6"
+          role="presentation"
+          onClick={() => setPosterOpen(false)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={language === "en" ? "Anime poster viewer" : "Просмотр постера аниме"}
+            className="relative flex max-h-[94dvh] w-full max-w-[420px] items-center justify-center"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button type="button" onClick={() => setPosterOpen(false)} aria-label={language === "en" ? "Close poster" : "Закрыть постер"} className="absolute -right-1 -top-1 z-10 rounded-full border border-white/20 bg-black/70 p-2 text-white shadow-lg sm:right-2 sm:top-2">
+              <X className="h-5 w-5" />
+            </button>
+            <PosterArt anime={anime} className="aspect-[2/3] max-h-[86dvh] w-full rounded-2xl shadow-2xl" />
+          </div>
+        </div>
+      )}
 
       {activeScreenshotIndex !== null && displayableScreenshots[activeScreenshotIndex] && (
         <div
