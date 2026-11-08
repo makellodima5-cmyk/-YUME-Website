@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import appPackage from "../../../package.json";
 import {
   ArrowLeft,
-  Bell,
   Bookmark,
   ChevronRight,
   ChevronDown,
@@ -22,9 +21,7 @@ import {
   UserPlus,
   LogOut,
   Trash2,
-  X,
   LoaderCircle,
-  Clock3,
   Settings,
   Shield,
   Sun,
@@ -35,7 +32,6 @@ import {
 import type { Anime } from "@/data/anime";
 import { getShikimoriAnimes } from "@/data/shikimori";
 import { displayAnimeTitle, useYumePreferences } from "@/data/preferences";
-import { PosterArt } from "./Poster";
 import { PrivacyPolicy } from "./PrivacyPolicy";
 import { getTelegramWebApp, telegramHapticImpact } from "@/lib/telegram-mini-app";
 import { Grid } from "./Sections";
