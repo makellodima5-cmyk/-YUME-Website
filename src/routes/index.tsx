@@ -2236,7 +2236,7 @@ function Index() {
                     </button>
                   </div>
                   <label className="mt-3 flex cursor-pointer items-start gap-3 rounded-xl border border-[#49375A] bg-[#100B17] p-3">
-                    <input type="checkbox" checked={adminBulkBlock18Plus} onChange={event => { void saveAdminBulkImportFilter(event.target.checked); }} disabled={adminBulkFilterBusy || adminImportRunning || adminImport.state === "running" || metadataRefreshRunning} className="mt-1 h-4 w-4 shrink-0 accent-fuchsia-400 disabled:opacity-50"/>
+                    <input type="checkbox" checked={adminBulkBlock18Plus} onChange={event => { void saveAdminBulkImportFilter(event.target.checked); }} disabled={adminBulkFilterBusy || adminImportRunning || adminImport.state === "running" || metadataRefreshRunning} className="mt-1 h-4 w-4 shrink-0 accent-primary disabled:opacity-50"/>
                     <span className="min-w-0 flex-1">
                       <span className="block text-sm font-semibold text-[#F6F4F5]">{language==="ru" ? "Исключать рейтинг 18+ при импорте по количеству" : "Exclude 18+ ratings from quantity imports"}</span>
                       <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">{language==="ru" ? "Включено: тайтлы с рейтингом RX (18+) пропускаются. Хентай, яой и юри запрещены для массовой загрузки всегда. Поиск и ручной импорт по названию этими правилами не ограничиваются." : "When enabled, RX (18+) titles are skipped. Hentai, yaoi and yuri are always excluded from bulk imports. Title search and manual title imports are not affected."}</span>
