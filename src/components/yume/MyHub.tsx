@@ -77,9 +77,10 @@ export function MyHub({ animeList, onNavigate, onSelect }: Props) {
     };
   }, []);
 
-  const allIds = useMemo(() => [...new Set([...favoriteIds, ...watchIds, ...history.map(item => item.animeId), ...subscriptionIds])], [favoriteIds, watchIds, history, subscriptionIds]);
+  const historyIds = useMemo(() => [...new Set(history.map(item => item.animeId))], [history]);
+  const allIds = useMemo(() => [...new Set([...favoriteIds, ...watchIds, ...historyIds, ...subscriptionIds])], [favoriteIds, watchIds, historyIds, subscriptionIds]);
   useEffect(() => { setWatchPreviewIds(stablePreviewIds("watchlist", watchIds)); }, [watchIds]);
-  useEffect(() => { setHistoryPreviewIds(stablePreviewIds("history", history.map(item => item.animeId))); }, [history]);
+  useEffect(() => { setHistoryPreviewIds(stablePreviewIds("history", historyIds)); }, [history]);
   useEffect(() => {
     const missing = allIds.filter(id => !animeList.some(anime => anime.id === id) && !resolvedAnime.some(anime => anime.id === id));
     if (!missing.length) return;
@@ -116,7 +117,7 @@ export function MyHub({ animeList, onNavigate, onSelect }: Props) {
     </section>
     <div className="mt-5 grid gap-3">
       {listCard("watchlist", ru ? "Смотреть позже" : "Watch later", ru ? "Отложенные аниме" : "Anime saved for later", Bookmark, watchIds, watchlist)}
-      {listCard("history", ru ? "История просмотра" : "Viewing history", ru ? "Ранее просмотренные" : "Previously watched anime", Clock3, history.map(item => item.animeId), viewed)}
+      {listCard("history", ru ? "История просмотра" : "Viewing history", ru ? "Ранее просмотренные" : "Previously watched anime", Clock3, historyIds, viewed)}
       <button type="button" onClick={() => onNavigate("tracked-titles")} className="flex min-h-[96px] w-full items-center gap-3 rounded-[22px] border border-border bg-card/90 px-4 py-4 text-left shadow-sm transition hover:border-primary/40">
         <span className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-[#292A31] text-primary"><Radio className="h-7 w-7" /></span>
         <span className="min-w-0 flex-1"><span className="block text-[17px] font-bold">{ru ? "Подписки на новые серии" : "New episode subscriptions"}</span><span className="mt-1 block text-sm text-muted-foreground">{ru ? "Аниме, за выходом которых ты следишь" : "Anime whose new episodes you follow"}</span><span className="mt-2 block text-sm font-semibold">{subscriptionsLoaded ? subscriptionIds.length : "—"} {ru ? "тайтлов" : "titles"}</span></span>
