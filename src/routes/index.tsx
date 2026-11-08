@@ -1316,9 +1316,12 @@ function Index() {
   useEffect(() => {
     setViewRaw(section ?? "home");
     const restoredQuery = urlQuery ?? "";
-    setQuery(restoredQuery);
-    setSubmittedQuery(restoredQuery);
-    setCatalogQuery(restoredQuery);
+    if (lastSyncedQueryRef.current !== restoredQuery) {
+      lastSyncedQueryRef.current = restoredQuery;
+      setQuery(restoredQuery);
+      setSubmittedQuery(restoredQuery);
+      setCatalogQuery(restoredQuery);
+    }
     const restoredFilters: CatalogFiltersValue = {
       ...EMPTY_CATALOG_FILTERS,
       genres: (urlGenres ?? "").split(",").filter(Boolean).slice(0, 20),
@@ -1347,6 +1350,7 @@ function Index() {
   const [query, setQuery] = useState(urlQuery ?? "");
   const [submittedQuery, setSubmittedQuery] = useState(urlQuery ?? "");
   const [catalogQuery, setCatalogQuery] = useState(urlQuery ?? "");
+  const lastSyncedQueryRef = useRef(urlQuery ?? "");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const filtersFromUrl: CatalogFiltersValue = {
     ...EMPTY_CATALOG_FILTERS,
@@ -1503,7 +1507,6 @@ function Index() {
     if (view !== "catalog") return;
     setCatalogPage(loadedCatalogPage);
     const routeQuery = urlQuery ?? "";
-    if (catalogQuery.trim() !== routeQuery) setCatalogQuery(routeQuery);
     const routeSort = urlSort ?? "rating";
     if (sortBy !== routeSort) setSortBy(routeSort);
     const routeFilters = filtersFromUrl;
