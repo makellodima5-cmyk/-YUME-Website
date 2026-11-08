@@ -228,16 +228,16 @@ export function Grid({ items, onSelect, empty, onRemove, removeLabel }: {
     <div className="yubera-anime-grid grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
       {items.map((anime) => (
         <div key={anime.id} className="relative min-w-0 w-full [&>button:first-child]:w-full">
-          <AnimeCard anime={anime} onSelect={onSelect} />
+          <AnimeCard anime={anime} onSelect={onSelect} showBookmark={!onRemove} />
           {onRemove && (
             <button
               type="button"
               aria-label={removeLabel ?? (language === "ru" ? "Убрать из списка" : "Remove from list")}
               title={removeLabel ?? (language === "ru" ? "Убрать из списка" : "Remove from list")}
               onClick={(event) => { event.preventDefault(); event.stopPropagation(); onRemove(anime); }}
-              className="absolute left-2 top-2 z-20 flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-red-600 text-white shadow-[0_0_0_2px_rgba(0,0,0,0.7),0_4px_12px_rgba(0,0,0,0.65)] transition hover:scale-105 hover:bg-red-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-red-300"
+              className="absolute right-2 top-2 z-20 flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-black/75 text-white/80 shadow-lg backdrop-blur-sm transition hover:scale-105 hover:bg-black/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
-              <X className="h-5 w-5" strokeWidth={3} aria-hidden="true" />
+              <X className="h-4 w-4" strokeWidth={2.5} aria-hidden="true" />
             </button>
           )}
         </div>
