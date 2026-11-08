@@ -37,7 +37,30 @@
 :root {
   color-scheme: dark;
   --radius: 1rem;
-  /* YUBERA tokens are defined once in the shared theme block below. */
+  --background: #101116;
+  --foreground: #F6F4F5;
+  --card: #1A1B22;
+  --card-foreground: #F6F4F5;
+  --popover: #1A1B22;
+  --popover-foreground: #F6F4F5;
+  --primary: #FF5A3D;
+  --primary-foreground: #FFFFFF;
+  --secondary: #22232B;
+  --secondary-foreground: #F6F4F5;
+  --muted: #22232B;
+  --muted-foreground: #A4A1AA;
+  --accent: #34231F;
+  --accent-foreground: #FFFFFF;
+  --accent-warm: #FF764F;
+  --gold: #FFC36A;
+  --destructive: #E45B59;
+  --border: rgba(246,244,245,.10);
+  --input: rgba(246,244,245,.14);
+  --ring: #FF764F;
+  --gradient-neon: linear-gradient(120deg,#FF5A3D,#FF764F);
+  --gradient-fade: linear-gradient(to top,#101116 0%,rgba(16,17,22,.72) 40%,transparent 100%);
+  --shadow-neon: 0 8px 24px rgba(255,90,61,.18);
+  --body-gradient: #101116;
 }
 
 @layer base {
