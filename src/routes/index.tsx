@@ -1,6 +1,6 @@
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowDownWideNarrow, ChevronDown, ChevronRight, Search, SlidersHorizontal, X, UserRound, ShieldCheck, Play, CircleCheck, Download, Database, Settings, History, Bell, CheckCheck, Sparkles, Home, LayoutGrid, Bookmark, Newspaper } from "lucide-react";
+import { ArrowDownWideNarrow, ChevronDown, ChevronRight, Search, SlidersHorizontal, X, UserRound, ShieldCheck, Play, CircleCheck, Download, Database, Settings, History, Bell, CheckCheck, Sparkles, Home, LayoutGrid, Bookmark, Newspaper, ArrowLeft, Layers } from "lucide-react";
 import { COLLECTIONS, type Anime } from "@/data/anime";
 import { getShikimoriCatalog, getShikimoriAnimes } from "@/data/shikimori";
 import { getExactReleaseDate, isNewRelease, isUpcomingAnnouncement } from "@/data/anime-sections";
@@ -13,7 +13,7 @@ import { Profile } from "@/components/yume/Profile";
 import { MyHub } from "@/components/yume/MyHub";
 import { News } from "@/components/yume/News";
 import { useYumePreferences, displayGenre, type TranslationKey } from "@/data/preferences";
-import { filterAndSortCatalog, getCatalogPageCount, matchesCollectionGenres, paginateCatalog } from "@/data/catalog-utils";
+import { filterAndSortCatalog, getCatalogPageCount, getCollectionAnime, matchesCollectionGenres, paginateCatalog } from "@/data/catalog-utils";
 import {
   CATALOG_RETURN_STORAGE_KEY,
   CATALOG_SCROLL_RESTORE_STORAGE_KEY,
@@ -100,7 +100,7 @@ export const Route = createFileRoute("/")({
   },
   validateSearch: validateCatalogSearch,
   loaderDeps: ({ search }) => ({
-    section: search.section, q: search.q, page: search.page, sort: search.sort,
+    section: search.section, collection: search.collection, q: search.q, page: search.page, sort: search.sort,
     genres: search.genres, status: search.status, from: search.from, to: search.to,
     rating: search.rating, kind: search.kind, age: search.age, lang: search.lang,
   }),
@@ -129,6 +129,22 @@ export const Route = createFileRoute("/")({
     }
 
     const catalog = await getShikimoriCatalog({ data: {} });
+    if (deps.section === "collections" && deps.collection) {
+      const selectedCollection = COLLECTIONS.find((item) => item.id === deps.collection);
+      if (selectedCollection) {
+        const results = getCollectionAnime(catalog.items, selectedCollection.genres);
+        const pageSize = 20;
+        const pageCount = getCatalogPageCount(results.length, pageSize);
+        const page = Math.min(Math.max(1, deps.page ?? 1), pageCount);
+        return {
+          catalogMode: "paged", anime: paginateCatalog(results, page, pageSize), popular: [],
+          sectionFeeds: { airing: [], newReleases: [], announcements: [] }, catalogIds: [],
+          catalogTotal: results.length, catalogPage: page, catalogFacets: null,
+          apiError: catalog.error, catalogProgress: catalog.progress,
+        };
+      }
+    }
+
     if (deps.section === "catalog") {
       const allItems = catalog.items;
       const filters: CatalogFiltersValue = {
@@ -277,7 +293,7 @@ function Index() {
     document.querySelector('meta[property="og:title"]')?.setAttribute("content", metadata.ogTitle);
     document.querySelector('meta[property="og:description"]')?.setAttribute("content", metadata.ogDescription);
   }, [language]);
-  const { section, q: urlQuery, page: urlPage, sort: urlSort, genres: urlGenres, status: urlStatus, from: urlFrom, to: urlTo, rating: urlRating, kind: urlKind, age: urlAge, lang: urlLang } = Route.useSearch();
+  const { section, collection: urlCollection, q: urlQuery, page: urlPage, sort: urlSort, genres: urlGenres, status: urlStatus, from: urlFrom, to: urlTo, rating: urlRating, kind: urlKind, age: urlAge, lang: urlLang } = Route.useSearch();
   const {
     anime: loadedAnime,
     popular: initialPopularAnime,
@@ -299,7 +315,7 @@ function Index() {
 
 
   useEffect(() => {
-    if (catalogMode === "full" || view === "catalog") {
+    if (catalogMode === "full" || view === "catalog" || (view === "collections" && Boolean(urlCollection))) {
       setCatalogAnime(loadedAnime);
       catalogAnimeRef.current = loadedAnime;
     }
@@ -1219,7 +1235,8 @@ function Index() {
     setActiveFilters(restoredFilters);
     setSortBy(urlSort ?? "rating");
     setCatalogPage(urlPage ?? 1);
-  }, [section, urlQuery, urlPage, urlSort, urlGenres, urlStatus, urlFrom, urlTo, urlRating, urlKind, urlAge]);
+    setCollection(urlCollection ?? null);
+  }, [section, urlCollection, urlQuery, urlPage, urlSort, urlGenres, urlStatus, urlFrom, urlTo, urlRating, urlKind, urlAge]);
 
   // Catalog seeding/expansion is an explicit admin operation, not a user-page side effect.
 
@@ -1303,8 +1320,27 @@ function Index() {
     if (v === "announcements") setAnnouncementsPage(1);
     if (v === "airing") setAiringPage(1);
     // Persist the selected section in the URL so refreshing the page keeps the same view.
-    navigate({ to: "/", search: { section: v, q: undefined, page: undefined, sort: undefined, genres: undefined, status: undefined, from: undefined, to: undefined, rating: undefined, kind: undefined, age: undefined, lang: v === "catalog" ? language : undefined } });
+    navigate({ to: "/", search: { section: v, collection: undefined, q: undefined, page: undefined, sort: undefined, genres: undefined, status: undefined, from: undefined, to: undefined, rating: undefined, kind: undefined, age: undefined, lang: v === "catalog" ? language : undefined } });
     window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+  const openCollection = (id: string) => {
+    setCollection(id);
+    setCatalogPage(1);
+    setViewRaw("collections");
+    void navigate({ to: "/", search: { section: "collections", collection: id, page: undefined } });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+  const returnToCollections = () => {
+    setCollection(null);
+    setCatalogPage(1);
+    void navigate({ to: "/", search: { section: "collections", collection: undefined, page: undefined } });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+  const changeCollectionPage = (page: number) => {
+    if (!activeCollection) return;
+    setCatalogPage(page);
+    void navigate({ to: "/", replace: true, search: { section: "collections", collection: activeCollection.id, page } });
+    window.requestAnimationFrame(() => document.getElementById("collection-anime-list")?.scrollIntoView({ behavior: "smooth", block: "start" }));
   };
   const select = (anime: Anime) => {
     if (view === "catalog") {
@@ -1465,11 +1501,10 @@ function Index() {
     setCatalogPage(1);
     writeCatalogUrl({ page: 1, genres: undefined, status: undefined, from: undefined, to: undefined, rating: undefined, kind: undefined, age: undefined });
   };
-  const activeCollection = COLLECTIONS.find((c) => c.id === collection);
-  const activeCollectionAnime = activeCollection
-    ? ANIME.filter((anime) => matchesCollectionGenres(anime.genres, activeCollection.genres))
-        .sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1))
-    : [];
+  const activeCollection = COLLECTIONS.find((c) => c.id === (urlCollection ?? collection));
+  const activeCollectionAnime = activeCollection ? ANIME : [];
+  const totalCollectionTitles = activeCollection ? initialCatalogTotal : 0;
+  const totalCollectionPages = getCatalogPageCount(totalCollectionTitles, 20);
   const newReleaseAnime = (sectionFeeds?.newReleases ?? ANIME
     .filter((anime) => isNewRelease(anime)))
     .sort((a, b) => {
@@ -1597,7 +1632,7 @@ function Index() {
           airing={airingCards}
           onSelect={select}
           onSeeAll={setView}
-          onOpenCollection={(id) => { setCollection(id); setView("collections"); }}
+          onOpenCollection={openCollection}
         />
       ) : view === "notifications" && notificationStateLoaded && !notificationRemoteAccount ? (
         <main id="main-content" className="px-4 pb-12 pt-24 md:px-10 md:pt-24">
@@ -1842,14 +1877,23 @@ function Index() {
         <main id="main-content" className="yubera-with-bottom-nav mx-auto w-full max-w-[1600px] px-3 pb-8 pt-[78px] sm:px-4 md:px-6 lg:px-8">
           {activeCollection ? (
             <>
-              <button onClick={() => setCollection(null)} className="mb-3 text-sm text-muted-foreground hover:text-primary">← {t("collections.all")}</button>
-              <SectionBanner title={t((`collection.${activeCollection.id}.title`) as TranslationKey)} subtitle={t((`collection.${activeCollection.id}.subtitle`) as TranslationKey)} />
-              <Grid items={activeCollectionAnime} onSelect={select} empty={t("collections.empty")} />
+              <button type="button" onClick={returnToCollections} className="mb-3 inline-flex min-h-10 items-center gap-2 text-sm font-semibold text-muted-foreground transition hover:text-primary">
+                <ArrowLeft className="h-5 w-5" aria-hidden="true" />{t("collections.all")}
+              </button>
+              <section className="yubera-collection-detail-header" aria-labelledby="collection-detail-title">
+                <h1 id="collection-detail-title">{t((`collection.${activeCollection.id}.title`) as TranslationKey)}</h1>
+                <p>{t((`collection.${activeCollection.id}.subtitle`) as TranslationKey)}</p>
+                <span className="yubera-collection-detail-count"><Layers aria-hidden="true" />{totalCollectionTitles} {language === "ru" ? "тайтлов" : "titles"}</span>
+              </section>
+              <div id="collection-anime-list" className="yubera-collection-anime-anchor">
+                <Grid items={activeCollectionAnime} onSelect={select} empty={t("collections.empty")} />
+              </div>
+              {totalCollectionTitles > 0 && <PageNavigation page={loadedCatalogPage} totalPages={totalCollectionPages} onPageChange={changeCollectionPage} ariaLabel={language === "ru" ? "Страницы подборки" : "Collection pages"} previousLabel={t("catalog.previous")} nextLabel={t("catalog.next")} />}
             </>
           ) : (
             <>
               <SectionBanner title={t("collections.title")} subtitle={language === "ru" ? "Подборки аниме по настроению и жанрам" : "Anime collections by mood and genre"} />
-              <CollectionsGrid animeList={ANIME} onOpen={setCollection} />
+              <CollectionsGrid animeList={ANIME} onOpen={openCollection} />
             </>
           )}
         </main>
