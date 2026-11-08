@@ -1,5 +1,5 @@
-import { useState, type ReactNode } from "react";
-import { Bookmark, ChevronRight, Play, Star, Megaphone, Radio } from "lucide-react";
+import { useMemo, useState, type ReactNode } from "react";
+import { Bookmark, ChevronRight, Play, Star, Megaphone, Radio, Layers } from "lucide-react";
 import type { Anime } from "@/data/anime";
 import { COLLECTIONS } from "@/data/anime";
 import { displayAnimeTitle, displayAnimeKind, useYumePreferences, type TranslationKey } from "@/data/preferences";
@@ -19,15 +19,16 @@ type HomeExperienceProps = {
   onOpenCollection: (id: string) => void;
 };
 
-function HomeSection({ title, action, icon, children }: {
+function HomeSection({ title, action, icon, className, children }: {
   title: string;
   action: ReactNode;
   icon?: "announcements" | "airing";
+  className?: string;
   children: ReactNode;
 }) {
   const Icon = icon === "announcements" ? Megaphone : icon === "airing" ? Radio : null;
   return (
-    <section className="yubera-home-section">
+    <section className={`yubera-home-section ${className ?? ""}`}>
       <div className="yubera-home-section-heading">
         <div className="flex min-w-0 items-center gap-2.5">
           {Icon ? <Icon className="h-6 w-6 shrink-0 text-primary" strokeWidth={2.2} /> : <span className="yubera-home-section-mark" />}
@@ -54,12 +55,43 @@ function HomeAnimeCard({ anime, onSelect }: { anime: Anime; onSelect: (anime: An
   );
 }
 
+function stableCollectionPosterRank(collectionId: string, animeId: string): number {
+  const value = collectionId + ":" + animeId;
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function collectionCountLabel(count: number, language: "ru" | "en", t: (key: TranslationKey) => string): string {
+  if (language === "en") return count + " " + t((count === 1 ? "collection.countOne" : "collection.countMany") as TranslationKey);
+  const lastTwo = count % 100;
+  const last = count % 10;
+  const key = last === 1 && lastTwo !== 11
+    ? "collection.countOne"
+    : last >= 2 && last <= 4 && (lastTwo < 12 || lastTwo > 14)
+      ? "collection.countFew"
+      : "collection.countMany";
+  return count + " " + t(key as TranslationKey);
+}
+
 export function HomeExperience({
   animeList, popular, newReleases, announcements, airing, onSelect, onSeeAll, onOpenCollection,
 }: HomeExperienceProps) {
   const { language, t } = useYumePreferences();
   const ru = language === "ru";
   const featuredItems = [popular[0], newReleases[0], airing[0]].filter((item): item is Anime => Boolean(item));
+  const collectionCards = useMemo(() => COLLECTIONS.slice(0, 3).map((collection) => {
+    const matches = animeList.filter((anime) => matchesCollectionGenres(anime.genres, collection.genres));
+    const posters = matches
+      .map((anime) => ({ anime, rank: stableCollectionPosterRank(collection.id, anime.id) }))
+      .sort((a, b) => a.rank - b.rank || a.anime.id.localeCompare(b.anime.id))
+      .slice(0, 3)
+      .map((entry) => entry.anime);
+    return { collection, count: matches.length, posters };
+  }), [animeList]);
   const [featuredIndex, setFeaturedIndex] = useState(0);
   const featured = featuredItems[featuredIndex] ?? featuredItems[0] ?? animeList[0] ?? null;
   const seeAll = (view: View) => <button type="button" onClick={() => onSeeAll(view)} className="inline-flex shrink-0 items-center gap-1 text-sm font-bold text-primary">{ru ? "Все" : "See all"} <ChevronRight className="h-4 w-4" /></button>;
@@ -97,17 +129,29 @@ export function HomeExperience({
 
         {airing.length > 0 && <HomeSection title={ru ? "Сейчас выходит" : "Currently airing"} action={seeAll("airing")} icon="airing"><div className="yubera-home-horizontal-row">{airing.slice(0, 14).map(anime => <HomeAnimeCard key={anime.id} anime={anime} onSelect={onSelect} />)}</div></HomeSection>}
 
-        <HomeSection title={ru ? "Подборки" : "Collections"} action={seeAll("collections")}>
+        <HomeSection title={ru ? "Подборки" : "Collections"} action={seeAll("collections")} className="yubera-home-collections-section">
           <div className="yubera-home-collections">
-            {COLLECTIONS.map(collection => {
-              const matches = animeList.filter(anime => matchesCollectionGenres(anime.genres, collection.genres)).sort((a,b) => (b.rating ?? -1) - (a.rating ?? -1));
-              const preview = matches[0];
-              return <button key={collection.id} type="button" onClick={() => onOpenCollection(collection.id)} className="yubera-home-collection">
-                {preview ? <PosterArt anime={preview} className="h-[44px] w-[44px] shrink-0 rounded-[13px]" /> : <span className="h-[44px] w-[44px] shrink-0 rounded-[13px] bg-secondary" />}
-                <span className="min-w-0 flex-1 text-left"><span className="line-clamp-2 block text-xs font-bold leading-snug sm:text-sm">{t((`collection.${collection.id}.title`) as TranslationKey)}</span><span className="mt-1 block text-[10px] text-muted-foreground">{matches.length} {ru ? "тайтлов" : "titles"}</span></span>
-                <ChevronRight className="mr-2 h-4 w-4 shrink-0 text-muted-foreground" />
-              </button>;
-            })}
+            {collectionCards.map(({ collection, count, posters }) => (
+              <button
+                key={collection.id}
+                type="button"
+                onClick={() => onOpenCollection(collection.id)}
+                className="yubera-home-collection"
+                aria-label={t((`collection.${collection.id}.title`) as TranslationKey) + ", " + collectionCountLabel(count, language, t)}
+              >
+                <span className="yubera-home-collection-posters" aria-hidden="true">
+                  {posters[0] && <PosterArt anime={posters[0]} className="yubera-home-collection-poster is-left" />}
+                  {posters[1] && <PosterArt anime={posters[1]} className="yubera-home-collection-poster is-center" />}
+                  {posters[2] && <PosterArt anime={posters[2]} className="yubera-home-collection-poster is-right" />}
+                </span>
+                <span className="yubera-home-collection-copy">
+                  <span className="yubera-home-collection-title">{t((`collection.${collection.id}.title`) as TranslationKey)}</span>
+                  <span className="yubera-home-collection-description">{t((`collection.${collection.id}.subtitle`) as TranslationKey)}</span>
+                  <span className="yubera-home-collection-count"><Layers aria-hidden="true" /><span>{collectionCountLabel(count, language, t)}</span></span>
+                </span>
+                <ChevronRight className="yubera-home-collection-arrow" aria-hidden="true" />
+              </button>
+            ))}
           </div>
         </HomeSection>
       </div>
