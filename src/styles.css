@@ -342,7 +342,8 @@ button.yume-tactile-control:has(.aspect-\\[2\\/3\\]) {
 
 
 /* -------------------------------------------------------------------------
-   YUBERA Android web experience
+   YUBERA Android web experience — canonical palette and shared surfaces.
+   ------------------------------------------------------------------------- */
 :root {
   color-scheme: dark;
   --radius: 1rem;
