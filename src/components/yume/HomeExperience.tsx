@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Bookmark, ChevronRight, Play, Star, Megaphone, Radio } from "lucide-react";
 import type { Anime } from "@/data/anime";
 import { COLLECTIONS } from "@/data/anime";
@@ -7,7 +7,6 @@ import { PosterArt } from "./Poster";
 import type { View } from "./Header";
 import { FAVORITES_STORAGE_KEY, toggleSavedAnimeId } from "@/data/profile-storage";
 import { matchesCollectionGenres } from "@/data/catalog-utils";
-import { PLAYBACK_PROGRESS_UPDATED_EVENT, readPlaybackProgress, type PlaybackProgressEntry } from "@/data/playback-progress";
 
 type HomeExperienceProps = {
   animeList: Anime[];
@@ -16,7 +15,6 @@ type HomeExperienceProps = {
   announcements: Anime[];
   airing: Anime[];
   onSelect: (anime: Anime) => void;
-  onResume: (anime: Anime, episode: number, positionSeconds: number) => void;
   onSeeAll: (view: View) => void;
   onOpenCollection: (id: string) => void;
 };
@@ -56,66 +54,8 @@ function HomeAnimeCard({ anime, onSelect }: { anime: Anime; onSelect: (anime: An
   );
 }
 
-export function ContinueWatching({ animeList, onResume }: {
-  animeList: Anime[];
-  onResume: (anime: Anime, episode: number, positionSeconds: number) => void;
-}) {
-  const { language } = useYumePreferences();
-  const [progress, setProgress] = useState<PlaybackProgressEntry[]>([]);
-
-  useEffect(() => {
-    const sync = () => setProgress(readPlaybackProgress());
-    sync();
-    window.addEventListener(PLAYBACK_PROGRESS_UPDATED_EVENT, sync);
-    window.addEventListener("storage", sync);
-    return () => {
-      window.removeEventListener(PLAYBACK_PROGRESS_UPDATED_EVENT, sync);
-      window.removeEventListener("storage", sync);
-    };
-  }, []);
-
-  const latestByAnime = new Map<string, PlaybackProgressEntry>();
-  for (const entry of progress) {
-    if (!latestByAnime.has(entry.animeId)) latestByAnime.set(entry.animeId, entry);
-  }
-  const items = Array.from(latestByAnime.values())
-    .filter(entry => !entry.completed)
-    .map(entry => ({ entry, anime: animeList.find(item => item.id === entry.animeId) }))
-    .filter((item): item is { entry: PlaybackProgressEntry; anime: Anime } => Boolean(item.anime));
-
-  if (!items.length) return null;
-
-  return (
-    <HomeSection title={language === "ru" ? "Продолжить просмотр" : "Continue watching"} action={null}>
-      <div className="yubera-home-continue-row">
-        {items.slice(0, 12).map(({ entry, anime }) => {
-          const percent = entry.durationSeconds && entry.durationSeconds > 0
-            ? Math.max(0, Math.min(100, entry.positionSeconds / entry.durationSeconds * 100))
-            : 0;
-          return (
-            <button key={anime.id} type="button" onClick={() => onResume(anime, entry.episode, entry.positionSeconds)} className="yubera-home-continue-card">
-              <span className="relative block aspect-video overflow-hidden rounded-t-[16px]">
-                <PosterArt anime={anime} className="h-full w-full" />
-                <span className="absolute inset-0 bg-gradient-to-t from-black/75 via-transparent to-transparent" />
-                <span className="absolute bottom-2 left-3 inline-flex items-center gap-1.5 text-xs font-bold text-white">
-                  <Play className="h-3.5 w-3.5 fill-current" />
-                  {language === "ru" ? "Серия " : "Episode "}{entry.episode}
-                </span>
-                <span className="absolute inset-x-0 bottom-0 h-1 bg-white/25">
-                  <span className="block h-full bg-primary" style={{ width: percent + "%" }} />
-                </span>
-              </span>
-              <span className="block line-clamp-1 px-3 py-2.5 text-left text-sm font-bold">{displayAnimeTitle(anime, language)}</span>
-            </button>
-          );
-        })}
-      </div>
-    </HomeSection>
-  );
-}
-
 export function HomeExperience({
-  animeList, popular, newReleases, announcements, airing, onSelect, onResume, onSeeAll, onOpenCollection,
+  animeList, popular, newReleases, announcements, airing, onSelect, onSeeAll, onOpenCollection,
 }: HomeExperienceProps) {
   const { language, t } = useYumePreferences();
   const ru = language === "ru";
@@ -148,8 +88,6 @@ export function HomeExperience({
             </div>
           </section>
         )}
-
-        <ContinueWatching animeList={animeList} onResume={onResume} />
 
         {popular.length > 0 && <HomeSection title={ru ? "Популярное" : "Popular"} action={seeAll("popular")}><div className="yubera-home-horizontal-row">{popular.slice(0, 14).map(anime => <HomeAnimeCard key={anime.id} anime={anime} onSelect={onSelect} />)}</div></HomeSection>}
 
