@@ -213,16 +213,23 @@ export function NewsArticle({
           {article.authorName && <span>{article.authorName}</span>}
         </div>
 
-        {related && (
-          <a href={"/anime/" + encodeURIComponent(related.id)} className="mt-6 flex items-center gap-3 rounded-2xl border border-border bg-card p-3 transition hover:border-primary/50">
-            <PosterArt anime={related} className="h-[112px] w-[76px] shrink-0 rounded-xl" />
+        {article.linkedTitle && (
+          <div className="mt-6 flex items-center gap-3 rounded-2xl border border-border bg-card p-3">
+            {related ? (
+              <PosterArt anime={related} className="h-[112px] w-[76px] shrink-0 rounded-xl" />
+            ) : article.linkedPosterUrl ? (
+              <img src={article.linkedPosterUrl} alt="" loading="lazy" className="h-[112px] w-[76px] shrink-0 rounded-xl object-cover" />
+            ) : null}
             <span className="min-w-0 flex-1">
               <span className="block text-xs text-muted-foreground">{ru ? "Связанное аниме" : "Related anime"}</span>
-              <span className="mt-1 block font-semibold">{displayAnimeTitle(related, language)}</span>
-              <span className="mt-2 block text-xs font-semibold text-primary">{ru ? "Открыть страницу аниме" : "Open anime page"}</span>
+              <span className="mt-1 block font-semibold">{related ? displayAnimeTitle(related, language) : article.linkedTitle}</span>
+              {related && (
+                <a href={"/anime/" + encodeURIComponent(related.id)} className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-primary">
+                  {ru ? "Открыть страницу аниме" : "Open anime page"} <ArrowUpRight className="h-3 w-3" />
+                </a>
+              )}
             </span>
-            <ArrowUpRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-          </a>
+          </div>
         )}
 
         {details?.youtubeVideoId && !details.youtubeEmbedInBody && <VideoPlayer videoId={details.youtubeVideoId} />}
