@@ -1,4 +1,4 @@
-import { ArrowLeft, Bell, Search } from "lucide-react";
+import { ArrowLeft, Bell } from "lucide-react";
 import { useYumePreferences } from "@/data/preferences";
 import { Logo } from "./Logo";
 
@@ -16,8 +16,8 @@ type Props = {
 
 /**
  * Compact Android-style app bar. All primary navigation lives in the
- * persistent five-destination bottom bar; this header only exposes search
- * and the notification centre.
+ * persistent five-destination bottom bar; this header only exposes the
+ * notification centre.
  */
 export function Header({ setView, unreadNotificationCount = 0, variant = "app" }: Props) {
   const { language } = useYumePreferences();
@@ -34,15 +34,6 @@ export function Header({ setView, unreadNotificationCount = 0, variant = "app" }
         </div>
 
         {variant === "app" && <div className="flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={() => { telegramHapticImpact("light"); setView("catalog"); }}
-            aria-label={ru ? "Поиск аниме" : "Search anime"}
-            title={ru ? "Поиск" : "Search"}
-            className="yubera-topbar-action"
-          >
-            <Search className="h-6 w-6" strokeWidth={2} />
-          </button>
           <button
             type="button"
             onClick={() => { telegramHapticImpact("light"); setView("notifications"); }}
