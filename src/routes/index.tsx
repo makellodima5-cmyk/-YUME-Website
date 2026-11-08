@@ -113,7 +113,7 @@ export const Route = createFileRoute("/")({
     // every time a user opens Favorites, Watch Later, History, Profile or News.
     // This also prevents a transient catalogue-store failure from breaking navigation
     // into account-owned lists.
-    const catalogueIndependentSections = ["admin", "my", "profile", "favorites", "watchlist", "history", "notifications", "privacy", "privacy-policy", "rules", "rights", "news"];
+    const catalogueIndependentSections = ["admin", "my", "profile", "favorites", "watchlist", "history", "tracked-titles", "notifications", "privacy", "privacy-policy", "rules", "rights", "news"];
     if (catalogueIndependentSections.includes(deps.section ?? "")) {
       return {
         catalogMode: "paged",
@@ -2268,7 +2268,7 @@ function Index() {
           {[
             { id: "home" as View, label: language === "ru" ? "Главная" : "Home", icon: Home, active: ["home", "popular", "new-releases", "announcements", "airing", "collections"].includes(view) },
             { id: "catalog" as View, label: language === "ru" ? "Каталог" : "Catalog", icon: LayoutGrid, active: view === "catalog" },
-            { id: "my" as View, label: language === "ru" ? "Моё" : "My", icon: Bookmark, active: ["my", "favorites", "watchlist", "history", "notifications"].includes(view) },
+            { id: "my" as View, label: language === "ru" ? "Моё" : "My", icon: Bookmark, active: ["my", "favorites", "watchlist", "history", "tracked-titles", "notifications"].includes(view) },
             { id: "news" as View, label: language === "ru" ? "Новости" : "News", icon: Newspaper, active: view === "news" },
             { id: "profile" as View, label: language === "ru" ? "Профиль" : "Profile", icon: UserRound, active: ["profile", "admin", "privacy", "privacy-policy", "rules", "rights"].includes(view) },
           ].map((item) => {
