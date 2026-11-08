@@ -41,7 +41,7 @@ function stablePreviewIds(key: string, ids: string[]): string[] {
 function MiniPosterStack({ items }: { items: Anime[] }) {
   if (!items.length) return <span className="grid h-[92px] w-[112px] shrink-0 place-items-center rounded-xl bg-black/15 text-xs text-muted-foreground">—</span>;
   return <span className="relative flex h-[104px] w-[148px] shrink-0 items-center justify-center">
-    {items.slice(0, PREVIEW_LIMIT).map((anime, index) => <span key={anime.id} className={\`absolute top-1 h-[88px] w-[60px] overflow-hidden rounded-xl border border-white/15 shadow-lg \${items.length === 1 ? "left-1/2 z-20 -translate-x-1/2" : items.length === 2 ? (index === 0 ? "left-4 z-10 -rotate-[8deg]" : "right-4 z-20 rotate-[8deg]") : index === 1 ? "left-1/2 z-20 -translate-x-1/2 scale-110" : index === 0 ? "left-2 z-10 -rotate-[12deg]" : "right-2 z-10 rotate-[12deg]"}\`}><PosterArt anime={anime} className="h-full w-full" /></span>)}
+    {items.slice(0, PREVIEW_LIMIT).map((anime, index) => <span key={anime.id} className={`absolute top-1 h-[88px] w-[60px] overflow-hidden rounded-xl border border-white/15 shadow-lg ${items.length === 1 ? "left-1/2 z-20 -translate-x-1/2" : items.length === 2 ? (index === 0 ? "left-4 z-10 -rotate-[8deg]" : "right-4 z-20 rotate-[8deg]") : index === 1 ? "left-1/2 z-20 -translate-x-1/2 scale-110" : index === 0 ? "left-2 z-10 -rotate-[12deg]" : "right-2 z-10 rotate-[12deg]"}`}><PosterArt anime={anime} className="h-full w-full" /></span>)}
   </span>;
 }
 
