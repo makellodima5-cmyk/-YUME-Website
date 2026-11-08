@@ -135,6 +135,7 @@ function AnimeDetailPage() {
   const [posterOpen, setPosterOpen] = useState(false);
   const screenshotTriggerRef = useRef<HTMLButtonElement | null>(null);
   const posterTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const posterWasOpenRef = useRef(false);
 
   useEffect(() => {
     if (anime) document.title = displayAnimeTitle(anime, language) + (language === "en" ? " — watch anime | Yubera" : " — смотреть аниме | Yubera");
@@ -382,9 +383,11 @@ function AnimeDetailPage() {
 
   useEffect(() => {
     if (!posterOpen) {
-      posterTriggerRef.current?.focus();
+      if (posterWasOpenRef.current) posterTriggerRef.current?.focus();
+      posterWasOpenRef.current = false;
       return;
     }
+    posterWasOpenRef.current = true;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const onKeyDown = (event: KeyboardEvent) => {
