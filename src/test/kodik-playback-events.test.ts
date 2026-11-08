@@ -24,6 +24,14 @@ describe("Kodik iframe playback messages", () => {
     })).toEqual({ type: "timeupdate", currentTime: 91.2, durationSeconds: 1400 });
   });
 
+  it("parses PlayerJS scalar time information", () => {
+    expect(parseKodikPlaybackMessage({ event: "time", info: 120 })).toEqual({
+      type: "timeupdate",
+      currentTime: 120,
+      durationSeconds: null,
+    });
+  });
+
   it("recognizes player completion events", () => {
     expect(parseKodikPlaybackMessage({ event: "video_end" })).toEqual({ type: "ended" });
     expect(parseKodikPlaybackMessage({ type: "ended" })).toEqual({ type: "ended" });
