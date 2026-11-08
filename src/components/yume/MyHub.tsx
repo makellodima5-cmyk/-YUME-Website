@@ -64,11 +64,11 @@ export function MyHub({ animeList, onNavigate, onSelect }: Props) {
     window.addEventListener("storage", sync);
     fetch("/api/telegram/history", { credentials: "same-origin", cache: "no-store" }).then(async response => {
       const payload = await response.json().catch(() => null) as { authenticated?: boolean; items?: HistoryPreview[] } | null;
-      if (response.ok && payload?.authenticated && Array.isArray(payload.items)) setHistory(payload.items.filter(item => item && /^\\d{1,12}$/.test(item.animeId) && typeof item.viewedAt === "string").sort((a,b) => b.viewedAt.localeCompare(a.viewedAt)));
+      if (response.ok && payload?.authenticated && Array.isArray(payload.items)) setHistory(payload.items.filter(item => item && /^\d{1,12}$/.test(item.animeId) && typeof item.viewedAt === "string").sort((a,b) => b.viewedAt.localeCompare(a.viewedAt)));
     }).catch(() => undefined);
     fetch("/api/anime-subscriptions", { credentials: "same-origin", cache: "no-store" }).then(async response => {
       const payload = await response.json().catch(() => ({})) as { subscriptions?: string[] };
-      if (response.ok && Array.isArray(payload.subscriptions)) setSubscriptionIds(payload.subscriptions.filter(id => /^\\d{1,20}$/.test(id)));
+      if (response.ok && Array.isArray(payload.subscriptions)) setSubscriptionIds(payload.subscriptions.filter(id => /^\d{1,20}$/.test(id)));
     }).catch(() => undefined).finally(() => setSubscriptionsLoaded(true));
     return () => {
       window.removeEventListener(PROFILE_UPDATED_EVENT, sync);
