@@ -48,6 +48,9 @@ export function readPlaybackProgress(): PlaybackProgressEntry[] {
     return parsed
       .map(normalizeEntry)
       .filter((item): item is PlaybackProgressEntry => item !== null)
+      // Older website builds wrote a zero-second entry as soon as an iframe loaded.
+      // It is not playback and must not appear in local history or episode progress.
+      .filter(item => item.positionSeconds >= 5 || item.completed)
       .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
   } catch {
     return [];

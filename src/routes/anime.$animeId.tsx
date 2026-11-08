@@ -129,7 +129,7 @@ function AnimeDetailPage() {
   const [authRequired, setAuthRequired] = useState(false);
   const [episodeSubscribed, setEpisodeSubscribed] = useState(false);
   const [subscriptionBusy, setSubscriptionBusy] = useState(false);
-  const [watchMode, setWatchMode] = useState<"trailer" | "episodes">("episodes");
+  const [watchMode, setWatchMode] = useState<"trailer" | "episodes">("trailer");
   const [screenshots, setScreenshots] = useState<ShikimoriScreenshot[]>([]);
   const [activeScreenshotIndex, setActiveScreenshotIndex] = useState<number | null>(null);
   const [posterOpen, setPosterOpen] = useState(false);
@@ -254,27 +254,6 @@ function AnimeDetailPage() {
     frame.allow = "autoplay; fullscreen; picture-in-picture; encrypted-media";
     frame.allowFullscreen = true;
     frame.referrerPolicy = "strict-origin-when-cross-origin";
-    frame.addEventListener("load", () => {
-      const openedAt = new Date().toISOString();
-      savePlaybackProgress({
-        animeId,
-        title: displayAnimeTitle(anime, language),
-        ...(anime.englishTitle ? { englishTitle: anime.englishTitle } : {}),
-        ...((anime.bannerUrl || anime.posterUrl) ? { posterUrl: anime.bannerUrl || anime.posterUrl } : {}),
-        episode: kodikEpisode,
-        positionSeconds: 0,
-        durationSeconds: null,
-        completed: false,
-        updatedAt: openedAt,
-      });
-      void fetch("/api/telegram/history", {
-        method: "POST",
-        credentials: "same-origin",
-        cache: "no-store",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ animeId, event: "opened", episodeNumber: kodikEpisode }),
-      }).catch(() => undefined);
-    }, { once: true });
     player.appendChild(frame);
     return () => { frame.remove(); };
   }, [watchMode, kodikEmbedUrl, anime, language, resumeTargetEpisode, resumeTargetSeconds, kodikEpisode]);
@@ -282,11 +261,14 @@ function AnimeDetailPage() {
   useEffect(() => {
     if (watchMode !== "episodes" || !kodikEmbedUrl || !anime) return;
     let lastSavedPosition = -1;
+    let lastServerSavedPosition = -1;
+    let lastKnownDuration: number | null = null;
+    let serverCompletionSaved = false;
     const trustedHosts = ["kodik.info", "kodik.biz", "kodik.cc", "kodik.online", "kodikplayer.com", "kodikres.com"];
     const onKodikMessage = (event: MessageEvent) => {
       if (!event.origin) return;
       const playerFrame = document.getElementById("kodik-player") as HTMLIFrameElement | null;
-      if (playerFrame?.contentWindow && event.source !== playerFrame.contentWindow) return;
+      if (!playerFrame?.contentWindow) return;
       try {
         const hostname = new URL(event.origin).hostname.toLowerCase().replace(/\.$/, "");
         if (!trustedHosts.some((host) => hostname === host || hostname.endsWith("." + host))) return;
@@ -305,14 +287,31 @@ function AnimeDetailPage() {
       if (playbackEvent.type === "ended") {
         markPlaybackEpisodeCompleted({
           ...progressEntry,
-          positionSeconds: 0,
-          durationSeconds: null,
+          positionSeconds: Math.max(0, lastSavedPosition),
+          durationSeconds: lastKnownDuration,
         });
+        if (!serverCompletionSaved) {
+          serverCompletionSaved = true;
+          void fetch("/api/telegram/history", {
+            method: "POST",
+            credentials: "same-origin",
+            cache: "no-store",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              animeId,
+              event: "completed",
+              episodeNumber: kodikEpisode,
+              watchedSeconds: Math.max(0, lastSavedPosition),
+              durationSeconds: lastKnownDuration,
+            }),
+          }).catch(() => undefined);
+        }
         return;
       }
 
       const watchedSeconds = playbackEvent.currentTime;
       const durationSeconds = playbackEvent.durationSeconds;
+      if (durationSeconds !== null) lastKnownDuration = durationSeconds;
       // Kodik may omit duration. Use a conservative TV-episode estimate only for
       // the completion indicator; the saved duration remains unknown.
       const estimatedTvEpisodeDuration = durationSeconds === null && anime.episodes > 1 ? 24 * 60 : null;
@@ -325,8 +324,41 @@ function AnimeDetailPage() {
         if (!alreadyCompleted) {
           markPlaybackEpisodeCompleted({ ...progressEntry, positionSeconds: watchedSeconds, durationSeconds });
         }
+        if (!serverCompletionSaved) {
+          serverCompletionSaved = true;
+          void fetch("/api/telegram/history", {
+            method: "POST",
+            credentials: "same-origin",
+            cache: "no-store",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              animeId,
+              event: "completed",
+              episodeNumber: kodikEpisode,
+              watchedSeconds,
+              durationSeconds,
+            }),
+          }).catch(() => undefined);
+        }
         lastSavedPosition = watchedSeconds;
-      } else if (watchedSeconds >= 5 && (lastSavedPosition < 0 || watchedSeconds - lastSavedPosition >= 8 || watchedSeconds < lastSavedPosition)) {
+      } else if (watchedSeconds >= 5) {
+        if (lastServerSavedPosition < 0 || watchedSeconds - lastServerSavedPosition >= 30 || watchedSeconds < lastServerSavedPosition) {
+          lastServerSavedPosition = watchedSeconds;
+          void fetch("/api/telegram/history", {
+            method: "POST",
+            credentials: "same-origin",
+            cache: "no-store",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              animeId,
+              event: "progress",
+              episodeNumber: kodikEpisode,
+              watchedSeconds,
+              durationSeconds,
+            }),
+          }).catch(() => undefined);
+        }
+        if (lastSavedPosition < 0 || watchedSeconds - lastSavedPosition >= 8 || watchedSeconds < lastSavedPosition) {
         savePlaybackProgress({
           ...progressEntry,
           positionSeconds: watchedSeconds,
@@ -335,6 +367,7 @@ function AnimeDetailPage() {
           updatedAt: new Date().toISOString(),
         });
         lastSavedPosition = watchedSeconds;
+        }
       }
     };
     window.addEventListener("message", onKodikMessage);

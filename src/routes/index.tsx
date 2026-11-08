@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowDownWideNarrow, ChevronDown, ChevronRight, Search, SlidersHorizontal, X, UserRound, ShieldCheck, Play, CircleCheck, Download, Database, Settings, History, Bell, CheckCheck, Sparkles, Home, LayoutGrid, Bookmark, Newspaper } from "lucide-react";
 import { COLLECTIONS, type Anime } from "@/data/anime";
@@ -29,7 +29,6 @@ import { USER_NOTIFICATIONS } from "@/data/notifications.shared";
 import { runAdminTrailerUpdate, type AdminTrailerStats } from "@/data/admin-trailer-update";
 import { hasAdminSession } from "@/lib/admin-access";
 import { normalizeInternalRedirect } from "@/lib/request-security";
-import { PLAYBACK_PROGRESS_UPDATED_EVENT, readPlaybackProgress, removeAnimePlaybackProgress } from "@/data/playback-progress";
 
 const NOTIFICATION_STORAGE_KEY = "yume-user-notifications-read-v1";
 const NOTIFICATION_DISMISSED_STORAGE_KEY = "yume-user-notifications-dismissed-v1";
@@ -106,6 +105,9 @@ export const Route = createFileRoute("/")({
     rating: search.rating, kind: search.kind, age: search.age, lang: search.lang,
   }),
   loader: async ({ deps }) => {
+    if (deps.section === "history") {
+      throw redirect({ to: "/history" });
+    }
     // Personal screens do not need the entire catalogue. Avoid an unnecessary R2 read
     // every time a user opens Favorites, Watch Later, History, Profile or News.
     // This also prevents a transient catalogue-store failure from breaking navigation
@@ -382,40 +384,6 @@ function Index() {
   const [maintenanceBusy, setMaintenanceBusy] = useState(false);
   const [maintenanceMessage, setMaintenanceMessage] = useState("");
   const [expandedAdminSections, setExpandedAdminSections] = useState({import:false,deletion:false,metadata:false,quality:false,maintenance:false,audit:false,trailers:false,notifications:false});
-  const [historyItems, setHistoryItems] = useState<{ animeId: string; viewedAt: string; viewCount: number }[]>([]);
-  const [loadedHistoryAnime, setLoadedHistoryAnime] = useState<Anime[]>([]);
-  const historyAnimeLookupAttempted = useRef(new Set<string>());
-  const [historyDeletingIds, setHistoryDeletingIds] = useState<string[]>([]);
-  const [historyLoading, setHistoryLoading] = useState(false);
-  const [historyAuthenticated, setHistoryAuthenticated] = useState(false);
-  const [historyError, setHistoryError] = useState("");
-  const [localPlaybackProgress, setLocalPlaybackProgress] = useState<ReturnType<typeof readPlaybackProgress>>([]);
-  const localHistoryItems = useMemo(() => {
-    const grouped = new Map<string, { animeId: string; viewedAt: string; episodes: Set<number> }>();
-    for (const entry of localPlaybackProgress) {
-      const current = grouped.get(entry.animeId) ?? { animeId: entry.animeId, viewedAt: entry.updatedAt, episodes: new Set<number>() };
-      current.episodes.add(entry.episode);
-      if (entry.updatedAt > current.viewedAt) current.viewedAt = entry.updatedAt;
-      grouped.set(entry.animeId, current);
-    }
-    return Array.from(grouped.values()).map(item => ({
-      animeId: item.animeId,
-      viewedAt: item.viewedAt,
-      viewCount: item.episodes.size,
-    }));
-  }, [localPlaybackProgress]);
-  const combinedHistoryItems = useMemo(() => {
-    const merged = new Map<string, { animeId: string; viewedAt: string; viewCount: number }>();
-    for (const item of historyItems) merged.set(item.animeId, item);
-    for (const item of localHistoryItems) {
-      const current = merged.get(item.animeId);
-      merged.set(item.animeId, current
-        ? { animeId: item.animeId, viewedAt: item.viewedAt > current.viewedAt ? item.viewedAt : current.viewedAt, viewCount: Math.max(current.viewCount, item.viewCount) }
-        : item);
-    }
-    return Array.from(merged.values()).sort((a, b) => b.viewedAt.localeCompare(a.viewedAt));
-  }, [historyItems, localHistoryItems]);
-
   useEffect(() => {
     const detectTelegramMiniApp = () => {
       setIsTelegramMiniApp(Boolean(getTelegramWebApp()?.initData));
@@ -1297,111 +1265,13 @@ function Index() {
     return () => window.removeEventListener("yume-open-auth", openAuth);
   }, []);
 
-  useEffect(() => {
-    const syncLocalProgress = () => setLocalPlaybackProgress(readPlaybackProgress());
-    syncLocalProgress();
-    window.addEventListener(PLAYBACK_PROGRESS_UPDATED_EVENT, syncLocalProgress);
-    window.addEventListener("storage", syncLocalProgress);
-    return () => {
-      window.removeEventListener(PLAYBACK_PROGRESS_UPDATED_EVENT, syncLocalProgress);
-      window.removeEventListener("storage", syncLocalProgress);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (view !== "history") return;
-    let cancelled = false;
-    setHistoryLoading(true);
-    setHistoryError("");
-    fetch("/api/telegram/history", { credentials: "same-origin", cache: "no-store" })
-      .then(async (response) => {
-        const payload = await response.json().catch(() => ({})) as {
-          authenticated?: boolean;
-          items?: unknown;
-          error?: string;
-        };
-        if (cancelled) return;
-        if (response.status === 401) {
-          setHistoryAuthenticated(false);
-          setHistoryItems([]);
-          return;
-        }
-        if (!response.ok) throw new Error(payload.error || "history_unavailable");
-        if (payload.authenticated !== true) {
-          setHistoryAuthenticated(false);
-          setHistoryItems([]);
-          return;
-        }
-        if (!Array.isArray(payload.items)) throw new Error(payload.error || "history_unavailable");
-        setHistoryAuthenticated(true);
-        setHistoryItems(payload.items.filter((item): item is { animeId: string; viewedAt: string; viewCount: number } =>
-          Boolean(item && typeof item === "object" &&
-            typeof (item as { animeId?: unknown }).animeId === "string" &&
-            /^\d{1,12}$/.test((item as { animeId: string }).animeId) &&
-            typeof (item as { viewedAt?: unknown }).viewedAt === "string" &&
-            typeof (item as { viewCount?: unknown }).viewCount === "number"),
-        ));
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setHistoryAuthenticated(false);
-          setHistoryItems([]);
-          setHistoryError(language === "ru" ? "Не удалось загрузить историю просмотров." : "Could not load viewing history.");
-        }
-      })
-      .finally(() => { if (!cancelled) setHistoryLoading(false); });
-    return () => { cancelled = true; };
-  }, [view, language]);
-
-  useEffect(() => {
-    const missing = combinedHistoryItems
-      .map(item => item.animeId)
-      .filter(id => !ANIME.some(anime => anime.id === id) && !loadedHistoryAnime.some(anime => anime.id === id) && !historyAnimeLookupAttempted.current.has(id));
-    if (!missing.length) return;
-    missing.forEach(id => historyAnimeLookupAttempted.current.add(id));
-    let cancelled = false;
-    const chunks: string[][] = [];
-    for (let index = 0; index < missing.length; index += 35) chunks.push(missing.slice(index, index + 35));
-    Promise.all(chunks.map(ids => getShikimoriAnimes({ data: { ids: ids.join(","), limit: ids.length, order: "ranked" } })))
-      .then(results => {
-        if (cancelled) return;
-        const fetched = results.flatMap(result => result.items);
-        setLoadedHistoryAnime(current => Array.from(new Map([...current, ...fetched].map(anime => [anime.id, anime])).values()));
-      })
-      .catch(() => undefined);
-    return () => { cancelled = true; };
-  }, [combinedHistoryItems, loadedHistoryAnime]);
-
-  const removeHistoryItem = async (item: { animeId: string; viewedAt: string; viewCount: number }) => {
-    if (historyDeletingIds.includes(item.animeId)) return;
-    setHistoryDeletingIds((current) => current.includes(item.animeId) ? current : [...current, item.animeId]);
-    setHistoryError("");
-
-    try {
-      if (historyAuthenticated) {
-        const response = await fetch("/api/telegram/history", {
-          method: "DELETE",
-          credentials: "same-origin",
-          cache: "no-store",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ animeId: item.animeId }),
-        });
-        const payload = await response.json().catch(() => ({})) as { deleted?: boolean; error?: string };
-        if (!response.ok || payload.deleted !== true) throw new Error(payload.error || "history_delete_failed");
-      }
-      setHistoryItems((current) => current.filter((entry) => entry.animeId !== item.animeId));
-      removeAnimePlaybackProgress(item.animeId);
-    } catch {
-      setHistoryError(language === "ru"
-        ? "Не удалось удалить тайтл из истории. Попробуй ещё раз."
-        : "Could not remove this title from history. Please try again.");
-    } finally {
-      setHistoryDeletingIds((current) => current.filter((id) => id !== item.animeId));
-    }
-  };
-
   const setView = (v: View) => {
     setNewsDetailOpen(false);
+    if (v === "history") {
+      void navigate({ to: "/history" });
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
     telegramHapticImpact("light");
     if (v === "login" || v === "register") {
       setViewRaw(v);
@@ -1436,14 +1306,6 @@ function Index() {
     navigate({ to: "/", search: { section: v, q: undefined, page: undefined, sort: undefined, genres: undefined, status: undefined, from: undefined, to: undefined, rating: undefined, kind: undefined, age: undefined, lang: v === "catalog" ? language : undefined } });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
-  const resumeAnime = (anime: Anime, episode: number, positionSeconds: number) => {
-    const query = new URLSearchParams({
-      episode: String(episode),
-      ...(positionSeconds > 0 ? { resume: String(Math.floor(positionSeconds)) } : {}),
-    });
-    window.location.assign("/anime/" + encodeURIComponent(anime.id) + "?" + query.toString());
-  };
-
   const select = (anime: Anime) => {
     if (view === "catalog") {
       try {
@@ -1734,7 +1596,6 @@ function Index() {
           announcements={announcementCards}
           airing={airingCards}
           onSelect={select}
-          onResume={resumeAnime}
           onSeeAll={setView}
           onOpenCollection={(id) => { setCollection(id); setView("collections"); }}
         />
@@ -1993,7 +1854,7 @@ function Index() {
           )}
         </main>
       ) : view === "my" ? (
-        <MyHub animeList={ANIME} onNavigate={setView} onSelect={select} onResume={resumeAnime} />
+        <MyHub animeList={ANIME} onNavigate={setView} onSelect={select} />
       ) : view === "news" ? (
         <News animeList={ANIME} onDetailChange={setNewsDetailOpen} />
       ) : view === "profile" ? (
@@ -2348,54 +2209,7 @@ function Index() {
             )}
           </div>
         </main>
-      ) : view === "history" ? (
-        <main id="main-content" className="yubera-with-bottom-nav mx-auto w-full max-w-[1600px] px-3 pb-8 pt-[78px] sm:px-4 md:px-6 lg:px-8">
-          <SectionBanner title={t("history.title")} subtitle={language === "ru" ? "Недавно просмотренные аниме и серии" : "Recently watched anime and episodes"} />
-          {historyLoading ? (
-            <p className="rounded-2xl border border-border bg-card/40 px-5 py-8 text-sm text-muted-foreground" role="status">{language === "ru" ? "Загружаем историю…" : "Loading history…"}</p>
-          ) : !historyAuthenticated && combinedHistoryItems.length === 0 ? (
-            <section className="rounded-2xl border border-dashed border-border bg-card/40 px-5 py-8 text-center">
-              <p className="text-sm text-muted-foreground">{historyError || (language === "ru" ? "История просмотров доступна только в аккаунте Yubera." : "Viewing history is available only in a Yubera account.")}</p>
-              <div className="mt-4 flex flex-wrap justify-center gap-2">
-                <button type="button" onClick={() => setView("login")} className="rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground">{language === "ru" ? "Войти через Telegram" : "Sign in with Telegram"}</button>
-                <button type="button" onClick={() => setView("register")} className="rounded-xl border border-border px-4 py-2.5 text-sm font-semibold hover:bg-accent">{language === "ru" ? "Регистрация" : "Register"}</button>
-              </div>
-            </section>
-          ) : combinedHistoryItems.length === 0 ? (
-            <p className="rounded-2xl border border-dashed border-border bg-card/40 px-5 py-8 text-sm text-muted-foreground">{language === "ru" ? "История пока пуста. Открывай страницы аниме — они появятся здесь." : "Your history is empty. Open anime pages and they will appear here."}</p>
-          ) : (
-            <>
-              {historyError && <p role="alert" className="mb-4 rounded-xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">{historyError}</p>}
-              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
-                {combinedHistoryItems.map((item) => {
-                  const anime = ANIME.find((entry) => entry.id === item.animeId) ?? loadedHistoryAnime.find((entry) => entry.id === item.animeId);
-                  const deleting = historyDeletingIds.includes(item.animeId);
-                  return (
-                    <div key={item.animeId} className="relative min-w-0">
-                      {anime ? <AnimeCard anime={anime} onSelect={select} /> : (
-                        <button type="button" onClick={() => navigate({ to: "/anime/$animeId", params: { animeId: item.animeId } })} className="w-full rounded-xl border border-border bg-card/50 p-4 text-left text-sm hover:bg-accent">
-                          {language === "ru" ? "Открыть тайтл" : "Open title"} #{item.animeId}
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        aria-label={language === "ru" ? "Удалить из истории просмотров" : "Remove from viewing history"}
-                        title={language === "ru" ? "Удалить из истории" : "Remove from history"}
-                        disabled={deleting}
-                        onClick={(event) => { event.preventDefault(); event.stopPropagation(); void removeHistoryItem(item); }}
-                        className="absolute right-2 top-2 z-20 flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-red-600 text-white shadow-[0_0_0_2px_rgba(0,0,0,0.7),0_4px_12px_rgba(0,0,0,0.65)] transition hover:scale-105 hover:bg-red-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-red-300 disabled:cursor-wait disabled:opacity-70"
-                      >
-                        <X className="h-5 w-5" strokeWidth={3} aria-hidden="true" />
-                      </button>
-                      <p className="mt-2 text-xs text-muted-foreground">{language === "ru" ? "Открыт" : "Opened"}: {new Date(item.viewedAt).toLocaleString(language === "ru" ? "ru-RU" : "en-GB")}</p>
-                    </div>
-                  );
-                })}
-              </div>
-            </>
-          )}
-        </main>
-            ) : null}
+      ) : null}
       {!newsDetailOpen && !(["login", "register"].includes(view)) && (
         <nav className="yubera-bottom-nav" aria-label={language === "ru" ? "Основная навигация" : "Main navigation"}>
           {[

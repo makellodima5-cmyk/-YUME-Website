@@ -529,7 +529,7 @@ export async function handleTelegramBrowserAuth(request: Request): Promise<Respo
 
 
 
-/** Saves recently opened anime only for a verified, signed-in Telegram account. */
+/** Records viewing history only after playback progress is confirmed for a signed-in account. */
 export async function handleTelegramHistory(request: Request): Promise<Response> {
   if (request.method !== "GET" && request.method !== "POST" && request.method !== "DELETE") return jsonResponse({ error: "method_not_allowed" }, 405);
   if ((request.method === "POST" || request.method === "DELETE") && !isSameOriginOrBearer(request)) return jsonResponse({ error: "cross_origin_request" }, 403);
@@ -543,7 +543,7 @@ export async function handleTelegramHistory(request: Request): Promise<Response>
     const userId = await authenticatedTelegramUserId(request, db, secret);
     if (!userId) return jsonResponse({ error: "authentication_required" }, 401);
     if (request.method === "GET") {
-      const rows = await db.prepare("SELECT anime_id AS animeId, viewed_at AS viewedAt, view_count AS viewCount, season_number AS seasonNumber, episode_number AS episodeNumber, position_millis AS positionMillis, duration_millis AS durationMillis, progress_updated_at_epoch_ms AS progressUpdatedAtEpochMillis FROM yume_view_history WHERE user_id = ? ORDER BY viewed_at DESC LIMIT 100")
+      const rows = await db.prepare("SELECT anime_id AS animeId, viewed_at AS viewedAt, view_count AS viewCount, season_number AS seasonNumber, episode_number AS episodeNumber, position_millis AS positionMillis, duration_millis AS durationMillis, progress_updated_at_epoch_ms AS progressUpdatedAtEpochMillis FROM yume_view_history WHERE user_id = ? AND (progress_updated_at_epoch_ms IS NOT NULL OR episode_number IS NULL) ORDER BY viewed_at DESC LIMIT 100")
         .bind(userId).all<{ animeId: string; viewedAt: string; viewCount: number; seasonNumber: number | null; episodeNumber: number | null; positionMillis: number; durationMillis: number; progressUpdatedAtEpochMillis: number | null }>();
       return jsonResponse({ authenticated: true, items: rows.results });
     }
@@ -575,16 +575,36 @@ export async function handleTelegramHistory(request: Request): Promise<Response>
       await db.prepare("DELETE FROM yume_view_history WHERE user_id = ? AND anime_id = ?").bind(userId, animeId).run();
       return jsonResponse({ deleted: true });
     }
-    if (input.event === "opened") {
-      const episodeNumber = input.episodeNumber;
+    const episodeNumber = input.episodeNumber;
+    if (input.event === "progress" || input.event === "completed") {
       if (typeof episodeNumber !== "number" || !Number.isInteger(episodeNumber) || episodeNumber < 1 || episodeNumber > 10_000) {
         return jsonResponse({ error: "invalid_episode_number" }, 400);
       }
-      await db.prepare("INSERT INTO yume_view_history (user_id, anime_id, viewed_at, view_count, episode_number) VALUES (?, ?, ?, 1, ?) ON CONFLICT(user_id, anime_id) DO UPDATE SET viewed_at = excluded.viewed_at, view_count = yume_view_history.view_count + 1, episode_number = excluded.episode_number")
-        .bind(userId, animeId, new Date().toISOString(), episodeNumber).run();
-      await db.prepare("DELETE FROM yume_view_history WHERE user_id = ? AND anime_id NOT IN (SELECT anime_id FROM yume_view_history WHERE user_id = ? ORDER BY viewed_at DESC LIMIT 100)")
+
+      const watchedSeconds = input.watchedSeconds;
+      if (input.event === "progress" &&
+          (typeof watchedSeconds !== "number" || !Number.isFinite(watchedSeconds) || watchedSeconds < 5 || watchedSeconds > 24 * 60 * 60)) {
+        return jsonResponse({ error: "playback_not_confirmed" }, 400);
+      }
+
+      const durationSeconds = input.durationSeconds === null || input.durationSeconds === undefined
+        ? null
+        : input.durationSeconds;
+      if (durationSeconds !== null &&
+          (typeof durationSeconds !== "number" || !Number.isFinite(durationSeconds) || durationSeconds <= 0 || durationSeconds > 24 * 60 * 60)) {
+        return jsonResponse({ error: "invalid_duration" }, 400);
+      }
+
+      const positionMillis = input.event === "completed"
+        ? Math.max(0, Math.floor((durationSeconds ?? (typeof watchedSeconds === "number" ? watchedSeconds : 0)) * 1000))
+        : Math.floor((watchedSeconds as number) * 1000);
+      const durationMillis = durationSeconds === null ? 0 : Math.floor(durationSeconds * 1000);
+      const now = new Date().toISOString();
+      await db.prepare("INSERT INTO yume_view_history (user_id, anime_id, viewed_at, view_count, episode_number, position_millis, duration_millis, progress_updated_at_epoch_ms) VALUES (?, ?, ?, 1, ?, ?, ?, ?) ON CONFLICT(user_id, anime_id) DO UPDATE SET viewed_at = excluded.viewed_at, view_count = CASE WHEN yume_view_history.episode_number IS NOT excluded.episode_number THEN yume_view_history.view_count + 1 ELSE yume_view_history.view_count END, episode_number = excluded.episode_number, position_millis = excluded.position_millis, duration_millis = excluded.duration_millis, progress_updated_at_epoch_ms = excluded.progress_updated_at_epoch_ms")
+        .bind(userId, animeId, now, episodeNumber, positionMillis, durationMillis, Date.now()).run();
+    await db.prepare("DELETE FROM yume_view_history WHERE user_id = ? AND anime_id NOT IN (SELECT anime_id FROM yume_view_history WHERE user_id = ? ORDER BY viewed_at DESC LIMIT 100)")
         .bind(userId, userId).run();
-      return jsonResponse({ saved: true, event: "opened" });
+      return jsonResponse({ saved: true, event: input.event });
     }
 
     const watchedSeconds = input.watchedSeconds;
