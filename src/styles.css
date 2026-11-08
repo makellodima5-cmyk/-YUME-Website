@@ -1455,3 +1455,124 @@ html[data-theme="light"] .yubera-bottom-nav { background:rgba(247,245,246,.96); 
   .yubera-collection-list-card .yubera-home-collection-poster.is-center { width:65px; height:104px; }
   .yubera-collection-detail-header { padding:14px; }
 }
+
+
+/* Home-only search: placed between the app bar and the existing featured banner. */
+.yubera-home-search-shell {
+  width:100%;
+  max-width:1120px;
+  margin:0 auto;
+  padding:78px 12px 0;
+}
+.yubera-home-search-anchor { position:relative; z-index:30; }
+.yubera-home-search-row {
+  display:flex;
+  align-items:center;
+  gap:12px;
+  width:100%;
+  min-width:0;
+}
+.yubera-home-search-field {
+  display:flex;
+  align-items:center;
+  flex:1 1 auto;
+  min-width:0;
+  height:clamp(44px,11.2vw,48px);
+  gap:10px;
+  padding:0 14px;
+  border:1px solid rgba(255,255,255,.20);
+  border-radius:999px;
+  background:rgba(67,69,80,.56);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 5px 16px rgba(0,0,0,.12);
+  -webkit-backdrop-filter:blur(14px);
+  backdrop-filter:blur(14px);
+  transition:border-color .18s ease,background .18s ease,box-shadow .18s ease;
+}
+.yubera-home-search-field:focus-within {
+  border-color:rgba(255,112,79,.62);
+  background:rgba(67,69,80,.72);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 0 0 3px rgba(255,90,61,.10);
+}
+.yubera-home-search-input {
+  width:100%;
+  min-width:0;
+  height:100%;
+  border:0;
+  outline:0;
+  background:transparent;
+  color:var(--foreground);
+  font-size:clamp(14px,3.8vw,17px);
+}
+.yubera-home-search-input::placeholder { color:rgba(224,224,232,.68); opacity:1; }
+.yubera-home-search-clear {
+  display:grid;
+  width:28px;
+  height:28px;
+  flex:0 0 28px;
+  place-items:center;
+  border-radius:50%;
+  color:var(--muted-foreground);
+  transition:background .16s ease,color .16s ease;
+}
+.yubera-home-search-clear:hover { background:rgba(255,255,255,.10); color:var(--foreground); }
+.yubera-home-filter-button {
+  position:relative;
+  display:grid;
+  width:clamp(44px,11.2vw,48px);
+  height:clamp(44px,11.2vw,48px);
+  flex:0 0 clamp(44px,11.2vw,48px);
+  place-items:center;
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:50%;
+  background:rgba(45,47,57,.78);
+  color:var(--foreground);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 5px 16px rgba(0,0,0,.16);
+  transition:background .18s ease,border-color .18s ease,color .18s ease,transform .16s ease;
+}
+.yubera-home-filter-button:hover,
+.yubera-home-filter-button.is-active {
+  border-color:rgba(255,112,79,.42);
+  background:rgba(255,90,61,.15);
+  color:var(--primary);
+}
+.yubera-home-filter-button:active { transform:scale(.96); }
+.yubera-home-filter-button:disabled { cursor:wait; opacity:.5; }
+.yubera-home-filter-count {
+  position:absolute;
+  top:-4px;
+  right:-3px;
+  display:flex;
+  min-width:18px;
+  height:18px;
+  align-items:center;
+  justify-content:center;
+  padding:0 4px;
+  border:1px solid var(--background);
+  border-radius:999px;
+  background:var(--primary);
+  color:white;
+  font-size:10px;
+  font-weight:800;
+  line-height:1;
+}
+.yubera-home-search-results { padding-top:0 !important; }
+@media(max-width:360px) {
+  .yubera-home-search-shell { padding-right:10px; padding-left:10px; }
+  .yubera-home-search-row { gap:8px; }
+  .yubera-home-search-field { padding-right:11px; padding-left:12px; gap:8px; }
+}
+@media(prefers-reduced-motion:reduce) {
+  .yubera-home-search-field,
+  .yubera-home-search-clear,
+  .yubera-home-filter-button { transition:none !important; }
+}
+html[data-theme="light"] .yubera-home-search-field {
+  border-color:rgba(40,34,42,.18);
+  background:rgba(235,233,238,.86);
+}
+html[data-theme="light"] .yubera-home-search-input::placeholder { color:rgba(60,56,66,.62); }
+html[data-theme="light"] .yubera-home-filter-button {
+  border-color:rgba(40,34,42,.13);
+  background:rgba(229,227,233,.94);
+  color:#302c35;
+}
