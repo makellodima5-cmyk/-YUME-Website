@@ -575,6 +575,18 @@ export async function handleTelegramHistory(request: Request): Promise<Response>
       await db.prepare("DELETE FROM yume_view_history WHERE user_id = ? AND anime_id = ?").bind(userId, animeId).run();
       return jsonResponse({ deleted: true });
     }
+    if (input.event === "opened") {
+      const episodeNumber = input.episodeNumber;
+      if (typeof episodeNumber !== "number" || !Number.isInteger(episodeNumber) || episodeNumber < 1 || episodeNumber > 10_000) {
+        return jsonResponse({ error: "invalid_episode_number" }, 400);
+      }
+      await db.prepare("INSERT INTO yume_view_history (user_id, anime_id, viewed_at, view_count, episode_number) VALUES (?, ?, ?, 1, ?) ON CONFLICT(user_id, anime_id) DO UPDATE SET viewed_at = excluded.viewed_at, view_count = yume_view_history.view_count + 1, episode_number = excluded.episode_number")
+        .bind(userId, animeId, new Date().toISOString(), episodeNumber).run();
+      await db.prepare("DELETE FROM yume_view_history WHERE user_id = ? AND anime_id NOT IN (SELECT anime_id FROM yume_view_history WHERE user_id = ? ORDER BY viewed_at DESC LIMIT 100)")
+        .bind(userId, userId).run();
+      return jsonResponse({ saved: true, event: "opened" });
+    }
+
     const watchedSeconds = input.watchedSeconds;
     if (typeof watchedSeconds !== "number" || !Number.isFinite(watchedSeconds) || watchedSeconds < 30 || watchedSeconds > 24 * 60 * 60) {
       return jsonResponse({ error: "playback_not_confirmed" }, 400);
