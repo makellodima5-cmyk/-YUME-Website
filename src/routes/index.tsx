@@ -2203,7 +2203,7 @@ function Index() {
                               disabled={item.alreadyInCatalog || Boolean(adminTitleImportBusy) || adminTitleSearchBusy || adminImportRunning || metadataRefreshRunning}
                               className={item.alreadyInCatalog
                                 ? "min-h-9 shrink-0 rounded-lg border border-border px-2.5 py-2 text-[11px] font-medium text-muted-foreground"
-                                : "min-h-9 shrink-0 rounded-lg bg-gradient-to-r from-[#AC4EFC] to-[#8736FA] px-2.5 py-2 text-[11px] font-semibold text-white transition hover:brightness-110 disabled:cursor-wait disabled:opacity-50"}
+                                : "min-h-9 shrink-0 rounded-lg bg-gradient-to-r from-primary to-[#FF764F] px-2.5 py-2 text-[11px] font-semibold text-white transition hover:brightness-110 disabled:cursor-wait disabled:opacity-50"}
                             >
                               {item.alreadyInCatalog
                                 ? (language === "ru" ? "Уже добавлено" : "Already added")
@@ -2231,25 +2231,25 @@ function Index() {
                         <option value="released">{language === "ru" ? "Вышедшее" : "Released"}</option>
                       </select>
                     </label>
-                    <button type="button" onClick={runCatalogImport} disabled={adminImportRunning || metadataRefreshRunning || (adminImport.state !== "running" && (!Number.isSafeInteger(Number(adminImportTarget)) || Number(adminImportTarget)<1))} className="self-end rounded-xl bg-gradient-to-r from-[#AC4EFC] to-[#8736FA] px-4 py-2.5 text-sm font-semibold text-white shadow-[0_0_16px_rgba(155,65,245,0.18)] transition hover:brightness-110 disabled:cursor-wait disabled:opacity-50">
+                    <button type="button" onClick={runCatalogImport} disabled={adminImportRunning || metadataRefreshRunning || (adminImport.state !== "running" && (!Number.isSafeInteger(Number(adminImportTarget)) || Number(adminImportTarget)<1))} className="self-end rounded-xl bg-gradient-to-r from-primary to-[#FF764F] px-4 py-2.5 text-sm font-semibold text-white shadow-[0_0_16px_rgba(255,90,61,0.18)] transition hover:brightness-110 disabled:cursor-wait disabled:opacity-50">
                       {adminImportRunning ? (language === "ru" ? "Импорт…" : "Importing…") : adminImport.state === "running" ? (language === "ru" ? "Продолжить импорт" : "Resume import") : (language === "ru" ? "Начать импорт" : "Start import")}
                     </button>
                   </div>
-                  <label className="mt-3 flex cursor-pointer items-start gap-3 rounded-xl border border-[#49375A] bg-[#100B17] p-3">
+                  <label className="mt-3 flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-card p-3">
                     <input type="checkbox" checked={adminBulkBlock18Plus} onChange={event => { void saveAdminBulkImportFilter(event.target.checked); }} disabled={adminBulkFilterBusy || adminImportRunning || adminImport.state === "running" || metadataRefreshRunning} className="mt-1 h-4 w-4 shrink-0 accent-primary disabled:opacity-50"/>
                     <span className="min-w-0 flex-1">
                       <span className="block text-sm font-semibold text-[#F6F4F5]">{language==="ru" ? "Исключать рейтинг 18+ при импорте по количеству" : "Exclude 18+ ratings from quantity imports"}</span>
                       <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">{language==="ru" ? "Включено: тайтлы с рейтингом RX (18+) пропускаются. Хентай, яой и юри запрещены для массовой загрузки всегда. Поиск и ручной импорт по названию этими правилами не ограничиваются." : "When enabled, RX (18+) titles are skipped. Hentai, yaoi and yuri are always excluded from bulk imports. Title search and manual title imports are not affected."}</span>
-                      {adminBulkFilterBusy && <span className="mt-1 block text-xs text-[#D0A8FF]">{language==="ru" ? "Сохраняем настройку…" : "Saving setting…"}</span>}
+                      {adminBulkFilterBusy && <span className="mt-1 block text-xs text-primary">{language==="ru" ? "Сохраняем настройку…" : "Saving setting…"}</span>}
                     </span>
                   </label>
                   <div className="mt-3 grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
-                    <div className="rounded-lg border border-[#243D35] bg-[#101116] p-2.5"><span className="block text-xs text-[#A89CB8]">{language === "ru" ? "Добавлено" : "Added"}</span><strong className="tabular-nums text-[#36EBA6]">{adminImport.added} / {adminImport.target}</strong></div>
-                    <div className="rounded-lg border border-[#27374A] bg-[#101116] p-2.5"><span className="block text-xs text-[#A89CB8]">{language === "ru" ? "Дубликаты" : "Duplicates"}</span><strong className="tabular-nums text-[#91CFFF]">{adminImport.skipped}</strong></div>
-                    <div className="rounded-lg border border-[#493A27] bg-[#101116] p-2.5"><span className="block text-xs text-[#A89CB8]">{language === "ru" ? "Неполные записи" : "Incomplete records"}</span><strong className="tabular-nums text-[#FFAA43]">{adminImport.incomplete}</strong></div>
-                    <div className="rounded-lg border border-[#492638] bg-[#101116] p-2.5"><span className="block text-xs text-[#A89CB8]">{language === "ru" ? "Ошибки источника" : "Source errors"}</span><strong className="tabular-nums text-[#FF4A68]">{adminImport.errors}</strong></div>
+                    <div className="rounded-lg border border-[#243D35] bg-[#101116] p-2.5"><span className="block text-xs text-muted-foreground">{language === "ru" ? "Добавлено" : "Added"}</span><strong className="tabular-nums text-[#36EBA6]">{adminImport.added} / {adminImport.target}</strong></div>
+                    <div className="rounded-lg border border-[#27374A] bg-[#101116] p-2.5"><span className="block text-xs text-muted-foreground">{language === "ru" ? "Дубликаты" : "Duplicates"}</span><strong className="tabular-nums text-[#91CFFF]">{adminImport.skipped}</strong></div>
+                    <div className="rounded-lg border border-[#493A27] bg-[#101116] p-2.5"><span className="block text-xs text-muted-foreground">{language === "ru" ? "Неполные записи" : "Incomplete records"}</span><strong className="tabular-nums text-[#FFAA43]">{adminImport.incomplete}</strong></div>
+                    <div className="rounded-lg border border-[#492638] bg-[#101116] p-2.5"><span className="block text-xs text-muted-foreground">{language === "ru" ? "Ошибки источника" : "Source errors"}</span><strong className="tabular-nums text-[#FF4A68]">{adminImport.errors}</strong></div>
                   </div>
-                  {adminImportRunning && <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted" role="progressbar" aria-valuemin={0} aria-valuemax={adminImport.target || 1} aria-valuenow={adminImport.added}><div className="h-full rounded-full bg-gradient-to-r from-[#A83BFA] to-[#D08AFF] transition-all" style={{width:`${adminImport.target ? Math.min(100,adminImport.added/adminImport.target*100) : 0}%`}} /></div>}
+                  {adminImportRunning && <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted" role="progressbar" aria-valuemin={0} aria-valuemax={adminImport.target || 1} aria-valuenow={adminImport.added}><div className="h-full rounded-full bg-gradient-to-r from-primary to-[#FF764F] transition-all" style={{width:`${adminImport.target ? Math.min(100,adminImport.added/adminImport.target*100) : 0}%`}} /></div>}
                   <p className="mt-2 text-xs text-muted-foreground">{language === "ru" ? `Состояние: ${adminImport.state}. Страница Shikimori: ${adminImport.cursor}.` : `Status: ${adminImport.state}. Shikimori page: ${adminImport.cursor}.`}</p>
                   {adminImportMessage && <p className="mt-2 rounded-lg border border-border bg-background/60 p-2.5 text-xs" role="status">{adminImportMessage}</p>}
                 </div>
@@ -2295,7 +2295,7 @@ function Index() {
                   <p className="text-xs leading-relaxed text-muted-foreground">{language === "ru" ? "Дозаполняет отсутствующие метаданные и кадры из Shikimori. Уже заполненные метаданные не перезаписываются; новые записи не добавляются." : "Fills missing metadata and screenshots from Shikimori. Existing metadata is preserved; no records are added."}</p>
                   <div className="grid grid-cols-2 gap-1.5">
                     <button type="button" onClick={resetMetadataRefresh} disabled={metadataRefreshRunning || metadataAutoBusy || adminImportRunning || adminRunning} className="col-span-2 w-full rounded-lg border border-amber-500/40 bg-amber-500/10 px-2.5 py-2 text-xs font-semibold text-amber-200 disabled:cursor-not-allowed disabled:opacity-45">{language === "ru" ? "Сбросить прогресс и начать сначала" : "Reset progress and start over"}</button>
-                    <button type="button" onClick={runMetadataRefresh} disabled={metadataRefreshRunning || metadataAutoBusy || adminImportRunning || adminRunning} className="w-full rounded-lg bg-gradient-to-r from-[#AC4EFC] to-[#8736FA] px-2.5 py-2 text-xs font-semibold text-white shadow-[0_0_12px_rgba(155,65,245,0.15)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-45">{metadataRefreshRunning ? (language === "ru" ? "Выполняется вручную…" : "Manual run active…") : (language === "ru" ? "Запустить вручную" : "Run manually")}</button>
+                    <button type="button" onClick={runMetadataRefresh} disabled={metadataRefreshRunning || metadataAutoBusy || adminImportRunning || adminRunning} className="w-full rounded-lg bg-gradient-to-r from-primary to-[#FF764F] px-2.5 py-2 text-xs font-semibold text-white shadow-[0_0_12px_rgba(255,90,61,0.15)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-45">{metadataRefreshRunning ? (language === "ru" ? "Выполняется вручную…" : "Manual run active…") : (language === "ru" ? "Запустить вручную" : "Run manually")}</button>
                     <button type="button" onClick={stopManualMetadataRefresh} disabled={!metadataRefreshRunning || metadataAutoBusy} className="w-full rounded-lg border border-border px-2.5 py-2 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-40">{language === "ru" ? "Стоп ручного запуска" : "Stop manual run"}</button>
                   </div>
                 </div>
@@ -2306,7 +2306,7 @@ function Index() {
                       <span>{language === "ru" ? "Дополнено тайтлов" : "Titles enriched"}: {metadataRefreshProgress.updated} · {language === "ru" ? "URL кадров" : "Screenshot URLs"}: {metadataRefreshProgress.screenshotsSaved} · {language === "ru" ? "Ошибок кадров" : "Failed shots"}: {metadataRefreshProgress.screenshotFailures} · {language === "ru" ? "Ожидают повтора" : "Waiting to retry"}: {metadataRefreshProgress.screenshotRetries}</span>
                     </div>
                     <div role="progressbar" aria-valuemin={0} aria-valuemax={metadataRefreshProgress.total} aria-valuenow={metadataRefreshProgress.offset} className="h-1.5 overflow-hidden rounded-full bg-muted">
-                      <div className="h-full rounded-full bg-gradient-to-r from-[#A83BFA] to-[#D08AFF] transition-all" style={{ width: (metadataRefreshProgress.total ? Math.min(100, metadataRefreshProgress.offset / metadataRefreshProgress.total * 100) : 0) + "%" }} />
+                      <div className="h-full rounded-full bg-gradient-to-r from-primary to-[#FF764F] transition-all" style={{ width: (metadataRefreshProgress.total ? Math.min(100, metadataRefreshProgress.offset / metadataRefreshProgress.total * 100) : 0) + "%" }} />
                     </div>
                   </div>
                 )}
@@ -2331,7 +2331,7 @@ function Index() {
               </details>
               <details open={expandedAdminSections.quality} onToggle={event => { const isOpen = event.currentTarget.open; setExpandedAdminSections(current => current.quality === isOpen ? current : {...current, quality: isOpen}); }} className="group mb-3 overflow-hidden rounded-2xl border border-[#22232B] bg-[#101116]" aria-label={language === "ru" ? "Качество каталога" : "Catalog quality"}>
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 hover:bg-card/80 [&::-webkit-details-marker]:hidden">
-                  <span className="flex min-w-0 items-center gap-3"><Database className="h-6 w-6 shrink-0 text-[#FF764F]"/><span className="min-w-0"><span className="block font-semibold text-[#F6F4F5]">{language === "ru" ? "Качество каталога" : "Catalog quality"}</span><span className="mt-0.5 block text-xs text-[#A89CB8]">{language === "ru" ? "Неполных записей: " : "Incomplete records: "}{catalogQualitySummary.incomplete}</span></span></span><span className="rounded-full bg-[#1D1729] px-3 py-1 text-xs text-[#DCC8F8]">{language === "ru" ? "Всего: " : "Total: "}{catalogQualitySummary.total}</span>
+                  <span className="flex min-w-0 items-center gap-3"><Database className="h-6 w-6 shrink-0 text-[#FF764F]"/><span className="min-w-0"><span className="block font-semibold text-[#F6F4F5]">{language === "ru" ? "Качество каталога" : "Catalog quality"}</span><span className="mt-0.5 block text-xs text-muted-foreground">{language === "ru" ? "Неполных записей: " : "Incomplete records: "}{catalogQualitySummary.incomplete}</span></span></span><span className="rounded-full bg-secondary px-3 py-1 text-xs text-foreground">{language === "ru" ? "Всего: " : "Total: "}{catalogQualitySummary.total}</span>
                   <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
                 </summary>
                 <div className="border-t border-border/70 p-3 sm:p-4">
@@ -2369,7 +2369,7 @@ function Index() {
               </details>
               <details open={expandedAdminSections.maintenance} onToggle={event => { const isOpen = event.currentTarget.open; setExpandedAdminSections(current => current.maintenance === isOpen ? current : {...current, maintenance: isOpen}); }} className="group mb-3 overflow-hidden rounded-2xl border border-[#22232B] bg-[#101116]" aria-label={language === "ru" ? "Обслуживание" : "Maintenance"}>
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 hover:bg-card/80 [&::-webkit-details-marker]:hidden">
-                  <span className="flex min-w-0 items-center gap-3"><Settings className="h-6 w-6 shrink-0 text-[#FF764F]"/><span><span className="block font-semibold text-[#F6F4F5]">{language==="ru"?"Обслуживание":"Maintenance"}</span><span className="mt-0.5 block text-xs text-[#A89CB8]">{language==="ru"?"Проверка подключения к D1":"D1 connectivity check"}</span></span></span>
+                  <span className="flex min-w-0 items-center gap-3"><Settings className="h-6 w-6 shrink-0 text-[#FF764F]"/><span><span className="block font-semibold text-[#F6F4F5]">{language==="ru"?"Обслуживание":"Maintenance"}</span><span className="mt-0.5 block text-xs text-muted-foreground">{language==="ru"?"Проверка подключения к D1":"D1 connectivity check"}</span></span></span>
                   <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
                 </summary>
                 <div className="border-t border-border/70 p-3 sm:p-4">
@@ -2380,7 +2380,7 @@ function Index() {
               </details>
               <details open={expandedAdminSections.audit} onToggle={event => { const isOpen = event.currentTarget.open; setExpandedAdminSections(current => current.audit === isOpen ? current : {...current, audit: isOpen}); }} className="group mb-3 overflow-hidden rounded-2xl border border-[#22232B] bg-[#101116]" aria-label={language==="ru"?"История административных операций":"Admin operation history"}>
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 hover:bg-card/80 [&::-webkit-details-marker]:hidden">
-                  <span className="flex min-w-0 items-center gap-3"><History className="h-6 w-6 shrink-0 text-[#FF764F]"/><span><span className="block font-semibold text-[#F6F4F5]">{language==="ru"?"История операций":"Operation history"}</span><span className="mt-0.5 block text-xs text-[#A89CB8]">{language==="ru"?"Последние 30 событий":"Latest 30 events"}</span></span></span>
+                  <span className="flex min-w-0 items-center gap-3"><History className="h-6 w-6 shrink-0 text-[#FF764F]"/><span><span className="block font-semibold text-[#F6F4F5]">{language==="ru"?"История операций":"Operation history"}</span><span className="mt-0.5 block text-xs text-muted-foreground">{language==="ru"?"Последние 30 событий":"Latest 30 events"}</span></span></span>
                   <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
                 </summary>
                 <div className="border-t border-border/70 p-3 sm:p-4">
