@@ -226,7 +226,7 @@ export function ViewingHistoryPage({ onNavigate, onSelect }: Props) {
                           {ru ? "Открыть тайтл" : "Open title"} #{item.animeId}
                         </button>
                       )}
-                      <button type="button" disabled={deleting} onClick={() => void removeItem(item)} aria-label={ru ? "Удалить из истории" : "Remove from history"} className="absolute right-2 top-2 z-10 grid h-8 w-8 place-items-center rounded-full border border-white/30 bg-black/75 text-white disabled:opacity-50"><X className="h-4 w-4" /></button>
+                      <button type="button" disabled={deleting} onClick={() => void removeItem(item)} aria-label={ru ? "Удалить из истории" : "Remove from history"} className="absolute right-2 top-2 z-10 grid h-8 w-8 place-items-center rounded-full border border-white/20 bg-black/75 text-white/80 shadow-lg backdrop-blur-sm disabled:opacity-50"><X className="h-4 w-4" /></button>
                       <div className="mt-2 text-xs text-muted-foreground">
                         {item.episodeNumber ? (ru ? "Серия " : "Episode ") + item.episodeNumber : (ru ? "Просмотрено" : "Watched")}
                         {item.viewCount > 1 ? " · " + item.viewCount : ""}
