@@ -6,16 +6,14 @@ import { useYumePreferences } from "@/data/preferences";
 import { SectionBanner } from "./Sections";
 import { PosterArt } from "./Poster";
 import { getShikimoriAnimes } from "@/data/shikimori";
-import { ContinueWatching } from "./HomeExperience";
 
 type Props = {
   animeList: Anime[];
   onNavigate: (view: View) => void;
   onSelect: (anime: Anime) => void;
-  onResume: (anime: Anime, episode: number, positionSeconds: number) => void;
 };
 
-export function MyHub({ animeList, onNavigate, onSelect, onResume }: Props) {
+export function MyHub({ animeList, onNavigate, onSelect }: Props) {
   const { language } = useYumePreferences();
   const ru = language === "ru";
   const [subscriptions, setSubscriptions] = useState<string[]>([]);
@@ -89,8 +87,6 @@ export function MyHub({ animeList, onNavigate, onSelect, onResume }: Props) {
             );
           })}
         </div>
-
-        <ContinueWatching animeList={animeList} onResume={onResume} />
 
         <section className="mt-8">
           <div className="mb-3 flex items-center justify-between">
