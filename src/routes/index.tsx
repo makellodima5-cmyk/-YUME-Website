@@ -332,6 +332,9 @@ function HomeSearchBar({
                 <X className="h-4 w-4" />
               </button>
             )}
+            <button type="submit" aria-label={t("catalog.search")} title={t("catalog.search")} className="yubera-home-search-clear">
+              <Search className="h-5 w-5" />
+            </button>
           </div>
           <button
             type="button"
@@ -1313,9 +1316,12 @@ function Index() {
   useEffect(() => {
     setViewRaw(section ?? "home");
     const restoredQuery = urlQuery ?? "";
-    setQuery(restoredQuery);
-    setSubmittedQuery(restoredQuery);
-    setCatalogQuery(restoredQuery);
+    if (lastSyncedQueryRef.current !== restoredQuery) {
+      lastSyncedQueryRef.current = restoredQuery;
+      setQuery(restoredQuery);
+      setSubmittedQuery(restoredQuery);
+      setCatalogQuery(restoredQuery);
+    }
     const restoredFilters: CatalogFiltersValue = {
       ...EMPTY_CATALOG_FILTERS,
       genres: (urlGenres ?? "").split(",").filter(Boolean).slice(0, 20),
@@ -1344,6 +1350,7 @@ function Index() {
   const [query, setQuery] = useState(urlQuery ?? "");
   const [submittedQuery, setSubmittedQuery] = useState(urlQuery ?? "");
   const [catalogQuery, setCatalogQuery] = useState(urlQuery ?? "");
+  const lastSyncedQueryRef = useRef(urlQuery ?? "");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const filtersFromUrl: CatalogFiltersValue = {
     ...EMPTY_CATALOG_FILTERS,
@@ -1500,7 +1507,6 @@ function Index() {
     if (view !== "catalog") return;
     setCatalogPage(loadedCatalogPage);
     const routeQuery = urlQuery ?? "";
-    if (catalogQuery.trim() !== routeQuery) setCatalogQuery(routeQuery);
     const routeSort = urlSort ?? "rating";
     if (sortBy !== routeSort) setSortBy(routeSort);
     const routeFilters = filtersFromUrl;
@@ -1558,7 +1564,7 @@ function Index() {
     const rating = has("rating") ? overrides.rating : activeFilters.minRating || undefined;
     const kind = has("kind") ? overrides.kind : activeFilters.type !== EMPTY_CATALOG_FILTERS.type ? activeFilters.type : undefined;
     const age = has("age") ? overrides.age : activeFilters.ageRating !== EMPTY_CATALOG_FILTERS.ageRating ? activeFilters.ageRating : undefined;
-    const q = has("q") ? overrides.q : view === "catalog" ? catalogQuery.trim() || undefined : view === "home" ? submittedQuery.trim() || undefined : undefined;
+    const q = has("q") ? overrides.q : view === "catalog" ? urlQuery || undefined : view === "home" ? submittedQuery.trim() || undefined : undefined;
     void navigate({ to: "/", replace: true, search: {
       section: view,
       q: q || undefined,
@@ -1585,7 +1591,14 @@ function Index() {
   
   const submitHomeSearch = () => {
     const nextQuery = query.trim();
+    setQuery(nextQuery);
     setSubmittedQuery(nextQuery);
+    setCatalogPage(1);
+    writeCatalogUrl({ q: nextQuery || undefined, page: 1 });
+  };
+  const submitCatalogSearch = () => {
+    const nextQuery = catalogQuery.trim();
+    setCatalogQuery(nextQuery);
     setCatalogPage(1);
     writeCatalogUrl({ q: nextQuery || undefined, page: 1 });
   };
@@ -1656,7 +1669,7 @@ function Index() {
       {view === "home" && (
         <HomeSearchBar
           query={query}
-          onQueryChange={(value) => { setQuery(value); setSubmittedQuery(value.trim()); setCatalogPage(1); }}
+          onQueryChange={(value) => { setQuery(value); }}
           onSubmit={submitHomeSearch}
           filtersOpen={filtersOpen}
           onToggleFilters={() => { setDraftFilters({ ...activeFilters, genres: [...activeFilters.genres] }); setFiltersOpen((open) => !open); }}
@@ -1947,15 +1960,18 @@ function Index() {
             </div>
           )}
           <div data-filter-anchor className="relative z-30 mt-5 max-w-xl">
-            <div className="flex h-11 items-center rounded-xl border border-white/10 bg-card shadow-lg shadow-black/10 backdrop-blur-xl focus-within:border-primary/60">
+            <form onSubmit={(event) => { event.preventDefault(); submitCatalogSearch(); }} role="search" className="flex h-11 items-center rounded-xl border border-white/10 bg-card shadow-lg shadow-black/10 backdrop-blur-xl focus-within:border-primary/60">
               <Search className="ml-3 h-4 w-4 shrink-0 text-muted-foreground" />
-              <input value={catalogQuery} onChange={(event) => { const value = event.target.value; setCatalogQuery(value); setCatalogPage(1); writeCatalogUrl({ q: value.trim() || undefined, page: 1 }); }} disabled={needsFullCatalog && catalogLoadState !== "loaded" && catalogLoadState !== "error"} placeholder={t("search.placeholder")} aria-label={t("catalog.search")} className="h-full min-w-0 flex-1 bg-transparent px-2.5 text-sm outline-none placeholder:text-muted-foreground" />
-              {catalogQuery && <button type="button" aria-label={t("search.clear")} onClick={() => { setCatalogQuery(""); setCatalogPage(1); writeCatalogUrl({ q: undefined, page: 1 }); }} className="rounded-full p-1.5 text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>}
+              <input value={catalogQuery} onChange={(event) => setCatalogQuery(event.target.value)} disabled={needsFullCatalog && catalogLoadState !== "loaded" && catalogLoadState !== "error"} placeholder={t("search.placeholder")} aria-label={t("catalog.search")} className="h-full min-w-0 flex-1 bg-transparent px-2.5 text-sm outline-none placeholder:text-muted-foreground" />
+              {catalogQuery && <button type="button" aria-label={t("search.clear")} onClick={() => setCatalogQuery("")} className="rounded-full p-1.5 text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>}
+              <button type="submit" aria-label={t("catalog.search")} title={t("catalog.search")} disabled={needsFullCatalog && catalogLoadState !== "loaded" && catalogLoadState !== "error"} className="mr-1 grid h-8 w-8 shrink-0 place-items-center rounded-lg text-muted-foreground transition hover:bg-accent hover:text-foreground disabled:opacity-40">
+                <Search className="h-4 w-4" />
+              </button>
               <button type="button" disabled={needsFullCatalog && catalogLoadState !== "loaded" && catalogLoadState !== "error"} onClick={() => { setDraftFilters({ ...activeFilters, genres: [...activeFilters.genres] }); setFiltersOpen((open) => !open); }} aria-label={t("filters.open")} aria-expanded={filtersOpen} data-filter-trigger className={`relative mr-1.5 flex h-8 w-9 shrink-0 items-center justify-center rounded-lg transition ${filtersOpen || activeFilterCount ? "bg-primary/20 text-primary" : "text-muted-foreground hover:bg-accent hover:text-foreground"}`}>
                 <SlidersHorizontal className="h-4 w-4" />
                 {activeFilterCount > 0 && <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-neon px-1 text-[10px] font-bold text-primary-foreground">{activeFilterCount}</span>}
               </button>
-            </div>
+            </form>
             <CatalogFilters open={filtersOpen && (!needsFullCatalog || catalogLoadState === "loaded" || catalogLoadState === "error")} draft={draftFilters} setDraft={setDraftFilters} onApply={applyCatalogFilters} onReset={resetCatalogFilters} onClose={() => setFiltersOpen(false)} genres={availableGenres} statuses={availableStatuses} types={availableTypes} ageRatings={availableAgeRatings} yearMin={catalogYearRange.min} yearMax={catalogYearRange.max} />
           </div>
           <div className="mb-5 mt-7 flex flex-wrap items-center justify-end gap-3">
