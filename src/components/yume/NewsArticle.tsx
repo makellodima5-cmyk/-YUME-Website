@@ -223,8 +223,8 @@ export function NewsArticle({
             <span className="min-w-0 flex-1">
               <span className="block text-xs text-muted-foreground">{ru ? "Связанное аниме" : "Related anime"}</span>
               <span className="mt-1 block font-semibold">{related ? displayAnimeTitle(related, language) : article.linkedTitle}</span>
-              {related && (
-                <a href={"/anime/" + encodeURIComponent(related.id)} className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-primary">
+              {article.linkedId && (
+                <a href={"/anime/" + encodeURIComponent(related?.id ?? String(article.linkedId))} className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-primary">
                   {ru ? "Открыть страницу аниме" : "Open anime page"} <ArrowUpRight className="h-3 w-3" />
                 </a>
               )}
