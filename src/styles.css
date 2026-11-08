@@ -26,7 +26,7 @@
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
-  --color-magenta: var(--magenta);
+  --color-accent-warm: var(--accent-warm);
   --color-gold: var(--gold);
   --color-destructive: var(--destructive);
   --color-border: var(--border);
@@ -434,7 +434,7 @@ button.yume-tactile-control:has(.aspect-\\[2\\/3\\]) {
   --muted-foreground: #A4A1AA;
   --accent: #34231F;
   --accent-foreground: #FFFFFF;
-  --magenta: #FF764F;
+  --accent-warm: #FF764F;
   --gold: #FFC36A;
   --destructive: #E45B59;
   --border: rgba(246,244,245,.10);
@@ -461,7 +461,7 @@ html[data-theme="light"] {
   --muted-foreground: #6C6872;
   --accent: #F6E5E1;
   --accent-foreground: #522319;
-  --magenta: #B94C38;
+  --accent-warm: #B94C38;
   --gold: #D99125;
   --destructive: #C53F42;
   --border: rgba(27,25,32,.12);
@@ -575,7 +575,7 @@ html[data-theme="light"] .yubera-wordmark {
   --muted-foreground: #A4A1AA;
   --accent: #34231F;
   --accent-foreground: #FFFFFF;
-  --magenta: #FF764F;
+  --accent-warm: #FF764F;
   --gold: #F4B942;
   --destructive: #E05252;
   --border: rgba(255,255,255,.12);
@@ -604,7 +604,7 @@ html[data-theme="light"] {
   --muted-foreground: #6C6872;
   --accent: #F4E5E1;
   --accent-foreground: #2A211F;
-  --magenta: #B94C38;
+  --accent-warm: #B94C38;
   --border: rgba(35,27,31,.14);
   --input: rgba(35,27,31,.18);
   --ring: #D9472D;
