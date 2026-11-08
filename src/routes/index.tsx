@@ -1,10 +1,11 @@
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowDownWideNarrow, ChevronDown, ChevronRight, Search, SlidersHorizontal, X, UserRound, ShieldCheck, Play, CircleCheck, Download, Database, Settings, History, Bell, CheckCheck, Sparkles, Home, LayoutGrid, Bookmark, Newspaper, ArrowLeft, Layers } from "lucide-react";
+import { ArrowDownWideNarrow, ChevronDown, ChevronRight, Search, SlidersHorizontal, X, ShieldCheck, Play, CircleCheck, Download, Database, Settings, History, Bell, CheckCheck, Sparkles, ArrowLeft, Layers } from "lucide-react";
 import { COLLECTIONS, type Anime } from "@/data/anime";
 import { getShikimoriCatalog, getShikimoriAnimes } from "@/data/shikimori";
 import { getExactReleaseDate, isNewRelease, isUpcomingAnnouncement } from "@/data/anime-sections";
 import { Header, type View } from "@/components/yume/Header";
+import { FloatingBottomNav } from "@/components/yume/FloatingBottomNav";
 import { HomeExperience } from "@/components/yume/HomeExperience";
 import { AuthPage } from "@/components/yume/AuthPage";
 import { CollectionsGrid, Grid, SectionBanner } from "@/components/yume/Sections";
@@ -2264,18 +2265,7 @@ function Index() {
         </main>
       ) : null}
       {!newsDetailOpen && !(["login", "register"].includes(view)) && (
-        <nav className="yubera-bottom-nav" aria-label={language === "ru" ? "Основная навигация" : "Main navigation"}>
-          {[
-            { id: "home" as View, label: language === "ru" ? "Главная" : "Home", icon: Home, active: ["home", "popular", "new-releases", "announcements", "airing", "collections"].includes(view) },
-            { id: "catalog" as View, label: language === "ru" ? "Каталог" : "Catalog", icon: LayoutGrid, active: view === "catalog" },
-            { id: "my" as View, label: language === "ru" ? "Моё" : "My", icon: Bookmark, active: ["my", "favorites", "watchlist", "history", "tracked-titles", "notifications"].includes(view) },
-            { id: "news" as View, label: language === "ru" ? "Новости" : "News", icon: Newspaper, active: view === "news" },
-            { id: "profile" as View, label: language === "ru" ? "Профиль" : "Profile", icon: UserRound, active: ["profile", "admin", "privacy", "privacy-policy", "rules", "rights"].includes(view) },
-          ].map((item) => {
-            const Icon = item.icon;
-            return <button key={item.id} type="button" onClick={() => setView(item.id)} aria-current={item.active ? "page" : undefined}><Icon className="h-5 w-5" /><span>{item.label}</span></button>;
-          })}
-        </nav>
+        <FloatingBottomNav view={view} setView={setView} />
       )}
       </div>
     </div>
