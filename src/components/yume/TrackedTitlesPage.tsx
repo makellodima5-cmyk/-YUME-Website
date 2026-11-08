@@ -26,7 +26,7 @@ export function TrackedTitlesPage({ animeList, onNavigate, onSelect }: Props) {
       .then(async response => {
         const payload = await response.json().catch(() => ({})) as { subscriptions?: string[] };
         if (!response.ok || !Array.isArray(payload.subscriptions)) throw new Error("subscriptions_unavailable");
-        setIds(payload.subscriptions.filter(id => /^\\d{1,20}$/.test(id)));
+        setIds(payload.subscriptions.filter(id => /^\d{1,20}$/.test(id)));
       })
       .catch(() => setFailed(true))
       .finally(() => setLoaded(true));
