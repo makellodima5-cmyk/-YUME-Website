@@ -27,7 +27,7 @@ function parseHistoryItems(value: unknown): HistoryItem[] | null {
   for (const raw of value) {
     if (!raw || typeof raw !== "object") continue;
     const item = raw as Record<string, unknown>;
-    if (typeof item.animeId !== "string" || !/^\\d{1,12}$/.test(item.animeId)) continue;
+    if (typeof item.animeId !== "string" || !/^\d{1,12}$/.test(item.animeId)) continue;
     if (typeof item.viewedAt !== "string" || !Number.isFinite(Date.parse(item.viewedAt))) continue;
     const viewCount = typeof item.viewCount === "number" && Number.isFinite(item.viewCount)
       ? Math.max(1, Math.floor(item.viewCount))
