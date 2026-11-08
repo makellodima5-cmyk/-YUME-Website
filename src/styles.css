@@ -1435,3 +1435,23 @@ html[data-theme="light"] .yubera-bottom-nav { background:rgba(247,245,246,.96); 
   .yubera-home-collection-count svg { width:20px; height:20px; flex-basis:20px; }
   .yubera-home-collection-arrow { width:18px; height:18px; }
 }
+
+
+/* Collection index and detail screen. */
+.yubera-collection-list-card { min-height:148px; }
+.yubera-collection-list-card .yubera-home-collection-posters { height:118px; }
+.yubera-collection-list-card .yubera-home-collection-poster { width:66px; height:100px; border-radius:12px; }
+.yubera-collection-list-card .yubera-home-collection-poster.is-center { width:74px; height:116px; }
+.yubera-collection-detail-header { display:grid; gap:6px; margin:12px 0 18px; padding:16px 18px; border:1px solid #34353D; border-radius:20px; background:#1C1D23; }
+.yubera-collection-detail-header h1 { color:#FFFFFF; font-size:clamp(19px,4vw,24px); font-weight:800; line-height:1.15; }
+.yubera-collection-detail-header p { color:#A5A5AE; font-size:14px; line-height:1.4; }
+.yubera-collection-detail-count { display:inline-flex; align-items:center; gap:7px; margin-top:3px; color:#FFFFFF; font-size:13px; font-weight:750; }
+.yubera-collection-detail-count svg { width:19px; height:19px; color:#FF5738; }
+.yubera-collection-anime-anchor { scroll-margin-top:92px; }
+@media(max-width:390px) {
+  .yubera-collection-list-card { min-height:132px; padding:8px 9px; }
+  .yubera-collection-list-card .yubera-home-collection-posters { height:108px; }
+  .yubera-collection-list-card .yubera-home-collection-poster { width:57px; height:88px; }
+  .yubera-collection-list-card .yubera-home-collection-poster.is-center { width:65px; height:104px; }
+  .yubera-collection-detail-header { padding:14px; }
+}
