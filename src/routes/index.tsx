@@ -1436,6 +1436,14 @@ function Index() {
     navigate({ to: "/", search: { section: v, q: undefined, page: undefined, sort: undefined, genres: undefined, status: undefined, from: undefined, to: undefined, rating: undefined, kind: undefined, age: undefined, lang: v === "catalog" ? language : undefined } });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
+  const resumeAnime = (anime: Anime, episode: number, positionSeconds: number) => {
+    const query = new URLSearchParams({
+      episode: String(episode),
+      ...(positionSeconds > 0 ? { resume: String(Math.floor(positionSeconds)) } : {}),
+    });
+    window.location.assign("/anime/" + encodeURIComponent(anime.id) + "?" + query.toString());
+  };
+
   const select = (anime: Anime) => {
     if (view === "catalog") {
       try {
@@ -1726,6 +1734,7 @@ function Index() {
           announcements={announcementCards}
           airing={airingCards}
           onSelect={select}
+          onResume={resumeAnime}
           onSeeAll={setView}
           onOpenCollection={(id) => { setCollection(id); setView("collections"); }}
         />
@@ -1984,7 +1993,7 @@ function Index() {
           )}
         </main>
       ) : view === "my" ? (
-        <MyHub animeList={ANIME} onNavigate={setView} onSelect={select} />
+        <MyHub animeList={ANIME} onNavigate={setView} onSelect={select} onResume={resumeAnime} />
       ) : view === "news" ? (
         <News animeList={ANIME} onDetailChange={setNewsDetailOpen} />
       ) : view === "profile" ? (
