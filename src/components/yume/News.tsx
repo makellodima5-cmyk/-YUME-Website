@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowUpRight, Bookmark, CalendarDays, MessageCircle, Newspaper, RefreshCw, Search } from "lucide-react";
+import { ArrowUpRight, Bookmark, CalendarDays, Newspaper, RefreshCw, Search } from "lucide-react";
 import type { Anime } from "@/data/anime";
 import { displayAnimeTitle, useYumePreferences } from "@/data/preferences";
 import type { YuberaNewsArticle } from "@/data/news-types";
@@ -107,8 +107,8 @@ export function News({ animeList, onDetailChange }: { animeList: Anime[]; onDeta
   }
 
   const text = ru
-    ? { title: "Новости", subtitle: "Главные события мира аниме", source: "Источник: Shikimori. Это лента одного источника, а не полный обзор новостей индустрии.", search: "Поиск новостей", saved: "Закладки", empty: "Публикаций не найдено", retry: "Обновить", open: "Открыть публикацию", comments: "комментариев" }
-    : { title: "Anime news", subtitle: "The latest anime industry stories", source: "Source: Shikimori. This is one source's feed, not a complete overview of the industry.", search: "Search news", saved: "Bookmarks", empty: "No publications found", retry: "Reload", open: "Open publication", comments: "comments" };
+    ? { title: "Новости", subtitle: "Главные события мира аниме", source: "Источник: Shikimori. Это лента одного источника, а не полный обзор новостей индустрии.", search: "Поиск новостей", saved: "Закладки", empty: "Публикаций не найдено", retry: "Обновить", open: "Открыть публикацию" }
+    : { title: "Anime news", subtitle: "The latest anime industry stories", source: "Source: Shikimori. This is one source's feed, not a complete overview of the industry.", search: "Search news", saved: "Bookmarks", empty: "No publications found", retry: "Reload", open: "Open publication" };
   const featured = filtered[0] ?? null;
   const remaining = featured ? filtered.slice(1) : [];
   const featuredAnime = featured ? relatedAnime(featured, animeList) : undefined;
@@ -171,7 +171,6 @@ export function News({ animeList, onDetailChange }: { animeList: Anime[]; onDeta
                 <div className="flex items-center justify-between gap-3 px-4 py-3">
                   <span className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
                     <span className="inline-flex items-center gap-1"><CalendarDays className="h-3.5 w-3.5" />{formatDate(featured.createdAt, language)}</span>
-                    {featured.commentsCount > 0 && <span className="inline-flex items-center gap-1"><MessageCircle className="h-3.5 w-3.5" />{featured.commentsCount}</span>}
                   </span>
                   <button type="button" onClick={() => toggleBookmark(featured.id)} aria-label={bookmarks.includes(featured.id) ? (ru ? "Убрать из закладок" : "Remove bookmark") : (ru ? "Добавить в закладки" : "Bookmark")} aria-pressed={bookmarks.includes(featured.id)} className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-border bg-secondary text-foreground">
                     <Bookmark className={`h-4 w-4 ${bookmarks.includes(featured.id) ? "fill-current text-primary" : ""}`} />
