@@ -165,7 +165,7 @@ export function News({ animeList, onDetailChange }: { animeList: Anime[]; onDeta
               <article className="overflow-hidden rounded-[20px] border border-border bg-card">
                 <button type="button" onClick={() => openArticle(featured)} className="group block w-full text-left">
                   <div className="relative aspect-[16/8] overflow-hidden bg-secondary">
-                    {featuredAnime ? <PosterArt anime={featuredAnime} className="h-full w-full transition duration-500 group-hover:scale-[1.03]" /> : <img src="/images/yubera/yubera_banner.webp" alt="" className="h-full w-full object-cover" />}
+                    {featuredAnime ? <PosterArt anime={featuredAnime} className="h-full w-full transition duration-500 group-hover:scale-[1.03]" /> : featured.linkedPosterUrl ? <img src={featured.linkedPosterUrl} alt="" className="h-full w-full object-cover" /> : <img src="/images/yubera/yubera_banner.webp" alt="" className="h-full w-full object-cover" />}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/10 to-transparent" />
                     <span className="absolute left-4 top-4 rounded-full bg-primary px-3 py-1 text-[10px] font-bold text-white">{categoryLabel(featured.category, language)}</span>
                     <div className="absolute inset-x-4 bottom-4">
@@ -191,7 +191,7 @@ export function News({ animeList, onDetailChange }: { animeList: Anime[]; onDeta
                   return (
                     <article key={article.id} className="flex min-h-[112px] gap-3 rounded-2xl border border-border bg-card p-2.5">
                       <button type="button" onClick={() => openArticle(article)} className="h-[96px] w-[104px] shrink-0 overflow-hidden rounded-xl bg-secondary text-left">
-                        {related ? <PosterArt anime={related} className="h-full w-full" /> : <img src="/images/yubera/yubera_banner.webp" alt="" className="h-full w-full object-cover" />}
+                        {related ? <PosterArt anime={related} className="h-full w-full" /> : article.linkedPosterUrl ? <img src={article.linkedPosterUrl} alt="" className="h-full w-full object-cover" /> : <img src="/images/yubera/yubera_banner.webp" alt="" className="h-full w-full object-cover" />}
                       </button>
                       <div className="flex min-w-0 flex-1 flex-col justify-between py-0.5">
                         <button type="button" onClick={() => setSelectedArticle(article)} className="text-left">
