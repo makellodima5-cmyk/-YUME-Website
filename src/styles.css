@@ -625,7 +625,7 @@ html[data-theme="light"] .yubera-wordmark {
 /* -------------------------------------------------------------------------
    YUBERA Android web experience
    The web client uses the Android palette and component rhythm, not the
-   previous violet YUME theme.
+   legacy YUME theme.
    ------------------------------------------------------------------------- */
 :root {
   color-scheme: dark;
