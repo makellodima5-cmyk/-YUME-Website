@@ -5,7 +5,7 @@ import { getShikimoriAnimes } from "@/data/shikimori";
 import { displayAnimeTitle, useYumePreferences } from "@/data/preferences";
 import { removeAnimePlaybackProgress } from "@/data/playback-progress";
 import { Header, type View } from "./Header";
-import { PosterArt, type } from "./Poster";
+import { PosterArt } from "./Poster";
 import { SectionBanner } from "./Sections";
 
 type HistoryItem = {
@@ -91,16 +91,22 @@ export function ViewingHistoryPage({ onNavigate, onSelect }: Props) {
     let cancelled = false;
     setLoading(true);
     setLoadFailed(false);
+    setMetadataFailed(false);
     fetch("/api/telegram/history", { credentials: "same-origin", cache: "no-store", headers: { Accept: "application/json" } })
       .then(async response => {
         const payload = await response.json().catch(() => null) as { authenticated?: unknown; items?: unknown } | null;
         if (cancelled) return;
-        if (response.status === 401 || payload?.authenticated !== true) {
+        if (response.status === 401) {
           setAuthenticated(false);
           setItems([]);
           return;
         }
         if (!response.ok || !payload) throw new Error("history_unavailable");
+        if (payload.authenticated !== true) {
+          setAuthenticated(false);
+          setItems([]);
+          return;
+        }
         const parsed = parseHistoryItems(payload.items);
         if (!parsed) throw new Error("history_payload_invalid");
         setAuthenticated(true);
