@@ -11,6 +11,7 @@ import { CollectionsGrid, Grid, SectionBanner } from "@/components/yume/Sections
 import { CatalogFilters, EMPTY_CATALOG_FILTERS, type CatalogFiltersValue } from "@/components/yume/CatalogFilters";
 import { Profile } from "@/components/yume/Profile";
 import { MyHub } from "@/components/yume/MyHub";
+import { TrackedTitlesPage } from "@/components/yume/TrackedTitlesPage";
 import { News } from "@/components/yume/News";
 import { useYumePreferences, displayGenre, type TranslationKey } from "@/data/preferences";
 import { filterAndSortCatalog, getCatalogPageCount, getCollectionAnime, matchesCollectionGenres, paginateCatalog } from "@/data/catalog-utils";
@@ -1905,6 +1906,8 @@ function Index() {
         </main>
       ) : view === "my" ? (
         <MyHub animeList={ANIME} onNavigate={setView} onSelect={select} />
+      ) : view === "tracked-titles" ? (
+        <TrackedTitlesPage animeList={ANIME} onNavigate={setView} onSelect={select} />
       ) : view === "news" ? (
         <News animeList={ANIME} onDetailChange={setNewsDetailOpen} />
       ) : view === "profile" ? (
