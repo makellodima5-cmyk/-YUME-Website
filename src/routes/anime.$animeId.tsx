@@ -685,16 +685,8 @@ function AnimeDetailPage() {
                         <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                       </span>
                     </label>
-                    <label className="min-w-0">
-                      <span className="mb-2 block text-sm font-medium text-muted-foreground">{language === "en" ? "Episode" : "Серия"}</span>
-                      <span className="relative block">
-                        <select value={kodikEpisode} onChange={event => { const nextEpisode = Number(event.target.value); setKodikEpisode(nextEpisode); const progress = episodeProgress.find(entry => entry.episode === nextEpisode); setResumeTargetEpisode(progress && !progress.completed ? nextEpisode : null); setResumeTargetSeconds(progress && !progress.completed ? progress.positionSeconds : 0); }} disabled={!selectedKodikSource?.episodes.length} className="w-full appearance-none rounded-full border border-border bg-secondary px-4 py-3 pr-10 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-60">
-                          {selectedKodikSource?.episodes.map(episode => <option key={episode.number} value={episode.number}>{language === "en" ? "Episode " : ""}{episode.number}{episode.title ? " · " + episode.title : ""}</option>)}
-                        </select>
-                        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                      </span>
-                    </label>
                   </div>
+                  <div className="mb-2 text-sm font-medium text-muted-foreground">{language === "en" ? "Episodes" : "Серии"}</div>
                   <div className="yubera-episode-progress-list" aria-label={language === "en" ? "Episode progress" : "Прогресс серий"}>
                     {selectedKodikSource?.episodes.map((episode) => {
                       const progress = episodeProgress.find((entry) => entry.episode === episode.number);
