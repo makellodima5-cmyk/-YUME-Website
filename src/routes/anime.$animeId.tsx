@@ -263,11 +263,12 @@ function AnimeDetailPage() {
     let lastSavedPosition = -1;
     let lastServerSavedPosition = -1;
     let lastKnownDuration: number | null = null;
+    let serverCompletionSaved = false;
     const trustedHosts = ["kodik.info", "kodik.biz", "kodik.cc", "kodik.online", "kodikplayer.com", "kodikres.com"];
     const onKodikMessage = (event: MessageEvent) => {
       if (!event.origin) return;
       const playerFrame = document.getElementById("kodik-player") as HTMLIFrameElement | null;
-      if (playerFrame?.contentWindow && event.source !== playerFrame.contentWindow) return;
+      if (!playerFrame?.contentWindow || event.source !== playerFrame.contentWindow) return;
       try {
         const hostname = new URL(event.origin).hostname.toLowerCase().replace(/\.$/, "");
         if (!trustedHosts.some((host) => hostname === host || hostname.endsWith("." + host))) return;
@@ -289,19 +290,22 @@ function AnimeDetailPage() {
           positionSeconds: Math.max(0, lastSavedPosition),
           durationSeconds: lastKnownDuration,
         });
-        void fetch("/api/telegram/history", {
-          method: "POST",
-          credentials: "same-origin",
-          cache: "no-store",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            animeId,
-            event: "completed",
-            episodeNumber: kodikEpisode,
-            watchedSeconds: Math.max(0, lastSavedPosition),
-            durationSeconds: lastKnownDuration,
-          }),
-        }).catch(() => undefined);
+        if (!serverCompletionSaved) {
+          serverCompletionSaved = true;
+          void fetch("/api/telegram/history", {
+            method: "POST",
+            credentials: "same-origin",
+            cache: "no-store",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              animeId,
+              event: "completed",
+              episodeNumber: kodikEpisode,
+              watchedSeconds: Math.max(0, lastSavedPosition),
+              durationSeconds: lastKnownDuration,
+            }),
+          }).catch(() => undefined);
+        }
         return;
       }
 
@@ -319,6 +323,22 @@ function AnimeDetailPage() {
         );
         if (!alreadyCompleted) {
           markPlaybackEpisodeCompleted({ ...progressEntry, positionSeconds: watchedSeconds, durationSeconds });
+        }
+        if (!serverCompletionSaved) {
+          serverCompletionSaved = true;
+          void fetch("/api/telegram/history", {
+            method: "POST",
+            credentials: "same-origin",
+            cache: "no-store",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              animeId,
+              event: "completed",
+              episodeNumber: kodikEpisode,
+              watchedSeconds,
+              durationSeconds,
+            }),
+          }).catch(() => undefined);
         }
         lastSavedPosition = watchedSeconds;
       } else if (watchedSeconds >= 5) {
