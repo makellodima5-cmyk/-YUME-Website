@@ -113,8 +113,8 @@ export const Route = createFileRoute("/")({
     // every time a user opens Favorites, Watch Later, History, Profile or News.
     // This also prevents a transient catalogue-store failure from breaking navigation
     // into account-owned lists.
-    const catalogueIndependentSections = ["admin", "my", "profile", "favorites", "watchlist", "history", "tracked-titles", "notifications", "privacy", "privacy-policy", "rules", "rights", "news"];
-    if (catalogueIndependentSections.includes(deps.section ?? "")) {
+    const catalogueIndependentSections = new Set(["admin", "my", "profile", "favorites", "watchlist", "history", "tracked-titles", "notifications", "privacy", "privacy-policy", "rules", "rights", "news"]);
+    if (deps.section && catalogueIndependentSections.has(deps.section)) {
       return {
         catalogMode: "paged",
         anime: [],
