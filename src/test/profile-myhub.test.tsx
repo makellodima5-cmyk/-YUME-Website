@@ -1,6 +1,7 @@
 /** @vitest-environment jsdom */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
+import type { ReactNode } from "react";
 import type { Anime } from "@/data/anime";
 import { YumePreferencesProvider } from "@/data/preferences";
 import { FAVORITES_STORAGE_KEY, WATCHLIST_STORAGE_KEY } from "@/data/profile-storage";
@@ -37,7 +38,7 @@ function jsonResponse(payload: unknown): Response {
   } as Response;
 }
 
-function withPreferences(children: React.ReactNode) {
+function withPreferences(children: ReactNode) {
   return <YumePreferencesProvider>{children}</YumePreferencesProvider>;
 }
 
@@ -62,7 +63,7 @@ describe("Profile and My library pages", () => {
     ));
 
     expect(await screen.findByRole("heading", { name: "Смотреть позже" })).toBeInTheDocument();
-    expect(screen.getByText(/добавьте аниме|добавить аниме|пока нет/i)).toBeInTheDocument();
+    expect(screen.getByText(/Добавляй в список аниме/i)).toBeInTheDocument();
   });
 
   it("shows only unique titles from the authoritative server history and always shows Watch Later", async () => {
