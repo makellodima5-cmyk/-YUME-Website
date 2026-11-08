@@ -221,7 +221,7 @@ export function News({ animeList, onDetailChange }: { animeList: Anime[]; onDeta
                     return (
                       <article key={article.id} className="flex gap-3 rounded-2xl border border-border bg-card p-3">
                         <button type="button" onClick={() => setSelectedArticle(article)} className="h-[88px] w-[88px] shrink-0 overflow-hidden rounded-xl bg-secondary">
-                          {related ? <PosterArt anime={related} className="h-full w-full" /> : <img src="/images/yubera/yubera_banner.webp" alt="" className="h-full w-full object-cover" />}
+                          {related ? <PosterArt anime={related} className="h-full w-full" /> : article.linkedPosterUrl ? <img src={article.linkedPosterUrl} alt="" className="h-full w-full object-cover" /> : <img src="/images/yubera/yubera_banner.webp" alt="" className="h-full w-full object-cover" />}
                         </button>
                         <div className="min-w-0 flex-1">
                           <span className="text-[9px] font-bold uppercase tracking-wide text-primary">{categoryLabel(article.category, language)}</span>
