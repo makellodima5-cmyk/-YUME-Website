@@ -770,7 +770,7 @@ function AnimeDetailPage() {
                 <div className="space-y-4">
                   <div className="yubera-player-options">
                     <label className="yubera-player-voice min-w-0">
-                      <span className="mb-2 block text-sm font-medium text-muted-foreground">{language === "en" ? "Voice-over" : "Озвучка"}</span>
+                      <span className="block text-sm font-medium text-muted-foreground">{language === "en" ? "Voice-over" : "Озвучка"}</span>
                       <span className="relative block">
                         <select id="kodik-translation" value={kodikTranslationId} onChange={(event) => { const next = kodikSources.find(source => source.id === event.target.value); setKodikTranslationId(event.target.value); setKodikEpisode(next?.episodes.some(episode => episode.number === kodikEpisode) ? kodikEpisode : (next?.episodes[0]?.number ?? 1)); }} disabled={!kodikSources.length} className="w-full appearance-none rounded-full border border-border bg-secondary px-4 py-3 pr-10 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-60">
                           {!kodikSources.length && <option value="">{language === "en" ? "Loading voice-overs…" : "Загрузка озвучек…"}</option>}
@@ -779,40 +779,40 @@ function AnimeDetailPage() {
                         <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                       </span>
                     </label>
-                  <div className="yubera-player-episodes">
-                    <div className="yubera-player-episodes-heading">{language === "en" ? "Episodes" : "Серии"}</div>
-                  <div className="yubera-episode-progress-list" aria-label={language === "en" ? "Episode progress" : "Прогресс серий"}>
-                    {selectedKodikSource?.episodes.map((episode) => {
-                      const progress = episodeProgress.find((entry) => entry.episode === episode.number);
-                      const estimatedDuration = progress?.durationSeconds ?? (anime.episodes > 1 ? 24 * 60 : null);
-                      const percent = progress
-                        ? progress.completed
-                          ? 100
-                          : estimatedDuration
-                            ? Math.max(0, Math.min(100, progress.positionSeconds / estimatedDuration * 100))
-                            : 0
-                        : 0;
-                      const active = episode.number === kodikEpisode;
-                      return (
-                        <button
-                          key={episode.number}
-                          type="button"
-                          aria-pressed={active}
-                          aria-label={(language === "en" ? "Episode " : "Серия ") + episode.number + (progress ? ", " + Math.round(percent) + "% " + (language === "en" ? "watched" : "просмотрено") : "")}
-                          onClick={() => {
-                            setKodikEpisode(episode.number);
-                            setResumeTargetEpisode(progress && !progress.completed ? episode.number : null);
-                            setResumeTargetSeconds(progress && !progress.completed ? progress.positionSeconds : 0);
-                          }}
-                          className={`yubera-episode-progress-item ${active ? "is-active" : ""}`}
-                        >
-                          <span>{episode.number}</span>
-                          <span className="yubera-episode-progress-track"><span style={{ width: percent + "%" }} /></span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                  </div>
+                    <div className="yubera-player-episodes">
+                      <div className="yubera-player-episodes-heading">{language === "en" ? "Episodes" : "Серии"}</div>
+                      <div className="yubera-episode-progress-list" aria-label={language === "en" ? "Episode progress" : "Прогресс серий"}>
+                        {selectedKodikSource?.episodes.map((episode) => {
+                          const progress = episodeProgress.find((entry) => entry.episode === episode.number);
+                          const estimatedDuration = progress?.durationSeconds ?? (anime.episodes > 1 ? 24 * 60 : null);
+                          const percent = progress
+                            ? progress.completed
+                              ? 100
+                              : estimatedDuration
+                                ? Math.max(0, Math.min(100, progress.positionSeconds / estimatedDuration * 100))
+                                : 0
+                            : 0;
+                          const active = episode.number === kodikEpisode;
+                          return (
+                            <button
+                              key={episode.number}
+                              type="button"
+                              aria-pressed={active}
+                              aria-label={(language === "en" ? "Episode " : "Серия ") + episode.number + (progress ? ", " + Math.round(percent) + "% " + (language === "en" ? "watched" : "просмотрено") : "")}
+                              onClick={() => {
+                                setKodikEpisode(episode.number);
+                                setResumeTargetEpisode(progress && !progress.completed ? episode.number : null);
+                                setResumeTargetSeconds(progress && !progress.completed ? progress.positionSeconds : 0);
+                              }}
+                              className={`yubera-episode-progress-item ${active ? "is-active" : ""}`}
+                            >
+                              <span>{episode.number}</span>
+                              <span className="yubera-episode-progress-track"><span style={{ width: percent + "%" }} /></span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
                   </div>
                   <div className="relative mx-auto aspect-video w-full min-w-0 overflow-hidden rounded-2xl border border-white/10 bg-[#101116] shadow-2xl">
                     <div id="kodik-player-container" className="absolute inset-0 h-full w-full [&_iframe]:!absolute [&_iframe]:!inset-0 [&_iframe]:!h-full [&_iframe]:!w-full" />
