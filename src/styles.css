@@ -1462,7 +1462,7 @@ html[data-theme="light"] .yubera-bottom-nav { background:rgba(247,245,246,.96); 
   width:100%;
   max-width:1120px;
   margin:0 auto;
-  padding:78px 12px 0;
+  padding:78px 12px 8px;
 }
 .yubera-home-search-anchor { position:relative; z-index:30; }
 .yubera-home-search-row {
