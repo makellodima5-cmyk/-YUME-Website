@@ -77,7 +77,7 @@ export function AnimeCard({ anime, onSelect }: { anime: Anime; onSelect: (a: Ani
         <div className="relative aspect-[2/3] overflow-hidden rounded-[16px] border border-border bg-card shadow-sm transition duration-300 group-hover:-translate-y-1 group-hover:shadow-[0_12px_28px_rgba(0,0,0,.28)]">
           <PosterArt anime={anime} className="h-full w-full transition duration-500 group-hover:scale-[1.035]" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/5 to-black/10" />
-          {anime.rating !== null && (
+          {typeof anime.rating === "number" && Number.isFinite(anime.rating) && (
             <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-lg bg-black/65 px-2 py-1 text-[11px] font-bold text-white backdrop-blur-sm">
               <Star className="h-3 w-3 fill-[#F4B942] text-[#F4B942]" /> {anime.rating.toFixed(1)}
             </span>
