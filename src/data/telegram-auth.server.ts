@@ -529,7 +529,7 @@ export async function handleTelegramBrowserAuth(request: Request): Promise<Respo
 
 
 
-/** Saves recently opened anime only for a verified, signed-in Telegram account. */
+/** Records viewing history only after playback progress is confirmed for a signed-in account. */
 export async function handleTelegramHistory(request: Request): Promise<Response> {
   if (request.method !== "GET" && request.method !== "POST" && request.method !== "DELETE") return jsonResponse({ error: "method_not_allowed" }, 405);
   if ((request.method === "POST" || request.method === "DELETE") && !isSameOriginOrBearer(request)) return jsonResponse({ error: "cross_origin_request" }, 403);
@@ -543,7 +543,7 @@ export async function handleTelegramHistory(request: Request): Promise<Response>
     const userId = await authenticatedTelegramUserId(request, db, secret);
     if (!userId) return jsonResponse({ error: "authentication_required" }, 401);
     if (request.method === "GET") {
-      const rows = await db.prepare("SELECT anime_id AS animeId, viewed_at AS viewedAt, view_count AS viewCount, season_number AS seasonNumber, episode_number AS episodeNumber, position_millis AS positionMillis, duration_millis AS durationMillis, progress_updated_at_epoch_ms AS progressUpdatedAtEpochMillis FROM yume_view_history WHERE user_id = ? ORDER BY viewed_at DESC LIMIT 100")
+      const rows = await db.prepare("SELECT anime_id AS animeId, viewed_at AS viewedAt, view_count AS viewCount, season_number AS seasonNumber, episode_number AS episodeNumber, position_millis AS positionMillis, duration_millis AS durationMillis, progress_updated_at_epoch_ms AS progressUpdatedAtEpochMillis FROM yume_view_history WHERE user_id = ? AND (progress_updated_at_epoch_ms IS NOT NULL OR episode_number IS NULL) ORDER BY viewed_at DESC LIMIT 100")
         .bind(userId).all<{ animeId: string; viewedAt: string; viewCount: number; seasonNumber: number | null; episodeNumber: number | null; positionMillis: number; durationMillis: number; progressUpdatedAtEpochMillis: number | null }>();
       return jsonResponse({ authenticated: true, items: rows.results });
     }
