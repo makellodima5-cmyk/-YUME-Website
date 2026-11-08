@@ -1612,7 +1612,7 @@ html[data-theme="light"] .yubera-bottom-nav-indicator {
 
 /* Keep the active destination orange even under the legacy light-theme nav rules. */
 html[data-theme="light"] nav[aria-label="Основная навигация"].yubera-bottom-nav button[aria-current="page"],
-html[data-theme="Основная навигация"] nav[aria-label="Main navigation"].yubera-bottom-nav button[aria-current="page"],
+html[data-theme="light"] nav[aria-label="Main navigation"].yubera-bottom-nav button[aria-current="page"],
 html[data-theme="light"] nav[aria-label="Основная навигация"].yubera-bottom-nav button[data-preview-active="true"],
 html[data-theme="light"] nav[aria-label="Main navigation"].yubera-bottom-nav button[data-preview-active="true"] {
   color:#e64e36 !important;
