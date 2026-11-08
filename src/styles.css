@@ -1090,3 +1090,96 @@ html[data-theme="light"] .yubera-bottom-nav { background:rgba(247,245,246,.96); 
   .yubera-anime-overview .yubera-chip { font-size:.8rem; }
   .yubera-anime-actions > button { min-height:74px; flex-direction:row; font-size:13px; }
 }
+
+
+/* Home shelves use the same tall poster rhythm as the catalog, not square thumbnails. */
+.yubera-home-anime-card {
+  flex: 0 0 clamp(140px, 38vw, 184px);
+  aspect-ratio: 2 / 3;
+}
+@media (max-width: 420px) {
+  .yubera-home-anime-card {
+    flex-basis: clamp(140px, 38vw, 158px);
+    aspect-ratio: 2 / 3;
+  }
+}
+.yubera-home-continue-row {
+  display:flex;
+  gap:12px;
+  overflow-x:auto;
+  overscroll-behavior-x:contain;
+  scrollbar-width:none;
+  padding:0 2px 3px;
+}
+.yubera-home-continue-row::-webkit-scrollbar { display:none; }
+.yubera-home-continue-card {
+  flex:0 0 clamp(210px, 56vw, 290px);
+  min-width:0;
+  overflow:hidden;
+  border:1px solid var(--border);
+  border-radius:16px;
+  background:var(--card);
+  text-align:left;
+}
+
+/* The anime overview is part of the page flow, not a separate card. */
+.yubera-anime-overview {
+  grid-template-columns:minmax(108px, 29%) minmax(0, 1fr);
+  gap:14px;
+  padding:0;
+  border:0;
+  border-radius:0;
+  background:transparent;
+}
+@media (max-width: 390px) {
+  .yubera-anime-overview {
+    grid-template-columns:minmax(104px, 29%) minmax(0, 1fr);
+    gap:11px;
+    padding:0;
+  }
+}
+@media (min-width: 640px) {
+  .yubera-anime-overview {
+    grid-template-columns:minmax(190px, 230px) minmax(0, 1fr);
+    gap:22px;
+    padding:0;
+  }
+}
+
+/* One voice selector above one vertically scrollable episode picker. */
+.yubera-player-options {
+  grid-template-columns:minmax(0, 1fr);
+}
+.yubera-episode-progress-list {
+  display:grid;
+  grid-template-columns:repeat(auto-fill, minmax(58px, 1fr));
+  gap:8px;
+  max-height:232px;
+  overflow-x:hidden;
+  overflow-y:auto;
+  overscroll-behavior-y:contain;
+  scrollbar-width:thin;
+  padding:10px;
+  border:1px solid var(--border);
+  border-radius:18px;
+  background:var(--card);
+}
+.yubera-episode-progress-item {
+  width:100%;
+  min-width:0;
+  min-height:58px;
+  flex:initial;
+  border-radius:13px;
+}
+@media (max-width: 390px) {
+  .yubera-episode-progress-list {
+    grid-template-columns:repeat(4, minmax(0, 1fr));
+    max-height:216px;
+    gap:7px;
+    padding:8px;
+  }
+  .yubera-episode-progress-item {
+    min-height:54px;
+    padding:7px 5px 6px;
+  }
+}
