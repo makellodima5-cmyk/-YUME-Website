@@ -54,7 +54,7 @@ function classify(title: string, summary: string): YuberaNewsArticle["category"]
 function safeHttpUrl(value: string | null | undefined): string | null {
   if (!value?.trim()) return null;
   try {
-    const url = new URL(value.trim().startsWith("//") ? "https:" + value.trim() : value.trim());
+    const url = new URL(value.trim().startsWith("//") ? "https:" + value.trim() : value.trim(), "https://shikimori.io");
     return url.protocol === "https:" || url.protocol === "http:" ? url.toString() : null;
   } catch {
     return null;
@@ -101,6 +101,7 @@ function mapTopic(topic: ShikimoriTopic): YuberaNewsArticle | null {
     linkedTitle: (topic.linked?.russian || topic.linked?.name || "").trim() || null,
     linkedId: Number.isSafeInteger(linkedId) && linkedId > 0 ? linkedId : null,
     linkedType: topic.linked_type ?? null,
+    linkedPosterUrl: safeHttpUrl(topic.linked?.image?.original ?? topic.linked?.image?.preview ?? topic.linked?.image?.x96 ?? topic.linked?.image?.x48),
     category: classify(title, summary),
     sourceUrl: `https://shikimori.io/forum/news/${topic.id}`,
     sourceName: "Shikimori",
