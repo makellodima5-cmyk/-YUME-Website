@@ -100,13 +100,25 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
   } | null>(null);
 
   useEffect(() => {
-    const syncHistory = () => setHistoryCount(readPlaybackProgress().length);
-    syncHistory();
-    window.addEventListener(PLAYBACK_PROGRESS_UPDATED_EVENT, syncHistory);
-    window.addEventListener("storage", syncHistory);
+    let cancelled = false;
+    const syncLocalHistory = () => {
+      const animeIds = new Set(readPlaybackProgress().map(entry => entry.animeId));
+      setHistoryCount(animeIds.size);
+    };
+    syncLocalHistory();
+    window.addEventListener(PLAYBACK_PROGRESS_UPDATED_EVENT, syncLocalHistory);
+    window.addEventListener("storage", syncLocalHistory);
+    fetch("/api/telegram/history", { credentials: "same-origin", cache: "no-store" })
+      .then(async response => {
+        const payload = await response.json().catch(() => null) as { authenticated?: unknown; items?: unknown } | null;
+        if (cancelled || !response.ok || payload?.authenticated !== true || !Array.isArray(payload.items)) return;
+        setHistoryCount(payload.items.length);
+      })
+      .catch(() => undefined);
     return () => {
-      window.removeEventListener(PLAYBACK_PROGRESS_UPDATED_EVENT, syncHistory);
-      window.removeEventListener("storage", syncHistory);
+      cancelled = true;
+      window.removeEventListener(PLAYBACK_PROGRESS_UPDATED_EVENT, syncLocalHistory);
+      window.removeEventListener("storage", syncLocalHistory);
     };
   }, []);
 
