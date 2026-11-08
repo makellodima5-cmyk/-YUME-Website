@@ -1,0 +1,110 @@
+/** @vitest-environment jsdom */
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { render, screen, waitFor } from "@testing-library/react";
+import type { Anime } from "@/data/anime";
+import { YumePreferencesProvider } from "@/data/preferences";
+import { FAVORITES_STORAGE_KEY, WATCHLIST_STORAGE_KEY } from "@/data/profile-storage";
+import { MyHub } from "@/components/yume/MyHub";
+import { Profile } from "@/components/yume/Profile";
+
+vi.mock("@/components/yume/Poster", () => ({
+  PosterArt: ({ anime }: { anime: { id: string } }) => (
+    <span data-testid="poster-art" data-anime-id={anime.id} />
+  ),
+}));
+
+function anime(id: string, title: string): Anime {
+  return {
+    id,
+    title,
+    original: title,
+    year: 2025,
+    episodes: 12,
+    rating: 8,
+    genres: [],
+    status: "Вышел",
+    description: "",
+    hue: 180,
+    glyph: "ア",
+  };
+}
+
+function jsonResponse(payload: unknown): Response {
+  return {
+    ok: true,
+    status: 200,
+    json: async () => payload,
+  } as Response;
+}
+
+function withPreferences(children: React.ReactNode) {
+  return <YumePreferencesProvider>{children}</YumePreferencesProvider>;
+}
+
+beforeEach(() => {
+  window.localStorage.clear();
+  vi.restoreAllMocks();
+  vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({ authenticated: false, items: [] })));
+});
+
+describe("Profile and My library pages", () => {
+  it("renders the profile instead of crashing when Telegram profile data is absent", async () => {
+    render(withPreferences(
+      <Profile animeList={[]} onSelect={vi.fn()} onCatalog={vi.fn()} />,
+    ));
+
+    expect(await screen.findByRole("heading", { name: "Личный профиль" })).toBeInTheDocument();
+  });
+
+  it("keeps Watch Later reachable and explains the empty list to guests", async () => {
+    render(withPreferences(
+      <Profile animeList={[]} initialPanel="watchlist" onSelect={vi.fn()} onCatalog={vi.fn()} />,
+    ));
+
+    expect(await screen.findByRole("heading", { name: "Смотреть позже" })).toBeInTheDocument();
+    expect(screen.getByText(/добавьте аниме|добавить аниме|пока нет/i)).toBeInTheDocument();
+  });
+
+  it("shows only unique titles from the authoritative server history and always shows Watch Later", async () => {
+    window.localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(["999"]));
+    window.localStorage.setItem(WATCHLIST_STORAGE_KEY, JSON.stringify([]));
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).includes("/api/telegram/history")) {
+        return jsonResponse({
+          authenticated: true,
+          items: [
+            { animeId: "123", viewedAt: "2026-11-01T10:00:00.000Z" },
+            { animeId: "456", viewedAt: "2026-11-02T10:00:00.000Z" },
+            { animeId: "789", viewedAt: "2026-11-03T10:00:00.000Z" },
+            { animeId: "456", viewedAt: "2026-11-02T10:00:00.000Z" },
+          ],
+        });
+      }
+      return jsonResponse({ authenticated: false, items: [] });
+    }));
+
+    render(withPreferences(
+      <MyHub
+        animeList={[
+          anime("123", "History One"),
+          anime("456", "History Two"),
+          anime("789", "History Three"),
+          anime("999", "Favorite Only"),
+        ]}
+        onNavigate={vi.fn()}
+        onSelect={vi.fn()}
+      />,
+    ));
+
+    const historyCard = await screen.findByRole("button", { name: /История просмотра/ });
+    await waitFor(() => {
+      expect(Array.from(historyCard.querySelectorAll("[data-anime-id]")).map(node => node.getAttribute("data-anime-id")))
+        .toEqual(["123", "456", "789"]);
+    });
+    expect(historyCard).toHaveTextContent("3 тайтлов");
+
+    const watchLaterCard = screen.getByRole("button", { name: /Смотреть позже/ });
+    expect(watchLaterCard).toHaveTextContent("0 тайтлов");
+    expect(watchLaterCard.querySelectorAll("[data-anime-id]")).toHaveLength(0);
+  });
+});
