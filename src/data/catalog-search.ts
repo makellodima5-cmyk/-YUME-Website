@@ -33,6 +33,7 @@ export function parseCatalogReturnState(raw: string | null): CatalogReturnState 
 
 export type CatalogSearch = {
   section?: View;
+  collection?: string;
   q?: string;
   page?: number;
   sort?: string;
@@ -64,6 +65,7 @@ export function validateCatalogSearch(search: Record<string, unknown>): CatalogS
   ];
 
   return {
+    collection: typeof search.collection === "string" && ["c1", "c2", "c3", "c4", "c5", "c6"].includes(search.collection) ? search.collection : undefined,
     q: typeof search.q === "string" ? search.q.slice(0, 120) : undefined,
     page: page !== undefined && Number.isInteger(page) && page > 0 ? Math.min(page, 10000) : undefined,
     sort: typeof search.sort === "string" && ["rating", "newest", "oldest", "title"].includes(search.sort)

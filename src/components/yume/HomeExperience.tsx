@@ -91,7 +91,7 @@ export function HomeExperience({
       .slice(0, 3)
       .map((entry) => entry.anime);
     return { collection, count: matches.length, posters };
-  }), [animeList]);
+  }).filter((entry) => entry.count > 0), [animeList]);
   const [featuredIndex, setFeaturedIndex] = useState(0);
   const featured = featuredItems[featuredIndex] ?? featuredItems[0] ?? animeList[0] ?? null;
   const seeAll = (view: View) => <button type="button" onClick={() => onSeeAll(view)} className="inline-flex shrink-0 items-center gap-1 text-sm font-bold text-primary">{ru ? "Все" : "See all"} <ChevronRight className="h-4 w-4" /></button>;

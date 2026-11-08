@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { ANIME } from "@/data/anime";
+import { ANIME, COLLECTIONS } from "@/data/anime";
 import { EMPTY_CATALOG_FILTERS, type CatalogFiltersValue } from "@/components/yume/CatalogFilters";
-import { filterAndSortCatalog, getCatalogPageCount, matchesCollectionGenres, paginateCatalog } from "@/data/catalog-utils";
+import { filterAndSortCatalog, getCatalogPageCount, getCollectionAnime, matchesCollectionGenres, paginateCatalog } from "@/data/catalog-utils";
 import type { Language } from "@/data/preferences";
 
 const translateGenre = (genre: string, language: Language) => language === "en" ? ({
@@ -89,4 +89,39 @@ describe("collection genre matching", () => {
     expect(matchesCollectionGenres(["  сверхъестественное  "], ["Сверхъестественное"])).toBe(true);
     expect(matchesCollectionGenres(["Романтика"], ["Сверхъестественное", "Мистика"])).toBe(false);
   });
+});
+
+
+describe("collection catalogue pages", () => {
+  it("keeps genre-specific membership and allows an anime in multiple collections", () => {
+    const fixture = { ...ANIME[0]!, id: "action-fantasy", genres: ["Экшен", "Фэнтези"] };
+    expect(getCollectionAnime([fixture], ["Экшен"])).toEqual([fixture]);
+    expect(getCollectionAnime([fixture], ["Фэнтези"])).toEqual([fixture]);
+    expect(getCollectionAnime([fixture], ["Романтика"])).toEqual([]);
+  });
+
+  it("hides empty collections and builds previews only from collection members", () => {
+    const items = [
+      { ...ANIME[0]!, id: "one-action", genres: ["Экшен"] },
+      { ...ANIME[1]!, id: "two-action", genres: ["Экшен", "Фэнтези"] },
+    ];
+    const visible = COLLECTIONS
+      .map((collection) => ({ collection, members: getCollectionAnime(items, collection.genres) }))
+      .filter(({ members }) => members.length > 0);
+    expect(visible.map(({ collection }) => collection.id)).toEqual(["c1", "c3"]);
+    expect(visible.every(({ members }) => members.slice(0, 3).every((item) => items.includes(item)))).toBe(true);
+    expect(visible.every(({ members }) => members.every((item) => items.includes(item)))).toBe(true);
+  });
+  it.each([[501,26,1],[326,17,6],[287,15,7],[246,13,6],[198,10,18],[27,2,7],[20,1,20],[12,1,12]])(
+    "calculates %i titles over %i pages with %i items on the last page", (total, pages, lastCount) => {
+      const items = Array.from({ length: total }, (_, index) => index + 1);
+      expect(getCatalogPageCount(total, 20)).toBe(pages);
+      expect(paginateCatalog(items, 1, 20)).toHaveLength(Math.min(20, total));
+      expect(paginateCatalog(items, pages, 20)).toHaveLength(lastCount);
+      if (pages > 1) {
+        expect(paginateCatalog(items, 2, 20)[0]).toBe(21);
+        expect(paginateCatalog(items, 1, 20).some((id) => paginateCatalog(items, 2, 20).includes(id))).toBe(false);
+      }
+    },
+  );
 });

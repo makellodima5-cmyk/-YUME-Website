@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Play, Search, Shuffle, SlidersHorizontal, X } from "lucide-react";
+import { Play, Search, Shuffle, SlidersHorizontal, X, ChevronRight, Layers } from "lucide-react";
 import { type Anime, CONTINUE, COLLECTIONS, byId } from "@/data/anime";
 import { matchesCollectionGenres } from "@/data/catalog-utils";
 import { AnimeCard, PosterArt } from "./Poster";
@@ -159,32 +159,54 @@ export function ContinueRow({ onSelect }: { onSelect: (a: Anime) => void }) {
   );
 }
 
+function stableCollectionPosterRank(collectionId: string, animeId: string): number {
+  const value = collectionId + ":" + animeId;
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
 export function CollectionsGrid({ onOpen, animeList }: { onOpen: (id: string) => void; animeList: Anime[] }) {
   const { t } = useYumePreferences();
+  const collections = COLLECTIONS.map((collection) => {
+    const matches = animeList
+      .filter((anime) => matchesCollectionGenres(anime.genres, collection.genres))
+      .sort((a, b) => stableCollectionPosterRank(collection.id, a.id) - stableCollectionPosterRank(collection.id, b.id) || a.id.localeCompare(b.id));
+    return { collection, matches, posters: matches.slice(0, 3) };
+  }).filter(({ matches }) => matches.length > 0);
+
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {COLLECTIONS.map((c) => {
-        const matches = animeList
-          .filter((anime) => matchesCollectionGenres(anime.genres, c.genres))
-          .sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1));
-        const posters = matches.slice(0, 4);
+    <div className="yubera-home-collections yubera-collections-list" aria-label={t("collections.title")}>
+      {collections.map(({ collection, matches, posters }) => {
+        const count = matches.length;
+        const remainder = count % 100;
+        const lastDigit = count % 10;
+        const countKey = remainder >= 11 && remainder <= 14 ? "collection.countMany"
+          : lastDigit === 1 ? "collection.countOne"
+            : lastDigit >= 2 && lastDigit <= 4 ? "collection.countFew"
+              : "collection.countMany";
         return (
           <button
-            key={c.id}
-            onClick={() => { telegramHapticImpact("light"); onOpen(c.id); }}
-            className="yume-tactile-control group relative h-44 overflow-hidden rounded-2xl p-5 text-left ring-1 ring-border transition hover:shadow-neon"
-            style={{ background: "linear-gradient(145deg, var(--secondary), var(--card))" }}
+            key={collection.id}
+            type="button"
+            onClick={() => { telegramHapticImpact("light"); onOpen(collection.id); }}
+            className="yubera-home-collection yubera-collection-list-card"
+            aria-label={t((`collection.${collection.id}.title`) as TranslationKey) + ", " + count + " " + t(countKey as TranslationKey)}
           >
-            <div className="absolute -right-3 bottom-3 flex max-w-[54%]">
-              {posters.map((anime) => (
-                <PosterArt key={anime.id} anime={anime} className="h-28 w-16 -ml-5 rounded-lg ring-2 ring-background transition first:ml-0 group-hover:-translate-y-1 sm:w-[4.5rem]" />
-              ))}
-            </div>
-            <div className="relative z-10 max-w-[58%] text-white">
-              <div className="text-xs text-white/80">{matches.length === 0 ? t("collection.emptyPreview") : `${matches.length} ${matches.length === 1 ? t("collection.countOne") : matches.length >= 2 && matches.length <= 4 ? t("collection.countFew") : t("collection.countMany")}`}</div>
-              <h3 className="mt-1 text-lg font-semibold leading-snug text-white">{t((`collection.${c.id}.title`) as TranslationKey)}</h3>
-              <p className="mt-1 line-clamp-2 text-sm text-white/75">{t((`collection.${c.id}.subtitle`) as TranslationKey)}</p>
-            </div>
+            <span className="yubera-home-collection-posters" aria-hidden="true">
+              {posters[0] && <PosterArt anime={posters[0]} className="yubera-home-collection-poster is-left" />}
+              {posters[1] && <PosterArt anime={posters[1]} className="yubera-home-collection-poster is-center" />}
+              {posters[2] && <PosterArt anime={posters[2]} className="yubera-home-collection-poster is-right" />}
+            </span>
+            <span className="yubera-home-collection-copy">
+              <span className="yubera-home-collection-title">{t((`collection.${collection.id}.title`) as TranslationKey)}</span>
+              <span className="yubera-home-collection-description">{t((`collection.${collection.id}.subtitle`) as TranslationKey)}</span>
+              <span className="yubera-home-collection-count"><Layers aria-hidden="true" /><span>{count} {t(countKey as TranslationKey)}</span></span>
+            </span>
+            <ChevronRight className="yubera-home-collection-arrow" aria-hidden="true" />
           </button>
         );
       })}

@@ -15,6 +15,12 @@ export function matchesCollectionGenres(animeGenres: string[], collectionGenres:
   return collectionGenres.some((genre) => available.has(normalizeCollectionGenre(genre)));
 }
 
+export function getCollectionAnime(items: Anime[], collectionGenres: string[]): Anime[] {
+  return items
+    .filter((anime) => matchesCollectionGenres(anime.genres, collectionGenres))
+    .sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1) || a.id.localeCompare(b.id));
+}
+
 export function filterAndSortCatalog(
   animeItems: Anime[],
   query: string,

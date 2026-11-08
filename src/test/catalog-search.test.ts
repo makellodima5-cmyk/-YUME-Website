@@ -21,8 +21,10 @@ describe("catalog URL search validation", () => {
       kind: "TV",
       age: "12+",
       lang: "en",
+      collection: "c3",
     })).toEqual({
       section: "catalog",
+      collection: "c3",
       q: "  Naruto  ",
       page: 12,
       sort: "newest",
@@ -64,6 +66,7 @@ describe("catalog URL search validation", () => {
       kind: undefined,
       age: undefined,
       lang: undefined,
+      collection: undefined,
     });
   });
 
