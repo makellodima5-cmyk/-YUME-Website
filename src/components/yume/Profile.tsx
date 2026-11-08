@@ -39,7 +39,6 @@ import { PosterArt } from "./Poster";
 import { PrivacyPolicy } from "./PrivacyPolicy";
 import { getTelegramWebApp, telegramHapticImpact } from "@/lib/telegram-mini-app";
 import { Grid } from "./Sections";
-import { PLAYBACK_PROGRESS_UPDATED_EVENT, readPlaybackProgress } from "@/data/playback-progress";
 import { SITE_RULES, SITE_RULES_LAST_UPDATED } from "@/data/site-rules";
 import {
   FAVORITES_STORAGE_KEY,
@@ -68,11 +67,9 @@ type Props = {
   initialPanel?: ProfilePanel;
   isAdmin?: boolean;
   onAdmin?: () => void;
-  onHistory?: () => void;
-  onTrackedTitles?: () => void;
 };
 
-export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overview", isAdmin = false, onAdmin, onHistory, onTrackedTitles }: Props) {
+export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overview", isAdmin = false, onAdmin }: Props) {
   const { t, language, theme, setTheme, setLanguage } = useYumePreferences();
   const [panel, setPanel] = useState<ProfilePanel>(initialPanel);
   const [settingsExpanded, setSettingsExpanded] = useState(false);
@@ -91,37 +88,6 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
   const [accountBusy, setAccountBusy] = useState(false);
   const [accountMessage, setAccountMessage] = useState("");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [historyCount, setHistoryCount] = useState(0);
-  const [telegramUser, setTelegramUser] = useState<{
-    first_name?: string;
-    last_name?: string;
-    username?: string;
-    photo_url?: string;
-  } | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    const syncLocalHistory = () => {
-      const animeIds = new Set(readPlaybackProgress().map(entry => entry.animeId));
-      setHistoryCount(animeIds.size);
-    };
-    syncLocalHistory();
-    window.addEventListener(PLAYBACK_PROGRESS_UPDATED_EVENT, syncLocalHistory);
-    window.addEventListener("storage", syncLocalHistory);
-    fetch("/api/telegram/history", { credentials: "same-origin", cache: "no-store" })
-      .then(async response => {
-        const payload = await response.json().catch(() => null) as { authenticated?: unknown; items?: unknown } | null;
-        if (cancelled || !response.ok || payload?.authenticated !== true || !Array.isArray(payload.items)) return;
-        setHistoryCount(payload.items.length);
-      })
-      .catch(() => undefined);
-    return () => {
-      cancelled = true;
-      window.removeEventListener(PLAYBACK_PROGRESS_UPDATED_EVENT, syncLocalHistory);
-      window.removeEventListener("storage", syncLocalHistory);
-    };
-  }, []);
-
   useEffect(() => setPanel(initialPanel), [initialPanel]);
   useEffect(() => {
     if (panel !== "support") return;
