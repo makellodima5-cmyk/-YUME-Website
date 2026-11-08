@@ -1286,3 +1286,152 @@ html[data-theme="light"] .yubera-bottom-nav { background:rgba(247,245,246,.96); 
     height:112px;
   }
 }
+
+
+/* Home collections — reference B: three compact stacked cards with poster triptychs. */
+.yubera-home-collections-section .yubera-home-section-mark {
+  width:9px;
+  flex-basis:9px;
+  height:38px;
+  background:#FF5738;
+}
+.yubera-home-collections {
+  display:flex;
+  flex-direction:column;
+  gap:11px;
+  overflow:visible;
+  padding:0;
+}
+.yubera-home-collection {
+  display:grid;
+  grid-template-columns:minmax(112px,min(34%,200px)) minmax(0,1fr) 18px;
+  align-items:center;
+  gap:10px;
+  width:100%;
+  min-width:0;
+  min-height:120px;
+  padding:10px 12px;
+  overflow:hidden;
+  border:1px solid #34353D;
+  border-radius:22px;
+  background:#1C1D23;
+  color:#FFFFFF;
+  text-align:left;
+  transition:border-color .18s ease,background-color .18s ease;
+}
+.yubera-home-collection:focus-visible {
+  outline:2px solid #FF5738;
+  outline-offset:2px;
+}
+.yubera-home-collection-posters {
+  position:relative;
+  display:block;
+  width:100%;
+  max-width:190px;
+  height:98px;
+  min-width:0;
+  justify-self:center;
+}
+.yubera-home-collection-poster {
+  position:absolute;
+  top:50%;
+  display:block;
+  width:58px;
+  height:86px;
+  overflow:hidden;
+  border:1px solid rgba(255,255,255,.2);
+  border-radius:11px;
+  background:#292A31;
+  box-shadow:0 4px 12px rgba(0,0,0,.34);
+}
+.yubera-home-collection-poster.is-left {
+  left:2px;
+  z-index:1;
+  transform:translateY(-50%) rotate(-8deg);
+}
+.yubera-home-collection-poster.is-center {
+  left:50%;
+  z-index:3;
+  width:64px;
+  height:98px;
+  border-color:rgba(255,255,255,.28);
+  transform:translate(-50%,-50%);
+}
+.yubera-home-collection-poster.is-right {
+  right:2px;
+  z-index:2;
+  transform:translateY(-50%) rotate(8deg);
+}
+.yubera-home-collection-copy {
+  display:flex;
+  min-width:0;
+  flex-direction:column;
+  align-items:flex-start;
+  gap:4px;
+}
+.yubera-home-collection-title {
+  display:-webkit-box;
+  width:100%;
+  overflow:hidden;
+  color:#FFFFFF;
+  font-size:clamp(14px,1.5vw,17px);
+  font-weight:750;
+  line-height:1.18;
+  -webkit-box-orient:vertical;
+  -webkit-line-clamp:2;
+}
+.yubera-home-collection-description {
+  display:-webkit-box;
+  width:100%;
+  overflow:hidden;
+  color:#A5A5AE;
+  font-size:12.5px;
+  font-weight:450;
+  line-height:1.22;
+  -webkit-box-orient:vertical;
+  -webkit-line-clamp:2;
+}
+.yubera-home-collection-count {
+  display:inline-flex;
+  min-width:0;
+  align-items:center;
+  gap:7px;
+  margin-top:2px;
+  color:#FFFFFF;
+  font-size:13px;
+  font-weight:750;
+  line-height:1.15;
+  white-space:nowrap;
+}
+.yubera-home-collection-count svg {
+  width:22px;
+  height:22px;
+  flex:0 0 22px;
+  color:#FF5738;
+  stroke-width:2.2;
+}
+.yubera-home-collection-arrow {
+  width:20px;
+  height:20px;
+  justify-self:center;
+  color:#B7B7C0;
+  stroke-width:2.3;
+}
+@media(max-width:390px) {
+  .yubera-home-collections { gap:10px; }
+  .yubera-home-collection {
+    grid-template-columns:minmax(104px,36%) minmax(0,1fr) 15px;
+    gap:7px;
+    min-height:112px;
+    padding:8px 9px;
+    border-radius:20px;
+  }
+  .yubera-home-collection-posters { height:92px; }
+  .yubera-home-collection-poster { width:51px; height:78px; border-radius:9px; }
+  .yubera-home-collection-poster.is-center { width:58px; height:90px; }
+  .yubera-home-collection-title { font-size:14px; }
+  .yubera-home-collection-description { font-size:11.5px; }
+  .yubera-home-collection-count { gap:5px; font-size:12px; }
+  .yubera-home-collection-count svg { width:20px; height:20px; flex-basis:20px; }
+  .yubera-home-collection-arrow { width:18px; height:18px; }
+}
