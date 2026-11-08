@@ -137,7 +137,7 @@ export function CatalogFilters({
 
       <div className="mt-3">
         <div className="mb-1 flex items-center justify-between"><label htmlFor="catalog-min-rating" className="text-xs text-muted-foreground">{t("filters.ratingFrom")}</label><span className="text-xs font-semibold tabular-nums">{draft.minRating.toFixed(1)}</span></div>
-        <input id="catalog-min-rating" type="range" min="0" max="9" step="0.5" value={draft.minRating} onChange={(e) => update({ minRating: Number(e.target.value) })} className="h-2 w-full cursor-pointer accent-fuchsia-400" />
+        <input id="catalog-min-rating" type="range" min="0" max="9" step="0.5" value={draft.minRating} onChange={(e) => update({ minRating: Number(e.target.value) })} className="h-2 w-full cursor-pointer accent-primary" />
         <div className="flex justify-between text-[10px] text-muted-foreground"><span>0</span><span>9</span></div>
       </div>
 
