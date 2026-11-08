@@ -30,6 +30,7 @@ class HistoryStatement {
   }
 
   async all<T = Record<string, unknown>>() {
+    this.db.executed.push({ sql: this.sql, values: this.values });
     return { results: [] as T[] };
   }
 }
@@ -71,6 +72,21 @@ afterEach(() => {
 });
 
 describe("Telegram viewing history", () => {
+  it("returns only history rows backed by confirmed playback", async () => {
+    const db = new HistoryDatabase();
+    configureDatabase(db);
+
+    const response = await handleTelegramHistory(new Request("https://yume.test/api/telegram/history", {
+      method: "GET",
+      headers: { Cookie: "__Host-yume-session=" + SESSION_TOKEN },
+    }));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ authenticated: true, items: [] });
+    const query = db.executed.find(statement => statement.sql.includes("SELECT anime_id AS animeId"));
+    expect(query?.sql).toContain("progress_updated_at_epoch_ms IS NOT NULL OR episode_number IS NULL");
+  });
+
   it("records a title only after confirmed playback progress reaches five seconds", async () => {
     const db = new HistoryDatabase();
     configureDatabase(db);
