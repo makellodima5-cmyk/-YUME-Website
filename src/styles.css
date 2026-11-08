@@ -343,16 +343,14 @@ button.yume-tactile-control:has(.aspect-\\[2\\/3\\]) {
 
 /* -------------------------------------------------------------------------
    YUBERA Android web experience
-   The web client uses the Android palette and component rhythm, not the
-   legacy YUME theme.
-   ------------------------------------------------------------------------- */
 :root {
   color-scheme: dark;
+  --radius: 1rem;
   --background: #101116;
   --foreground: #F6F4F5;
   --card: #1A1B22;
   --card-foreground: #F6F4F5;
-  --popover: #22232B;
+  --popover: #1A1B22;
   --popover-foreground: #F6F4F5;
   --primary: #FF5A3D;
   --primary-foreground: #FFFFFF;
@@ -363,17 +361,15 @@ button.yume-tactile-control:has(.aspect-\\[2\\/3\\]) {
   --accent: #34231F;
   --accent-foreground: #FFFFFF;
   --accent-warm: #FF764F;
-  --gold: #F4B942;
-  --destructive: #E05252;
-  --border: rgba(255,255,255,.12);
-  --input: rgba(255,255,255,.16);
-  --ring: #FF5A3D;
+  --gold: #FFC36A;
+  --destructive: #E45B59;
+  --border: rgba(246,244,245,.10);
+  --input: rgba(246,244,245,.14);
+  --ring: #FF764F;
   --gradient-neon: linear-gradient(120deg,#FF5A3D,#FF764F);
   --gradient-fade: linear-gradient(to top,#101116 0%,rgba(16,17,22,.72) 40%,transparent 100%);
-  --shadow-neon: 0 10px 34px -12px rgba(255,90,61,.32);
-  --body-gradient:
-    radial-gradient(ellipse 70% 26% at 50% 0%,rgba(255,90,61,.10),transparent 76%),
-    linear-gradient(180deg,#101116 0%,#101116 100%);
+  --shadow-neon: 0 8px 24px rgba(255,90,61,.18);
+  --body-gradient: #101116;
 }
 html[data-theme="light"] {
   color-scheme: light;
@@ -386,39 +382,35 @@ html[data-theme="light"] {
   --primary: #D9472D;
   --primary-foreground: #FFFFFF;
   --secondary: #ECE9EC;
-  --secondary-foreground: #29262D;
+  --secondary-foreground: #1B1920;
   --muted: #ECE9EC;
   --muted-foreground: #6C6872;
-  --accent: #F4E5E1;
-  --accent-foreground: #2A211F;
+  --accent: #F6E5E1;
+  --accent-foreground: #522319;
   --accent-warm: #B94C38;
-  --border: rgba(35,27,31,.14);
-  --input: rgba(35,27,31,.18);
+  --gold: #D99125;
+  --destructive: #C53F42;
+  --border: rgba(27,25,32,.12);
+  --input: rgba(27,25,32,.16);
   --ring: #D9472D;
   --gradient-neon: linear-gradient(120deg,#D9472D,#B94C38);
-  --shadow-neon: 0 10px 32px -12px rgba(217,71,45,.20);
-  --body-gradient:
-    radial-gradient(ellipse 70% 24% at 50% 0%,rgba(217,71,45,.07),transparent 76%),
-    linear-gradient(180deg,#F7F5F6 0%,#F7F5F6 100%);
-}
-html[data-theme="light"] body {
-  background-color: var(--background);
-  color: var(--foreground);
-}
-html[data-theme="light"] header.yubera-topbar {
-  background: rgba(247,245,246,.94) !important;
-  color: #1B1920 !important;
-  border-color: rgba(35,27,31,.12) !important;
-}
-html[data-theme="light"] .yubera-wordmark {
-  border-radius: .5rem;
-  padding: .22rem .42rem;
-  background: #101116;
+  --gradient-fade: linear-gradient(to top,#F7F5F6 0%,rgba(247,245,246,.74) 40%,transparent 100%);
+  --shadow-neon: 0 8px 22px rgba(217,71,45,.12);
+  --body-gradient: #F7F5F6;
 }
 .glass-liquid,.glass-active,.glass-search {
-  background: linear-gradient(135deg,rgba(255,255,255,.12),rgba(255,118,79,.07)),rgba(16,17,22,.62);
-  border-color: rgba(255,255,255,.16);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.16),0 10px 28px rgba(0,0,0,.22);
+  background: linear-gradient(135deg,rgba(255,255,255,.12),rgba(255,118,79,.07)),color-mix(in srgb,var(--card) 88%,transparent);
+  border: 1px solid var(--border);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.12),0 10px 28px rgba(0,0,0,.18);
+  -webkit-backdrop-filter: blur(18px) saturate(145%);
+  backdrop-filter: blur(18px) saturate(145%);
+}
+html[data-theme="light"] .glass-liquid,
+html[data-theme="light"] .glass-active,
+html[data-theme="light"] .glass-search {
+  background: linear-gradient(135deg,rgba(255,255,255,.84),rgba(255,118,79,.06)),rgba(255,255,255,.86);
+  border-color: var(--border);
+  box-shadow: 0 8px 24px rgba(27,25,32,.08);
 }
 .yubera-topbar {
   position: fixed;
