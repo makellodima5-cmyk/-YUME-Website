@@ -83,7 +83,8 @@ function extractYoutubeVideo(html: string): { id: string | null; embedded: boole
   const embeddedId = iframeSources.map(youtubeVideoId).find(Boolean) ?? null;
   if (embeddedId) return { id: embeddedId, embedded: true };
   const links = Array.from(html.matchAll(/(?:href|src)\s*=\s*["']([^"']*(?:youtube\.com|youtu\.be)[^"']*)["']/gi), (match) => match[1]);
-  const linkedId = links.map(youtubeVideoId).find(Boolean) ?? null;
+  const bareLinks = Array.from(html.matchAll(/https?:\/\/(?:www\.)?(?:youtube\.com|youtu\.be)\/[^\s"'<>]+/gi), (match) => match[0]);
+  const linkedId = [...links, ...bareLinks].map(youtubeVideoId).find(Boolean) ?? null;
   return { id: linkedId, embedded: false };
 }
 
