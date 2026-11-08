@@ -34,7 +34,7 @@ function MiniPosterStack({ items, onSelect }: { items: Anime[]; onSelect: (anime
   if (!items.length) return <span className="grid h-[92px] w-[112px] shrink-0 place-items-center rounded-xl bg-black/15 text-xs text-muted-foreground">—</span>;
   return <span className="relative flex h-[104px] w-[148px] shrink-0 items-center justify-center">
     {items.slice(0, 3).map((anime, index) => <button key={anime.id} type="button" onClick={event => { event.stopPropagation(); onSelect(anime); }} aria-label={anime.title}
-      className={\`absolute top-1 h-[88px] w-[60px] overflow-hidden rounded-xl border border-white/15 shadow-lg \${index === 1 ? "left-1/2 z-20 -translate-x-1/2 scale-110" : index === 0 ? "left-2 z-10 -rotate-[12deg]" : "right-2 z-10 rotate-[12deg]"}\`}>
+      className={`absolute top-1 h-[88px] w-[60px] overflow-hidden rounded-xl border border-white/15 shadow-lg ${index === 1 ? "left-1/2 z-20 -translate-x-1/2 scale-110" : index === 0 ? "left-2 z-10 -rotate-[12deg]" : "right-2 z-10 rotate-[12deg]"}`}>
       <PosterArt anime={anime} className="h-full w-full" />
     </button>)}
   </span>;
