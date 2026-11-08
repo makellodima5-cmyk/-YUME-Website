@@ -60,11 +60,11 @@ export function TrackedTitlesPage({ animeList, onNavigate, onSelect }: Props) {
   };
 
   return <main id="main-content" className="yubera-with-bottom-nav mx-auto w-full max-w-[1600px] px-3 pb-8 pt-[78px] sm:px-4 md:px-6 lg:px-8">
-    <SectionBanner title={ru ? "Подписки на новые серии" : "New episode subscriptions"} subtitle={ru ? "Аниме, за выходом которых ты следишь" : "Anime whose new episodes you follow"} />
+    <SectionBanner title={ru ? "Подписки на новые серии" : "New episode subscriptions"} subtitle={ru ? "Здесь будут отображаться аниме, за выходом новых серий которых ты следишь" : "Anime whose new episodes you follow will appear here"} />
     {failed && <div role="alert" className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-border bg-card p-3 text-sm"><span>{ru ? "Не удалось обновить подписки." : "Could not update subscriptions."}</span><button type="button" onClick={load} className="inline-flex items-center gap-2 text-primary"><RotateCcw className="h-4 w-4" />{ru ? "Повторить" : "Retry"}</button></div>}
     {!loaded ? <p className="rounded-2xl border border-border bg-card/40 px-5 py-8 text-sm text-muted-foreground">{ru ? "Загружаем подписки…" : "Loading subscriptions…"}</p> :
       items.length ? <Grid items={items} onSelect={onSelect} empty="" onRemove={remove} removeLabel={ru ? "Отменить подписку" : "Unsubscribe"} /> :
-      <section className="rounded-2xl border border-dashed border-border bg-card/40 px-5 py-8 text-center"><Radio className="mx-auto h-8 w-8 text-primary" /><h2 className="mt-3 font-bold">{ru ? "Подписок пока нет" : "No subscriptions yet"}</h2><p className="mt-2 text-sm text-muted-foreground">{ru ? "Подпишитесь на новые серии на странице аниме, и они появятся здесь." : "Subscribe to new episodes on an anime page and titles will appear here."}</p></section>}
+      <section className="rounded-2xl border border-dashed border-border bg-card/40 px-5 py-8 text-center"><Radio className="mx-auto h-8 w-8 text-primary" /><h2 className="mt-3 font-bold">{ru ? "Пока нет отслеживаемых тайтлов" : "No tracked titles yet"}</h2><p className="mt-2 text-sm text-muted-foreground">{ru ? "Подпишитесь на новые серии на странице аниме, и они появятся здесь." : "Subscribe to new episodes on an anime page and titles will appear here."}</p></section>}
     {loaded && missing.length > 0 && <p className="mt-4 text-xs text-muted-foreground">{ru ? "Часть постеров пока не удалось загрузить." : "Some posters could not be loaded."}</p>}
   </main>;
 }

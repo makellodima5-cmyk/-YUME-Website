@@ -16,6 +16,7 @@ const SCREENSHOT_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 export type ShikimoriScreenshot = { originalUrl: string; previewUrl: string };
 const screenshotCache = new Map<string, { expiresAt: number; items: ShikimoriScreenshot[] }>();
 const responseCache = new Map<string, { expiresAt: number; items: Anime[] }>();
+const responseInFlight = new Map<string, Promise<{ items: Anime[]; error: string | null; retryAfterMs?: number }>>();
 // A 429 opens a per-isolate circuit breaker to avoid repeated upstream bursts.
 let shikimoriCooldownUntil = 0;
 const SHIKIMORI_429_COOLDOWN_MS = 60 * 1000;
@@ -371,90 +372,103 @@ export function validateRequest(input: ShikimoriRequest): ShikimoriRequest {
 
 async function fetchShikimoriAnimes(data: ShikimoriRequest) {
   const key = JSON.stringify(data);
+  const now = Date.now();
   const cached = responseCache.get(key);
-  if (cached && cached.expiresAt > Date.now()) {
+  if (cached && cached.expiresAt > now) {
     return { items: cached.items, error: null as string | null };
   }
+  if (cached) responseCache.delete(key);
 
-  const sharedCached = await readShikimoriSharedCache<Anime[]>("graphql:" + await hashShikimoriCacheKey(key));
-  if (sharedCached) {
-    responseCache.set(key, { expiresAt: Date.now() + CACHE_TTL_MS, items: sharedCached });
-    return { items: sharedCached, error: null as string | null };
-  }
+  const pending = responseInFlight.get(key);
+  if (pending) return pending;
 
-  if (Date.now() < shikimoriCooldownUntil) {
-    return {
-      items: [] as Anime[],
-      error: "Источник каталога временно ограничил запросы. Повтори попытку немного позже.",
-      retryAfterMs: Math.max(1000, shikimoriCooldownUntil - Date.now()),
-    };
-  }
+  const request = (async () => {
+    const cacheKey = "graphql:" + await hashShikimoriCacheKey(key);
+    const sharedCached = await readShikimoriSharedCache<Anime[]>(cacheKey);
+    if (sharedCached) {
+      responseCache.set(key, { expiresAt: Date.now() + CACHE_TTL_MS, items: sharedCached });
+      return { items: sharedCached, error: null as string | null };
+    }
 
-  const args = [
-    "page: " + (data.page ?? 1),
-    "limit: " + (data.limit ?? 50),
-    "order: " + (data.order ?? "ranked"),
-  ];
-  if (data.search) args.push("search: " + JSON.stringify(data.search));
-  if (data.status) args.push("status: " + JSON.stringify(data.status));
-  if (data.kind) args.push("kind: " + JSON.stringify(data.kind));
-  if (data.ids) args.push("ids: " + JSON.stringify(data.ids));
-
-  const fields = ANIME_FIELDS + (data.includeVideos ? " " + ANIME_VIDEO_FIELDS : "");
-  const query = "query { animes(" + args.join(", ") + ") { " + fields + " } }";
-
-  try {
-    const response = await fetch(API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-        "User-Agent": "YUME/1.0",
-      },
-      body: JSON.stringify({ query }),
-      signal: AbortSignal.timeout(12000),
-    });
-
-    if (response.status === 429) {
-      const retryAfterMs = retryAfterMilliseconds(response.headers.get("Retry-After"))
-        ?? SHIKIMORI_429_COOLDOWN_MS;
-      shikimoriCooldownUntil = Math.max(shikimoriCooldownUntil, Date.now() + retryAfterMs);
-      console.warn("[YUME] Shikimori returned HTTP 429; pausing requests for", retryAfterMs, "ms.");
+    if (Date.now() < shikimoriCooldownUntil) {
       return {
         items: [] as Anime[],
         error: "Источник каталога временно ограничил запросы. Повтори попытку немного позже.",
-        retryAfterMs,
+        retryAfterMs: Math.max(1000, shikimoriCooldownUntil - Date.now()),
       };
     }
-    if (!response.ok) {
-      throw new Error("Shikimori returned HTTP " + response.status);
-    }
 
-    const payload = (await response.json()) as GraphQLResponse;
-    const parsed = parseShikimoriResponse(payload);
-    if (parsed.error) throw new Error(parsed.error);
-    const items = parsed.items;
-    responseCache.set(key, { expiresAt: Date.now() + CACHE_TTL_MS, items });
-    await writeShikimoriSharedCache("graphql:" + await hashShikimoriCacheKey(key), items, CACHE_TTL_MS);
-    if (responseCache.size > 160) {
-      const now = Date.now();
-      for (const [cacheKey, entry] of responseCache) {
-        if (entry.expiresAt <= now) responseCache.delete(cacheKey);
+    const args = [
+      "page: " + (data.page ?? 1),
+      "limit: " + (data.limit ?? 50),
+      "order: " + (data.order ?? "ranked"),
+    ];
+    if (data.search) args.push("search: " + JSON.stringify(data.search));
+    if (data.status) args.push("status: " + JSON.stringify(data.status));
+    if (data.kind) args.push("kind: " + JSON.stringify(data.kind));
+    if (data.ids) args.push("ids: " + JSON.stringify(data.ids));
+
+    const fields = ANIME_FIELDS + (data.includeVideos ? " " + ANIME_VIDEO_FIELDS : "");
+    const query = "query { animes(" + args.join(", ") + ") { " + fields + " } }";
+
+    try {
+      const response = await fetch(API_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          "User-Agent": "YUME/1.0",
+        },
+        body: JSON.stringify({ query }),
+        signal: AbortSignal.timeout(12000),
+      });
+
+      if (response.status === 429) {
+        const retryAfterMs = retryAfterMilliseconds(response.headers.get("Retry-After"))
+          ?? SHIKIMORI_429_COOLDOWN_MS;
+        shikimoriCooldownUntil = Math.max(shikimoriCooldownUntil, Date.now() + retryAfterMs);
+        console.warn("[YUME] Shikimori returned HTTP 429; pausing requests for", retryAfterMs, "ms.");
+        return {
+          items: [] as Anime[],
+          error: "Источник каталога временно ограничил запросы. Повтори попытку немного позже.",
+          retryAfterMs,
+        };
       }
-      while (responseCache.size > 160) {
-        const oldestKey = responseCache.keys().next().value;
-        if (oldestKey === undefined) break;
-        responseCache.delete(oldestKey);
+      if (!response.ok) throw new Error("Shikimori returned HTTP " + response.status);
+
+      const payload = (await response.json()) as GraphQLResponse;
+      const parsed = parseShikimoriResponse(payload);
+      if (parsed.error) throw new Error(parsed.error);
+      const items = parsed.items;
+      responseCache.set(key, { expiresAt: Date.now() + CACHE_TTL_MS, items });
+      await writeShikimoriSharedCache(cacheKey, items, CACHE_TTL_MS);
+      if (responseCache.size > 160) {
+        const expiry = Date.now();
+        for (const [cacheKey, entry] of responseCache) {
+          if (entry.expiresAt <= expiry) responseCache.delete(cacheKey);
+        }
+        while (responseCache.size > 160) {
+          const oldestKey = responseCache.keys().next().value;
+          if (oldestKey === undefined) break;
+          responseCache.delete(oldestKey);
+        }
       }
+      return { items, error: null as string | null };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown Shikimori API error";
+      console.error("[YUME] Shikimori catalog request failed:", message);
+      return {
+        items: [] as Anime[],
+        error: "Не удалось загрузить каталог Shikimori. Проверь подключение и обнови страницу.",
+      };
     }
-    return { items, error: null as string | null };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown Shikimori API error";
-    console.error("[YUME] Shikimori catalog request failed:", message);
-    return {
-      items: [] as Anime[],
-      error: "Не удалось загрузить каталог Shikimori. Проверь подключение и обнови страницу.",
-    };
+  })();
+
+  responseInFlight.set(key, request);
+  try {
+    return await request;
+  } finally {
+    if (responseInFlight.get(key) === request) responseInFlight.delete(key);
   }
 }
 export const getShikimoriAnimes = createServerFn({ method: "GET" })
