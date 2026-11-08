@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ANIME } from "@/data/anime";
+import { ANIME, COLLECTIONS } from "@/data/anime";
 import { EMPTY_CATALOG_FILTERS, type CatalogFiltersValue } from "@/components/yume/CatalogFilters";
 import { filterAndSortCatalog, getCatalogPageCount, getCollectionAnime, matchesCollectionGenres, paginateCatalog } from "@/data/catalog-utils";
 import type { Language } from "@/data/preferences";
@@ -98,6 +98,19 @@ describe("collection catalogue pages", () => {
     expect(getCollectionAnime([fixture], ["Экшен"])).toEqual([fixture]);
     expect(getCollectionAnime([fixture], ["Фэнтези"])).toEqual([fixture]);
     expect(getCollectionAnime([fixture], ["Романтика"])).toEqual([]);
+  });
+
+  it("hides empty collections and builds previews only from collection members", () => {
+    const items = [
+      { ...ANIME[0]!, id: "one-action", genres: ["Экшен"] },
+      { ...ANIME[1]!, id: "two-action", genres: ["Экшен", "Фэнтези"] },
+    ];
+    const visible = COLLECTIONS
+      .map((collection) => ({ collection, members: getCollectionAnime(items, collection.genres) }))
+      .filter(({ members }) => members.length > 0);
+    expect(visible.map(({ collection }) => collection.id)).toEqual(["c1", "c3"]);
+    expect(visible.every(({ members }) => members.length <= 3 || members.every((item) => items.includes(item)))).toBe(true);
+    expect(visible.every(({ members }) => members.every((item) => items.includes(item)))).toBe(true);
   });
   it.each([[501,26,20],[326,17,20],[287,15,20],[246,13,20],[198,10,20],[27,2,7],[20,1,20],[12,1,12]])(
     "calculates %i titles over %i pages with %i items on the last page", (total, pages, lastCount) => {
