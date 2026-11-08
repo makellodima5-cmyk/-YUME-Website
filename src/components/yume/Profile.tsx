@@ -573,120 +573,12 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
                   </div>
                 </div>
 
-                <div className="mt-4 grid grid-cols-3 overflow-hidden rounded-[18px] border border-border bg-black/20 sm:mt-5">
-                  <button
-                    type="button"
-                    onClick={() => navigatePanel("favorites")}
-                    aria-label={`${favorites.length} — ${t("profile.favoritesCount")}`}
-                    className="flex min-w-0 items-center gap-2.5 px-2.5 py-2.5 text-left transition hover:bg-white/[0.06] sm:gap-4 sm:px-5 sm:py-3.5"
-                  >
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#22232B] text-[#FF764F] sm:h-12 sm:w-12">
-                      <Heart className="h-5 w-5 sm:h-6 sm:w-6" strokeWidth={1.9} />
-                    </span>
-                    <span className="min-w-0">
-                      <span className="block text-lg font-bold tabular-nums text-white sm:text-xl">{favorites.length}</span>
-                      <span className="mt-0.5 block text-[10px] leading-snug text-white/65 sm:text-xs">{t("profile.favoritesCount")}</span>
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => navigatePanel("watchlist")}
-                    aria-label={`${watchlist.length} — ${t("profile.watchlistCount")}`}
-                    className="flex min-w-0 items-center gap-2.5 border-l border-border px-2.5 py-2.5 text-left transition hover:bg-white/[0.06] sm:gap-4 sm:px-5 sm:py-3.5"
-                  >
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#22232B] text-primary sm:h-12 sm:w-12">
-                      <Bookmark className="h-5 w-5 sm:h-6 sm:w-6" strokeWidth={1.9} />
-                    </span>
-                    <span className="min-w-0">
-                      <span className="block text-lg font-bold tabular-nums text-white sm:text-xl">{watchlist.length}</span>
-                      <span className="mt-0.5 block text-[11px] leading-snug text-white/65 sm:text-sm">{t("profile.watchlistCount")}</span>
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onHistory?.()}
-                    aria-label={String(historyCount) + " — " + (language === "ru" ? "тайтлов в истории" : "titles in history")}
-                    className="flex min-w-0 items-center gap-2 border-l border-border px-2 py-2.5 text-left transition hover:bg-white/[0.06] sm:gap-3 sm:px-4 sm:py-3.5"
-                  >
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#22232B] text-[#FF764F] sm:h-11 sm:w-11">
-                      <Clock3 className="h-5 w-5 sm:h-6 sm:w-6" strokeWidth={1.9} />
-                    </span>
-                    <span className="min-w-0">
-                      <span className="block text-lg font-bold tabular-nums text-white sm:text-xl">{historyCount}</span>
-                      <span className="mt-0.5 block text-[9px] leading-snug text-white/65 sm:text-xs">{language === "ru" ? "В истории" : "In history"}</span>
-                    </span>
-                  </button>
-                </div>
+
               </div>
             </div>
             {!isTelegramMiniApp && <p className="mt-3 text-xs leading-relaxed text-muted-foreground">{t("profile.localLibraryNotice")}</p>}
 
-            <section className="mt-8">
-              <div className="mb-3 flex items-end justify-between gap-3">
-                <div>
-                  <h2 className="text-xl font-bold">{t("profile.favorites")}</h2>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => navigatePanel("favorites")}
-                  className="inline-flex shrink-0 items-center gap-1 text-sm font-medium text-primary transition hover:text-neon"
-                >
-                  {t("profile.all")} <ChevronRight className="h-4 w-4" />
-                </button>
-              </div>
-              {favorites.length ? (
-                <div className="scrollbar-none flex gap-3 overflow-x-auto pb-2">
-                  {favorites.slice(0, 4).map((anime) => (
-                    <div key={anime.id} className="yubera-profile-favorites relative shrink-0">
-                      <button
-                        type="button"
-                        aria-label={displayAnimeTitle(anime, language)}
-                        onClick={() => onSelect(anime)}
-                        className="group w-full overflow-hidden rounded-xl text-left transition hover:-translate-y-1"
-                      >
-                        <span className="block overflow-hidden rounded-xl ring-1 ring-white/10 transition group-hover:ring-primary">
-                          <PosterArt anime={anime} className="aspect-[2/3] w-full transition duration-300 group-hover:scale-[1.02]" />
-                        </span>
-                        <span className="mt-2 block line-clamp-2 min-h-8 px-0.5 text-[11px] leading-snug text-foreground/90 sm:text-xs">
-                          {displayAnimeTitle(anime, language)}
-                        </span>
-                      </button>
-                      <button
-                        type="button"
-                        aria-label={language === "ru" ? "Убрать из избранного" : "Remove from favorites"}
-                        title={language === "ru" ? "Убрать из избранного" : "Remove from favorites"}
-                        onClick={(event) => { event.preventDefault(); event.stopPropagation(); toggleSavedAnimeId(FAVORITES_STORAGE_KEY, anime.id); }}
-                        className="absolute right-1.5 top-1.5 z-20 flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-red-600 text-white shadow-[0_0_0_2px_rgba(0,0,0,0.7),0_4px_12px_rgba(0,0,0,0.65)] transition hover:scale-105 hover:bg-red-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-red-300"
-                      >
-                        <X className="h-5 w-5" strokeWidth={3} aria-hidden="true" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="flex items-center gap-3 rounded-2xl border border-dashed border-border px-4 py-4">
-                  <Heart className="h-5 w-5 shrink-0 text-primary" />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium">{t("profile.empty")}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">{t("profile.emptyFavorites")}</p>
-                  </div>
-                  <button type="button" onClick={onCatalog} className="shrink-0 text-sm font-semibold text-primary hover:text-neon">{t("profile.catalog")}</button>
-                </div>
-              )}
-            </section>
-
             <section className="mt-7 grid gap-2.5">
-              {profileRow(Bookmark, t("profile.watchlist"), t("profile.watchlistDescription"), "watchlist")}
-              <button type="button" onClick={() => onHistory?.()} className="yubera-profile-row flex w-full items-center gap-4 rounded-2xl border border-border bg-card text-left text-card-foreground shadow-sm transition hover:border-primary/35 hover:bg-accent/70">
-                <span className="yubera-profile-row-icon flex shrink-0 items-center justify-center rounded-full bg-[#22232B] text-primary"><Clock3 className="h-6 w-6" /></span>
-                <span className="min-w-0 flex-1"><span className="block text-sm font-semibold">{language === "ru" ? "История просмотра" : "Watch history"}</span><span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">{language === "ru" ? "Ранее просмотренные серии" : "Previously watched episodes"}</span></span>
-                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-              </button>
-              <button type="button" onClick={() => onTrackedTitles?.()} className="yubera-profile-row flex w-full items-center gap-4 rounded-2xl border border-border bg-card text-left text-card-foreground shadow-sm transition hover:border-primary/35 hover:bg-accent/70">
-                <span className="yubera-profile-row-icon flex shrink-0 items-center justify-center rounded-full bg-[#22232B] text-primary"><Bell className="h-6 w-6" /></span>
-                <span className="min-w-0 flex-1"><span className="block text-sm font-semibold">{language === "ru" ? "Отслеживаемые тайтлы" : "Tracked anime"}</span><span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">{language === "ru" ? "Аниме, за выходом новых серий которых ты следишь" : "Anime with new episodes you follow"}</span></span>
-                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-              </button>
               <button type="button" onClick={() => setSettingsExpanded(current => !current)} aria-expanded={settingsExpanded} className="yubera-profile-row flex w-full items-center gap-4 rounded-2xl border border-border bg-card text-left text-card-foreground shadow-sm transition hover:border-primary/35 hover:bg-accent/70">
                 <span className="yubera-profile-row-icon flex shrink-0 items-center justify-center rounded-full bg-[#22232B] text-primary"><Settings className="h-6 w-6" /></span>
                 <span className="min-w-0 flex-1"><span className="block text-sm font-semibold">{language === "ru" ? "Настройки приложения" : "App settings"}</span><span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">{language === "ru" ? "Тема, язык и другие параметры" : "Theme, language and preferences"}</span></span>
