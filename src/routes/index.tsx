@@ -2209,6 +2209,7 @@ function Index() {
             )}
           </div>
         </main>
+      ) : null}
       {!newsDetailOpen && !(["login", "register"].includes(view)) && (
         <nav className="yubera-bottom-nav" aria-label={language === "ru" ? "Основная навигация" : "Main navigation"}>
           {[
