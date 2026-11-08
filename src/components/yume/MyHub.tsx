@@ -30,7 +30,7 @@ function stablePreviewIds(key: string, ids: string[]): string[] {
   } catch { return ids.slice(0, 3); }
 }
 
-function MiniPosterStack({ items, onSelect }: { items: Anime[]; onSelect: (anime: Anime) => void }) {
+function MiniPosterStack({ items }: { items: Anime[] }) {
   if (!items.length) return <span className="grid h-[92px] w-[112px] shrink-0 place-items-center rounded-xl bg-black/15 text-xs text-muted-foreground">—</span>;
   return <span className="relative flex h-[104px] w-[148px] shrink-0 items-center justify-center">
     {items.slice(0, 3).map((anime, index) => <span key={anime.id} className={`absolute top-1 h-[88px] w-[60px] overflow-hidden rounded-xl border border-white/15 shadow-lg ${index === 1 ? "left-1/2 z-20 -translate-x-1/2 scale-110" : index === 0 ? "left-2 z-10 -rotate-[12deg]" : "right-2 z-10 rotate-[12deg]"}`}><PosterArt anime={anime} className="h-full w-full" /></span>)}
@@ -47,8 +47,7 @@ export function MyHub({ animeList, onNavigate, onSelect }: Props) {
   const [resolvedAnime, setResolvedAnime] = useState<Anime[]>([]);
   const [watchPreviewIds, setWatchPreviewIds] = useState<string[]>([]);
   const [historyPreviewIds, setHistoryPreviewIds] = useState<string[]>([]);
-  const [subscriptionsLoaded, setSubscriptionsLoaded] = useState(false);
-
+  
   useEffect(() => {
     const sync = () => {
       setFavoriteIds(readSavedAnimeIds(FAVORITES_STORAGE_KEY));
@@ -66,7 +65,7 @@ export function MyHub({ animeList, onNavigate, onSelect }: Props) {
     fetch("/api/anime-subscriptions", { credentials: "same-origin", cache: "no-store" }).then(async response => {
       const payload = await response.json().catch(() => ({})) as { subscriptions?: string[] };
       if (response.ok && Array.isArray(payload.subscriptions)) setSubscriptionIds(payload.subscriptions.filter(id => /^\d{1,20}$/.test(id)));
-    }).catch(() => undefined).finally(() => setSubscriptionsLoaded(true));
+    }).catch(() => undefined);
     return () => {
       window.removeEventListener(PROFILE_UPDATED_EVENT, sync);
       window.removeEventListener(PLAYBACK_PROGRESS_UPDATED_EVENT, sync);
@@ -99,7 +98,7 @@ export function MyHub({ animeList, onNavigate, onSelect }: Props) {
   const listCard = (id: View, title: string, subtitle: string, icon: typeof Bookmark, ids: string[], preview: Anime[]) => {
     const Icon = icon;
     return <button type="button" onClick={() => onNavigate(id)} className="flex min-h-[116px] w-full items-center gap-3 rounded-[22px] border border-border bg-card/90 px-3 py-3 text-left shadow-sm transition hover:border-primary/40">
-      <MiniPosterStack items={preview} onSelect={onSelect} />
+      <MiniPosterStack items={preview} />
       <span className="min-w-0 flex-1"><span className="block text-[17px] font-bold leading-tight">{title}</span><span className="mt-1 block text-sm leading-snug text-muted-foreground">{subtitle}</span><span className="mt-2 inline-flex items-center gap-2 text-sm font-semibold"><Icon className="h-5 w-5 text-primary" />{ids.length} {ru ? "тайтлов" : "titles"}</span></span>
       <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" />
     </button>;
