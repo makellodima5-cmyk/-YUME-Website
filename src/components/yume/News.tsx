@@ -34,6 +34,11 @@ function categoryLabel(category: YuberaNewsArticle["category"], language: "ru" |
   return CATEGORIES.find((item) => item.id === category)?.[language] ?? (language === "en" ? "Industry" : "Индустрия");
 }
 function relatedAnime(article: YuberaNewsArticle, animeList: Anime[]): Anime | undefined {
+  const linkedId = article.linkedId ? String(article.linkedId) : null;
+  if (linkedId) {
+    const byId = animeList.find((anime) => anime.id === linkedId);
+    if (byId) return byId;
+  }
   const needle = article.linkedTitle?.trim().toLocaleLowerCase();
   if (!needle) return undefined;
   return animeList.find((anime) =>
@@ -97,6 +102,7 @@ export function News({ animeList, onDetailChange }: { animeList: Anime[]; onDeta
     return (
       <NewsArticle
         article={selectedArticle}
+        animeList={animeList}
         onBack={() => {
           setBookmarks(readBookmarks());
           setSelectedArticle(null);
