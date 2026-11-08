@@ -1237,6 +1237,12 @@ function Index() {
     setCatalogPage(urlPage ?? 1);
     setCollection(urlCollection ?? null);
   }, [section, urlCollection, urlQuery, urlPage, urlSort, urlGenres, urlStatus, urlFrom, urlTo, urlRating, urlKind, urlAge]);
+  useEffect(() => {
+    if (view !== "collections" || !urlCollection) return;
+    if ((urlPage ?? 1) !== loadedCatalogPage) {
+      void navigate({ to: "/", replace: true, search: { section: "collections", collection: urlCollection, page: loadedCatalogPage === 1 ? undefined : loadedCatalogPage } });
+    }
+  }, [view, urlCollection, urlPage, loadedCatalogPage, navigate]);
 
   // Catalog seeding/expansion is an explicit admin operation, not a user-page side effect.
 
@@ -1340,7 +1346,6 @@ function Index() {
     if (!activeCollection) return;
     setCatalogPage(page);
     void navigate({ to: "/", replace: true, search: { section: "collections", collection: activeCollection.id, page } });
-    window.requestAnimationFrame(() => document.getElementById("collection-anime-list")?.scrollIntoView({ behavior: "smooth", block: "start" }));
   };
   const select = (anime: Anime) => {
     if (view === "catalog") {
@@ -1501,7 +1506,7 @@ function Index() {
     setCatalogPage(1);
     writeCatalogUrl({ page: 1, genres: undefined, status: undefined, from: undefined, to: undefined, rating: undefined, kind: undefined, age: undefined });
   };
-  const activeCollection = COLLECTIONS.find((c) => c.id === (urlCollection ?? collection));
+  const activeCollection = COLLECTIONS.find((c) => c.id === urlCollection);
   const activeCollectionAnime = activeCollection ? ANIME : [];
   const totalCollectionTitles = activeCollection ? initialCatalogTotal : 0;
   const totalCollectionPages = getCatalogPageCount(totalCollectionTitles, 20);
