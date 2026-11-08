@@ -46,18 +46,6 @@ class HistoryDatabase {
   }
 }
 
-async function sessionHash(token: string): Promise<string> {
-  const key = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(SESSION_SECRET),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"],
-  );
-  const digest = new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(token)));
-  return Array.from(digest, byte => byte.toString(16).padStart(2, "0")).join("");
-}
-
 afterEach(() => {
   delete (cloudflareEnv as Record<string, unknown>).YUME_DB;
   delete (cloudflareEnv as Record<string, unknown>).YUME_AUTH_SESSION_SECRET;
@@ -86,7 +74,6 @@ describe("Telegram viewing history", () => {
     const insert = db.executed.find(statement => statement.sql.includes("INSERT INTO yume_view_history"));
     expect(insert?.values).toEqual(["user-history-test", "123", expect.any(String), 4]);
     expect(db.executed.some(statement => statement.sql.includes("DELETE FROM yume_view_history"))).toBe(true);
-    expect(await sessionHash(SESSION_TOKEN)).toMatch(/^[a-f0-9]{64}$/);
   });
 
   it("rejects invalid episode numbers without inserting history", async () => {
