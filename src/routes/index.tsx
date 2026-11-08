@@ -1321,12 +1321,18 @@ function Index() {
           error?: string;
         };
         if (cancelled) return;
-        if (response.status === 401 || payload.authenticated !== true) {
+        if (response.status === 401) {
           setHistoryAuthenticated(false);
           setHistoryItems([]);
           return;
         }
-        if (!response.ok || !Array.isArray(payload.items)) throw new Error(payload.error || "history_unavailable");
+        if (!response.ok) throw new Error(payload.error || "history_unavailable");
+        if (payload.authenticated !== true) {
+          setHistoryAuthenticated(false);
+          setHistoryItems([]);
+          return;
+        }
+        if (!Array.isArray(payload.items)) throw new Error(payload.error || "history_unavailable");
         setHistoryAuthenticated(true);
         setHistoryItems(payload.items.filter((item): item is { animeId: string; viewedAt: string; viewCount: number } =>
           Boolean(item && typeof item === "object" &&
