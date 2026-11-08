@@ -120,8 +120,8 @@ export function MyHub({ animeList, onNavigate, onSelect }: Props) {
         <div className="scrollbar-none flex gap-3 overflow-x-auto pb-2">{favorites.slice(0, 8).map(anime => <button key={anime.id} type="button" onClick={() => onSelect(anime)} className="w-[104px] shrink-0 text-left"><PosterArt anime={anime} className="aspect-[2/3] w-full rounded-[16px] border border-border" /><span className="mt-2 block line-clamp-2 min-h-8 text-[12px] leading-snug">{displayAnimeTitle(anime, language)}</span></button>)}</div>}
     </section>
     <div className="mt-5 grid gap-3">
-      {listCard("watchlist", ru ? "Смотреть позже" : "Watch later", ru ? "Отложенные аниме" : "Anime saved for later", Bookmark, watchIds.length, watchlistPreview)}
-      {listCard("history", ru ? "История просмотра" : "Viewing history", ru ? "Ранее просмотренные" : "Previously watched anime", Clock3, historyIds.length, historyPreview)}
+      {watchIds.length > 0 && listCard("watchlist", ru ? "Смотреть позже" : "Watch later", ru ? "Отложенные аниме" : "Anime saved for later", Bookmark, watchIds.length, watchlistPreview)}
+      {historyIds.length > 0 && listCard("history", ru ? "История просмотра" : "Viewing history", ru ? "Ранее просмотренные" : "Previously watched anime", Clock3, historyIds.length, historyPreview)}
       <button type="button" onClick={() => onNavigate("tracked-titles")} className="flex min-h-[96px] w-full items-center gap-3 rounded-[22px] border border-border bg-card/90 px-4 py-4 text-left shadow-sm transition hover:border-primary/40">
         <span className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-[#292A31] text-primary"><Radio className="h-7 w-7" /></span>
         <span className="min-w-0 flex-1"><span className="block text-[17px] font-bold">{ru ? "Подписки на новые серии" : "New episode subscriptions"}</span><span className="mt-1 block text-sm text-muted-foreground">{ru ? "Аниме, за выходом которых ты следишь" : "Anime whose new episodes you follow"}</span></span>
