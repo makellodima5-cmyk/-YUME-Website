@@ -331,7 +331,7 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
   const panelTitles: Record<ProfilePanel, string> = {
     overview: t("profile.title"),
     favorites: t("profile.favorites"),
-    watchlist: t("profile.watchlist"),
+    watchlist: language === "ru" ? "Смотреть позже" : "Watch Later",
     documents: t("profile.documents"),
     privacy: t("profile.privacy"),
     rules: t("profile.rules"),
