@@ -11,6 +11,9 @@ describe("App routing", () => {
   it("accepts the Telegram Mini App admin view and privacy policy, while rejecting removed auth views", () => {
     expect(validateCatalogSearch({ section: "admin" }).section).toBe("admin");
     expect(validateCatalogSearch({ section: "privacy-policy" }).section).toBe("privacy-policy");
+    expect(validateCatalogSearch({ section: "tracked-titles" }).section).toBe("tracked-titles");
+    expect(validateCatalogSearch({ section: "watchlist" }).section).toBe("watchlist");
+    expect(validateCatalogSearch({ section: "profile" }).section).toBe("profile");
     expect(validateCatalogSearch({ section: "login" }).section).toBeUndefined();
     expect(validateCatalogSearch({ section: "register" }).section).toBeUndefined();
   });
