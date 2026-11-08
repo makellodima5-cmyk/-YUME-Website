@@ -324,7 +324,7 @@ function Index() {
       setSectionFeeds(initialSectionFeeds);
       setCatalogProgress(initialCatalogProgress);
     }
-  }, [loadedAnime, initialPopularAnime, initialSectionFeeds, initialCatalogProgress, view, catalogMode]);
+  }, [loadedAnime, initialPopularAnime, initialSectionFeeds, initialCatalogProgress, view, catalogMode, urlCollection]);
   useEffect(() => { catalogAnimeRef.current = catalogAnime; }, [catalogAnime]);
 
   const [catalogLoadState, setCatalogLoadState] = useState<"idle" | "loading" | "loaded" | "error">("idle");
@@ -1243,6 +1243,12 @@ function Index() {
       void navigate({ to: "/", replace: true, search: { section: "collections", collection: urlCollection, page: loadedCatalogPage === 1 ? undefined : loadedCatalogPage } });
     }
   }, [view, urlCollection, urlPage, loadedCatalogPage, navigate]);
+  useEffect(() => {
+    if (view !== "collections" || !urlCollection) return;
+    if ((urlPage ?? 1) !== loadedCatalogPage) {
+      void navigate({ to: "/", replace: true, search: { section: "collections", collection: urlCollection, page: loadedCatalogPage === 1 ? undefined : loadedCatalogPage } });
+    }
+  }, [view, urlCollection, urlPage, loadedCatalogPage, navigate]);
 
   // Catalog seeding/expansion is an explicit admin operation, not a user-page side effect.
 
@@ -1346,6 +1352,7 @@ function Index() {
     if (!activeCollection) return;
     setCatalogPage(page);
     void navigate({ to: "/", replace: true, search: { section: "collections", collection: activeCollection.id, page } });
+    window.requestAnimationFrame(() => document.getElementById("collection-anime-list")?.scrollIntoView({ behavior: "smooth", block: "start" }));
   };
   const select = (anime: Anime) => {
     if (view === "catalog") {
