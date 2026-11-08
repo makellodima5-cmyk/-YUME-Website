@@ -66,46 +66,55 @@ describe("Profile and My library pages", () => {
     expect(screen.getByText(/Добавляй в список аниме/i)).toBeInTheDocument();
   });
 
-  it("shows only unique titles from the authoritative server history and always shows Watch Later", async () => {
-    window.localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(["999"]));
-    window.localStorage.setItem(WATCHLIST_STORAGE_KEY, JSON.stringify([]));
-    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
-      if (String(input).includes("/api/telegram/history")) {
-        return jsonResponse({
-          authenticated: true,
-          items: [
-            { animeId: "123", viewedAt: "2026-11-01T10:00:00.000Z" },
-            { animeId: "456", viewedAt: "2026-11-02T10:00:00.000Z" },
-            { animeId: "789", viewedAt: "2026-11-03T10:00:00.000Z" },
-            { animeId: "456", viewedAt: "2026-11-02T10:00:00.000Z" },
-          ],
-        });
-      }
-      return jsonResponse({ authenticated: false, items: [] });
-    }));
+  it.each([1, 2, 3, 4])(
+    "shows the exact preview size for %i unique history titles",
+    async titleCount => {
+      const allIds = ["123", "456", "789", "987"];
+      const historyIds = allIds.slice(0, titleCount);
+      window.localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(["999"]));
+      window.localStorage.setItem(WATCHLIST_STORAGE_KEY, JSON.stringify([]));
+      window.localStorage.setItem("yume-playback-progress-v1", JSON.stringify([
+        { animeId: "999", title: "Favorite Only", episode: 1, positionSeconds: 100, durationSeconds: null, completed: false, updatedAt: "2026-11-03T10:00:00.000Z" },
+      ]));
+      vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+        if (String(input).includes("/api/telegram/history")) {
+          return jsonResponse({
+            authenticated: true,
+            items: [
+              ...historyIds.map((animeId, index) => ({
+                animeId,
+                viewedAt: `2026-11-${String(index + 1).padStart(2, "0")}T10:00:00.000Z`,
+              })),
+              ...(historyIds.length ? [{ animeId: historyIds[0], viewedAt: "2026-11-01T10:00:00.000Z" }] : []),
+            ],
+          });
+        }
+        return jsonResponse({ authenticated: false, items: [] });
+      }));
 
-    render(withPreferences(
-      <MyHub
-        animeList={[
-          anime("123", "History One"),
-          anime("456", "History Two"),
-          anime("789", "History Three"),
-          anime("999", "Favorite Only"),
-        ]}
-        onNavigate={vi.fn()}
-        onSelect={vi.fn()}
-      />,
-    ));
+      render(withPreferences(
+        <MyHub
+          animeList={[
+            ...allIds.map(id => anime(id, `History ${id}`)),
+            anime("999", "Favorite Only"),
+          ]}
+          onNavigate={vi.fn()}
+          onSelect={vi.fn()}
+        />,
+      ));
 
-    const historyCard = await screen.findByRole("button", { name: /История просмотра/ });
-    await waitFor(() => {
-      expect(Array.from(historyCard.querySelectorAll("[data-anime-id]")).map(node => node.getAttribute("data-anime-id")))
-        .toEqual(["123", "456", "789"]);
-    });
-    expect(historyCard).toHaveTextContent("3 тайтлов");
+      const historyCard = await screen.findByRole("button", { name: /История просмотра/ });
+      await waitFor(() => {
+        const posterIds = Array.from(historyCard.querySelectorAll("[data-anime-id]"))
+          .map(node => node.getAttribute("data-anime-id"));
+        expect(posterIds).toHaveLength(Math.min(titleCount, 3));
+        expect(posterIds.every(id => historyIds.includes(id ?? ""))).toBe(true);
+      });
+      expect(historyCard).toHaveTextContent(`${titleCount} тайтлов`);
 
-    const watchLaterCard = screen.getByRole("button", { name: /Смотреть позже/ });
-    expect(watchLaterCard).toHaveTextContent("0 тайтлов");
-    expect(watchLaterCard.querySelectorAll("[data-anime-id]")).toHaveLength(0);
-  });
+      const watchLaterCard = screen.getByRole("button", { name: /Смотреть позже/ });
+      expect(watchLaterCard).toHaveTextContent("0 тайтлов");
+      expect(watchLaterCard.querySelectorAll("[data-anime-id]")).toHaveLength(0);
+    },
+  );
 });
