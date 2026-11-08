@@ -272,6 +272,100 @@ function PageNavigation({
     </nav>
   );
 }
+function HomeSearchBar({
+  query,
+  onQueryChange,
+  onSubmit,
+  filtersOpen,
+  onToggleFilters,
+  activeFilterCount,
+  filtersReady,
+  draftFilters,
+  setDraftFilters,
+  onApplyFilters,
+  onResetFilters,
+  onCloseFilters,
+  genres,
+  statuses,
+  types,
+  ageRatings,
+  yearMin,
+  yearMax,
+}: {
+  query: string;
+  onQueryChange: (value: string) => void;
+  onSubmit: () => void;
+  filtersOpen: boolean;
+  onToggleFilters: () => void;
+  activeFilterCount: number;
+  filtersReady: boolean;
+  draftFilters: CatalogFiltersValue;
+  setDraftFilters: (value: CatalogFiltersValue) => void;
+  onApplyFilters: () => void;
+  onResetFilters: () => void;
+  onCloseFilters: () => void;
+  genres: string[];
+  statuses: string[];
+  types: string[];
+  ageRatings: string[];
+  yearMin: number;
+  yearMax: number;
+}) {
+  const { t } = useYumePreferences();
+  return (
+    <div className="yubera-home-search-shell">
+      <div data-filter-anchor className="yubera-home-search-anchor">
+        <form className="yubera-home-search-row" role="search" onSubmit={(event) => { event.preventDefault(); onSubmit(); }}>
+          <div className="yubera-home-search-field">
+            <Search aria-hidden="true" className="h-5 w-5 shrink-0 text-muted-foreground" strokeWidth={2} />
+            <input
+              type="text"
+              value={query}
+              onChange={(event) => onQueryChange(event.target.value)}
+              placeholder={t("search.placeholder")}
+              aria-label={t("catalog.search")}
+              autoComplete="off"
+              className="yubera-home-search-input"
+            />
+            {query && (
+              <button type="button" aria-label={t("search.clear")} onClick={() => onQueryChange("")} className="yubera-home-search-clear">
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={onToggleFilters}
+            disabled={!filtersReady}
+            aria-label={t("filters.open")}
+            aria-expanded={filtersOpen}
+            data-filter-trigger
+            className={`yubera-home-filter-button ${filtersOpen || activeFilterCount > 0 ? "is-active" : ""}`}
+          >
+            <SlidersHorizontal aria-hidden="true" className="h-6 w-6" strokeWidth={1.9} />
+            {activeFilterCount > 0 && <span className="yubera-home-filter-count">{activeFilterCount}</span>}
+          </button>
+        </form>
+        <CatalogFilters
+          open={filtersOpen && filtersReady}
+          placement="home"
+          draft={draftFilters}
+          setDraft={setDraftFilters}
+          onApply={onApplyFilters}
+          onReset={onResetFilters}
+          onClose={onCloseFilters}
+          genres={genres}
+          statuses={statuses}
+          types={types}
+          ageRatings={ageRatings}
+          yearMin={yearMin}
+          yearMax={yearMax}
+        />
+      </div>
+    </div>
+  );
+}
+
 function Index() {
   const { t, language } = useYumePreferences();
   const navigate = useNavigate();
@@ -1559,6 +1653,28 @@ function Index() {
     <div className="relative isolate min-h-screen pb-8 yubera-with-bottom-nav">
       <div className="relative z-10">
       <Header setView={setView} unreadNotificationCount={notificationStateLoaded && notificationRemoteAccount ? notificationItems.filter((item) => !notificationReadIds.includes(item.id) && !notificationDismissedIds.includes(item.id)).length : 0} />
+      {view === "home" && (
+        <HomeSearchBar
+          query={query}
+          onQueryChange={(value) => { setQuery(value); setSubmittedQuery(value.trim()); setCatalogPage(1); }}
+          onSubmit={submitHomeSearch}
+          filtersOpen={filtersOpen}
+          onToggleFilters={() => { setDraftFilters({ ...activeFilters, genres: [...activeFilters.genres] }); setFiltersOpen((open) => !open); }}
+          activeFilterCount={activeFilterCount}
+          filtersReady={catalogLoadState === "loaded" || catalogLoadState === "error"}
+          draftFilters={draftFilters}
+          setDraftFilters={setDraftFilters}
+          onApplyFilters={applyCatalogFilters}
+          onResetFilters={resetCatalogFilters}
+          onCloseFilters={() => setFiltersOpen(false)}
+          genres={availableGenres}
+          statuses={availableStatuses}
+          types={availableTypes}
+          ageRatings={availableAgeRatings}
+          yearMin={catalogYearRange.min}
+          yearMax={catalogYearRange.max}
+        />
+      )}
       {isTelegramMiniApp && telegramConsentRequired && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-background/85 px-4 py-6 backdrop-blur-md" role="dialog" aria-modal="true" aria-labelledby="telegram-consent-title">
           <section className="w-full max-w-md rounded-3xl border border-border bg-card p-6 shadow-2xl sm:p-8">
@@ -1601,7 +1717,7 @@ function Index() {
           onComplete={handleAuthComplete}
         />
       ) : searching ? (
-        <main id="main-content" className="yubera-with-bottom-nav px-3 pb-8 pt-[78px] sm:px-4 md:px-6 lg:px-8">
+        <main id="main-content" className="yubera-with-bottom-nav yubera-home-search-results px-3 pb-8 pt-0 sm:px-4 md:px-6 lg:px-8">
           <div className="mb-6 flex items-center justify-between">
             <h1 className="text-xl font-semibold">{submittedQuery ? `${t("catalog.results")}: «${submittedQuery}»` : t("catalog.filterResults")} <span className="text-muted-foreground">· {needsFullCatalog && catalogLoadState !== "loaded" && catalogLoadState !== "error" ? "…" : catalogResults.length}</span></h1>
             <button onClick={() => { setQuery(""); setSubmittedQuery(""); setDraftFilters(EMPTY_CATALOG_FILTERS); setActiveFilters(EMPTY_CATALOG_FILTERS); setFiltersOpen(false); setCatalogPage(1); }} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"><X className="h-4 w-4" />{t("catalog.reset")}</button>
