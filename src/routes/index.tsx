@@ -1321,12 +1321,18 @@ function Index() {
           error?: string;
         };
         if (cancelled) return;
-        if (response.status === 401 || payload.authenticated !== true) {
+        if (response.status === 401) {
           setHistoryAuthenticated(false);
           setHistoryItems([]);
           return;
         }
-        if (!response.ok || !Array.isArray(payload.items)) throw new Error(payload.error || "history_unavailable");
+        if (!response.ok) throw new Error(payload.error || "history_unavailable");
+        if (payload.authenticated !== true) {
+          setHistoryAuthenticated(false);
+          setHistoryItems([]);
+          return;
+        }
+        if (!Array.isArray(payload.items)) throw new Error(payload.error || "history_unavailable");
         setHistoryAuthenticated(true);
         setHistoryItems(payload.items.filter((item): item is { animeId: string; viewedAt: string; viewCount: number } =>
           Boolean(item && typeof item === "object" &&
@@ -1430,6 +1436,14 @@ function Index() {
     navigate({ to: "/", search: { section: v, q: undefined, page: undefined, sort: undefined, genres: undefined, status: undefined, from: undefined, to: undefined, rating: undefined, kind: undefined, age: undefined, lang: v === "catalog" ? language : undefined } });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
+  const resumeAnime = (anime: Anime, episode: number, positionSeconds: number) => {
+    const query = new URLSearchParams({
+      episode: String(episode),
+      ...(positionSeconds > 0 ? { resume: String(Math.floor(positionSeconds)) } : {}),
+    });
+    window.location.assign("/anime/" + encodeURIComponent(anime.id) + "?" + query.toString());
+  };
+
   const select = (anime: Anime) => {
     if (view === "catalog") {
       try {
@@ -1720,6 +1734,7 @@ function Index() {
           announcements={announcementCards}
           airing={airingCards}
           onSelect={select}
+          onResume={resumeAnime}
           onSeeAll={setView}
           onOpenCollection={(id) => { setCollection(id); setView("collections"); }}
         />
@@ -1978,7 +1993,7 @@ function Index() {
           )}
         </main>
       ) : view === "my" ? (
-        <MyHub animeList={ANIME} onNavigate={setView} onSelect={select} />
+        <MyHub animeList={ANIME} onNavigate={setView} onSelect={select} onResume={resumeAnime} />
       ) : view === "news" ? (
         <News animeList={ANIME} onDetailChange={setNewsDetailOpen} />
       ) : view === "profile" ? (

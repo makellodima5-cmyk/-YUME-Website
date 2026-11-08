@@ -37,6 +37,7 @@ import {
 import { absoluteImageUrl, canonicalUrl, sanitizeMetaDescription } from "@/data/seo";
 import { toSameOriginShikimoriScreenshot } from "@/lib/shikimori-image-proxy";
 import { PLAYBACK_PROGRESS_UPDATED_EVENT, readPlaybackProgress, savePlaybackProgress, markPlaybackEpisodeCompleted, type PlaybackProgressEntry } from "@/data/playback-progress";
+import { parseKodikPlaybackMessage } from "@/data/kodik-playback-events";
 
 function formatAnimeDate(value: string | undefined, language: "ru" | "en", includeTime = false): string | null {
   if (!value) return null;
@@ -131,7 +132,10 @@ function AnimeDetailPage() {
   const [watchMode, setWatchMode] = useState<"trailer" | "episodes">("episodes");
   const [screenshots, setScreenshots] = useState<ShikimoriScreenshot[]>([]);
   const [activeScreenshotIndex, setActiveScreenshotIndex] = useState<number | null>(null);
+  const [posterOpen, setPosterOpen] = useState(false);
   const screenshotTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const posterTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const posterWasOpenRef = useRef(false);
 
   useEffect(() => {
     if (anime) document.title = displayAnimeTitle(anime, language) + (language === "en" ? " — watch anime | Yubera" : " — смотреть аниме | Yubera");
@@ -250,13 +254,33 @@ function AnimeDetailPage() {
     frame.allow = "autoplay; fullscreen; picture-in-picture; encrypted-media";
     frame.allowFullscreen = true;
     frame.referrerPolicy = "strict-origin-when-cross-origin";
+    frame.addEventListener("load", () => {
+      const openedAt = new Date().toISOString();
+      savePlaybackProgress({
+        animeId,
+        title: displayAnimeTitle(anime, language),
+        ...(anime.englishTitle ? { englishTitle: anime.englishTitle } : {}),
+        ...((anime.bannerUrl || anime.posterUrl) ? { posterUrl: anime.bannerUrl || anime.posterUrl } : {}),
+        episode: kodikEpisode,
+        positionSeconds: 0,
+        durationSeconds: null,
+        completed: false,
+        updatedAt: openedAt,
+      });
+      void fetch("/api/telegram/history", {
+        method: "POST",
+        credentials: "same-origin",
+        cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ animeId, event: "opened", episodeNumber: kodikEpisode }),
+      }).catch(() => undefined);
+    }, { once: true });
     player.appendChild(frame);
     return () => { frame.remove(); };
   }, [watchMode, kodikEmbedUrl, anime, language, resumeTargetEpisode, resumeTargetSeconds, kodikEpisode]);
 
   useEffect(() => {
     if (watchMode !== "episodes" || !kodikEmbedUrl || !anime) return;
-    let historySaved = false;
     let lastSavedPosition = -1;
     const trustedHosts = ["kodik.info", "kodik.biz", "kodik.cc", "kodik.online", "kodikplayer.com", "kodikres.com"];
     const onKodikMessage = (event: MessageEvent) => {
@@ -269,13 +293,8 @@ function AnimeDetailPage() {
       } catch {
         return;
       }
-      let payload: unknown = event.data;
-      if (typeof payload === "string") {
-        try { payload = JSON.parse(payload); } catch { return; }
-      }
-      if (!payload || typeof payload !== "object") return;
-      const message = payload as Record<string, unknown>;
-      const messageType = [message.type, message.event, message.name, message.key].map((value) => String(value ?? "").toLowerCase()).join(" ");
+      const playbackEvent = parseKodikPlaybackMessage(event.data);
+      if (!playbackEvent) return;
       const progressEntry = {
         animeId,
         title: displayAnimeTitle(anime, language),
@@ -283,7 +302,7 @@ function AnimeDetailPage() {
         ...((anime.bannerUrl || anime.posterUrl) ? { posterUrl: anime.bannerUrl || anime.posterUrl } : {}),
         episode: kodikEpisode,
       };
-      if (messageType.includes("ended") || messageType.endsWith(" end") || messageType.endsWith("_end") || messageType.includes("video_end") || messageType.includes("complete")) {
+      if (playbackEvent.type === "ended") {
         markPlaybackEpisodeCompleted({
           ...progressEntry,
           positionSeconds: 0,
@@ -291,14 +310,11 @@ function AnimeDetailPage() {
         });
         return;
       }
-      if (!messageType.includes("time_update")) return;
-      const rawTime = message.value ?? message.time ?? message.currentTime ?? message.seconds ?? message.current_time;
-      const watchedSeconds = typeof rawTime === "number" ? rawTime : Number(rawTime);
-      const rawDuration = message.duration ?? message.durationSeconds ?? message.duration_seconds ?? message.totalTime ?? message.total_time;
-      const durationValue = typeof rawDuration === "number" ? rawDuration : Number(rawDuration);
-      const durationSeconds = Number.isFinite(durationValue) && durationValue > 0 ? durationValue : null;
-      if (!Number.isFinite(watchedSeconds) || watchedSeconds < 0) return;
-      // Kodik currently guarantees the current playback time but may omit duration. For multi-episode anime, use a conservative 24-minute estimate so the list still shows a useful approximate progress bar.
+
+      const watchedSeconds = playbackEvent.currentTime;
+      const durationSeconds = playbackEvent.durationSeconds;
+      // Kodik may omit duration. Use a conservative TV-episode estimate only for
+      // the completion indicator; the saved duration remains unknown.
       const estimatedTvEpisodeDuration = durationSeconds === null && anime.episodes > 1 ? 24 * 60 : null;
       const completionDuration = durationSeconds ?? estimatedTvEpisodeDuration;
       const completed = completionDuration !== null && watchedSeconds / completionDuration >= 0.95;
@@ -319,17 +335,6 @@ function AnimeDetailPage() {
           updatedAt: new Date().toISOString(),
         });
         lastSavedPosition = watchedSeconds;
-      }
-      // Preserve the existing Telegram history signal, but do not let it stop local progress updates.
-      if (!historySaved && watchedSeconds >= 30) {
-        historySaved = true;
-        void fetch("/api/telegram/history", {
-          method: "POST",
-          credentials: "same-origin",
-          cache: "no-store",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ animeId, watchedSeconds }),
-        }).catch(() => undefined);
       }
     };
     window.addEventListener("message", onKodikMessage);
@@ -375,6 +380,25 @@ function AnimeDetailPage() {
       document.body.style.overflow = previousOverflow;
     };
   }, [activeScreenshotIndex, displayableScreenshots.length]);
+
+  useEffect(() => {
+    if (!posterOpen) {
+      if (posterWasOpenRef.current) posterTriggerRef.current?.focus();
+      posterWasOpenRef.current = false;
+      return;
+    }
+    posterWasOpenRef.current = true;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setPosterOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [posterOpen]);
 
   useEffect(() => {
     setDescriptionExpanded(false);
@@ -564,7 +588,7 @@ function AnimeDetailPage() {
         }
       }}
       aria-pressed={episodeSubscribed}
-      className="inline-flex w-full min-w-0 flex-col items-center justify-center gap-1 rounded-full bg-secondary px-2 py-2.5 text-center text-[11px] font-semibold leading-tight ring-1 ring-border transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-45 md:flex-row md:gap-2 md:px-4 md:py-2.5 md:text-sm md:leading-normal"
+      className="hidden"
     >
       <Bell className={`h-4 w-4 ${episodeSubscribed ? "fill-current text-primary" : ""}`} />
       {language === "en" ? "Follow new episodes" : "Отслеживать новые серии"}
@@ -603,7 +627,15 @@ function AnimeDetailPage() {
           <section id="overview" className="relative isolate scroll-mt-24" aria-label={displayAnimeTitle(anime, language) + " — " + t("anime.sectionLabel")}>
             <div className="yubera-anime-overview">
               <div className="yubera-anime-poster">
-                <PosterArt anime={anime} className="aspect-[2/3] w-full rounded-[18px] ring-1 ring-border shadow-lg" />
+                <button
+                  ref={posterTriggerRef}
+                  type="button"
+                  onClick={() => setPosterOpen(true)}
+                  aria-label={language === "en" ? "View full-size poster" : "Открыть постер на весь экран"}
+                  className="block w-full overflow-hidden rounded-[18px] text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                >
+                  <PosterArt anime={anime} className="aspect-[2/3] w-full ring-1 ring-border shadow-lg" />
+                </button>
               </div>
               <div className="min-w-0">
                 <h1 id="anime-title-desktop" className="break-words text-[clamp(1.15rem,3.4vw,2rem)] font-extrabold leading-[1.08]">{displayAnimeTitle(anime, language)}</h1>
@@ -683,16 +715,8 @@ function AnimeDetailPage() {
                         <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                       </span>
                     </label>
-                    <label className="min-w-0">
-                      <span className="mb-2 block text-sm font-medium text-muted-foreground">{language === "en" ? "Episode" : "Серия"}</span>
-                      <span className="relative block">
-                        <select value={kodikEpisode} onChange={event => { const nextEpisode = Number(event.target.value); setKodikEpisode(nextEpisode); const progress = episodeProgress.find(entry => entry.episode === nextEpisode); setResumeTargetEpisode(progress && !progress.completed ? nextEpisode : null); setResumeTargetSeconds(progress && !progress.completed ? progress.positionSeconds : 0); }} disabled={!selectedKodikSource?.episodes.length} className="w-full appearance-none rounded-full border border-border bg-secondary px-4 py-3 pr-10 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-60">
-                          {selectedKodikSource?.episodes.map(episode => <option key={episode.number} value={episode.number}>{language === "en" ? "Episode " : ""}{episode.number}{episode.title ? " · " + episode.title : ""}</option>)}
-                        </select>
-                        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                      </span>
-                    </label>
                   </div>
+                  <div className="mb-2 text-sm font-medium text-muted-foreground">{language === "en" ? "Episodes" : "Серии"}</div>
                   <div className="yubera-episode-progress-list" aria-label={language === "en" ? "Episode progress" : "Прогресс серий"}>
                     {selectedKodikSource?.episodes.map((episode) => {
                       const progress = episodeProgress.find((entry) => entry.episode === episode.number);
@@ -803,6 +827,27 @@ function AnimeDetailPage() {
           </section>
         </div>
       </main>
+
+      {posterOpen && (
+        <div
+          className="fixed inset-0 z-[69] flex items-center justify-center bg-black/90 p-3 backdrop-blur-sm sm:p-6"
+          role="presentation"
+          onClick={() => setPosterOpen(false)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={language === "en" ? "Anime poster viewer" : "Просмотр постера аниме"}
+            className="relative flex max-h-[94dvh] w-full max-w-[420px] items-center justify-center"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button type="button" onClick={() => setPosterOpen(false)} aria-label={language === "en" ? "Close poster" : "Закрыть постер"} className="absolute -right-1 -top-1 z-10 rounded-full border border-white/20 bg-black/70 p-2 text-white shadow-lg sm:right-2 sm:top-2">
+              <X className="h-5 w-5" />
+            </button>
+            <PosterArt anime={anime} className="aspect-[2/3] max-h-[86dvh] w-full rounded-2xl shadow-2xl" />
+          </div>
+        </div>
+      )}
 
       {activeScreenshotIndex !== null && displayableScreenshots[activeScreenshotIndex] && (
         <div
