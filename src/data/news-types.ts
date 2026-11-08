@@ -7,6 +7,7 @@ export type YuberaNewsArticle = {
   linkedTitle: string | null;
   linkedId: number | null;
   linkedType: string | null;
+  linkedPosterUrl: string | null;
   category: "ANNOUNCEMENTS" | "NEW_SEASONS" | "INDUSTRY" | "EVENTS" | "INTERVIEWS";
   sourceUrl: string;
   sourceName: "Shikimori";
