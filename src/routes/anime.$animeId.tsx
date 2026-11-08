@@ -37,6 +37,7 @@ import {
 import { absoluteImageUrl, canonicalUrl, sanitizeMetaDescription } from "@/data/seo";
 import { toSameOriginShikimoriScreenshot } from "@/lib/shikimori-image-proxy";
 import { PLAYBACK_PROGRESS_UPDATED_EVENT, readPlaybackProgress, savePlaybackProgress, markPlaybackEpisodeCompleted, type PlaybackProgressEntry } from "@/data/playback-progress";
+import { parseKodikPlaybackMessage } from "@/data/kodik-playback-events";
 
 function formatAnimeDate(value: string | undefined, language: "ru" | "en", includeTime = false): string | null {
   if (!value) return null;
@@ -250,13 +251,33 @@ function AnimeDetailPage() {
     frame.allow = "autoplay; fullscreen; picture-in-picture; encrypted-media";
     frame.allowFullscreen = true;
     frame.referrerPolicy = "strict-origin-when-cross-origin";
+    frame.addEventListener("load", () => {
+      const openedAt = new Date().toISOString();
+      savePlaybackProgress({
+        animeId,
+        title: displayAnimeTitle(anime, language),
+        ...(anime.englishTitle ? { englishTitle: anime.englishTitle } : {}),
+        ...((anime.bannerUrl || anime.posterUrl) ? { posterUrl: anime.bannerUrl || anime.posterUrl } : {}),
+        episode: kodikEpisode,
+        positionSeconds: 0,
+        durationSeconds: null,
+        completed: false,
+        updatedAt: openedAt,
+      });
+      void fetch("/api/telegram/history", {
+        method: "POST",
+        credentials: "same-origin",
+        cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ animeId, event: "opened", episodeNumber: kodikEpisode }),
+      }).catch(() => undefined);
+    }, { once: true });
     player.appendChild(frame);
     return () => { frame.remove(); };
   }, [watchMode, kodikEmbedUrl, anime, language, resumeTargetEpisode, resumeTargetSeconds, kodikEpisode]);
 
   useEffect(() => {
     if (watchMode !== "episodes" || !kodikEmbedUrl || !anime) return;
-    let historySaved = false;
     let lastSavedPosition = -1;
     const trustedHosts = ["kodik.info", "kodik.biz", "kodik.cc", "kodik.online", "kodikplayer.com", "kodikres.com"];
     const onKodikMessage = (event: MessageEvent) => {
@@ -269,13 +290,8 @@ function AnimeDetailPage() {
       } catch {
         return;
       }
-      let payload: unknown = event.data;
-      if (typeof payload === "string") {
-        try { payload = JSON.parse(payload); } catch { return; }
-      }
-      if (!payload || typeof payload !== "object") return;
-      const message = payload as Record<string, unknown>;
-      const messageType = [message.type, message.event, message.name, message.key].map((value) => String(value ?? "").toLowerCase()).join(" ");
+      const playbackEvent = parseKodikPlaybackMessage(event.data);
+      if (!playbackEvent) return;
       const progressEntry = {
         animeId,
         title: displayAnimeTitle(anime, language),
@@ -283,7 +299,7 @@ function AnimeDetailPage() {
         ...((anime.bannerUrl || anime.posterUrl) ? { posterUrl: anime.bannerUrl || anime.posterUrl } : {}),
         episode: kodikEpisode,
       };
-      if (messageType.includes("ended") || messageType.endsWith(" end") || messageType.endsWith("_end") || messageType.includes("video_end") || messageType.includes("complete")) {
+      if (playbackEvent.type === "ended") {
         markPlaybackEpisodeCompleted({
           ...progressEntry,
           positionSeconds: 0,
@@ -291,14 +307,11 @@ function AnimeDetailPage() {
         });
         return;
       }
-      if (!messageType.includes("time_update")) return;
-      const rawTime = message.value ?? message.time ?? message.currentTime ?? message.seconds ?? message.current_time;
-      const watchedSeconds = typeof rawTime === "number" ? rawTime : Number(rawTime);
-      const rawDuration = message.duration ?? message.durationSeconds ?? message.duration_seconds ?? message.totalTime ?? message.total_time;
-      const durationValue = typeof rawDuration === "number" ? rawDuration : Number(rawDuration);
-      const durationSeconds = Number.isFinite(durationValue) && durationValue > 0 ? durationValue : null;
-      if (!Number.isFinite(watchedSeconds) || watchedSeconds < 0) return;
-      // Kodik currently guarantees the current playback time but may omit duration. For multi-episode anime, use a conservative 24-minute estimate so the list still shows a useful approximate progress bar.
+
+      const watchedSeconds = playbackEvent.currentTime;
+      const durationSeconds = playbackEvent.durationSeconds;
+      // Kodik may omit duration. Use a conservative TV-episode estimate only for
+      // the completion indicator; the saved duration remains unknown.
       const estimatedTvEpisodeDuration = durationSeconds === null && anime.episodes > 1 ? 24 * 60 : null;
       const completionDuration = durationSeconds ?? estimatedTvEpisodeDuration;
       const completed = completionDuration !== null && watchedSeconds / completionDuration >= 0.95;
@@ -319,17 +332,6 @@ function AnimeDetailPage() {
           updatedAt: new Date().toISOString(),
         });
         lastSavedPosition = watchedSeconds;
-      }
-      // Preserve the existing Telegram history signal, but do not let it stop local progress updates.
-      if (!historySaved && watchedSeconds >= 30) {
-        historySaved = true;
-        void fetch("/api/telegram/history", {
-          method: "POST",
-          credentials: "same-origin",
-          cache: "no-store",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ animeId, watchedSeconds }),
-        }).catch(() => undefined);
       }
     };
     window.addEventListener("message", onKodikMessage);
