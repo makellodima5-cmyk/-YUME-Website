@@ -238,7 +238,7 @@ export function News({ animeList, onDetailChange }: { animeList: Anime[]; onDeta
               </section>
             )}
             <p className="mt-6 flex items-center justify-center gap-2 text-xs text-muted-foreground">
-              {ru ? "Полные публикации доступны в первоисточнике" : "Full stories remain available at the original source"}
+              {ru ? "Новостные публикации Shikimori" : "News publications from Shikimori"}
               <a href={featured.sourceUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-semibold text-primary">{ru ? "Shikimori" : "Shikimori"} <ArrowUpRight className="h-3 w-3" /></a>
             </p>
           </>
