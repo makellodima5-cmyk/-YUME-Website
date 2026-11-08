@@ -44,8 +44,7 @@ export function parseKodikPlaybackMessage(value: unknown): KodikPlaybackEvent | 
   const normalizedNames = eventNames.map((name) => name.toLowerCase().replace(/[^a-z0-9]/g, ""));
 
   if (normalizedNames.some((name) =>
-    name === "ended" || name.endsWith("videoended") || name.includes("videoend") ||
-    name === "complete" || name.endsWith("completed"),
+    name.includes("ended") || name.includes("videoend") || name.includes("complete"),
   )) {
     return { type: "ended" };
   }
