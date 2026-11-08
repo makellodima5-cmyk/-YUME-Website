@@ -45,7 +45,7 @@ export function PosterArt({ anime, className = "" }: { anime: Anime; className?:
   );
 }
 
-export function AnimeCard({ anime, onSelect }: { anime: Anime; onSelect: (a: Anime) => void }) {
+export function AnimeCard({ anime, onSelect, showBookmark = true }: { anime: Anime; onSelect: (a: Anime) => void; showBookmark?: boolean }) {
   const { language, t } = useYumePreferences();
   const [saved, setSaved] = useState(false);
 
@@ -95,15 +95,17 @@ export function AnimeCard({ anime, onSelect }: { anime: Anime; onSelect: (a: Ani
           {anime.kind ? displayAnimeKind(anime.kind, language) : "TV"} · {anime.year || t("anime.yearUnknown")} · {anime.episodes > 0 ? anime.episodes + " " + t("anime.series") : displayAnimeStatus(anime.status, language)}
         </div>
       </button>
-      <button
-        type="button"
-        onClick={toggleBookmark}
-        aria-label={saved ? (language === "ru" ? "Убрать из избранного" : "Remove from favorites") : (language === "ru" ? "Добавить в избранное" : "Add to favorites")}
-        aria-pressed={saved}
-        className="absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-lg border border-white/20 bg-black/65 text-white shadow-sm backdrop-blur-sm transition hover:bg-primary"
-      >
-        <Bookmark className={`h-4 w-4 ${saved ? "fill-current text-primary" : ""}`} />
-      </button>
+      {showBookmark && (
+        <button
+          type="button"
+          onClick={toggleBookmark}
+          aria-label={saved ? (language === "ru" ? "Убрать из избранного" : "Remove from favorites") : (language === "ru" ? "Добавить в избранное" : "Add to favorites")}
+          aria-pressed={saved}
+          className="absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-lg border border-white/20 bg-black/65 text-white shadow-sm backdrop-blur-sm transition hover:bg-primary"
+        >
+          <Bookmark className={`h-4 w-4 ${saved ? "fill-current text-primary" : ""}`} />
+        </button>
+      )}
     </article>
   );
 }
