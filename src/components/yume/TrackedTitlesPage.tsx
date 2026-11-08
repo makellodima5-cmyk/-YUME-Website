@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Radio, RotateCcw } from "lucide-react";
 import type { Anime } from "@/data/anime";
 import { getShikimoriAnimes } from "@/data/shikimori";
@@ -19,7 +19,7 @@ export function TrackedTitlesPage({ animeList, onNavigate, onSelect }: Props) {
   const byId = useMemo(() => new Map([...extra, ...animeList].map(item => [item.id, item])), [extra, animeList]);
   const missing = useMemo(() => ids.filter(id => !byId.has(id)), [ids, byId]);
 
-  const load = () => {
+  const load = useCallback(() => {
     setLoaded(false);
     setFailed(false);
     fetch("/api/anime-subscriptions", { credentials: "same-origin", cache: "no-store" })
@@ -30,8 +30,8 @@ export function TrackedTitlesPage({ animeList, onNavigate, onSelect }: Props) {
       })
       .catch(() => setFailed(true))
       .finally(() => setLoaded(true));
-  };
-  useEffect(() => { load(); }, []);
+  }, []);
+  useEffect(() => { load(); }, [load]);
 
   useEffect(() => {
     if (!missing.length) return;
