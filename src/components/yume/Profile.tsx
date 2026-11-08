@@ -35,6 +35,7 @@ import { displayAnimeTitle, useYumePreferences } from "@/data/preferences";
 import { PrivacyPolicy } from "./PrivacyPolicy";
 import { getTelegramWebApp, telegramHapticImpact } from "@/lib/telegram-mini-app";
 import { Grid } from "./Sections";
+import { PLAYBACK_PROGRESS_UPDATED_EVENT, readPlaybackProgress } from "@/data/playback-progress";
 import { SITE_RULES, SITE_RULES_LAST_UPDATED } from "@/data/site-rules";
 import {
   FAVORITES_STORAGE_KEY,
@@ -84,6 +85,26 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
   const [accountBusy, setAccountBusy] = useState(false);
   const [accountMessage, setAccountMessage] = useState("");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [historyCount, setHistoryCount] = useState(0);
+  useEffect(() => {
+    let cancelled = false;
+    const syncLocalHistory = () => setHistoryCount(new Set(readPlaybackProgress().map(entry => entry.animeId)).size);
+    syncLocalHistory();
+    window.addEventListener(PLAYBACK_PROGRESS_UPDATED_EVENT, syncLocalHistory);
+    window.addEventListener("storage", syncLocalHistory);
+    fetch("/api/telegram/history", { credentials: "same-origin", cache: "no-store" })
+      .then(async response => {
+        const payload = await response.json().catch(() => null) as { authenticated?: unknown; items?: unknown } | null;
+        if (!cancelled && response.ok && payload?.authenticated === true && Array.isArray(payload.items)) {
+          setHistoryCount(new Set(payload.items.flatMap(item => item && typeof item === "object" && typeof (item as { animeId?: unknown }).animeId === "string" ? [(item as { animeId: string }).animeId] : [])).size);
+        }
+      }).catch(() => undefined);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(PLAYBACK_PROGRESS_UPDATED_EVENT, syncLocalHistory);
+      window.removeEventListener("storage", syncLocalHistory);
+    };
+  }, []);
   useEffect(() => setPanel(initialPanel), [initialPanel]);
   useEffect(() => {
     if (panel !== "support") return;
@@ -534,8 +555,20 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
                     </p>
                   </div>
                 </div>
-
-
+                <div className="mt-4 grid grid-cols-3 overflow-hidden rounded-[18px] border border-border bg-black/20 sm:mt-5">
+                  <div className="px-2.5 py-2.5 text-center">
+                    <span className="block text-lg font-bold tabular-nums text-white">{favorites.length}</span>
+                    <span className="text-[10px] text-white/65">{t("profile.favoritesCount")}</span>
+                  </div>
+                  <div className="border-l border-border px-2.5 py-2.5 text-center">
+                    <span className="block text-lg font-bold tabular-nums text-white">{watchlist.length}</span>
+                    <span className="text-[10px] text-white/65">{t("profile.watchlistCount")}</span>
+                  </div>
+                  <div className="border-l border-border px-2.5 py-2.5 text-center">
+                    <span className="block text-lg font-bold tabular-nums text-white">{historyCount}</span>
+                    <span className="text-[10px] text-white/65">{language === "ru" ? "В истории" : "In history"}</span>
+                  </div>
+                </div>
               </div>
             </div>
             {!isTelegramMiniApp && <p className="mt-3 text-xs leading-relaxed text-muted-foreground">{t("profile.localLibraryNotice")}</p>}
