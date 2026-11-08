@@ -68,7 +68,10 @@ export function parseKodikPlaybackMessage(value: unknown): KodikPlaybackEvent | 
     return null;
   };
 
-  const currentTime = findNumber(["currentTime", "current_time", "time", "seconds", "position", "value"]);
+  const scalarPayload = [root.data, root.value, root.info, root.answer]
+    .map(finiteSeconds)
+    .find((item): item is number => item !== null) ?? null;
+  const currentTime = findNumber(["currentTime", "current_time", "time", "seconds", "position", "value"]) ?? scalarPayload;
   if (currentTime === null) return null;
 
   const durationSeconds = findNumber(["duration", "durationSeconds", "duration_seconds", "totalTime", "total_time"]);
