@@ -48,6 +48,8 @@ export function MyHub({ animeList, onNavigate, onSelect }: Props) {
   const [history, setHistory] = useState<HistoryPreview[]>([]);
   const [subscriptionIds, setSubscriptionIds] = useState<string[]>([]);
   const [resolvedAnime, setResolvedAnime] = useState<Anime[]>([]);
+  const [watchPreviewIds, setWatchPreviewIds] = useState<string[]>([]);
+  const [historyPreviewIds, setHistoryPreviewIds] = useState<string[]>([]);
   const [subscriptionsLoaded, setSubscriptionsLoaded] = useState(false);
 
   useEffect(() => {
@@ -76,6 +78,8 @@ export function MyHub({ animeList, onNavigate, onSelect }: Props) {
   }, []);
 
   const allIds = useMemo(() => [...new Set([...favoriteIds, ...watchIds, ...history.map(item => item.animeId), ...subscriptionIds])], [favoriteIds, watchIds, history, subscriptionIds]);
+  useEffect(() => { setWatchPreviewIds(stablePreviewIds("watchlist", watchIds)); }, [watchIds]);
+  useEffect(() => { setHistoryPreviewIds(stablePreviewIds("history", history.map(item => item.animeId))); }, [history]);
   useEffect(() => {
     const missing = allIds.filter(id => !animeList.some(anime => anime.id === id) && !resolvedAnime.some(anime => anime.id === id));
     if (!missing.length) return;
@@ -91,8 +95,8 @@ export function MyHub({ animeList, onNavigate, onSelect }: Props) {
   const byId = useMemo(() => new Map([...resolvedAnime, ...animeList].map(item => [item.id, item])), [resolvedAnime, animeList]);
   const resolve = (ids: string[]) => ids.map(id => byId.get(id)).filter((item): item is Anime => Boolean(item));
   const favorites = resolve(favoriteIds);
-  const watchlist = resolve(stablePreviewIds("watchlist", watchIds));
-  const viewed = resolve(stablePreviewIds("history", history.map(item => item.animeId)));
+  const watchlist = resolve(watchPreviewIds);
+  const viewed = resolve(historyPreviewIds);
 
   const listCard = (id: View, title: string, subtitle: string, icon: typeof Bookmark, ids: string[], preview: Anime[]) => {
     const Icon = icon;
