@@ -110,6 +110,17 @@ describe("episode list playback progress", () => {
     ]));
   });
 
+  it("ignores legacy zero-second entries written when an iframe merely loaded", () => {
+    window.localStorage.setItem(PLAYBACK_PROGRESS_STORAGE_KEY, JSON.stringify([
+      entry(1, 0),
+      entry(2, 8),
+    ]));
+
+    expect(readPlaybackProgress()).toEqual([
+      expect.objectContaining({ animeId: "123", episode: 2, positionSeconds: 8 }),
+    ]);
+  });
+
   it("marks only the selected episode completed and preserves its last position", () => {
     savePlaybackProgress(entry(1, 300));
     savePlaybackProgress(entry(2, 420));
