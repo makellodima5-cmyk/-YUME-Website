@@ -27,16 +27,38 @@ export function isUpcomingEpisodeDate(value: string | undefined, now = Date.now(
   return Number.isFinite(timestamp) && timestamp > now;
 }
 
-/** Rank related catalog entries by shared genres, then by rating. */
+/**
+ * Select the best related titles without sorting a copy of the entire catalogue.
+ * The detail page only displays a handful of results, so retaining the top K
+ * candidates keeps this O(catalogue size × K) rather than O(N log N).
+ * Equal scores keep their original catalogue order, matching stable Array.sort.
+ */
 export function selectRelatedAnime(anime: Anime, candidates: readonly Anime[], limit = 6): Anime[] {
   const safeLimit = Number.isFinite(limit) ? Math.max(0, Math.floor(limit)) : 6;
-  return candidates
-    .filter((candidate) => candidate.id !== anime.id)
-    .slice()
-    .sort((a, b) => {
-      const sharedA = a.genres.filter((genre) => anime.genres.includes(genre)).length;
-      const sharedB = b.genres.filter((genre) => anime.genres.includes(genre)).length;
-      return sharedB - sharedA || (b.rating ?? -1) - (a.rating ?? -1);
-    })
-    .slice(0, safeLimit);
+  if (safeLimit === 0 || candidates.length === 0) return [];
+
+  const targetGenres = new Set(anime.genres);
+  const best: Array<{ item: Anime; sharedGenres: number; rating: number }> = [];
+  const compare = (
+    left: { sharedGenres: number; rating: number },
+    right: { sharedGenres: number; rating: number },
+  ) => right.sharedGenres - left.sharedGenres || right.rating - left.rating;
+
+  for (const candidate of candidates) {
+    if (candidate.id === anime.id) continue;
+    let sharedGenres = 0;
+    for (const genre of candidate.genres) {
+      if (targetGenres.has(genre)) sharedGenres += 1;
+    }
+    const ranked = { item: candidate, sharedGenres, rating: candidate.rating ?? -1 };
+    let insertAt = best.findIndex((entry) => compare(ranked, entry) < 0);
+    if (insertAt === -1) {
+      if (best.length < safeLimit) best.push(ranked);
+      continue;
+    }
+    best.splice(insertAt, 0, ranked);
+    if (best.length > safeLimit) best.pop();
+  }
+
+  return best.map((entry) => entry.item);
 }
