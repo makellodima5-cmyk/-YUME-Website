@@ -1,6 +1,6 @@
 import { DurableObject } from "cloudflare:workers";
-import { applyCatalogMutation, CATALOG_CURRENT_KEY, CATALOG_REVISION_PREFIX, emptyCatalogState, type CatalogMutation, type CatalogPointer, type CatalogState } from "@/data/catalog-r2.shared";
-import { pruneCatalogSnapshotCache, publishCatalogSnapshotCachePointer, writeCatalogAdminSnapshotCache } from "@/data/catalog-kv-cache.shared";
+import { applyCatalogMutation, CATALOG_CURRENT_KEY, CATALOG_REVISION_PREFIX, emptyCatalogState, isCatalogRevisionPinned, type CatalogMutation, type CatalogPointer, type CatalogState } from "@/data/catalog-r2.shared";
+import { deleteCatalogSnapshotCacheRevision, pruneCatalogSnapshotCache, publishCatalogSnapshotCachePointer, readCatalogAdminCachePointer, readCatalogCachePointer, writeCatalogAdminSnapshotCache } from "@/data/catalog-kv-cache.shared";
 import type { Anime } from "@/data/anime";
 import { isHomeFeaturedEligible } from "@/data/home-featured.shared";
 
@@ -183,17 +183,35 @@ export class CatalogCoordinator extends DurableObject<CoordinatorEnv>{
     // Admin reads need the latest committed import checkpoint without forcing
     // the Reader to re-sign multiple R2 requests on every status poll. Keep it
     // separate from the public pointer so visitors never see a partial import.
+    const previousPublic = await readCatalogCachePointer(this.env.YUME_CATALOG_CACHE);
     await writeCatalogAdminSnapshotCache(this.env.YUME_CATALOG_CACHE,state);
     if(state.metadata.admin_import_cache_pending==="1")return;
     await publishCatalogSnapshotCachePointer(this.env.YUME_CATALOG_CACHE,state);
+    // A long import can pin the public revision far beyond the normal ten-revision
+    // retention window. Once publication advances, release that old snapshot.
+    if(previousPublic && previousPublic.revision !== state.revision && previousPublic.revision <= state.revision - 10) {
+      await this.pruneRevisionIfUnpinned(previousPublic.revision);
+    }
     await pruneCatalogSnapshotCache(this.env.YUME_CATALOG_CACHE,state.revision);
   }
 
   private async pruneOldRevision(revision:number):Promise<void>{
-    const obsolete=revision-10;
-    if(obsolete<1)return;
-    try{await this.env.CATALOG_BUCKET.delete(CATALOG_REVISION_PREFIX+obsolete+".json");}
-    catch(error){console.warn("[YUME][CATALOG_COORDINATOR] Old revision cleanup failed.",{revision:obsolete,error});}
+    await this.pruneRevisionIfUnpinned(revision - 10);
+  }
+
+  private async pruneRevisionIfUnpinned(revision:number):Promise<void>{
+    if(revision<1)return;
+    const [publicPointer,adminPointer]=await Promise.all([
+      readCatalogCachePointer(this.env.YUME_CATALOG_CACHE),
+      readCatalogAdminCachePointer(this.env.YUME_CATALOG_CACHE),
+    ]);
+    if(isCatalogRevisionPinned(revision,publicPointer?.revision,adminPointer?.revision))return;
+    try{
+      await this.env.CATALOG_BUCKET.delete(CATALOG_REVISION_PREFIX+revision+".json");
+      await deleteCatalogSnapshotCacheRevision(this.env.YUME_CATALOG_CACHE,revision);
+    }catch(error){
+      console.warn("[YUME][CATALOG_COORDINATOR] Old revision cleanup failed.",{revision,error});
+    }
   }
 
   private async pruneOperationHistory(sequence:number):Promise<void>{
