@@ -27,7 +27,7 @@ export function Header({ setView, unreadNotificationCount = 0, variant = "app" }
     <header className="yubera-topbar">
       <div className="yubera-topbar-inner">
         <div className="flex min-w-0 items-center gap-3">
-          {variant === "detail" && <button type="button" onClick={() => setView("catalog")} aria-label={ru ? "Назад в каталог" : "Back to catalog"} className="grid h-10 w-8 shrink-0 place-items-center text-foreground"><ArrowLeft className="h-6 w-6" /></button>}
+          {variant === "detail" && <button type="button" onClick={() => setView("catalog")} aria-label={ru ? "Назад" : "Back"} className="grid h-10 w-8 shrink-0 place-items-center text-foreground"><ArrowLeft className="h-6 w-6" /></button>}
           <div className="shrink-0" aria-label="YUBERA">
             <Logo />
           </div>
