@@ -51,7 +51,7 @@ export function selectRelatedAnime(anime: Anime, candidates: readonly Anime[], l
       if (targetGenres.has(genre)) sharedGenres += 1;
     }
     const ranked = { item: candidate, sharedGenres, rating: candidate.rating ?? -1 };
-    let insertAt = best.findIndex((entry) => compare(ranked, entry) < 0);
+    const insertAt = best.findIndex((entry) => compare(ranked, entry) < 0);
     if (insertAt === -1) {
       if (best.length < safeLimit) best.push(ranked);
       continue;
