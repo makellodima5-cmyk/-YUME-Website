@@ -316,6 +316,16 @@ body {
   transform: translateY(0);
 }
 
+@keyframes yubera-route-enter {
+  from { opacity: .88; transform: translate3d(0, 5px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  html.yubera-route-enter #main-content {
+    animation: yubera-route-enter 220ms cubic-bezier(.2,.75,.25,1) both;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html:focus-within {
     scroll-behavior: auto !important;
