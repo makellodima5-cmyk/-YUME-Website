@@ -27,6 +27,8 @@ export interface TelegramWebApp {
   openTelegramLink?(url: string): void;
   openInvoice?(url: string, callback?: (status: "paid" | "cancelled" | "failed" | "pending") => void): void;
   disableVerticalSwipes?(): void;
+  /** Telegram Bot API 8.0+. Unsupported clients may throw when this is called. */
+  requestFullscreen?(): void;
   HapticFeedback?: {
     impactOccurred(style: "light" | "medium" | "heavy" | "rigid" | "soft"): void;
     notificationOccurred(type: "error" | "success" | "warning"): void;
@@ -98,16 +100,18 @@ export function initializeTelegramMiniApp(): (() => void) | undefined {
   if (!webApp) return;
 
   document.documentElement.classList.add("telegram-mini-app");
-  // ready() hides Telegram's loading placeholder; expand() requests the available height.
-  webApp.ready();
-  webApp.expand();
-  // Prevent Telegram's vertical swipe gesture from collapsing the Mini App while
-  // the user scrolls the page. Older Telegram clients may not expose this method.
-  webApp.disableVerticalSwipes?.();
+  // Treat every Telegram API as progressive enhancement: a client/version-specific
+  // exception must never prevent the rest of the application from initializing.
+  try { webApp.ready(); } catch (error) { console.warn('[YUME][TELEGRAM] ready() is unavailable.', error); }
+  try { webApp.expand(); } catch (error) { console.warn('[YUME][TELEGRAM] expand() is unavailable.', error); }
+  try { webApp.disableVerticalSwipes?.(); } catch (error) { console.warn('[YUME][TELEGRAM] disableVerticalSwipes() is unavailable.', error); }
+  // requestFullscreen is available in newer Telegram clients (Bot API 8.0+).
+  // Older clients keep the expanded viewport; failure here is intentionally non-fatal.
+  try { webApp.requestFullscreen?.(); } catch (error) { console.warn('[YUME][TELEGRAM] Fullscreen mode is unavailable in this client.', error); }
   setInsetVariables(webApp);
 
   const refreshViewport = () => setInsetVariables(webApp);
-  const events = ["viewportChanged", "safeAreaChanged", "contentSafeAreaChanged"];
+  const events = ["viewportChanged", "safeAreaChanged", "contentSafeAreaChanged", "fullscreenChanged"];
   events.forEach((eventName) => webApp.onEvent?.(eventName, refreshViewport));
 
   return () => {
