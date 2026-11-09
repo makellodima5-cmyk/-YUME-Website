@@ -16,6 +16,7 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import { YumePreferencesProvider, useYumePreferences } from "@/data/preferences";
 import { DEFAULT_META_DESCRIPTION, SITE_NAME } from "@/data/seo";
 import { getTelegramWebApp, initializeTelegramMiniApp } from "@/lib/telegram-mini-app";
+import { clearAnimeNavigationOrigin } from "@/data/anime-navigation";
 import { TelegramSubscriptionGate } from "@/components/yume/TelegramSubscriptionGate";
 import { CookieConsentBanner } from "@/components/yume/CookieConsentBanner";
 
@@ -177,10 +178,17 @@ function RootComponent() {
   const navigationStack = useRef<string[]>([]);
 
   useEffect(() => {
-    const initialHref = router.history.location.href;
+    const initialLocation = router.history.location;
+    const initialHref = initialLocation.href;
     navigationStack.current = [initialHref];
+    if (!initialLocation.pathname.startsWith("/anime/")) {
+      clearAnimeNavigationOrigin(window.sessionStorage);
+    }
     return router.history.subscribe(({ location, action }) => {
       const href = location.href;
+      if (!location.pathname.startsWith("/anime/")) {
+        clearAnimeNavigationOrigin(window.sessionStorage);
+      }
       const stack = navigationStack.current;
       if (action.type === "PUSH") {
         if (stack[stack.length - 1] !== href) stack.push(href);
