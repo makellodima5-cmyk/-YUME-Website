@@ -271,23 +271,43 @@ export async function handleTelegramWebhook(request: Request): Promise<Response>
     const chargeId = successfulPayment.telegram_payment_charge_id;
     const payload = successfulPayment.invoice_payload;
     const amount = successfulPayment.total_amount;
-    if (db && typeof userId === "number" && successfulPayment.currency === "XTR" &&
-        typeof chargeId === "string" && chargeId && typeof payload === "string" &&
-        typeof amount === "number" && Number.isSafeInteger(amount)) {
-      try {
-        const order = await db.prepare("SELECT telegram_user_id, amount, currency, status FROM yume_stars_donations WHERE payload = ?")
-          .bind(payload).first<{ telegram_user_id: string; amount: number; currency: string; status: string }>();
-        if (order && order.telegram_user_id === String(userId) && order.amount === amount &&
-            order.currency === "XTR" && order.status === "pre_checkout") {
-          await db.prepare("UPDATE yume_stars_donations SET status = 'paid', telegram_payment_charge_id = ?, provider_payment_charge_id = ?, paid_at = CURRENT_TIMESTAMP WHERE payload = ? AND status = 'pre_checkout'")
-            .bind(chargeId, successfulPayment.provider_payment_charge_id ?? null, payload).run();
-        } else {
-          console.error("[YUBERA][STARS] Successful payment did not match a pending order.", { payload, userId, amount });
-        }
-      } catch (error) {
-        console.error("[YUBERA][STARS] Could not persist successful payment.", error);
-        return json({ ok: false, error: "payment_persistence_failed" }, 503);
+    if (!db || typeof userId !== "number" || !Number.isSafeInteger(userId) ||
+        successfulPayment.currency !== "XTR" || typeof chargeId !== "string" || !chargeId ||
+        typeof payload !== "string" || !/^yubera_support:[0-9a-f-]{36}$/i.test(payload) ||
+        typeof amount !== "number" || !Number.isSafeInteger(amount) || amount < 1 || amount > 100000) {
+      console.error("[YUBERA][STARS] Successful payment update is missing valid payment fields.", { userId, amount });
+      return json({ ok: true, ignored: true });
+    }
+    try {
+      const order = await db.prepare("SELECT telegram_user_id, amount, currency, status, telegram_payment_charge_id FROM yume_stars_donations WHERE payload = ?")
+        .bind(payload).first<{ telegram_user_id: string; amount: number; currency: string; status: string; telegram_payment_charge_id: string | null }>();
+      if (!order || order.telegram_user_id !== String(userId) || order.amount !== amount || order.currency !== "XTR") {
+        console.error("[YUBERA][STARS] Successful payment did not match its invoice.", { payload, userId, amount });
+        return json({ ok: true, ignored: true });
       }
+      if (order.status === "paid") {
+        if (order.telegram_payment_charge_id === chargeId) return json({ ok: true, action: "stars_payment_already_recorded" });
+        console.error("[YUBERA][STARS] Paid invoice was replayed with a different charge ID.", { payload, userId });
+        return json({ ok: true, ignored: true });
+      }
+      if (order.status !== "pre_checkout" || order.telegram_payment_charge_id) {
+        console.error("[YUBERA][STARS] Successful payment arrived for an order outside pre-checkout.", { payload, status: order.status });
+        return json({ ok: true, ignored: true });
+      }
+      const result = await db.prepare("UPDATE yume_stars_donations SET status = 'paid', telegram_payment_charge_id = ?, provider_payment_charge_id = ?, paid_at = CURRENT_TIMESTAMP WHERE payload = ? AND status = 'pre_checkout' AND telegram_payment_charge_id IS NULL")
+        .bind(chargeId, successfulPayment.provider_payment_charge_id ?? null, payload).run() as { meta?: { changes?: number } };
+      if (result.meta?.changes !== 1) {
+        const latest = await db.prepare("SELECT status, telegram_payment_charge_id FROM yume_stars_donations WHERE payload = ?")
+          .bind(payload).first<{ status: string; telegram_payment_charge_id: string | null }>();
+        if (latest?.status === "paid" && latest.telegram_payment_charge_id === chargeId) {
+          return json({ ok: true, action: "stars_payment_already_recorded" });
+        }
+        console.error("[YUBERA][STARS] Successful payment update did not change exactly one order.", { payload, changes: result.meta?.changes });
+        return json({ ok: false, error: "payment_persistence_conflict" }, 503);
+      }
+    } catch (error) {
+      console.error("[YUBERA][STARS] Could not persist successful payment.", error);
+      return json({ ok: false, error: "payment_persistence_failed" }, 503);
     }
     return json({ ok: true, action: "stars_payment_recorded" });
   }
