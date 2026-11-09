@@ -4,6 +4,8 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { CookieConsentBanner } from "@/components/yume/CookieConsentBanner";
 import { YumePreferencesProvider } from "@/data/preferences";
 import { COOKIE_CONSENT_STORAGE_KEY } from "@/data/cookie-consent";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 afterEach(() => {
   cleanup();
@@ -56,5 +58,11 @@ describe("cookie consent banner", () => {
 
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(screen.queryByTestId("cookie-consent-banner")).not.toBeInTheDocument();
+  });
+  it("does not include a parser-blocking Telegram SDK script in the static HTML shell", () => {
+    const source = readFileSync(fileURLToPath(new URL("../routes/__root.tsx", import.meta.url)), "utf8");
+    expect(source).not.toContain('<script src="https://telegram.org/js/telegram-web-app.js?64" />');
+    expect(source).toContain("s.async=true");
+    expect(source).toContain("isTma");
   });
 });
