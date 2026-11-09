@@ -6,14 +6,14 @@ describe("YUBERA support page", () => {
   it("shows the required preset amounts and defaults to 100 Stars", () => {
     render(<SupportPage onBack={() => undefined} />);
     for (const amount of [50, 100, 250, 500, 1000]) {
-      expect(screen.getByRole("button", { name: new RegExp(String(amount)) })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: new RegExp("^" + String(amount) + "$") })).toBeInTheDocument();
     }
     expect(screen.getByRole("button", { name: /отправить 100 звёзд/i })).toBeInTheDocument();
   });
 
   it("updates the payment action when a preset amount is selected", () => {
     render(<SupportPage onBack={() => undefined} />);
-    fireEvent.click(screen.getByRole("button", { name: /250/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^250$/ }));
     expect(screen.getByRole("button", { name: /отправить 250 звёзд/i })).toBeInTheDocument();
   });
 
