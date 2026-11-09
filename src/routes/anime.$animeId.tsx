@@ -270,7 +270,7 @@ function AnimeDetailPage() {
     const onKodikMessage = (event: MessageEvent) => {
       if (!event.origin) return;
       const playerFrame = document.getElementById("kodik-player") as HTMLIFrameElement | null;
-      if (!playerFrame?.contentWindow) return;
+      if (!playerFrame?.contentWindow || event.source !== playerFrame.contentWindow) return;
       try {
         const hostname = new URL(event.origin).hostname.toLowerCase().replace(/\.$/, "");
         if (!trustedHosts.some((host) => hostname === host || hostname.endsWith("." + host))) return;

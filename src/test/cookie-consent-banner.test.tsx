@@ -1,5 +1,7 @@
 /** @vitest-environment jsdom */
 import { afterEach, describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { CookieConsentBanner } from "@/components/yume/CookieConsentBanner";
 import { YumePreferencesProvider } from "@/data/preferences";
@@ -56,5 +58,11 @@ describe("cookie consent banner", () => {
 
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(screen.queryByTestId("cookie-consent-banner")).not.toBeInTheDocument();
+  });
+  it("does not include a parser-blocking Telegram SDK script in the static HTML shell", () => {
+    const source = readFileSync(resolve(process.cwd(), "src/routes/__root.tsx"), "utf8");
+    expect(source).not.toContain('<script src="https://telegram.org/js/telegram-web-app.js?64" />');
+    expect(source).toContain("s.async=true");
+    expect(source).toContain("isTma");
   });
 });

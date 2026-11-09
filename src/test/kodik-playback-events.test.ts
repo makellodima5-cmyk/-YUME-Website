@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { parseKodikPlaybackMessage } from "@/data/kodik-playback-events";
 
 describe("Kodik iframe playback messages", () => {
@@ -41,5 +43,9 @@ describe("Kodik iframe playback messages", () => {
     expect(parseKodikPlaybackMessage({ event: "play", time: 10 })).toBeNull();
     expect(parseKodikPlaybackMessage({ event: "timeupdate", time: -1 })).toBeNull();
     expect(parseKodikPlaybackMessage("not-json")).toBeNull();
+  });
+  it("binds accepted player messages to the actual iframe window", () => {
+    const source = readFileSync(resolve(process.cwd(), "src/routes/anime.$animeId.tsx"), "utf8");
+    expect(source).toContain("event.source !== playerFrame.contentWindow");
   });
 });
