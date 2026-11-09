@@ -26,7 +26,8 @@ export function SupportPage({ onBack }: Props) {
   const [error, setError] = useState("");
   const [status, setStatus] = useState<PaymentStatus | null>(null);
   const [message, setMessage] = useState("");
-  const pollingRef = useRef(false);\n  const submitLockRef = useRef(false);
+  const pollingRef = useRef(false);
+  const submitLockRef = useRef(false);
 
   const amount = customAmount ? Number(customAmount) : selected;
   const valid = Number.isSafeInteger(amount) && amount >= MIN_STARS && amount <= MAX_STARS;
