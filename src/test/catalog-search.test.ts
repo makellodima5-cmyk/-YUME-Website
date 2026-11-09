@@ -39,6 +39,10 @@ describe("catalog URL search validation", () => {
     });
   });
 
+  it("accepts the support screen as a directly addressable app section", () => {
+    expect(validateCatalogSearch({ section: "support" }).section).toBe("support");
+  });
+
   it("accepts all public legal document destinations from footer and registration links", () => {
     for (const section of ["privacy-policy", "rules", "rights"] as const) {
       expect(validateCatalogSearch({ section }).section).toBe(section);

@@ -82,7 +82,7 @@ async function handleCreateStarsInvoice(request: Request): Promise<Response> {
       return json({ error: "invoice_creation_failed" }, 502);
     }
     await db.prepare("UPDATE yume_stars_donations SET invoice_link = ? WHERE id = ? AND status = 'pending'").bind(result.result, id).run();
-    return json({ invoiceUrl: result.result });
+    return json({ invoiceUrl: result.result, payload });
   } catch (error) {
     console.error("[YUBERA][STARS] Could not create invoice.", error);
     return json({ error: "payments_unavailable" }, 503);

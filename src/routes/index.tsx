@@ -6,6 +6,7 @@ import { getShikimoriCatalog, getShikimoriAnimes, getGlobalHomeFeatured } from "
 import { getExactReleaseDate, isNewRelease, isUpcomingAnnouncement } from "@/data/anime-sections";
 import { Header, type View } from "@/components/yume/Header";
 import { HomeExperience } from "@/components/yume/HomeExperience";
+import { SupportPage } from "@/components/yume/SupportPage";
 import { AuthPage } from "@/components/yume/AuthPage";
 import { CollectionsGrid, Grid, SectionBanner } from "@/components/yume/Sections";
 import { CatalogFilters, EMPTY_CATALOG_FILTERS, type CatalogFiltersValue } from "@/components/yume/CatalogFilters";
@@ -115,7 +116,7 @@ export const Route = createFileRoute("/")({
     // every time a user opens Favorites, Watch Later, History, Profile or News.
     // This also prevents a transient catalogue-store failure from breaking navigation
     // into account-owned lists.
-    const catalogueIndependentSections = new Set(["admin", "my", "profile", "favorites", "watchlist", "history", "tracked-titles", "notifications", "privacy", "privacy-policy", "rules", "rights", "news"]);
+    const catalogueIndependentSections = new Set(["admin", "my", "profile", "favorites", "watchlist", "history", "tracked-titles", "notifications", "privacy", "privacy-policy", "rules", "rights", "news", "support"]);
     if (deps.section && catalogueIndependentSections.has(deps.section)) {
       return {
         catalogMode: "paged",
@@ -1787,7 +1788,10 @@ function Index() {
           onSelect={select}
           onSeeAll={setView}
           onOpenCollection={openCollection}
+          onSupport={() => setView("support")}
         />
+      ) : view === "support" ? (
+        <SupportPage onBack={() => setView("home")} />
       ) : view === "notifications" && notificationStateLoaded && !notificationRemoteAccount ? (
         <main id="main-content" className="px-4 pb-12 pt-24 md:px-10 md:pt-24">
           <section className="mx-auto max-w-lg rounded-3xl border border-border bg-card/70 p-6 text-center sm:p-8">
@@ -2416,7 +2420,7 @@ function Index() {
       {!newsDetailOpen && !(["login", "register"].includes(view)) && (
         <nav className="yubera-bottom-nav" aria-label={language === "ru" ? "Основная навигация" : "Main navigation"}>
           {[
-            { id: "home" as View, label: language === "ru" ? "Главная" : "Home", icon: Home, active: ["home", "popular", "new-releases", "announcements", "airing", "collections"].includes(view) },
+            { id: "home" as View, label: language === "ru" ? "Главная" : "Home", icon: Home, active: ["home", "popular", "new-releases", "announcements", "airing", "collections", "support"].includes(view) },
             { id: "catalog" as View, label: language === "ru" ? "Каталог" : "Catalog", icon: LayoutGrid, active: view === "catalog" },
             { id: "my" as View, label: language === "ru" ? "Моё" : "My", icon: Bookmark, active: ["my", "favorites", "watchlist", "history", "tracked-titles", "notifications"].includes(view) },
             { id: "news" as View, label: language === "ru" ? "Новости" : "News", icon: Newspaper, active: view === "news" },
