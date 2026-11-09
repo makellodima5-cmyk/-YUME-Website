@@ -2061,7 +2061,7 @@ function Index() {
       ) : view === "favorites" ? (
         <Profile key="favorites" initialPanel="favorites" animeList={ANIME} onSelect={select} onCatalog={() => setView("catalog")} telegramMiniApp={isTelegramMiniApp} />
       ) : view === "watchlist" ? (
-        <Profile key="watchlist" initialPanel="watchlist" animeList={ANIME} onSelect={select} onCatalog={() => setView("catalog")} />
+        <Profile key="watchlist" initialPanel="watchlist" animeList={ANIME} onSelect={select} onCatalog={() => setView("catalog")} telegramMiniApp={isTelegramMiniApp} />
       ) : view === "privacy" ? (
         <Profile key="privacy" initialPanel="documents" animeList={ANIME} onSelect={select} onCatalog={() => setView("catalog")} />
       ) : view === "privacy-policy" ? (
