@@ -78,6 +78,31 @@ export async function publishCatalogSnapshotCachePointer(kv: KVNamespace, state:
 
 const ADMIN_CURRENT_KEY = `${PREFIX}:admin-current`;
 
+const ADMIN_STATUS_METADATA_KEYS = [
+  "admin_import_target",
+  "admin_import_cursor",
+  "admin_import_added",
+  "admin_import_skipped",
+  "admin_import_incomplete",
+  "admin_import_errors",
+  "admin_import_state",
+  "admin_import_run_id",
+  "admin_import_block_18_plus",
+  "admin_import_status_filter",
+  "metadata_refresh_cursor",
+  "metadata_refresh_state",
+] as const;
+
+export type CatalogAdminStatus = {
+  schemaVersion: 1;
+  revision: number;
+  updatedAt: string;
+  itemCount: number;
+  metadata: Record<string, string>;
+  screenshotFailures: number;
+  screenshotRetries: number;
+};
+
 export async function readCatalogAdminCachePointer(kv: KVNamespace): Promise<CatalogCachePointer | null> {
   const raw = await kv.get(ADMIN_CURRENT_KEY);
   if (!raw) return null;
@@ -95,20 +120,46 @@ export async function readCatalogAdminCachePointer(kv: KVNamespace): Promise<Cat
  * The private admin checkpoint follows every committed import page while the
  * public pointer remains pinned to the last fully published catalogue.
  */
+export async function readCatalogAdminStatusCache(kv: KVNamespace): Promise<CatalogAdminStatus | null> {
+  const raw = await kv.get(ADMIN_CURRENT_KEY);
+  if (!raw) return null;
+  try {
+    const status = JSON.parse(raw) as CatalogAdminStatus;
+    return status.schemaVersion === 1 &&
+      Number.isSafeInteger(status.revision) && status.revision >= 0 &&
+      Number.isSafeInteger(status.itemCount) && status.itemCount >= 0 &&
+      status.metadata !== null && typeof status.metadata === "object" &&
+      Number.isSafeInteger(status.screenshotFailures) && status.screenshotFailures >= 0 &&
+      Number.isSafeInteger(status.screenshotRetries) && status.screenshotRetries >= 0
+      ? status
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function writeCatalogAdminSnapshotCache(kv: KVNamespace, state: CatalogState): Promise<void> {
   const previous = await readCatalogAdminCachePointer(kv);
   await writeCatalogSnapshotCache(kv, state, false);
-  await kv.put(ADMIN_CURRENT_KEY, JSON.stringify({
+  const metadata = Object.fromEntries(
+    ADMIN_STATUS_METADATA_KEYS.flatMap((key) => typeof state.metadata[key] === "string" ? [[key, state.metadata[key]!]] : []),
+  );
+  const status: CatalogAdminStatus = {
     schemaVersion: 1,
     revision: state.revision,
     updatedAt: state.updatedAt,
-  } satisfies CatalogCachePointer));
+    itemCount: state.items.length,
+    metadata,
+    screenshotFailures: Object.keys(state.metadata).filter((key) => key.startsWith("screenshot_last_error:") && Boolean(state.metadata[key])).length,
+    screenshotRetries: Object.keys(state.metadata).filter((key) => key.startsWith("screenshot_attempts:") && Number(state.metadata[key]) > 0 && Number(state.metadata[key]) < 3).length,
+  };
+  await kv.put(ADMIN_CURRENT_KEY, JSON.stringify(status));
 
   // Retain the public snapshot and the new admin checkpoint, but do not let
   // every import page leave another full catalogue snapshot behind in KV.
   const published = await readCatalogCachePointer(kv);
   if (previous && previous.revision !== state.revision && previous.revision !== published?.revision) {
-    await deleteCatalogSnapshotCache(kv, previous.revision);
+    await deleteCatalogSnapshotCacheRevision(kv, previous.revision);
   }
 }
 
@@ -117,7 +168,7 @@ export async function readCatalogAdminSnapshotCache(kv: KVNamespace): Promise<Ca
   return pointer ? readCatalogSnapshotCache(kv, pointer.revision) : null;
 }
 
-async function deleteCatalogSnapshotCache(kv: KVNamespace, revision: number): Promise<void> {
+export async function deleteCatalogSnapshotCacheRevision(kv: KVNamespace, revision: number): Promise<void> {
   const base = `${PREFIX}:revision:${revision}`;
   const manifestRaw = await kv.get(`${base}:manifest`);
   if (!manifestRaw) return;
