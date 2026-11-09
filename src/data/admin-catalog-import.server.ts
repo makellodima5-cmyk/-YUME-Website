@@ -38,6 +38,11 @@ export function adminCatalogImportPageOperationId(runId:string,cursor:number):st
   const safeCursor=Number.isSafeInteger(cursor)&&cursor>0?cursor:1;
   return ("import"+safeRunId+String(safeCursor).padStart(8,"0")).slice(0,80);
 }
+export function adminCatalogImportNextResumeAt(startedAt:string,cursor:number):number {
+  const start=Number(startedAt);
+  const safeCursor=Number.isSafeInteger(cursor)&&cursor>0?cursor:1;
+  return (Number.isFinite(start)&&start>0?start:0)+(safeCursor+1)*REQUEST_DELAY_MS;
+}
 export function chunkAdminCatalogIds(value: unknown, size = METADATA_LOOKUP_BATCH_SIZE): string[][] {
   const ids = normalizeAdminCatalogIds(value);
   const limit = Number.isInteger(size) && size > 0 ? Math.min(size, METADATA_LOOKUP_BATCH_SIZE) : METADATA_LOOKUP_BATCH_SIZE;
@@ -322,7 +327,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
         const shots=mapAdminCatalogScreenshots(item);
         if(shots.length)mutations.push({type:"screenshots",animeId:String(item.id),items:shots.map((shot,position)=>({originalUrl:shot.original,previewUrl:shot.preview,position}))});
       }
-      mutations.push({type:"metadata",values:{admin_import_cursor:String(progress.cursor+1),admin_import_added:String(nextAdded),admin_import_skipped:String(progress.skipped+skipped),admin_import_incomplete:String(progress.incomplete+incompleteCount),admin_import_resume_at:String(Date.now()+REQUEST_DELAY_MS),admin_import_state:nextState,admin_import_cache_pending:nextState==="completed"?"0":"1"}});
+      mutations.push({type:"metadata",values:{admin_import_cursor:String(progress.cursor+1),admin_import_added:String(nextAdded),admin_import_skipped:String(progress.skipped+skipped),admin_import_incomplete:String(progress.incomplete+incompleteCount),admin_import_resume_at:String(adminCatalogImportNextResumeAt(fresh.metadata.admin_import_started_at,progress.cursor)),admin_import_state:nextState,admin_import_cache_pending:nextState==="completed"?"0":"1"}});
       const operationId=adminCatalogImportPageOperationId(progress.runId,progress.cursor);
       await submitCatalogMutation({type:"batch",mutations},operationId);
       await audit(db,"catalog.import.page","success",{page:progress.cursor,added:mapped.length,skipped,state:nextState},actor);

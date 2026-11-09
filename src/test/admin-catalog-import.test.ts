@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { adminCatalogImportPageOperationId, adminCatalogImportResumeCursor, adminCatalogImportShouldResumeCounters, chunkAdminCatalogIds, isCatalogMetadataIncomplete, mapAdminCatalogScreenshots, normalizeAdminCatalogIds, isValidAdminImportTarget } from "@/data/admin-catalog-import.server";
+import { adminCatalogImportNextResumeAt, adminCatalogImportPageOperationId, adminCatalogImportResumeCursor, adminCatalogImportShouldResumeCounters, chunkAdminCatalogIds, isCatalogMetadataIncomplete, mapAdminCatalogScreenshots, normalizeAdminCatalogIds, isValidAdminImportTarget } from "@/data/admin-catalog-import.server";
 
 describe("admin catalog import target", () => {
   it("accepts targets above the old 500-title application cap", () => {
@@ -94,6 +94,15 @@ describe("catalog import screenshot policy", () => {
   it("falls back to the original image when no preview URL is available", () => {
     expect(mapAdminCatalogScreenshots({ screenshots: [{ originalUrl: "https://cdn.example.org/frame.jpg" }] }))
       .toEqual([{ original: "https://cdn.example.org/frame.jpg", preview: "https://cdn.example.org/frame.jpg" }]);
+  });
+});
+
+describe("bulk import page checkpoint timing", () => {
+  it("uses the same next-page delay for concurrent retries of the same run and cursor", () => {
+    const startedAt = String(Date.UTC(2026, 10, 9, 17, 0, 0));
+    expect(adminCatalogImportNextResumeAt(startedAt, 34)).toBe(Number(startedAt) + 35 * 1500);
+    expect(adminCatalogImportNextResumeAt(startedAt, 34)).toBe(adminCatalogImportNextResumeAt(startedAt, 34));
+    expect(adminCatalogImportNextResumeAt(startedAt, 35)).toBe(Number(startedAt) + 36 * 1500);
   });
 });
 
