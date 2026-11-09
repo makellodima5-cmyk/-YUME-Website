@@ -122,7 +122,6 @@ export const Route = createFileRoute("/")({
         anime: [],
         popular: [],
         sectionFeeds: { airing: [], newReleases: [], announcements: [] },
-        catalogIds: [],
         catalogTotal: 0,
         catalogPage: 1,
         catalogFacets: null,
@@ -141,7 +140,7 @@ export const Route = createFileRoute("/")({
         const page = Math.min(Math.max(1, deps.page ?? 1), pageCount);
         return {
           catalogMode: "paged", anime: paginateCatalog(results, page, pageSize), popular: [],
-          sectionFeeds: { airing: [], newReleases: [], announcements: [] }, catalogIds: [],
+          sectionFeeds: { airing: [], newReleases: [], announcements: [] },
           catalogTotal: results.length, catalogPage: page, catalogFacets: null,
           apiError: catalog.error, catalogProgress: catalog.progress,
         };
@@ -168,7 +167,7 @@ export const Route = createFileRoute("/")({
       return {
         catalogMode: "paged",
         anime: paginateCatalog(results, page, pageSize), popular: [],
-        sectionFeeds: { airing: [], newReleases: [], announcements: [] }, catalogIds: [],
+        sectionFeeds: { airing: [], newReleases: [], announcements: [] },
         catalogTotal: results.length, catalogPage: page,
         catalogFacets: {
           genres: Array.from(new Set(allItems.flatMap(a => a.genres))).sort((a,b)=>a.localeCompare(b,"ru")),
@@ -200,7 +199,6 @@ export const Route = createFileRoute("/")({
       featuredAnime,
       popular: [],
       sectionFeeds: null,
-      catalogIds: refreshedItems.map((anime) => anime.id),
       apiError: catalog.error,
       catalogProgress: catalog.progress,
       catalogMode: "full", catalogTotal: refreshedItems.length, catalogPage: 1, catalogFacets: null,
@@ -400,7 +398,6 @@ function Index() {
     featuredAnime: initialFeaturedAnime = [],
     popular: initialPopularAnime,
     sectionFeeds: initialSectionFeeds,
-    catalogIds,
     apiError,
     catalogProgress: initialCatalogProgress, catalogMode, catalogTotal: initialCatalogTotal, catalogPage: loadedCatalogPage, catalogFacets,
   } = Route.useLoaderData();
@@ -408,7 +405,6 @@ function Index() {
   const [popularAnime, setPopularAnime] = useState<Anime[]>(initialPopularAnime);
   const [catalogProgress, setCatalogProgress] = useState(initialCatalogProgress);
   const [sectionFeeds, setSectionFeeds] = useState(initialSectionFeeds);
-  const allowedCatalogIds = useMemo(() => new Set(catalogIds), [catalogIds]);
   const catalogAnimeRef = useRef(catalogAnime);
   const ANIME = catalogAnime;
   // Initialize view before effects that read it during server-side rendering.
@@ -1213,7 +1209,6 @@ function Index() {
       const response = await fetch("/api/admin/catalog-import", {method:"POST",credentials:"same-origin",cache:"no-store",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"delete_title",animeId})});
       const payload = await response.json().catch(()=>({})) as {isAdmin?:boolean;deleted?:boolean;error?:string;message?:string;anime?:{id:string;title:string}};
       if (!response.ok || payload.isAdmin !== true || payload.deleted !== true) throw new Error(payload.message ?? payload.error ?? (language==="ru" ? "Не удалось удалить тайтл." : "Could not delete title."));
-      allowedCatalogIds.delete(animeId);
       catalogAnimeRef.current = catalogAnimeRef.current.filter(item => item.id !== animeId);
       setCatalogAnime(catalogAnimeRef.current);
       setPopularAnime(current => current.filter(item => item.id !== animeId));
