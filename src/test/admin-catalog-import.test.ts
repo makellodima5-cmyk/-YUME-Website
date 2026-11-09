@@ -100,8 +100,9 @@ describe("catalog import screenshot policy", () => {
 describe("bulk import page checkpoint timing", () => {
   it("uses the same next-page delay for concurrent retries of the same run and cursor", () => {
     const startedAt = String(Date.UTC(2026, 10, 9, 17, 0, 0));
+    expect(adminCatalogImportNextResumeAt(startedAt, 34)).toBe(Number(startedAt) + 35 * 1500);
     expect(adminCatalogImportNextResumeAt(startedAt, 34)).toBe(adminCatalogImportNextResumeAt(startedAt, 34));
-    expect(adminCatalogImportNextResumeAt(startedAt, 35)).toBeGreaterThan(adminCatalogImportNextResumeAt(startedAt, 34));
+    expect(adminCatalogImportNextResumeAt(startedAt, 35)).toBe(Number(startedAt) + 36 * 1500);
   });
 });
 
