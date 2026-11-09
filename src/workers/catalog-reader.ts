@@ -168,10 +168,29 @@ async function signedGet(env: Env, key: string): Promise<Response> {
   });
 }
 
+function safeR2ErrorBody(value: string): string {
+  return value.slice(0, 1200)
+    .replace(/(authorization|x-amz-security-token|secretaccesskey|accesskeyid|token)\s*[:=]\s*[^\s<"]+/gi, "$1=[REDACTED]")
+    .replace(/Bearer\s+[^\s<"]+/gi, "Bearer [REDACTED]");
+}
+
 async function readR2Text(env: Env, key: string): Promise<{ body: string; checksum: string | null } | null> {
   const response = await signedGet(env, key);
   if (response.status === 404) return null;
-  if (!response.ok) throw new Error("R2 object read failed with HTTP " + response.status);
+  if (!response.ok) {
+    const body = safeR2ErrorBody(await response.text().catch(() => ""));
+    const code = /<Code>([^<]{1,120})<\/Code>/i.exec(body)?.[1] ?? null;
+    const requestId = /<RequestId>([^<]{1,160})<\/RequestId>/i.exec(body)?.[1] ??
+      response.headers.get("x-amz-request-id");
+    console.error("[YUME][CATALOG_READER] R2 upstream rejected object read.", {
+      resource: key,
+      status: response.status,
+      code,
+      requestId,
+      body: body || null,
+    });
+    throw new Error("R2 object read failed with HTTP " + response.status + (code ? " (" + code + ")" : ""));
+  }
   return {
     body: await response.text(),
     checksum: response.headers.get("x-amz-meta-checksum"),
