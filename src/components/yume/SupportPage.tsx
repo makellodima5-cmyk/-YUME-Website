@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, Info, Pencil, Rocket, Send, Server, Star } from "lucide-react";
+import { Info, Pencil, Rocket, Send, Server, Star } from "lucide-react";
 import { getTelegramWebApp, telegramHapticImpact, telegramHapticNotification } from "@/lib/telegram-mini-app";
 
-type Props = { onBack: () => void };
 type PaymentStatus = "pending" | "pre_checkout" | "paid" | "failed";
 const PRESETS = [50, 100, 250, 500, 1000] as const;
 const MIN_STARS = 1;
@@ -17,7 +16,7 @@ function StarsMark({ compact = false }: { compact?: boolean }) {
   );
 }
 
-export function SupportPage({ onBack }: Props) {
+export function SupportPage() {
   const [selected, setSelected] = useState<number>(100);
   const [customAmount, setCustomAmount] = useState("");
   const [customOpen, setCustomOpen] = useState(false);
@@ -142,14 +141,10 @@ export function SupportPage({ onBack }: Props) {
   };
 
   return (
-    <main id="main-content" className="yubera-with-bottom-nav min-h-[calc(100dvh-72px)] px-3 pb-8 pt-3 sm:px-4">
+    <main id="main-content" className="yubera-support-page yubera-with-bottom-nav min-h-[var(--yume-tg-viewport-height,100dvh)] px-3 pb-8 sm:px-4">
       <div className="mx-auto flex w-full max-w-[760px] flex-col gap-3">
-        <button type="button" onClick={onBack} className="mb-0 inline-flex min-h-9 w-fit items-center gap-2 rounded-full px-2 text-sm font-semibold text-muted-foreground hover:text-foreground">
-          <ArrowLeft className="h-4 w-4" /> Назад
-        </button>
-
         <section className="relative isolate min-h-[166px] overflow-hidden rounded-[22px] border border-[#3a3b43] bg-[#171820]">
-          <img src="/images/yubera-stars-donation-bg.webp" alt="" aria-hidden="true" className="absolute inset-0 h-full w-full object-cover object-[65%_38%]" />
+          <img src="/images/yubera/yubera_banner.webp" alt="" aria-hidden="true" className="absolute inset-0 h-full w-full object-cover object-[center_34%]" />
           <div className="absolute inset-0 bg-gradient-to-r from-[#101116]/95 via-[#101116]/78 to-[#101116]/10" />
           <div className="relative z-10 max-w-[64%] px-4 py-5 sm:px-6 sm:py-6">
             <span className="inline-flex rounded-full bg-[#652d2b]/75 px-3 py-1 text-[11px] font-semibold text-white">Поддержка проекта</span>

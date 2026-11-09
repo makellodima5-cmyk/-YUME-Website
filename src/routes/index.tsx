@@ -1435,6 +1435,34 @@ function Index() {
     navigate({ to: "/", search: { section: v, collection: undefined, q: undefined, page: undefined, sort: undefined, genres: undefined, status: undefined, from: undefined, to: undefined, rating: undefined, kind: undefined, age: undefined, lang: v === "catalog" ? language : undefined } });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
+  useEffect(() => {
+    if (telegramDetectionComplete && view === "support" && !isTelegramMiniApp) {
+      setViewRaw("home");
+      void navigate({ to: "/", search: { section: "home" } });
+      window.scrollTo({ top: 0, behavior: "auto" });
+    }
+  }, [telegramDetectionComplete, isTelegramMiniApp, view, navigate]);
+
+  useEffect(() => {
+    const backButton = getTelegramWebApp()?.BackButton;
+    if (!backButton) return;
+    if (!isTelegramMiniApp || view !== "support") {
+      backButton.hide();
+      return;
+    }
+    const handleTelegramBack = () => {
+      setViewRaw("home");
+      void navigate({ to: "/", search: { section: "home" } });
+      window.scrollTo({ top: 0, behavior: "auto" });
+    };
+    backButton.onClick?.(handleTelegramBack);
+    backButton.show();
+    return () => {
+      backButton.offClick?.(handleTelegramBack);
+      backButton.hide();
+    };
+  }, [isTelegramMiniApp, view, navigate]);
+
   const openCollection = (id: string) => {
     setCollection(id);
     setCatalogPage(1);
@@ -1789,9 +1817,10 @@ function Index() {
           onSeeAll={setView}
           onOpenCollection={openCollection}
           onSupport={() => setView("support")}
+          showSupport={isTelegramMiniApp}
         />
-      ) : view === "support" ? (
-        <SupportPage onBack={() => setView("home")} />
+      ) : view === "support" && isTelegramMiniApp ? (
+        <SupportPage />
       ) : view === "notifications" && notificationStateLoaded && !notificationRemoteAccount ? (
         <main id="main-content" className="px-4 pb-12 pt-24 md:px-10 md:pt-24">
           <section className="mx-auto max-w-lg rounded-3xl border border-border bg-card/70 p-6 text-center sm:p-8">

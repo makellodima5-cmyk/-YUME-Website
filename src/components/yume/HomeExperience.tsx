@@ -20,6 +20,7 @@ type HomeExperienceProps = {
   onSeeAll: (view: View) => void;
   onOpenCollection: (id: string) => void;
   onSupport: () => void;
+  showSupport?: boolean;
 };
 
 function HomeSection({ title, action, icon, className, children }: {
@@ -81,7 +82,7 @@ function collectionCountLabel(count: number, language: "ru" | "en", t: (key: Tra
 }
 
 export function HomeExperience({
-  animeList, featuredAnime, popular, newReleases, announcements, airing, onSelect, onSeeAll, onOpenCollection, onSupport,
+  animeList, featuredAnime, popular, newReleases, announcements, airing, onSelect, onSeeAll, onOpenCollection, onSupport, showSupport = false,
 }: HomeExperienceProps) {
   const { language, t } = useYumePreferences();
   const ru = language === "ru";
@@ -221,6 +222,7 @@ export function HomeExperience({
           </section>
         )}
 
+        {showSupport && (
         <button type="button" onClick={onSupport} className="yubera-support-entry group my-3 flex min-h-[68px] w-full items-center gap-3 rounded-[19px] border border-[#3a3b43] bg-[#1b1c23] px-3.5 py-2.5 text-left transition-colors hover:border-[#ff765c]/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ff6245] sm:my-4 sm:px-5">
           <span className="relative grid h-12 w-12 shrink-0 place-items-center">
             <Star aria-hidden="true" className="h-10 w-10 fill-[#ffc044] text-[#ffe49a] drop-shadow-[0_0_8px_rgba(255,190,55,.45)]" strokeWidth={1.5} />
@@ -233,6 +235,7 @@ export function HomeExperience({
           </span>
           <ChevronRight aria-hidden="true" className="h-6 w-6 shrink-0 text-[#ff6245] transition-transform group-hover:translate-x-0.5" />
         </button>
+        )}
 
         {popular.length > 0 && <HomeSection title={ru ? "Популярное" : "Popular"} action={seeAll("popular")}><div className="yubera-home-horizontal-row">{popular.slice(0, 14).map(anime => <HomeAnimeCard key={anime.id} anime={anime} onSelect={onSelect} />)}</div></HomeSection>}
 

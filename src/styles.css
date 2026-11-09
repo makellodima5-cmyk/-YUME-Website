@@ -1671,3 +1671,9 @@ html[data-theme="light"] .yubera-home-filter-button {
 @media(prefers-reduced-motion:reduce) {
   .yubera-home-featured-watch,.yubera-home-featured-bookmark,.yubera-home-featured-indicators button { transition:none !important; }
 }
+
+
+/* Support view clears the fixed app bar, including Telegram's content safe area. */
+.yubera-support-page {
+  padding-top: calc(80px + max(env(safe-area-inset-top, 0px), var(--yume-tg-content-safe-top, var(--yume-tg-safe-top, 0px))));
+}
