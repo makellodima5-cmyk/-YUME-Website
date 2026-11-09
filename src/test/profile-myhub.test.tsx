@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import type { Anime } from "@/data/anime";
 import { YumePreferencesProvider } from "@/data/preferences";
@@ -78,10 +78,11 @@ describe("Profile and My library pages", () => {
       />,
     ));
 
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
     const notificationsCard = screen.getByRole("button", { name: /Уведомления/ });
     expect(notificationsCard).toHaveTextContent("Непрочитанных: 2");
     expect(notificationsCard.querySelector('[aria-label="Есть непрочитанные уведомления"]')).toBeInTheDocument();
-    notificationsCard.click();
+    fireEvent.click(notificationsCard);
     expect(onNavigate).toHaveBeenCalledWith("notifications");
   });
 
