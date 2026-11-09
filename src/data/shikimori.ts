@@ -4,6 +4,7 @@ import type { Anime } from "@/data/anime";
 import { isNewRelease } from "@/data/anime-sections";
 import { getR2Catalog, readCatalogState, getR2Screenshots } from "@/data/catalog-r2.server";
 import { selectRelatedAnime, mergeLiveAnimeDetails, isUpcomingEpisodeDate } from "@/data/catalog-details";
+import { isHomeFeaturedEligible } from "@/data/home-featured.shared";
 import { retryAfterMilliseconds } from "@/data/retry-after";
 export { retryAfterMilliseconds };
 import { filterCatalogForCurrentRequest } from "@/data/territorial-restrictions.server";
