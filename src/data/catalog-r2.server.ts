@@ -68,7 +68,13 @@ async function fetchCatalogState(useAdminCheckpoint = false): Promise<CatalogSta
         status:response.status,attempt:attempt+1,durationMs:Date.now()-started,
         requestId,body:body||null,
       });
-      lastError=new Error("Private catalogue reader returned HTTP "+response.status);
+      const errorCode = (() => {
+        try { return (JSON.parse(body) as { error?: unknown }).error; } catch { return null; }
+      })();
+      lastError=new Error(
+        "Private catalogue reader returned HTTP "+response.status+
+        (typeof errorCode === "string" ? " ("+errorCode+")" : "")
+      );
       if(!RETRYABLE_READER_STATUSES.has(response.status)||attempt===2)break;
       const retryAfter=Number(response.headers.get("retry-after"));
       await sleep(Number.isFinite(retryAfter)&&retryAfter>0?Math.min(5000,retryAfter*1000):250*Math.pow(2,attempt));
