@@ -25,11 +25,12 @@ describe("shared catalogue snapshot KV cache", () => {
     expect(await readCatalogSnapshotCacheText(kv as unknown as KVNamespace, 7)).toBe(JSON.stringify(state));
   });
 
-  it("stores large UTF-8 snapshots as multiple chunks without breaking Cyrillic text", async () => {
+  it("stores large UTF-8 snapshots as one raw KV value without base64 decoding", async () => {
     const kv = new MemoryKV();
     const state = { ...emptyCatalogState(), revision: 8, items: [anime("2", "Ёжик ".repeat(110000))] };
     await writeCatalogSnapshotCache(kv as unknown as KVNamespace, state);
-    expect([...kv.values.keys()].filter((key) => key.includes(":chunk:")).length).toBeGreaterThan(1);
+    expect(kv.values.get("yume:catalog:v1:revision:8:body")).toBe(JSON.stringify(state));
+    expect([...kv.values.keys()].filter((key) => key.includes(":chunk:"))).toHaveLength(0);
     expect(await readCatalogSnapshotCache(kv as unknown as KVNamespace, 8)).toEqual(state);
   });
 
@@ -37,6 +38,7 @@ describe("shared catalogue snapshot KV cache", () => {
     const kv = new MemoryKV();
     const state = { ...emptyCatalogState(), revision: 9, items: [anime("3", "Integrity")] };
     await writeCatalogSnapshotCache(kv as unknown as KVNamespace, state);
+    kv.values.delete("yume:catalog:v1:revision:9:body");
     kv.values.set("yume:catalog:v1:revision:9:chunk:0", "!!!");
     expect(await readCatalogSnapshotCache(kv as unknown as KVNamespace, 9)).toBeNull();
   });
