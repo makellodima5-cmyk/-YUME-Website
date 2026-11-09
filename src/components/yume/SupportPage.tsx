@@ -89,6 +89,7 @@ export function SupportPage({ onBack }: Props) {
       setError("Оплата доступна только в актуальной версии Telegram.");
       return;
     }
+    submitLockRef.current = true;
     setLoading(true);
     setError("");
     setMessage("");
@@ -122,6 +123,7 @@ export function SupportPage({ onBack }: Props) {
       setError(cause instanceof Error ? cause.message : "Не удалось начать оплату.");
       telegramHapticNotification("error");
     } finally {
+      submitLockRef.current = false;
       setLoading(false);
     }
   };
