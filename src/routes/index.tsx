@@ -188,24 +188,16 @@ export const Route = createFileRoute("/")({
         console.error("[YUME] Global home featured selection is unavailable; no alternate titles are fabricated.", error);
       }
     }
-    const popular = refreshedItems.filter((anime) => (anime.rating ?? 0) >= 8).sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1));
-    const sectionFeeds = {
-      airing: refreshedItems.filter((anime) => anime.status === "Онгоинг").sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? "") || b.year - a.year),
-      newReleases: refreshedItems.filter((anime) => isNewRelease(anime)).sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? "") || (b.rating ?? -1) - (a.rating ?? -1)),
-      announcements: refreshedItems.filter((anime) => anime.status === "Анонс").sort((a, b) => {
-        const aDate = getExactReleaseDate(a.airedOn), bDate = getExactReleaseDate(b.airedOn);
-        if (aDate && bDate) return aDate.localeCompare(bDate);
-        if (aDate) return -1;
-        if (bDate) return 1;
-        return a.year - b.year || (b.rating ?? -1) - (a.rating ?? -1);
-      }),
-    };
 
+    // Keep the catalogue as the single serialized source of truth. Sending
+    // several overlapping, fully-sorted copies of the same catalogue through
+    // the server-function payload costs CPU and memory on every cold request.
+    // The UI derives these views once with useMemo from the catalogue itself.
     return {
       anime: refreshedItems,
       featuredAnime,
-      popular,
-      sectionFeeds,
+      popular: [],
+      sectionFeeds: null,
       catalogIds: refreshedItems.map((anime) => anime.id),
       apiError: catalog.error,
       catalogProgress: catalog.progress,
