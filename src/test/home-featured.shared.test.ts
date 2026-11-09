@@ -24,19 +24,12 @@ describe("global home featured candidates", () => {
     expect(result.map((item) => item.id)).toEqual(["11", "12", "13"]);
   });
 
-  it("avoids repeating the previous set when at least three alternatives exist", () => {
+  it("always selects the three highest rated eligible titles", () => {
     const result = rankFeaturedCandidates([
-      candidate("21", 9.9), candidate("22", 9.8), candidate("23", 9.7),
-      candidate("24", 9.6), candidate("25", 9.5), candidate("26", 9.4),
-    ], ["21", "22", "23"]);
-    expect(result.map((item) => item.id)).toEqual(["24", "25", "26"]);
-  });
-
-  it("uses remaining best titles when fewer than three alternatives exist", () => {
-    const result = rankFeaturedCandidates([
-      candidate("31", 9.9), candidate("32", 9.8), candidate("33", 9.7), candidate("34", 9.6),
-    ], ["31", "32", "33"]);
-    expect(result.map((item) => item.id)).toEqual(["34", "31", "32"]);
+      candidate("21", 9.4), candidate("22", 9.9), candidate("23", 9.6),
+      candidate("24", 9.8), candidate("25", 9.5),
+    ]);
+    expect(result.map((item) => item.id)).toEqual(["22", "24", "23"]);
   });
 
   it("requires a rating of at least 9 and accepts ongoing titles independently of their release date", () => {

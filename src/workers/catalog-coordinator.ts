@@ -8,7 +8,7 @@ type CoordinatorEnv = { CATALOG_BUCKET:R2Bucket; YUME_DB:D1Database; YUME_CATALO
 type Env = { CATALOG_COORDINATOR:DurableObjectNamespace<CatalogCoordinator> };
 type Operation = { id:string; mutation:CatalogMutation; acceptedAt:string; sequence:number; status:"pending"|"committed"; revision?:number };
 type FeaturedSnapshot = { items:Anime[]; generatedAt:string; expiresAt:number; revision:number; retryAfter?:number };
-const FEATURED_SNAPSHOT_KEY = "home:featured:v1";
+const FEATURED_SNAPSHOT_KEY = "home:featured:v2";
 const FEATURED_TTL_MS = 24 * 60 * 60 * 1000;
 const FEATURED_RETRY_MS = 5 * 60 * 1000;
 
@@ -104,10 +104,7 @@ export class CatalogCoordinator extends DurableObject<CoordinatorEnv>{
       const publishedById=new Map(published.items.map(item=>[item.id,item]));
       const ranked=candidates.filter(item=>publishedById.has(item.id)).map(item=>publishedById.get(item.id)!).filter(item=>isHomeFeaturedEligible(item,new Date(now))).sort((a,b)=>(b.rating??-1)-(a.rating??-1)||a.id.localeCompare(b.id));
       if(!ranked.length)throw new Error("No rated poster-backed catalogue entries are available.");
-      const previousIds=new Set((previous?.items??[]).map(item=>item.id));
-      const alternatives=ranked.filter(item=>!previousIds.has(item.id));
-      const preferred=alternatives.length>=Math.min(3,ranked.length)?alternatives:ranked;
-      const uniqueSelection=[...preferred,...ranked.filter(item=>!preferred.some(entry=>entry.id===item.id))].slice(0,3);
+      const uniqueSelection=ranked.slice(0,3);
       const snapshot:FeaturedSnapshot={items:uniqueSelection,generatedAt:new Date(now).toISOString(),expiresAt:now+FEATURED_TTL_MS,revision:pointer.revision};
       await this.ctx.storage.put(FEATURED_SNAPSHOT_KEY,snapshot);
       return snapshot;
