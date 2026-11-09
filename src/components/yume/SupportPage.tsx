@@ -12,7 +12,7 @@ function StarsMark({ compact = false }: { compact?: boolean }) {
   return (
     <span className={compact ? "relative inline-flex h-12 w-12 shrink-0 items-center justify-center" : "relative inline-flex h-[68px] w-[68px] shrink-0 items-center justify-center"} aria-hidden="true">
       <Star className="h-[82%] w-[82%] fill-[#FFC044] text-[#FFE49A] drop-shadow-[0_0_9px_rgba(255,190,55,.48)]" strokeWidth={1.4} />
-      <span className="absolute bottom-0 right-0 grid h-[19px] w-[19px] place-items-center rounded-full border-2 border-[#22232a] bg-[#229ED9] text-[9px] font-black text-white">➤</span>
+      <span className="absolute bottom-0 right-0 grid h-[19px] w-[19px] place-items-center rounded-full border-2 border-[#22232a] bg-[#229ED9] text-white"><Send className="h-2.5 w-2.5 fill-current" /></span>
     </span>
   );
 }
@@ -26,7 +26,7 @@ export function SupportPage({ onBack }: Props) {
   const [error, setError] = useState("");
   const [status, setStatus] = useState<PaymentStatus | null>(null);
   const [message, setMessage] = useState("");
-  const pollingRef = useRef(false);
+  const pollingRef = useRef(false);\n  const submitLockRef = useRef(false);
 
   const amount = customAmount ? Number(customAmount) : selected;
   const valid = Number.isSafeInteger(amount) && amount >= MIN_STARS && amount <= MAX_STARS;
@@ -79,7 +79,7 @@ export function SupportPage({ onBack }: Props) {
   };
 
   const submit = async () => {
-    if (!valid || loading) {
+    if (!valid || submitLockRef.current) {
       setError("Укажите целое число от 1 до 100 000 Stars.");
       return;
     }
@@ -172,7 +172,7 @@ export function SupportPage({ onBack }: Props) {
             <Send className="h-5 w-5" />{loading ? "Создаём счёт…" : `Отправить ${amount} звёзд`}
           </button>
           {error && <p role="alert" className="mt-3 rounded-xl border border-red-400/30 bg-red-500/10 px-3 py-2 text-sm text-red-100">{error}</p>}
-          {message && <p role={status === "paid" ? "status" : "alert"} className={`mt-3 rounded-xl border px-3 py-2 text-sm ${status === "paid" ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-100" : "border-white/10 bg-black/20 text-white/75"}`}>{message}</p>}
+          {message && <p role={status === "paid" || status === "pending" ? "status" : "alert"} className={`mt-3 rounded-xl border px-3 py-2 text-sm ${status === "paid" ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-100" : "border-white/10 bg-black/20 text-white/75"}`}>{message}</p>}
         </section>
 
         <section className="rounded-[20px] border border-[#383941] bg-[#191a21] p-3.5 sm:p-5">
