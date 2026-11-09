@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { emptyCatalogState } from "@/data/catalog-r2.shared";
-import { pruneCatalogSnapshotCache, readCatalogAdminCachePointer, readCatalogCachePointer, readCatalogSnapshotCache, readCatalogSnapshotCacheDirectText, readCatalogSnapshotCacheText, writeCatalogAdminSnapshotCache, writeCatalogSnapshotCache } from "@/data/catalog-kv-cache.shared";
+import { pruneCatalogSnapshotCache, readCatalogAdminCachePointer, readCatalogAdminStatusCache, readCatalogCachePointer, readCatalogSnapshotCache, readCatalogSnapshotCacheDirectText, readCatalogSnapshotCacheText, writeCatalogAdminSnapshotCache, writeCatalogSnapshotCache } from "@/data/catalog-kv-cache.shared";
 import type { Anime } from "@/data/anime";
 
 class MemoryKV {
@@ -101,5 +101,44 @@ describe("private admin catalogue checkpoint cache", () => {
     expect(await readCatalogSnapshotCache(kv as unknown as KVNamespace, 12)).toEqual(second);
     expect(await readCatalogSnapshotCache(kv as unknown as KVNamespace, 10)).toEqual(published);
     expect(await readCatalogSnapshotCache(kv as unknown as KVNamespace, 11)).toBeNull();
+  });
+});
+
+
+describe("compact admin catalogue status cache", () => {
+  it("stores only import progress and screenshot counters beside the admin pointer", async () => {
+    const kv = new MemoryKV();
+    const state = {
+      ...emptyCatalogState(),
+      revision: 21,
+      items: [anime("21", "One"), anime("22", "Two")],
+      metadata: {
+        admin_import_target: "100",
+        admin_import_cursor: "3",
+        admin_import_added: "100",
+        admin_import_state: "running",
+        metadata_refresh_cursor: "1",
+        metadata_refresh_state: "metadata",
+        screenshot_last_error: "not-a-counter",
+        "screenshot_last_error:21": "missing",
+        "screenshot_attempts:21": "2",
+        "screenshot_attempts:22": "3",
+      },
+    };
+    await writeCatalogAdminSnapshotCache(kv as unknown as KVNamespace, state);
+    await expect(readCatalogAdminStatusCache(kv as unknown as KVNamespace)).resolves.toMatchObject({
+      revision: 21,
+      itemCount: 2,
+      metadata: {
+        admin_import_target: "100",
+        admin_import_cursor: "3",
+        admin_import_added: "100",
+        admin_import_state: "running",
+        metadata_refresh_cursor: "1",
+        metadata_refresh_state: "metadata",
+      },
+      screenshotFailures: 1,
+      screenshotRetries: 1,
+    });
   });
 });
