@@ -4,7 +4,7 @@ import { SupportPage } from "@/components/yume/SupportPage";
 
 describe("YUBERA support page", () => {
   it("shows the required preset amounts and defaults to 100 Stars", () => {
-    render(<SupportPage onBack={() => undefined} />);
+    render(<SupportPage />);
     for (const amount of [50, 100, 250, 500, 1000]) {
       expect(screen.getByRole("button", { name: new RegExp("^" + String(amount) + "$") })).toBeInTheDocument();
     }
