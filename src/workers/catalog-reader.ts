@@ -14,12 +14,21 @@ import {
 } from "@/data/catalog-kv-cache.shared";
 
 type Env = {
-  CATALOG_BUCKET: R2Bucket;
+  R2_ACCOUNT_ID: string;
+  R2_ACCESS_KEY_ID: string;
+  R2_SECRET_ACCESS_KEY: string;
   CATALOG_READER_TOKEN: string;
   YUME_CATALOG_CACHE: KVNamespace;
 };
+type TemporaryCredentials = {
+  accessKeyId: string;
+  secretAccessKey: string;
+  sessionToken: string;
+  expiresAt: number;
+};
 
 const encoder = new TextEncoder();
+let cachedCredentials: TemporaryCredentials | null = null;
 let cachedPublicRevision: number | null = null;
 let cachedPublicBody: string | null = null;
 let cachedAdminRevision: number | null = null;
@@ -67,10 +76,109 @@ function validPointer(value: unknown): value is CatalogPointer {
     /^[a-f0-9]{64}$/i.test(pointer.checksum);
 }
 
+function hex(value: ArrayBuffer): string {
+  return [...new Uint8Array(value)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+async function sha256(value: string | ArrayBuffer): Promise<ArrayBuffer> {
+  return crypto.subtle.digest("SHA-256", typeof value === "string" ? encoder.encode(value) : value);
+}
+
+async function hmac(key: ArrayBuffer | string, value: string): Promise<ArrayBuffer> {
+  const raw = typeof key === "string" ? encoder.encode(key) : key;
+  const cryptoKey = await crypto.subtle.importKey("raw", raw, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  return crypto.subtle.sign("HMAC", cryptoKey, encoder.encode(value));
+}
+
+function base64Url(bytes: Uint8Array): string {
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/=/g, "").replace(/\\+/g, "-").replace(/\\//g, "_");
+}
+
+async function createTemporaryCredentials(env: Env): Promise<TemporaryCredentials> {
+  if (cachedCredentials && cachedCredentials.expiresAt > Date.now() + 60_000) return cachedCredentials;
+  const host = env.R2_ACCOUNT_ID + ".r2.cloudflarestorage.com";
+  const now = Math.floor(Date.now() / 1000);
+  const header = base64Url(encoder.encode(JSON.stringify({ alg: "HS256", typ: "JWT" })));
+  const payload = base64Url(encoder.encode(JSON.stringify({
+    bucket: "yume-catalog",
+    actions: ["GetObject", "HeadObject"],
+    paths: { prefixPaths: ["catalog/v1/"] },
+    sub: env.R2_ACCOUNT_ID,
+    iss: env.R2_ACCESS_KEY_ID,
+    aud: host,
+    iat: now,
+    exp: now + 900,
+  })));
+  const unsigned = header + "." + payload;
+  const signature = base64Url(new Uint8Array(await hmac(env.R2_SECRET_ACCESS_KEY, unsigned)));
+  const jwt = unsigned + "." + signature;
+  const derived = await sha256(jwt);
+  cachedCredentials = {
+    accessKeyId: env.R2_ACCESS_KEY_ID,
+    secretAccessKey: hex(derived),
+    sessionToken: btoa("jwt/" + jwt),
+    expiresAt: (now + 900) * 1000,
+  };
+  return cachedCredentials;
+}
+
+function encodePath(value: string): string {
+  return value.split("/").map((part) =>
+    encodeURIComponent(part).replace(/[!'()*]/g, (char) => "%" + char.charCodeAt(0).toString(16).toUpperCase()),
+  ).join("/");
+}
+
+async function signedGet(env: Env, key: string): Promise<Response> {
+  const credentials = await createTemporaryCredentials(env);
+  const host = env.R2_ACCOUNT_ID + ".r2.cloudflarestorage.com";
+  const path = "/" + encodePath("yume-catalog/" + key);
+  const url = "https://" + host + path;
+  const now = new Date();
+  const amzDate = now.toISOString().replace(/[:-]|\\.\\d{3}/g, "");
+  const date = amzDate.slice(0, 8);
+  const scope = date + "/auto/s3/aws4_request";
+  const payloadHash = hex(await sha256(""));
+  const canonicalHeaders = "host:" + host + "\\n" +
+    "x-amz-content-sha256:" + payloadHash + "\\n" +
+    "x-amz-date:" + amzDate + "\\n" +
+    "x-amz-security-token:" + credentials.sessionToken + "\\n";
+  const signedHeaders = "host;x-amz-content-sha256;x-amz-date;x-amz-security-token";
+  const canonicalRequest = ["GET", path, "", canonicalHeaders, signedHeaders, payloadHash].join("\\n");
+  const stringToSign = ["AWS4-HMAC-SHA256", amzDate, scope, hex(await sha256(canonicalRequest))].join("\\n");
+  const kDate = await hmac("AWS4" + credentials.secretAccessKey, date);
+  const kRegion = await hmac(kDate, "auto");
+  const kService = await hmac(kRegion, "s3");
+  const kSigning = await hmac(kService, "aws4_request");
+  const signature = hex(await hmac(kSigning, stringToSign));
+  const authorization = "AWS4-HMAC-SHA256 Credential=" + credentials.accessKeyId + "/" + scope +
+    ", SignedHeaders=" + signedHeaders + ", Signature=" + signature;
+  return fetch(url, {
+    method: "GET",
+    headers: {
+      Authorization: authorization,
+      "x-amz-content-sha256": payloadHash,
+      "x-amz-date": amzDate,
+      "x-amz-security-token": credentials.sessionToken,
+    },
+    signal: AbortSignal.timeout(8000),
+  });
+}
+
+async function readR2Text(env: Env, key: string): Promise<{ body: string; checksum: string | null }> {
+  const response = await signedGet(env, key);
+  if (response.status === 404) throw new Error("R2 object is missing: " + key);
+  if (!response.ok) throw new Error("R2 object read failed with HTTP " + response.status);
+  return {
+    body: await response.text(),
+    checksum: response.headers.get("x-amz-meta-checksum"),
+  };
+}
+
 async function readCurrentPointer(env: Env): Promise<CatalogPointer | null> {
-  const object = await env.CATALOG_BUCKET.get(CATALOG_CURRENT_KEY);
-  if (!object) return null;
-  const pointer = await object.json<unknown>();
+  const object = await readR2Text(env, CATALOG_CURRENT_KEY);
+  const pointer = JSON.parse(object.body) as unknown;
   return validPointer(pointer) ? pointer : null;
 }
 
@@ -80,12 +188,11 @@ async function readRevisionBody(
   expectedChecksum?: string,
 ): Promise<{ body: string; checksum: string } | null> {
   const key = CATALOG_REVISION_PREFIX + revision + ".json";
-  const object = await env.CATALOG_BUCKET.get(key);
-  if (!object) return null;
-  const checksum = object.customMetadata?.checksum;
+  const object = await readR2Text(env, key);
+  const checksum = object.checksum;
   if (!checksum || !/^[a-f0-9]{64}$/i.test(checksum) ||
       (expectedChecksum && checksum !== expectedChecksum)) return null;
-  return { body: await object.text(), checksum };
+  return { body: object.body, checksum };
 }
 
 function stateIsValid(state: unknown, revision: number): state is CatalogState {
