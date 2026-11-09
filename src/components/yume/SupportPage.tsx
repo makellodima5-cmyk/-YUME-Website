@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, CheckCircle2, ChevronRight, Info, Pencil, Rocket, Send, Server, Star } from "lucide-react";
+import { ArrowLeft, Info, Pencil, Rocket, Send, Server, Star } from "lucide-react";
 import { getTelegramWebApp, telegramHapticImpact, telegramHapticNotification } from "@/lib/telegram-mini-app";
 
 type Props = { onBack: () => void };
