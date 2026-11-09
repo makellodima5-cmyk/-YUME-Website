@@ -38,6 +38,7 @@ import { absoluteImageUrl, canonicalUrl, sanitizeMetaDescription } from "@/data/
 import { toSameOriginShikimoriScreenshot } from "@/lib/shikimori-image-proxy";
 import { PLAYBACK_PROGRESS_UPDATED_EVENT, readPlaybackProgress, savePlaybackProgress, markPlaybackEpisodeCompleted, type PlaybackProgressEntry } from "@/data/playback-progress";
 import { parseKodikPlaybackMessage } from "@/data/kodik-playback-events";
+import { canReturnToAnimeOrigin } from "@/data/anime-navigation";
 
 function formatAnimeDate(value: string | undefined, language: "ru" | "en", includeTime = false): string | null {
   if (!value) return null;
@@ -493,6 +494,10 @@ function AnimeDetailPage() {
     }
     if (view === "catalog") {
       try {
+        if (canReturnToAnimeOrigin(window.sessionStorage, window.history.length)) {
+          window.history.back();
+          return;
+        }
         const saved = parseCatalogReturnState(window.sessionStorage.getItem(CATALOG_RETURN_STORAGE_KEY));
         if (saved) {
           window.sessionStorage.removeItem(CATALOG_RETURN_STORAGE_KEY);
@@ -501,7 +506,7 @@ function AnimeDetailPage() {
           return;
         }
       } catch {
-        // Fall back to the first catalog page when browser storage is unavailable.
+        // Fall back to the catalogue when the browser history or storage is unavailable.
       }
     }
     navigate({ to: "/", search: { section: view } });
