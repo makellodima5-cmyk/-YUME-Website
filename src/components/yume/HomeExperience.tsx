@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent, type ReactNode, type KeyboardEvent, type MouseEvent } from "react";
-import { Bookmark, ChevronRight, Play, Star, Megaphone, Radio, Layers } from "lucide-react";
+import { Bookmark, ChevronRight, Play, Star, Megaphone, Radio, Layers, Send } from "lucide-react";
 import type { Anime } from "@/data/anime";
 import { COLLECTIONS } from "@/data/anime";
 import { displayAnimeTitle, displayAnimeKind, useYumePreferences, type TranslationKey } from "@/data/preferences";
@@ -221,10 +221,10 @@ export function HomeExperience({
           </section>
         )}
 
-        <button type="button" onClick={onSupport} className="yubera-support-entry group my-3 flex min-h-[76px] w-full items-center gap-3 rounded-[19px] border border-[#3a3b43] bg-[#1b1c23] px-3.5 py-2.5 text-left transition-colors hover:border-[#ff765c]/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ff6245] sm:my-4 sm:px-5">
+        <button type="button" onClick={onSupport} className="yubera-support-entry group my-3 flex min-h-[68px] w-full items-center gap-3 rounded-[19px] border border-[#3a3b43] bg-[#1b1c23] px-3.5 py-2.5 text-left transition-colors hover:border-[#ff765c]/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ff6245] sm:my-4 sm:px-5">
           <span className="relative grid h-12 w-12 shrink-0 place-items-center">
             <Star aria-hidden="true" className="h-10 w-10 fill-[#ffc044] text-[#ffe49a] drop-shadow-[0_0_8px_rgba(255,190,55,.45)]" strokeWidth={1.5} />
-            <span aria-hidden="true" className="absolute bottom-0 right-0 grid h-[19px] w-[19px] place-items-center rounded-full border-2 border-[#1b1c23] bg-[#229ED9] text-[9px] font-black text-white">➤</span>
+            <span aria-hidden="true" className="absolute bottom-0 right-0 grid h-[19px] w-[19px] place-items-center rounded-full border-2 border-[#1b1c23] bg-[#229ED9] text-white"><Send className="h-2.5 w-2.5 fill-current" /></span>
           </span>
           <span aria-hidden="true" className="h-12 w-px shrink-0 bg-white/20" />
           <span className="min-w-0 flex-1">
