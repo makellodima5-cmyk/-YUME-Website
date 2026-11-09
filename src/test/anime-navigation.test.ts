@@ -28,6 +28,12 @@ describe("browser anime return navigation", () => {
     expect(canReturnToAnimeOrigin(storage, 1)).toBe(false);
   });
 
+  it("allows Back from a same-origin anchor link without a session marker", () => {
+    const storage = memoryStorage();
+    expect(canReturnToAnimeOrigin(storage, 3, "https://yubera.example/?section=news", "https://yubera.example")).toBe(true);
+    expect(canReturnToAnimeOrigin(storage, 3, "https://other.example/", "https://yubera.example")).toBe(false);
+  });
+
   it("clears the marker when the user returns to the originating page", () => {
     const storage = memoryStorage();
     markAnimeNavigationOrigin(storage);
