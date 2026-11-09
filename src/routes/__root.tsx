@@ -213,6 +213,25 @@ function RootComponent() {
   }, []);
 
   useEffect(() => {
+    const root = document.documentElement;
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reducedMotion) return;
+    root.classList.remove("yubera-route-enter");
+    const frame = window.requestAnimationFrame(() => root.classList.add("yubera-route-enter"));
+    const handleAnimationEnd = (event: AnimationEvent) => {
+      if (event.target === document.getElementById("main-content")) {
+        root.classList.remove("yubera-route-enter");
+      }
+    };
+    document.addEventListener("animationend", handleAnimationEnd);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      document.removeEventListener("animationend", handleAnimationEnd);
+      root.classList.remove("yubera-route-enter");
+    };
+  }, [routeLocation.href]);
+
+  useEffect(() => {
     const webApp = getTelegramWebApp();
     const backButton = webApp?.BackButton;
     if (!webApp?.initData || !backButton) return;
