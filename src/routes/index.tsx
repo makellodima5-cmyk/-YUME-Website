@@ -25,6 +25,7 @@ import {
 const homeSocialImage = "/images/yubera/yubera_banner.webp";
 import { absoluteImageUrl, canonicalUrl } from "@/data/seo";
 import { getTelegramWebApp, telegramHapticImpact } from "@/lib/telegram-mini-app";
+import { clearAnimeNavigationOrigin, markAnimeNavigationOrigin } from "@/data/anime-navigation";
 import { setProfileStorageAuthenticated, syncTelegramLibrary } from "@/data/profile-storage";
 import { USER_NOTIFICATIONS } from "@/data/notifications.shared";
 import { runAdminTrailerUpdate, type AdminTrailerStats } from "@/data/admin-trailer-update";
@@ -77,6 +78,7 @@ function saveLocalNotificationIds(ids: string[]): boolean {
 type MetadataCatalogStats = { total:number; incomplete:number; complete:number; announced:number; missingTrailer:number; hasTrailer:number; savedScreenshotUrls:number; screenshotDone:number; screenshotRetry:number; screenshotFailed:number };
 
 export const Route = createFileRoute("/")({
+  staleTime: 30_000,
   head: () => {
     const image = absoluteImageUrl(homeSocialImage);
     return {
@@ -120,7 +122,6 @@ export const Route = createFileRoute("/")({
         anime: [],
         popular: [],
         sectionFeeds: { airing: [], newReleases: [], announcements: [] },
-        catalogIds: [],
         catalogTotal: 0,
         catalogPage: 1,
         catalogFacets: null,
@@ -139,7 +140,7 @@ export const Route = createFileRoute("/")({
         const page = Math.min(Math.max(1, deps.page ?? 1), pageCount);
         return {
           catalogMode: "paged", anime: paginateCatalog(results, page, pageSize), popular: [],
-          sectionFeeds: { airing: [], newReleases: [], announcements: [] }, catalogIds: [],
+          sectionFeeds: { airing: [], newReleases: [], announcements: [] },
           catalogTotal: results.length, catalogPage: page, catalogFacets: null,
           apiError: catalog.error, catalogProgress: catalog.progress,
         };
@@ -166,7 +167,7 @@ export const Route = createFileRoute("/")({
       return {
         catalogMode: "paged",
         anime: paginateCatalog(results, page, pageSize), popular: [],
-        sectionFeeds: { airing: [], newReleases: [], announcements: [] }, catalogIds: [],
+        sectionFeeds: { airing: [], newReleases: [], announcements: [] },
         catalogTotal: results.length, catalogPage: page,
         catalogFacets: {
           genres: Array.from(new Set(allItems.flatMap(a => a.genres))).sort((a,b)=>a.localeCompare(b,"ru")),
@@ -188,25 +189,16 @@ export const Route = createFileRoute("/")({
         console.error("[YUME] Global home featured selection is unavailable; no alternate titles are fabricated.", error);
       }
     }
-    const popular = refreshedItems.filter((anime) => (anime.rating ?? 0) >= 8).sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1));
-    const sectionFeeds = {
-      airing: refreshedItems.filter((anime) => anime.status === "Онгоинг").sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? "") || b.year - a.year),
-      newReleases: refreshedItems.filter((anime) => isNewRelease(anime)).sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? "") || (b.rating ?? -1) - (a.rating ?? -1)),
-      announcements: refreshedItems.filter((anime) => anime.status === "Анонс").sort((a, b) => {
-        const aDate = getExactReleaseDate(a.airedOn), bDate = getExactReleaseDate(b.airedOn);
-        if (aDate && bDate) return aDate.localeCompare(bDate);
-        if (aDate) return -1;
-        if (bDate) return 1;
-        return a.year - b.year || (b.rating ?? -1) - (a.rating ?? -1);
-      }),
-    };
 
+    // Keep the catalogue as the single serialized source of truth. Sending
+    // several overlapping, fully-sorted copies of the same catalogue through
+    // the server-function payload costs CPU and memory on every cold request.
+    // The UI derives these views once with useMemo from the catalogue itself.
     return {
       anime: refreshedItems,
       featuredAnime,
-      popular,
-      sectionFeeds,
-      catalogIds: refreshedItems.map((anime) => anime.id),
+      popular: [],
+      sectionFeeds: null,
       apiError: catalog.error,
       catalogProgress: catalog.progress,
       catalogMode: "full", catalogTotal: refreshedItems.length, catalogPage: 1, catalogFacets: null,
@@ -406,7 +398,6 @@ function Index() {
     featuredAnime: initialFeaturedAnime = [],
     popular: initialPopularAnime,
     sectionFeeds: initialSectionFeeds,
-    catalogIds,
     apiError,
     catalogProgress: initialCatalogProgress, catalogMode, catalogTotal: initialCatalogTotal, catalogPage: loadedCatalogPage, catalogFacets,
   } = Route.useLoaderData();
@@ -414,7 +405,6 @@ function Index() {
   const [popularAnime, setPopularAnime] = useState<Anime[]>(initialPopularAnime);
   const [catalogProgress, setCatalogProgress] = useState(initialCatalogProgress);
   const [sectionFeeds, setSectionFeeds] = useState(initialSectionFeeds);
-  const allowedCatalogIds = useMemo(() => new Set(catalogIds), [catalogIds]);
   const catalogAnimeRef = useRef(catalogAnime);
   const ANIME = catalogAnime;
   // Initialize view before effects that read it during server-side rendering.
@@ -1219,7 +1209,6 @@ function Index() {
       const response = await fetch("/api/admin/catalog-import", {method:"POST",credentials:"same-origin",cache:"no-store",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"delete_title",animeId})});
       const payload = await response.json().catch(()=>({})) as {isAdmin?:boolean;deleted?:boolean;error?:string;message?:string;anime?:{id:string;title:string}};
       if (!response.ok || payload.isAdmin !== true || payload.deleted !== true) throw new Error(payload.message ?? payload.error ?? (language==="ru" ? "Не удалось удалить тайтл." : "Could not delete title."));
-      allowedCatalogIds.delete(animeId);
       catalogAnimeRef.current = catalogAnimeRef.current.filter(item => item.id !== animeId);
       setCatalogAnime(catalogAnimeRef.current);
       setPopularAnime(current => current.filter(item => item.id !== animeId));
@@ -1383,6 +1372,10 @@ function Index() {
   const [collection, setCollection] = useState<string | null>(null);
 
   useEffect(() => {
+    try { clearAnimeNavigationOrigin(window.sessionStorage); } catch { /* Storage can be unavailable in restricted browser contexts. */ }
+  }, []);
+
+  useEffect(() => {
     const openAuth = (event: Event) => {
       const detail = (event as CustomEvent<{ mode?: unknown }>).detail;
       setViewRaw(detail?.mode === "register" ? "register" : "login");
@@ -1461,6 +1454,7 @@ function Index() {
     window.requestAnimationFrame(() => document.getElementById("collection-anime-list")?.scrollIntoView({ behavior: "smooth", block: "start" }));
   };
   const select = (anime: Anime) => {
+    try { markAnimeNavigationOrigin(window.sessionStorage); } catch { /* Native history remains the fallback. */ }
     if (view === "catalog") {
       try {
         window.sessionStorage.setItem(CATALOG_RETURN_STORAGE_KEY, serializeCatalogReturnState({
@@ -1629,46 +1623,56 @@ function Index() {
   const activeCollectionAnime = activeCollection ? ANIME : [];
   const totalCollectionTitles = activeCollection ? initialCatalogTotal : 0;
   const totalCollectionPages = getCatalogPageCount(totalCollectionTitles, 20);
-  const newReleaseAnime = (sectionFeeds?.newReleases ?? ANIME
-    .filter((anime) => isNewRelease(anime)))
-    .sort((a, b) => {
-      const aDate = getExactReleaseDate(a.airedOn);
-      const bDate = getExactReleaseDate(b.airedOn);
-      if (aDate && bDate) return bDate.localeCompare(aDate);
-      if (aDate) return -1;
-      if (bDate) return 1;
-      return (b.rating ?? -1) - (a.rating ?? -1);
-    });
+  const shouldBuildHomeShelves = view === "home" && !searching;
+  const newReleaseAnime = useMemo(() => {
+    if (!shouldBuildHomeShelves && view !== "new-releases") return [];
+    return (sectionFeeds?.newReleases ?? ANIME.filter((anime) => isNewRelease(anime)))
+      .slice()
+      .sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? "") || (b.rating ?? -1) - (a.rating ?? -1));
+  }, [sectionFeeds, ANIME, shouldBuildHomeShelves, view]);
   const newReleaseCards = newReleaseAnime.slice(0, 12);
   const totalNewReleasesPages = Math.max(1, Math.ceil(newReleaseAnime.length / catalogPageSize));
   const visibleNewReleaseAnime = newReleaseAnime.slice((newReleasesPage - 1) * catalogPageSize, newReleasesPage * catalogPageSize);
 
-  const sortedPopularAnime = popularAnime.filter((anime) => (anime.rating ?? 0) >= 8);
+  const sortedPopularAnime = useMemo(() => {
+    if (!shouldBuildHomeShelves && view !== "popular") return [];
+    const source = popularAnime.length ? popularAnime : ANIME;
+    return source
+      .filter((anime) => (anime.rating ?? 0) >= 8)
+      .slice()
+      .sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1));
+  }, [popularAnime, ANIME, shouldBuildHomeShelves, view]);
   const popularCards = sortedPopularAnime.slice(0, 12);
   const totalPopularPages = Math.max(1, Math.ceil(sortedPopularAnime.length / catalogPageSize));
   const visiblePopularAnime = sortedPopularAnime.slice((popularPage - 1) * catalogPageSize, popularPage * catalogPageSize);
 
-  const announcementAnime = sectionFeeds
-    ? sectionFeeds.announcements
-    : ANIME
-      .filter((anime) => isUpcomingAnnouncement(anime))
-      .sort((a, b) => {
-        const aDate = getExactReleaseDate(a.airedOn);
-        const bDate = getExactReleaseDate(b.airedOn);
-        if (aDate && bDate) return aDate.localeCompare(bDate);
-        if (aDate) return -1;
-        if (bDate) return 1;
-        return a.year - b.year || (b.rating ?? -1) - (a.rating ?? -1);
-      });
+  const announcementAnime = useMemo(() => {
+    if (!shouldBuildHomeShelves && view !== "announcements") return [];
+    return sectionFeeds
+      ? sectionFeeds.announcements
+      : ANIME
+        .filter((anime) => isUpcomingAnnouncement(anime))
+        .sort((a, b) => {
+          const aDate = getExactReleaseDate(a.airedOn);
+          const bDate = getExactReleaseDate(b.airedOn);
+          if (aDate && bDate) return aDate.localeCompare(bDate);
+          if (aDate) return -1;
+          if (bDate) return 1;
+          return a.year - b.year || (b.rating ?? -1) - (a.rating ?? -1);
+        });
+  }, [sectionFeeds, ANIME, shouldBuildHomeShelves, view]);
   const announcementCards = announcementAnime.slice(0, 12);
   const totalAnnouncementsPages = Math.max(1, Math.ceil(announcementAnime.length / catalogPageSize));
   const visibleAnnouncementAnime = announcementAnime.slice((announcementsPage - 1) * catalogPageSize, announcementsPage * catalogPageSize);
 
-  const airingAnime = sectionFeeds
-    ? sectionFeeds.airing
-    : ANIME
-      .filter((anime) => isEligibleAiringAnime(anime))
-      .sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? "") || b.year - a.year);
+  const airingAnime = useMemo(() => {
+    if (!shouldBuildHomeShelves && view !== "airing") return [];
+    return sectionFeeds
+      ? sectionFeeds.airing
+      : ANIME
+        .filter((anime) => anime.status === "Онгоинг")
+        .sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? "") || b.year - a.year);
+  }, [sectionFeeds, ANIME, shouldBuildHomeShelves, view]);
   const airingCards = airingAnime.slice(0, 12);
   const totalAiringPages = Math.max(1, Math.ceil(airingAnime.length / catalogPageSize));
   const visibleAiringAnime = airingAnime.slice((airingPage - 1) * catalogPageSize, airingPage * catalogPageSize);
@@ -2051,7 +2055,7 @@ function Index() {
           )}
         </main>
       ) : view === "my" ? (
-        <MyHub animeList={ANIME} onNavigate={setView} onSelect={select} showNotifications={isTelegramMiniApp} unreadNotificationCount={unreadNotificationCount} />
+        <MyHub animeList={ANIME} onNavigate={setView} onSelect={select} showNotifications unreadNotificationCount={unreadNotificationCount} />
       ) : view === "tracked-titles" ? (
         <TrackedTitlesPage animeList={ANIME} onNavigate={setView} onSelect={select} />
       ) : view === "news" ? (
@@ -2419,7 +2423,7 @@ function Index() {
             { id: "profile" as View, label: language === "ru" ? "Профиль" : "Profile", icon: UserRound, active: ["profile", "admin", "privacy", "privacy-policy", "rules", "rights"].includes(view) },
           ].map((item) => {
             const Icon = item.icon;
-            const hasUnread = item.id === "my" && isTelegramMiniApp && unreadNotificationCount > 0;
+            const hasUnread = item.id === "my" && unreadNotificationCount > 0;
             return <button key={item.id} type="button" onClick={() => setView(item.id)} aria-current={item.active ? "page" : undefined} aria-label={hasUnread ? (language === "ru" ? "Моё, есть непрочитанные уведомления" : "My, unread notifications") : item.label}><span className="relative inline-flex"><Icon className="h-5 w-5" />{hasUnread && <span className="absolute -right-1 -top-0.5 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-[#101116]" aria-hidden="true" />}</span><span>{item.label}</span></button>;
           })}
         </nav>

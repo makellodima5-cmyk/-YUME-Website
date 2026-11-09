@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import { Play, Search, Shuffle, SlidersHorizontal, X, ChevronRight, Layers } from "lucide-react";
 import { type Anime, CONTINUE, COLLECTIONS, byId } from "@/data/anime";
 import { matchesCollectionGenres } from "@/data/catalog-utils";
@@ -171,17 +171,29 @@ function stableCollectionPosterRank(collectionId: string, animeId: string): numb
 
 export function CollectionsGrid({ onOpen, animeList }: { onOpen: (id: string) => void; animeList: Anime[] }) {
   const { t } = useYumePreferences();
-  const collections = COLLECTIONS.map((collection) => {
-    const matches = animeList
-      .filter((anime) => matchesCollectionGenres(anime.genres, collection.genres))
-      .sort((a, b) => stableCollectionPosterRank(collection.id, a.id) - stableCollectionPosterRank(collection.id, b.id) || a.id.localeCompare(b.id));
-    return { collection, matches, posters: matches.slice(0, 3) };
-  }).filter(({ matches }) => matches.length > 0);
+  const collections = useMemo(() => COLLECTIONS.flatMap((collection) => {
+    let count = 0;
+    const topPosters: Array<{ anime: Anime; rank: number }> = [];
+    for (const anime of animeList) {
+      if (!matchesCollectionGenres(anime.genres, collection.genres)) continue;
+      count += 1;
+      const rank = stableCollectionPosterRank(collection.id, anime.id);
+      const position = topPosters.findIndex((entry) =>
+        rank < entry.rank || (rank === entry.rank && anime.id.localeCompare(entry.anime.id) < 0),
+      );
+      if (position === -1) {
+        if (topPosters.length < 3) topPosters.push({ anime, rank });
+      } else {
+        topPosters.splice(position, 0, { anime, rank });
+        if (topPosters.length > 3) topPosters.pop();
+      }
+    }
+    return count > 0 ? [{ collection, count, posters: topPosters.map((entry) => entry.anime) }] : [];
+  }), [animeList]);
 
   return (
     <div className="yubera-home-collections yubera-collections-list" aria-label={t("collections.title")}>
-      {collections.map(({ collection, matches, posters }) => {
-        const count = matches.length;
+      {collections.map(({ collection, count, posters }) => {
         const remainder = count % 100;
         const lastDigit = count % 10;
         const countKey = remainder >= 11 && remainder <= 14 ? "collection.countMany"

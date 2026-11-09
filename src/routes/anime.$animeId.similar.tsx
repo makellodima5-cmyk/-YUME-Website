@@ -6,6 +6,7 @@ import { displayAnimeTitle, useYumePreferences } from "@/data/preferences";
 import { canonicalUrl } from "@/data/seo";
 
 export const Route = createFileRoute("/anime/$animeId/similar")({
+  staleTime: 30_000,
   loader: async ({ params }) => {
     const result = await getShikimoriAnimeDetails({ data: { animeId: params.animeId } });
     if (!result.anime && !result.apiError) throw notFound();

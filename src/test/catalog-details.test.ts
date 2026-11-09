@@ -87,6 +87,31 @@ describe("related anime selection", () => {
       .toEqual(["two-genres", "same-genre", "unrelated"]);
   });
 
+  it("keeps original catalogue order for equally ranked related titles", () => {
+    const anime = { ...ANIME[0]!, id: "current", genres: ["Экшен"] };
+    const candidates = [
+      { ...ANIME[1]!, id: "first", genres: ["Экшен"], rating: 8.5 },
+      { ...ANIME[2]!, id: "second", genres: ["Экшен"], rating: 8.5 },
+      { ...ANIME[3]!, id: "third", genres: ["Экшен"], rating: 8.5 },
+    ];
+    expect(selectRelatedAnime(anime, candidates, 2).map((item) => item.id)).toEqual(["first", "second"]);
+  });
+
+  it("selects a bounded top-K from a large catalogue", () => {
+    const anime = { ...ANIME[0]!, id: "current", genres: ["Экшен", "Фэнтези"] };
+    const candidates = Array.from({ length: 2_000 }, (_, index) => ({
+      ...ANIME[index % ANIME.length]!,
+      id: String(index + 1),
+      genres: index % 97 === 0 ? ["Экшен", "Фэнтези"] : index % 7 === 0 ? ["Экшен"] : ["Комедия"],
+      rating: (index % 10) + 0.1,
+    }));
+    const originalLength = candidates.length;
+    const selected = selectRelatedAnime(anime, candidates, 6);
+    expect(selected).toHaveLength(6);
+    expect(selected[0]?.genres).toEqual(["Экшен", "Фэнтези"]);
+    expect(candidates).toHaveLength(originalLength);
+  });
+
   it("honors the limit and does not mutate the candidate array", () => {
     const anime = { ...ANIME[0]!, id: "current", genres: ["Экшен"] };
     const candidates = [

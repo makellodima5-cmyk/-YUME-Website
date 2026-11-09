@@ -16,6 +16,7 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import { YumePreferencesProvider, useYumePreferences } from "@/data/preferences";
 import { DEFAULT_META_DESCRIPTION, SITE_NAME } from "@/data/seo";
 import { getTelegramWebApp, initializeTelegramMiniApp } from "@/lib/telegram-mini-app";
+import { clearAnimeNavigationOrigin } from "@/data/anime-navigation";
 import { TelegramSubscriptionGate } from "@/components/yume/TelegramSubscriptionGate";
 import { CookieConsentBanner } from "@/components/yume/CookieConsentBanner";
 
@@ -177,10 +178,17 @@ function RootComponent() {
   const navigationStack = useRef<string[]>([]);
 
   useEffect(() => {
-    const initialHref = router.history.location.href;
+    const initialLocation = router.history.location;
+    const initialHref = initialLocation.href;
     navigationStack.current = [initialHref];
+    if (!initialLocation.pathname.startsWith("/anime/")) {
+      try { clearAnimeNavigationOrigin(window.sessionStorage); } catch { /* Session storage is optional. */ }
+    }
     return router.history.subscribe(({ location, action }) => {
       const href = location.href;
+      if (!location.pathname.startsWith("/anime/")) {
+        try { clearAnimeNavigationOrigin(window.sessionStorage); } catch { /* Session storage is optional. */ }
+      }
       const stack = navigationStack.current;
       if (action.type === "PUSH") {
         if (stack[stack.length - 1] !== href) stack.push(href);
@@ -211,6 +219,25 @@ function RootComponent() {
       cleanup?.();
     };
   }, []);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reducedMotion) return;
+    root.classList.remove("yubera-route-enter");
+    const frame = window.requestAnimationFrame(() => root.classList.add("yubera-route-enter"));
+    const handleAnimationEnd = (event: AnimationEvent) => {
+      if (event.target === document.getElementById("main-content")) {
+        root.classList.remove("yubera-route-enter");
+      }
+    };
+    document.addEventListener("animationend", handleAnimationEnd);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      document.removeEventListener("animationend", handleAnimationEnd);
+      root.classList.remove("yubera-route-enter");
+    };
+  }, [routeLocation.href]);
 
   useEffect(() => {
     const webApp = getTelegramWebApp();

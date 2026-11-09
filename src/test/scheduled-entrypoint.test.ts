@@ -5,13 +5,14 @@ import { resolve } from "node:path";
 
 describe("automatic Worker maintenance", () => {
   it("keeps scheduled catalogue refresh disabled and routes catalogue operations through R2", async () => {
-    const [viteConfig, catalogImporter, wranglerConfig, queueConfig, workflow, homeRoute, queueConsumer, queueWorker] = await Promise.all([
+    const [viteConfig, catalogImporter, wranglerConfig, queueConfig, workflow, homeRoute, animeSections, queueConsumer, queueWorker] = await Promise.all([
       readFile(resolve(process.cwd(), "vite.config.ts"), "utf8"),
       readFile(resolve(process.cwd(), "src/data/admin-catalog-import.server.ts"), "utf8"),
       readFile(resolve(process.cwd(), "wrangler.jsonc"), "utf8"),
       readFile(resolve(process.cwd(), "wrangler.queue.jsonc"), "utf8"),
       readFile(resolve(process.cwd(), ".github/workflows/cloudflare-worker.yml"), "utf8"),
       readFile(resolve(process.cwd(), "src/routes/index.tsx"), "utf8"),
+      readFile(resolve(process.cwd(), "src/data/anime-sections.ts"), "utf8"),
       readFile(resolve(process.cwd(), "src/data/episode-notification-queue.server.ts"), "utf8"),
       readFile(resolve(process.cwd(), "src/queue-worker.ts"), "utf8"),
     ]);
@@ -42,7 +43,8 @@ describe("automatic Worker maintenance", () => {
     expect(homeRoute).toContain('action:"refresh_section_metadata"');
     expect(homeRoute).not.toContain("setInterval(() => { void refreshSectionFeeds(); }");
     expect(homeRoute).toContain('anime.status === "Онгоинг"');
-    expect(homeRoute).toContain('anime.status === "Анонс"');
+    expect(homeRoute).toContain("isUpcomingAnnouncement(anime)");
+    expect(animeSections).toContain('anime.status !== "Анонс"');
 
     // Cloudflare Workers Builds owns production deploys; GitHub Actions validates artifacts only.
     expect(workflow).toContain("Validate Queue consumer Worker deploy artifact");
