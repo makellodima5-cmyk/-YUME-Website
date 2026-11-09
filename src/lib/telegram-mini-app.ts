@@ -22,6 +22,12 @@ export interface TelegramWebApp {
   viewportStableHeight?: number;
   safeAreaInset?: { top?: number; right?: number; bottom?: number; left?: number };
   contentSafeAreaInset?: { top?: number; right?: number; bottom?: number; left?: number };
+  BackButton?: {
+    show(): void;
+    hide(): void;
+    onClick?(callback: () => void): unknown;
+    offClick?(callback: () => void): unknown;
+  };
   ready(): void;
   expand(): void;
   openTelegramLink?(url: string): void;
