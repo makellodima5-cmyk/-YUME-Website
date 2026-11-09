@@ -1,6 +1,6 @@
 import { env as cloudflareEnv } from "cloudflare:workers";
 import type { Anime } from "@/data/anime";
-import { readAdminCatalogState, submitCatalogMutation } from "@/data/catalog-r2.server";
+import { readAdminCatalogState, readAdminCatalogStatus, submitCatalogMutation } from "@/data/catalog-r2.server";
 import { retryAfterMilliseconds } from "@/data/retry-after";
 import { hasAdminPasswordSession, isAdminPasswordConfigured } from "@/lib/admin-password.server";
 
@@ -200,8 +200,7 @@ async function recentAudit(db:D1Database):Promise<Array<{id:number;action:string
   const result=await db.prepare("SELECT id,action,status,details,created_at FROM yume_admin_audit_log ORDER BY id DESC LIMIT 20").all<{id:number;action:string;status:string;details:string;created_at:string}>();
   return (result.results??[]).map(row=>({id:row.id,action:row.action,status:row.status,details:(()=>{try{return JSON.parse(row.details) as Record<string,unknown>;}catch{return {};}})(),created_at:row.created_at}));
 }
-function metadata(state: Awaited<ReturnType<typeof readAdminCatalogState>>) {
-  const values = state.metadata;
+function metadataValues(values: Record<string,string>) {
   return {
     target:Number(values.admin_import_target ?? 0), cursor:Number(values.admin_import_cursor ?? 1),
     added:Number(values.admin_import_added ?? 0), skipped:Number(values.admin_import_skipped ?? 0),
@@ -209,6 +208,9 @@ function metadata(state: Awaited<ReturnType<typeof readAdminCatalogState>>) {
     state:values.admin_import_state ?? "idle", runId:values.admin_import_run_id ?? "", bulkImportBlock18Plus:values.admin_import_block_18_plus !== "0",
     statusFilter:values.admin_import_status_filter ?? "", delayMs:REQUEST_DELAY_MS,
   };
+}
+function metadata(state: Awaited<ReturnType<typeof readAdminCatalogState>>) {
+  return metadataValues(state.metadata);
 }
 function stats(items: Anime[]) {
   const incomplete = items.filter((item) => !item.posterUrl || !item.description || !item.year || item.rating == null).length;
@@ -235,19 +237,29 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
   if (!await hasAdminPasswordSession(request,env)) return json({ isAdmin:false,error:"admin_password_required" },428);
   const { db, actor } = auth;
   try {
-    // Status and quality GETs are read-only and can use the short-lived isolate cache.
-    // Mutating requests still force a fresh checkpoint before applying changes.
+    const query = new URL(request.url).searchParams;
+    // Status polling must not download and parse the multi-megabyte catalogue.
+    if (request.method === "GET" && query.has("status")) {
+      const status = await readAdminCatalogStatus();
+      const current = metadataValues(status.metadata);
+      const metadataCursor = Math.max(0,Number(status.metadata.metadata_refresh_cursor ?? 0) || 0);
+      const metadataRefresh = {
+        autoEnabled:false,
+        phase:status.metadata.metadata_refresh_state ?? "metadata",
+        metadataOffset:metadataCursor,
+        screenshotOffset:metadataCursor,
+        total:status.itemCount,
+        screenshotFailures:status.screenshotFailures,
+        screenshotRetries:status.screenshotRetries,
+        done:metadataCursor >= status.itemCount,
+      };
+      return json({isAdmin:true,...current,metadataRefresh});
+    }
+    // Quality GETs and mutations still need the full snapshot. Mutating requests
+    // force a fresh checkpoint before applying changes.
     const state = await readAdminCatalogState(request.method !== "GET");
     const current = metadata(state);
     if (request.method === "GET") {
-      const query=new URL(request.url).searchParams;
-      if(query.has("status")){
-        const screenshotFailures=Object.keys(state.metadata).filter((key)=>key.startsWith("screenshot_last_error:")&&Boolean(state.metadata[key])).length;
-        const screenshotRetries=Object.keys(state.metadata).filter((key)=>key.startsWith("screenshot_attempts:")&&Number(state.metadata[key])>0&&Number(state.metadata[key])<3).length;
-        const metadataCursor=Math.max(0,Number(state.metadata.metadata_refresh_cursor??0)||0);
-        const metadataRefresh={autoEnabled:false,phase:state.metadata.metadata_refresh_state??"metadata",metadataOffset:metadataCursor,screenshotOffset:metadataCursor,total:state.items.length,screenshotFailures,screenshotRetries,done:metadataCursor>=state.items.length};
-        return json({isAdmin:true,...current,metadataRefresh});
-      }
       const quality = stats(state.items);
       const qualityOffset=Math.max(0,Math.min(state.items.length,Number(query.get("qualityOffset")??0)||0));
       const qualityItems=state.items.map((item)=>({id:item.id,title:item.title,year:item.year,missingYear:!item.year,missingPoster:!item.posterUrl,missingDescription:!item.description})).filter((item)=>item.missingYear||item.missingPoster||item.missingDescription);

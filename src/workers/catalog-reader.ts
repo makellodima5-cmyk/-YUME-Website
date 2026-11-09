@@ -8,8 +8,10 @@ import {
 import {
   publishCatalogSnapshotCachePointer,
   readCatalogAdminCachePointer,
+  readCatalogAdminStatusCache,
   readCatalogCachePointer,
   readCatalogSnapshotCacheDirectText,
+  readCatalogSnapshotCacheText,
   writeCatalogSnapshotCacheText,
 } from "@/data/catalog-kv-cache.shared";
 
@@ -217,6 +219,9 @@ async function loadAdminSnapshot(request: Request, env: Env): Promise<Response> 
   if (pointer) {
     let body = cachedAdminRevision === pointer.revision ? cachedAdminBody : null;
     if (!body) body = await readCatalogSnapshotCacheDirectText(env.YUME_CATALOG_CACHE, pointer.revision);
+    // Older large snapshots use the legacy chunked KV format. Keep it readable
+    // as a recovery path when their R2 revision has already been pruned.
+    if (!body) body = await readCatalogSnapshotCacheText(env.YUME_CATALOG_CACHE, pointer.revision);
     if (!body) {
       const snapshot = await readRevisionBody(env, pointer.revision);
       if (!snapshot) return json({ error: "admin_catalog_checkpoint_unavailable" }, 503);
@@ -247,6 +252,9 @@ async function loadPublicSnapshot(request: Request, env: Env): Promise<Response>
   if (cachePointer) {
     let body = cachedPublicRevision === cachePointer.revision ? cachedPublicBody : null;
     if (!body) body = await readCatalogSnapshotCacheDirectText(env.YUME_CATALOG_CACHE, cachePointer.revision);
+    // Older large snapshots use the legacy chunked KV format. Keep it readable
+    // as a recovery path when their R2 revision has already been pruned.
+    if (!body) body = await readCatalogSnapshotCacheText(env.YUME_CATALOG_CACHE, cachePointer.revision);
     if (!body) {
       const snapshot = await readRevisionBody(env, cachePointer.revision);
       if (!snapshot) return json({ error: "published_catalog_snapshot_unavailable" }, 503);
@@ -303,7 +311,32 @@ export default {
     if (new URL(request.url).pathname !== "/v1/state") return json({ error: "not_found" }, 404);
 
     try {
-      return new URL(request.url).searchParams.get("fresh") === "1"
+      const url = new URL(request.url);
+      if (url.searchParams.get("status") === "1") {
+        const status = await readCatalogAdminStatusCache(env.YUME_CATALOG_CACHE);
+        if (status) return json(status);
+        // Compatibility fallback for deployments that have not populated the
+        // compact status pointer yet.
+        const response = await loadAdminSnapshot(request, env);
+        if (!response.ok) return response;
+        const state = await response.json() as CatalogState;
+        const metadata = state.metadata ?? {};
+        return json({
+          schemaVersion: 1,
+          revision: state.revision,
+          updatedAt: state.updatedAt,
+          itemCount: state.items.length,
+          metadata: Object.fromEntries([
+            "admin_import_target", "admin_import_cursor", "admin_import_added",
+            "admin_import_skipped", "admin_import_incomplete", "admin_import_errors",
+            "admin_import_state", "admin_import_run_id", "admin_import_block_18_plus",
+            "admin_import_status_filter", "metadata_refresh_cursor", "metadata_refresh_state",
+          ].flatMap((key) => typeof metadata[key] === "string" ? [[key, metadata[key]!]] : [])),
+          screenshotFailures: Object.keys(metadata).filter((key) => key.startsWith("screenshot_last_error:") && Boolean(metadata[key])).length,
+          screenshotRetries: Object.keys(metadata).filter((key) => key.startsWith("screenshot_attempts:") && Number(metadata[key]) > 0 && Number(metadata[key]) < 3).length,
+        });
+      }
+      return url.searchParams.get("fresh") === "1"
         ? await loadAdminSnapshot(request, env)
         : await loadPublicSnapshot(request, env);
     } catch (error) {

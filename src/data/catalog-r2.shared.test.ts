@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyCatalogMutation, emptyCatalogState } from "@/data/catalog-r2.shared";
+import { applyCatalogMutation, emptyCatalogState, isCatalogRevisionPinned } from "@/data/catalog-r2.shared";
 import type { Anime } from "@/data/anime";
 
 const anime=(id:string,title="Title"):Anime=>({id,title,original:title,year:2024,episodes:12,episodesAired:0,rating:8,genres:["Драма"],status:"Онгоинг",description:"",hue:120,glyph:"A"});
@@ -30,5 +30,16 @@ describe("R2 catalogue state mutations",()=>{
     expect(batch.items).toHaveLength(1);
     expect(batch.screenshots["7"]).toHaveLength(1);
     expect(batch.metadata).toMatchObject({admin_import_cursor:"2",admin_import_added:"1"});
+  });
+});
+
+
+describe("catalogue revision retention",()=>{
+  it("keeps a revision while it is referenced by either live pointer",()=>{
+    expect(isCatalogRevisionPinned(12,12,14)).toBe(true);
+    expect(isCatalogRevisionPinned(14,12,14)).toBe(true);
+    expect(isCatalogRevisionPinned(11,12,14)).toBe(false);
+    expect(isCatalogRevisionPinned(12,null,14)).toBe(false);
+    expect(isCatalogRevisionPinned(0,0,0)).toBe(false);
   });
 });

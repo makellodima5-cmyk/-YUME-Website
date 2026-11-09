@@ -1,6 +1,7 @@
 import { env as cloudflareEnv } from "cloudflare:workers";
 import type { Anime } from "@/data/anime";
 import { CATALOG_CURRENT_KEY, CATALOG_REVISION_PREFIX, emptyCatalogState, type CatalogPointer, type CatalogState } from "./catalog-r2.shared";
+import type { CatalogAdminStatus } from "./catalog-kv-cache.shared";
 
 type ReaderBinding = { fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> };
 type CoordinatorBinding = { fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> };
@@ -138,6 +139,30 @@ export async function readCatalogState(forceFresh = false): Promise<CatalogState
 /** Read the private import checkpoint, cached separately from the published public snapshot. */
 export async function readAdminCatalogState(forceFresh = false): Promise<CatalogState> {
   return readCachedCatalogState(true, forceFresh);
+}
+
+/** Reads the compact import progress projection without transferring the full catalogue snapshot. */
+export async function readAdminCatalogStatus(): Promise<CatalogAdminStatus> {
+  const reader = environment().YUME_CATALOG_READER;
+  if (!reader) throw new Error("YUME_CATALOG_READER binding is unavailable.");
+  const token = environment().YUME_CATALOG_READER_TOKEN ?? "";
+  const response = await reader.fetch("https://catalog-reader.internal/v1/state?status=1", {
+    method: "GET",
+    headers: { "X-Yume-Reader-Token": token },
+    signal: AbortSignal.timeout(5000),
+  });
+  if (!response.ok) {
+    const body = safeErrorBody(await response.text().catch(() => ""));
+    throw new Error("Private catalogue status reader returned HTTP " + response.status + (body ? ": " + body : ""));
+  }
+  const status = await response.json() as CatalogAdminStatus;
+  if (status.schemaVersion !== 1 || !Number.isSafeInteger(status.revision) ||
+      !Number.isSafeInteger(status.itemCount) || status.itemCount < 0 ||
+      !status.metadata || typeof status.metadata !== "object" ||
+      !Number.isSafeInteger(status.screenshotFailures) || !Number.isSafeInteger(status.screenshotRetries)) {
+    throw new Error("Private catalogue status has an unsupported schema.");
+  }
+  return status;
 }
 
 export async function getR2Catalog(): Promise<R2CatalogResult> {
