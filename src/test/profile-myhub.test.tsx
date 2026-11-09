@@ -66,7 +66,7 @@ describe("Profile and My library pages", () => {
     expect(screen.queryByRole("button", { name: "В профиль" })).not.toBeInTheDocument();
 
     const backEvent = new Event("yume-telegram-back", { cancelable: true });
-    window.dispatchEvent(backEvent);
+    await act(async () => { window.dispatchEvent(backEvent); });
     expect(backEvent.defaultPrevented).toBe(true);
     expect(await screen.findByRole("heading", { name: "Личный профиль" })).toBeInTheDocument();
   });
