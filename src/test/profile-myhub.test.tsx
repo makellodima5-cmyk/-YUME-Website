@@ -57,6 +57,29 @@ describe("Profile and My library pages", () => {
     expect(await screen.findByRole("heading", { name: "Личный профиль" })).toBeInTheDocument();
   });
 
+  it("uses Telegram BackButton to return from profile subpages and hides the in-page back link", async () => {
+    render(withPreferences(
+      <Profile animeList={[]} initialPanel="documents" onSelect={vi.fn()} onCatalog={vi.fn()} telegramMiniApp />,
+    ));
+
+    expect(await screen.findByRole("heading", { name: "Правовая информация" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "В профиль" })).not.toBeInTheDocument();
+
+    const backEvent = new Event("yume-telegram-back", { cancelable: true });
+    window.dispatchEvent(backEvent);
+    expect(backEvent.defaultPrevented).toBe(true);
+    expect(await screen.findByRole("heading", { name: "Личный профиль" })).toBeInTheDocument();
+  });
+
+  it("keeps the in-page profile back link in a regular browser", async () => {
+    render(withPreferences(
+      <Profile animeList={[]} initialPanel="documents" onSelect={vi.fn()} onCatalog={vi.fn()} />,
+    ));
+
+    expect(await screen.findByRole("heading", { name: "Правовая информация" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "В профиль" })).toBeInTheDocument();
+  });
+
   it("keeps Watch Later reachable and explains the empty list to guests", async () => {
     render(withPreferences(
       <Profile animeList={[]} initialPanel="watchlist" onSelect={vi.fn()} onCatalog={vi.fn()} />,
