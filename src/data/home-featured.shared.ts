@@ -16,7 +16,6 @@ export type FeaturedCandidate = Pick<Anime, "id" | "rating" | "posterUrl"> & Ani
 
 export function rankFeaturedCandidates(
   items: readonly Anime[],
-  previousIds: readonly string[] = [],
 ): Anime[] {
   const unique = new Map<string, Anime>();
   for (const item of items) {
@@ -35,10 +34,7 @@ export function rankFeaturedCandidates(
   const ranked = [...unique.values()].sort(
     (a, b) => (b.rating ?? -1) - (a.rating ?? -1) || a.id.localeCompare(b.id),
   );
-  const excluded = new Set(previousIds);
-  const preferred = ranked.filter((item) => !excluded.has(item.id));
-  const fill = ranked.filter((item) => !preferred.some((entry) => entry.id === item.id));
-  return [...preferred, ...fill].slice(0, 3);
+  return ranked.slice(0, 3);
 }
 
 export function hasFeaturedSnapshotExpired(expiresAt: number, now: number): boolean {
