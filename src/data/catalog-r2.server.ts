@@ -165,6 +165,42 @@ export const CATALOG_READER_KEYS = { current: CATALOG_CURRENT_KEY, revisionPrefi
 export const EMPTY_R2_CATALOG_STATE = emptyCatalogState;
 export type { CatalogPointer, CatalogState };
 
+export type HomeFeaturedResult = { items: Anime[]; generatedAt: string; expiresAt: number; revision: number; stale?: boolean };
+
+/** Returns the global 24-hour featured set through the existing catalogue Durable Object. */
+export async function getGlobalHomeFeatured(candidates: Anime[]): Promise<HomeFeaturedResult> {
+  const coordinator = environment().YUME_CATALOG_COORDINATOR;
+  if (!coordinator) throw new Error("YUME_CATALOG_COORDINATOR binding is unavailable.");
+  const eligible = candidates
+    .filter((item) => /^\\d{1,12}$/.test(item.id) && typeof item.posterUrl === "string" && item.posterUrl.trim() &&
+      typeof item.rating === "number" && Number.isFinite(item.rating) && item.rating >= 0 && item.rating <= 10)
+    .sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1) || a.id.localeCompare(b.id))
+    .slice(0, 100);
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const response = await coordinator.fetch("https://catalog-coordinator.internal/internal/v1/featured", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ candidates: eligible }),
+        signal: AbortSignal.timeout(12000),
+      });
+      const result = await response.json().catch(() => ({})) as Partial<HomeFeaturedResult> & { error?: string };
+      if (response.ok && Array.isArray(result.items) && typeof result.generatedAt === "string" &&
+        typeof result.expiresAt === "number" && typeof result.revision === "number") {
+        return result as HomeFeaturedResult;
+      }
+      lastError = new Error(result.error ?? "Global featured selection failed (HTTP " + response.status + ").");
+      if (!RETRYABLE_READER_STATUSES.has(response.status) || attempt === 2) break;
+    } catch (error) {
+      lastError = error;
+      if (attempt === 2) break;
+    }
+    await sleep(300 * Math.pow(2, attempt));
+  }
+  throw lastError instanceof Error ? lastError : new Error("Global featured selection failed.");
+}
+
 export async function submitCatalogMutation(mutation: import("./catalog-r2.shared").CatalogMutation, operationId = crypto.randomUUID().replace(/-/g, "")): Promise<{ revision: number; operationId: string }> {
   const coordinator = environment().YUME_CATALOG_COORDINATOR;
   if (!coordinator) throw new Error("YUME_CATALOG_COORDINATOR binding is unavailable.");

@@ -2,7 +2,7 @@ import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowDownWideNarrow, ChevronDown, ChevronRight, Search, SlidersHorizontal, X, UserRound, ShieldCheck, Play, CircleCheck, Download, Database, Settings, History, Bell, CheckCheck, Sparkles, Home, LayoutGrid, Bookmark, Newspaper, ArrowLeft, Layers } from "lucide-react";
 import { COLLECTIONS, type Anime } from "@/data/anime";
-import { getShikimoriCatalog, getShikimoriAnimes } from "@/data/shikimori";
+import { getShikimoriCatalog, getShikimoriAnimes, getGlobalHomeFeatured } from "@/data/shikimori";
 import { getExactReleaseDate, isNewRelease, isUpcomingAnnouncement } from "@/data/anime-sections";
 import { Header, type View } from "@/components/yume/Header";
 import { HomeExperience } from "@/components/yume/HomeExperience";
@@ -180,6 +180,14 @@ export const Route = createFileRoute("/")({
       };
     }
     const refreshedItems = catalog.items;
+    let featuredAnime: Anime[] = [];
+    if (!deps.section || deps.section === "home") {
+      try {
+        featuredAnime = (await getGlobalHomeFeatured(refreshedItems)).items;
+      } catch (error) {
+        console.error("[YUME] Global home featured selection is unavailable; no alternate titles are fabricated.", error);
+      }
+    }
     const popular = refreshedItems.filter((anime) => (anime.rating ?? 0) >= 8).sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1));
     const sectionFeeds = {
       airing: refreshedItems.filter((anime) => anime.status === "Онгоинг").sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? "") || b.year - a.year),
@@ -195,6 +203,7 @@ export const Route = createFileRoute("/")({
 
     return {
       anime: refreshedItems,
+      featuredAnime,
       popular,
       sectionFeeds,
       catalogIds: refreshedItems.map((anime) => anime.id),
@@ -394,6 +403,7 @@ function Index() {
   const { section, collection: urlCollection, q: urlQuery, page: urlPage, sort: urlSort, genres: urlGenres, status: urlStatus, from: urlFrom, to: urlTo, rating: urlRating, kind: urlKind, age: urlAge, lang: urlLang } = Route.useSearch();
   const {
     anime: loadedAnime,
+    featuredAnime: initialFeaturedAnime = [],
     popular: initialPopularAnime,
     sectionFeeds: initialSectionFeeds,
     catalogIds,
@@ -1762,6 +1772,7 @@ function Index() {
       ) : view === "home" ? (
         <HomeExperience
           animeList={ANIME}
+          featuredAnime={initialFeaturedAnime}
           popular={popularCards}
           newReleases={newReleaseCards}
           announcements={announcementCards}

@@ -606,6 +606,8 @@ function readyCatalog(items: Anime[]) {
   };
 }
 
+export { getGlobalHomeFeatured } from "@/data/catalog-r2.server";
+
 export const getShikimoriCatalog = createServerFn({ method: "GET" })
   .validator((input: { forceRefresh?: boolean; progressOnly?: boolean }) => ({
     forceRefresh: input.forceRefresh === true,
