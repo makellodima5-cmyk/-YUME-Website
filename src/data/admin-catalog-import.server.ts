@@ -322,7 +322,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
         const shots=mapAdminCatalogScreenshots(item);
         if(shots.length)mutations.push({type:"screenshots",animeId:String(item.id),items:shots.map((shot,position)=>({originalUrl:shot.original,previewUrl:shot.preview,position}))});
       }
-      mutations.push({type:"metadata",values:{admin_import_cursor:String(progress.cursor+1),admin_import_added:String(nextAdded),admin_import_skipped:String(progress.skipped+skipped),admin_import_incomplete:String(progress.incomplete+incompleteCount),admin_import_resume_at:String(Date.now()+REQUEST_DELAY_MS),admin_import_state:nextState,admin_import_cache_pending:nextState==="completed"?"0":"1"}});
+      mutations.push({type:"metadata",values:{admin_import_cursor:String(progress.cursor+1),admin_import_added:String(nextAdded),admin_import_skipped:String(progress.skipped+skipped),admin_import_incomplete:String(progress.incomplete+incompleteCount),admin_import_resume_at:String((Number(fresh.metadata.admin_import_started_at)||Date.now())+(progress.cursor+1)*REQUEST_DELAY_MS),admin_import_state:nextState,admin_import_cache_pending:nextState==="completed"?"0":"1"}});
       const operationId=adminCatalogImportPageOperationId(progress.runId,progress.cursor);
       await submitCatalogMutation({type:"batch",mutations},operationId);
       await audit(db,"catalog.import.page","success",{page:progress.cursor,added:mapped.length,skipped,state:nextState},actor);
