@@ -44,6 +44,15 @@ describe("global home featured candidates", () => {
     expect(isHomeFeaturedEligible(oldReleased, now)).toBe(false);
   });
 
+  it("accepts ordinary numeric Shikimori IDs and rejects non-numeric IDs", () => {
+    const result = rankFeaturedCandidates([
+      candidate("37141", 9.7),
+      candidate("5114", 9.6),
+      candidate("not-a-shikimori-id", 10),
+    ]);
+    expect(result.map((item) => item.id)).toEqual(["37141", "5114"]);
+  });
+
   it("returns only the available number of titles and no placeholder entries", () => {
     expect(rankFeaturedCandidates([candidate("41", 9.1)]).map((item) => item.id)).toEqual(["41"]);
     expect(rankFeaturedCandidates([candidate("42", null), candidate("43", 8.8, "")])).toEqual([]);

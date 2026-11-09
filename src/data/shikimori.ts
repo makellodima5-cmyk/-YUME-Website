@@ -606,7 +606,15 @@ function readyCatalog(items: Anime[]) {
   };
 }
 
-export { getGlobalHomeFeatured } from "@/data/catalog-r2.server";
+/** Server boundary for the existing global featured snapshot in the catalogue Coordinator. */
+export const getGlobalHomeFeatured = createServerFn({ method: "GET" })
+  .handler(async () => {
+    const catalog = await getR2Catalog();
+    if (catalog.error) throw new Error(catalog.error);
+    const candidates = catalog.items.filter((anime) => isHomeFeaturedEligible(anime));
+    const { getGlobalHomeFeatured: getGlobalHomeFeaturedFromCoordinator } = await import("@/data/catalog-r2.server");
+    return getGlobalHomeFeaturedFromCoordinator(candidates);
+  });
 
 export const getShikimoriCatalog = createServerFn({ method: "GET" })
   .validator((input: { forceRefresh?: boolean; progressOnly?: boolean }) => ({
