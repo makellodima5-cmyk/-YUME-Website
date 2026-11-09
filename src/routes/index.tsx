@@ -1626,14 +1626,7 @@ function Index() {
   const newReleaseAnime = useMemo(() => (sectionFeeds?.newReleases ?? ANIME
     .filter((anime) => isNewRelease(anime)))
     .slice()
-    .sort((a, b) => {
-      const aDate = getExactReleaseDate(a.airedOn);
-      const bDate = getExactReleaseDate(b.airedOn);
-      if (aDate && bDate) return bDate.localeCompare(aDate);
-      if (aDate) return -1;
-      if (bDate) return 1;
-      return (b.rating ?? -1) - (a.rating ?? -1);
-    }), [sectionFeeds, ANIME]);
+    .sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? "") || (b.rating ?? -1) - (a.rating ?? -1)), [sectionFeeds, ANIME]);
   const newReleaseCards = newReleaseAnime.slice(0, 12);
   const totalNewReleasesPages = Math.max(1, Math.ceil(newReleaseAnime.length / catalogPageSize));
   const visibleNewReleaseAnime = newReleaseAnime.slice((newReleasesPage - 1) * catalogPageSize, newReleasesPage * catalogPageSize);
