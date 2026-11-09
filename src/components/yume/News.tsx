@@ -61,6 +61,18 @@ export function News({ animeList, onDetailChange }: { animeList: Anime[]; onDeta
   const ru = language === "ru";
 
   useEffect(() => {
+    if (!selectedArticle) return;
+    const handleTelegramBack = (event: Event) => {
+      event.preventDefault();
+      setBookmarks(readBookmarks());
+      setSelectedArticle(null);
+      onDetailChange?.(false);
+    };
+    window.addEventListener("yume-telegram-back", handleTelegramBack);
+    return () => window.removeEventListener("yume-telegram-back", handleTelegramBack);
+  }, [selectedArticle, onDetailChange]);
+
+  useEffect(() => {
     setBookmarks(readBookmarks());
     let cancelled = false;
     fetch("/api/news", { credentials: "same-origin", cache: "no-store" })

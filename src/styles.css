@@ -337,6 +337,12 @@ html.telegram-mini-app body {
   min-height: var(--yume-tg-viewport-height, 100vh);
 }
 
+/* Apply Telegram's content inset only to pages that use the standard 78px
+   app-bar offset. Home and search layouts already include their own offset. */
+html.telegram-mini-app main#main-content[class*="pt-[78px]"] {
+  padding-top: calc(78px + max(env(safe-area-inset-top, 0px), var(--yume-tg-content-safe-top, var(--yume-tg-safe-top, 0px)))) !important;
+}
+
 
 /* Telegram Mini App touch reliability: decorative poster layers must never
    become independent hit targets, and interactive controls use native taps. */
@@ -705,8 +711,8 @@ html[data-theme="light"] .yubera-wordmark {
   position: fixed;
   z-index: 60;
   inset: 0 0 auto;
-  height: calc(64px + max(env(safe-area-inset-top, 0px), var(--yume-tg-safe-top, 0px)));
-  padding-top: max(env(safe-area-inset-top, 0px), var(--yume-tg-safe-top, 0px));
+  height: calc(64px + max(env(safe-area-inset-top, 0px), var(--yume-tg-content-safe-top, var(--yume-tg-safe-top, 0px))));
+  padding-top: max(env(safe-area-inset-top, 0px), var(--yume-tg-content-safe-top, var(--yume-tg-safe-top, 0px)));
   border-bottom: 1px solid var(--border);
   background: rgba(16,17,22,.94);
   -webkit-backdrop-filter: blur(20px);

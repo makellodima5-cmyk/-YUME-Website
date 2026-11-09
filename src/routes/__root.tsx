@@ -4,17 +4,18 @@ import {
   Link,
   createRootRouteWithContext,
   useRouter,
+  useRouterState,
   HeadContent,
   Scripts,
   type ErrorComponentProps,
 } from "@tanstack/react-router";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { YumePreferencesProvider, useYumePreferences } from "@/data/preferences";
 import { DEFAULT_META_DESCRIPTION, SITE_NAME } from "@/data/seo";
-import { initializeTelegramMiniApp } from "@/lib/telegram-mini-app";
+import { getTelegramWebApp, initializeTelegramMiniApp } from "@/lib/telegram-mini-app";
 import { TelegramSubscriptionGate } from "@/components/yume/TelegramSubscriptionGate";
 import { CookieConsentBanner } from "@/components/yume/CookieConsentBanner";
 
@@ -171,6 +172,32 @@ function SkipToContent() {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const router = useRouter();
+  const routeLocation = useRouterState({ select: (state) => state.location });
+  const navigationStack = useRef<string[]>([]);
+
+  useEffect(() => {
+    const initialHref = router.history.location.href;
+    navigationStack.current = [initialHref];
+    return router.history.subscribe(({ location, action }) => {
+      const href = location.href;
+      const stack = navigationStack.current;
+      if (action.type === "PUSH") {
+        if (stack[stack.length - 1] !== href) stack.push(href);
+      } else if (action.type === "REPLACE") {
+        if (stack.length) stack[stack.length - 1] = href;
+        else stack.push(href);
+      } else if (action.type === "BACK") {
+        if (stack.length > 1) stack.pop();
+        else navigationStack.current = [href];
+      } else if (action.type === "FORWARD") {
+        if (stack[stack.length - 1] !== href) stack.push(href);
+      } else if (action.type === "GO") {
+        const existingIndex = stack.lastIndexOf(href);
+        navigationStack.current = existingIndex >= 0 ? stack.slice(0, existingIndex + 1) : [href];
+      }
+    });
+  }, [router]);
 
   useEffect(() => {
     let cleanup = initializeTelegramMiniApp();
@@ -184,6 +211,46 @@ function RootComponent() {
       cleanup?.();
     };
   }, []);
+
+  useEffect(() => {
+    const webApp = getTelegramWebApp();
+    const backButton = webApp?.BackButton;
+    if (!webApp?.initData || !backButton) return;
+
+    const isHome = routeLocation.pathname === "/"
+      && (!new URLSearchParams(routeLocation.searchStr).get("section")
+        || new URLSearchParams(routeLocation.searchStr).get("section") === "home");
+
+    const handleBack = () => {
+      const localBackEvent = new Event("yume-telegram-back", { cancelable: true });
+      window.dispatchEvent(localBackEvent);
+      if (localBackEvent.defaultPrevented) return;
+
+      if (navigationStack.current.length > 1) {
+        router.history.back();
+      } else if (!isHome) {
+        void router.navigate({ to: "/", search: { section: "home" } });
+      }
+    };
+
+    try {
+      backButton.offClick?.(handleBack);
+      backButton.onClick?.(handleBack);
+      if (isHome) backButton.hide();
+      else backButton.show();
+    } catch (error) {
+      console.warn("[YUME][TELEGRAM] BackButton is unavailable in this client.", error);
+    }
+
+    return () => {
+      try {
+        backButton.offClick?.(handleBack);
+        backButton.hide();
+      } catch {
+        // Telegram UI controls are progressive enhancements.
+      }
+    };
+  }, [router, routeLocation.pathname, routeLocation.searchStr]);
 
   return (
     <QueryClientProvider client={queryClient}>
