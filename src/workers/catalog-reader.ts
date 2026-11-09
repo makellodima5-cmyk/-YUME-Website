@@ -93,7 +93,7 @@ async function hmac(key: ArrayBuffer | string, value: string): Promise<ArrayBuff
 function base64Url(bytes: Uint8Array): string {
   let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/=/g, "").replace(/\\+/g, "-").replace(/\\//g, "_");
+  return btoa(binary).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
 }
 
 async function createTemporaryCredentials(env: Env): Promise<TemporaryCredentials> {
@@ -136,17 +136,17 @@ async function signedGet(env: Env, key: string): Promise<Response> {
   const path = "/" + encodePath("yume-catalog/" + key);
   const url = "https://" + host + path;
   const now = new Date();
-  const amzDate = now.toISOString().replace(/[:-]|\\.\\d{3}/g, "");
+  const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, "");
   const date = amzDate.slice(0, 8);
   const scope = date + "/auto/s3/aws4_request";
   const payloadHash = hex(await sha256(""));
-  const canonicalHeaders = "host:" + host + "\\n" +
-    "x-amz-content-sha256:" + payloadHash + "\\n" +
-    "x-amz-date:" + amzDate + "\\n" +
-    "x-amz-security-token:" + credentials.sessionToken + "\\n";
+  const canonicalHeaders = "host:" + host + "\n" +
+    "x-amz-content-sha256:" + payloadHash + "\n" +
+    "x-amz-date:" + amzDate + "\n" +
+    "x-amz-security-token:" + credentials.sessionToken + "\n";
   const signedHeaders = "host;x-amz-content-sha256;x-amz-date;x-amz-security-token";
-  const canonicalRequest = ["GET", path, "", canonicalHeaders, signedHeaders, payloadHash].join("\\n");
-  const stringToSign = ["AWS4-HMAC-SHA256", amzDate, scope, hex(await sha256(canonicalRequest))].join("\\n");
+  const canonicalRequest = ["GET", path, "", canonicalHeaders, signedHeaders, payloadHash].join("\n");
+  const stringToSign = ["AWS4-HMAC-SHA256", amzDate, scope, hex(await sha256(canonicalRequest))].join("\n");
   const kDate = await hmac("AWS4" + credentials.secretAccessKey, date);
   const kRegion = await hmac(kDate, "auto");
   const kService = await hmac(kRegion, "s3");
@@ -166,9 +166,9 @@ async function signedGet(env: Env, key: string): Promise<Response> {
   });
 }
 
-async function readR2Text(env: Env, key: string): Promise<{ body: string; checksum: string | null }> {
+async function readR2Text(env: Env, key: string): Promise<{ body: string; checksum: string | null } | null> {
   const response = await signedGet(env, key);
-  if (response.status === 404) throw new Error("R2 object is missing: " + key);
+  if (response.status === 404) return null;
   if (!response.ok) throw new Error("R2 object read failed with HTTP " + response.status);
   return {
     body: await response.text(),
@@ -178,6 +178,7 @@ async function readR2Text(env: Env, key: string): Promise<{ body: string; checks
 
 async function readCurrentPointer(env: Env): Promise<CatalogPointer | null> {
   const object = await readR2Text(env, CATALOG_CURRENT_KEY);
+  if (!object) return null;
   const pointer = JSON.parse(object.body) as unknown;
   return validPointer(pointer) ? pointer : null;
 }
@@ -189,6 +190,7 @@ async function readRevisionBody(
 ): Promise<{ body: string; checksum: string } | null> {
   const key = CATALOG_REVISION_PREFIX + revision + ".json";
   const object = await readR2Text(env, key);
+  if (!object) return null;
   const checksum = object.checksum;
   if (!checksum || !/^[a-f0-9]{64}$/i.test(checksum) ||
       (expectedChecksum && checksum !== expectedChecksum)) return null;
