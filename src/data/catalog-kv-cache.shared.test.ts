@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { emptyCatalogState } from "@/data/catalog-r2.shared";
-import { pruneCatalogSnapshotCache, readCatalogAdminCachePointer, readCatalogCachePointer, readCatalogSnapshotCache, readCatalogSnapshotCacheText, writeCatalogAdminSnapshotCache, writeCatalogSnapshotCache } from "@/data/catalog-kv-cache.shared";
+import { pruneCatalogSnapshotCache, readCatalogAdminCachePointer, readCatalogCachePointer, readCatalogSnapshotCache, readCatalogSnapshotCacheDirectText, readCatalogSnapshotCacheText, writeCatalogAdminSnapshotCache, writeCatalogSnapshotCache } from "@/data/catalog-kv-cache.shared";
 import type { Anime } from "@/data/anime";
 
 class MemoryKV {
@@ -31,6 +31,7 @@ describe("shared catalogue snapshot KV cache", () => {
     await writeCatalogSnapshotCache(kv as unknown as KVNamespace, state);
     expect(kv.values.get("yume:catalog:v1:revision:8:body")).toBe(JSON.stringify(state));
     expect([...kv.values.keys()].filter((key) => key.includes(":chunk:"))).toHaveLength(0);
+    expect(await readCatalogSnapshotCacheDirectText(kv as unknown as KVNamespace, 8)).toBe(JSON.stringify(state));
     expect(await readCatalogSnapshotCache(kv as unknown as KVNamespace, 8)).toEqual(state);
   });
 
