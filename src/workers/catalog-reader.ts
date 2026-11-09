@@ -1,230 +1,317 @@
-import { CATALOG_CURRENT_KEY, CATALOG_REVISION_PREFIX, emptyCatalogState, type CatalogPointer, type CatalogState } from "@/data/catalog-r2.shared";
-import { readCatalogAdminCachePointer, readCatalogCachePointer, readCatalogSnapshotCacheText, writeCatalogSnapshotCache } from "@/data/catalog-kv-cache.shared";
+import {
+  CATALOG_CURRENT_KEY,
+  CATALOG_REVISION_PREFIX,
+  emptyCatalogState,
+  type CatalogPointer,
+  type CatalogState,
+} from "@/data/catalog-r2.shared";
+import {
+  publishCatalogSnapshotCachePointer,
+  readCatalogAdminCachePointer,
+  readCatalogCachePointer,
+  readCatalogSnapshotCacheDirectText,
+  writeCatalogSnapshotCacheText,
+} from "@/data/catalog-kv-cache.shared";
 
 type Env = {
-  R2_ACCOUNT_ID:string;
-  R2_ACCESS_KEY_ID:string;
-  R2_SECRET_ACCESS_KEY:string;
-  CATALOG_READER_TOKEN:string;
-  YUME_CATALOG_CACHE:KVNamespace;
+  R2_ACCOUNT_ID: string;
+  R2_ACCESS_KEY_ID: string;
+  R2_SECRET_ACCESS_KEY: string;
+  CATALOG_READER_TOKEN: string;
+  YUME_CATALOG_CACHE: KVNamespace;
 };
-type TemporaryCredentials={accessKeyId:string;secretAccessKey:string;sessionToken:string;expiresAt:number};
-const encoder=new TextEncoder();
-let cachedCredentials:TemporaryCredentials|null=null;
-let cachedPublicRevision:number|null=null;
-let cachedPublicBody:string|null=null;
-let cachedAdminRevision:number|null=null;
-let cachedAdminBody:string|null=null;
-function hex(value:ArrayBuffer):string{return [...new Uint8Array(value)].map(byte=>byte.toString(16).padStart(2,"0")).join("");}
-async function sha256(value:string|ArrayBuffer):Promise<ArrayBuffer>{return crypto.subtle.digest("SHA-256",typeof value==="string"?encoder.encode(value):value);}
-async function hmac(key:ArrayBuffer|string,value:string):Promise<ArrayBuffer>{
-  const raw=typeof key==="string"?encoder.encode(key):key;
-  const cryptoKey=await crypto.subtle.importKey("raw",raw,{name:"HMAC",hash:"SHA-256"},false,["sign"]);
-  return crypto.subtle.sign("HMAC",cryptoKey,encoder.encode(value));
+type TemporaryCredentials = {
+  accessKeyId: string;
+  secretAccessKey: string;
+  sessionToken: string;
+  expiresAt: number;
+};
+
+const encoder = new TextEncoder();
+let cachedCredentials: TemporaryCredentials | null = null;
+let cachedPublicRevision: number | null = null;
+let cachedPublicBody: string | null = null;
+let cachedAdminRevision: number | null = null;
+let cachedAdminBody: string | null = null;
+
+function json(data: unknown, status = 200, headers?: HeadersInit): Response {
+  return Response.json(data, {
+    status,
+    headers: {
+      "Cache-Control": "private, no-store",
+      ...Object.fromEntries(new Headers(headers)),
+    },
+  });
 }
-function base64Url(bytes:Uint8Array):string{
-  let binary="";for(const byte of bytes)binary+=String.fromCharCode(byte);
-  return btoa(binary).replace(/=/g,"").replace(/\+/g,"-").replace(/\//g,"_");
+
+function jsonText(body: string, status = 200, headers?: HeadersInit): Response {
+  return new Response(body, {
+    status,
+    headers: {
+      "Cache-Control": "private, no-store",
+      "Content-Type": "application/json; charset=utf-8",
+      ...Object.fromEntries(new Headers(headers)),
+    },
+  });
 }
-async function createTemporaryCredentials(env:Env):Promise<TemporaryCredentials>{
-  if(cachedCredentials&&cachedCredentials.expiresAt>Date.now()+60000)return cachedCredentials;
-  const host=env.R2_ACCOUNT_ID+".r2.cloudflarestorage.com";
-  const now=Math.floor(Date.now()/1000);
-  const header=base64Url(encoder.encode(JSON.stringify({alg:"HS256",typ:"JWT"})));
-  const payload=base64Url(encoder.encode(JSON.stringify({
-    bucket:"yume-catalog",
-    actions:["GetObject","HeadObject"],
-    paths:{prefixPaths:["catalog/v1/"]},
-    sub:env.R2_ACCOUNT_ID,
-    iss:env.R2_ACCESS_KEY_ID,
-    aud:host,
-    iat:now,
-    exp:now+900,
+
+function validToken(supplied: string, expected: string): boolean {
+  if (!expected || supplied.length !== expected.length) return false;
+  const a = encoder.encode(supplied);
+  const b = encoder.encode(expected);
+  let mismatch = 0;
+  for (let index = 0; index < a.length; index += 1) mismatch |= a[index]! ^ b[index]!;
+  return mismatch === 0;
+}
+
+function validPointer(value: unknown): value is CatalogPointer {
+  if (!value || typeof value !== "object") return false;
+  const pointer = value as Partial<CatalogPointer>;
+  return pointer.schemaVersion === 1 &&
+    Number.isSafeInteger(pointer.revision) &&
+    typeof pointer.revision === "number" &&
+    pointer.revision >= 0 &&
+    pointer.key === CATALOG_REVISION_PREFIX + pointer.revision + ".json" &&
+    typeof pointer.checksum === "string" &&
+    /^[a-f0-9]{64}$/i.test(pointer.checksum);
+}
+
+function hex(value: ArrayBuffer): string {
+  return [...new Uint8Array(value)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+async function sha256(value: string | ArrayBuffer): Promise<ArrayBuffer> {
+  return crypto.subtle.digest("SHA-256", typeof value === "string" ? encoder.encode(value) : value);
+}
+
+async function hmac(key: ArrayBuffer | string, value: string): Promise<ArrayBuffer> {
+  const raw = typeof key === "string" ? encoder.encode(key) : key;
+  const cryptoKey = await crypto.subtle.importKey("raw", raw, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  return crypto.subtle.sign("HMAC", cryptoKey, encoder.encode(value));
+}
+
+function base64Url(bytes: Uint8Array): string {
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
+}
+
+async function createTemporaryCredentials(env: Env): Promise<TemporaryCredentials> {
+  if (cachedCredentials && cachedCredentials.expiresAt > Date.now() + 60_000) return cachedCredentials;
+  const host = env.R2_ACCOUNT_ID + ".r2.cloudflarestorage.com";
+  const now = Math.floor(Date.now() / 1000);
+  const header = base64Url(encoder.encode(JSON.stringify({ alg: "HS256", typ: "JWT" })));
+  const payload = base64Url(encoder.encode(JSON.stringify({
+    bucket: "yume-catalog",
+    actions: ["GetObject", "HeadObject"],
+    paths: { prefixPaths: ["catalog/v1/"] },
+    sub: env.R2_ACCOUNT_ID,
+    iss: env.R2_ACCESS_KEY_ID,
+    aud: host,
+    iat: now,
+    exp: now + 900,
   })));
-  const unsigned=header+"."+payload;
-  const signature=base64Url(new Uint8Array(await hmac(env.R2_SECRET_ACCESS_KEY,unsigned)));
-  const jwt=unsigned+"."+signature;
-  const derived=await sha256(jwt);
-  cachedCredentials={
-    accessKeyId:env.R2_ACCESS_KEY_ID,
-    secretAccessKey:hex(derived),
-    sessionToken:btoa("jwt/"+jwt),
-    expiresAt:(now+900)*1000,
+  const unsigned = header + "." + payload;
+  const signature = base64Url(new Uint8Array(await hmac(env.R2_SECRET_ACCESS_KEY, unsigned)));
+  const jwt = unsigned + "." + signature;
+  const derived = await sha256(jwt);
+  cachedCredentials = {
+    accessKeyId: env.R2_ACCESS_KEY_ID,
+    secretAccessKey: hex(derived),
+    sessionToken: btoa("jwt/" + jwt),
+    expiresAt: (now + 900) * 1000,
   };
   return cachedCredentials;
 }
-function encodePath(value:string):string{
-  return value.split("/").map(part=>encodeURIComponent(part).replace(/[!'()*]/g,char=>"%"+char.charCodeAt(0).toString(16).toUpperCase())).join("/");
+
+function encodePath(value: string): string {
+  return value.split("/").map((part) =>
+    encodeURIComponent(part).replace(/[!'()*]/g, (char) => "%" + char.charCodeAt(0).toString(16).toUpperCase()),
+  ).join("/");
 }
-async function signedGet(env:Env,key:string):Promise<Response>{
-  const credentials=await createTemporaryCredentials(env);
-  const host=env.R2_ACCOUNT_ID+".r2.cloudflarestorage.com";
-  const path="/"+encodePath("yume-catalog/"+key);
-  const url="https://"+host+path;
-  const now=new Date();
-  const amzDate=now.toISOString().replace(/[:-]|\.\d{3}/g,"");
-  const date=amzDate.slice(0,8);
-  const scope=date+"/auto/s3/aws4_request";
-  const payloadHash=hex(await sha256(""));
-  const canonicalHeaders="host:"+host+"\n"+"x-amz-content-sha256:"+payloadHash+"\n"+"x-amz-date:"+amzDate+"\n"+"x-amz-security-token:"+credentials.sessionToken+"\n";
-  const signedHeaders="host;x-amz-content-sha256;x-amz-date;x-amz-security-token";
-  const canonicalRequest=["GET",path,"",canonicalHeaders,signedHeaders,payloadHash].join("\n");
-  const stringToSign=["AWS4-HMAC-SHA256",amzDate,scope,hex(await sha256(canonicalRequest))].join("\n");
-  const kDate=await hmac("AWS4"+credentials.secretAccessKey,date);
-  const kRegion=await hmac(kDate,"auto");
-  const kService=await hmac(kRegion,"s3");
-  const kSigning=await hmac(kService,"aws4_request");
-  const signature=hex(await hmac(kSigning,stringToSign));
-  const authorization="AWS4-HMAC-SHA256 Credential="+credentials.accessKeyId+"/"+scope+", SignedHeaders="+signedHeaders+", Signature="+signature;
-  return fetch(url,{method:"GET",headers:{Authorization:authorization,"x-amz-content-sha256":payloadHash,"x-amz-date":amzDate,"x-amz-security-token":credentials.sessionToken},signal:AbortSignal.timeout(8000)});
+
+async function signedGet(env: Env, key: string): Promise<Response> {
+  const credentials = await createTemporaryCredentials(env);
+  const host = env.R2_ACCOUNT_ID + ".r2.cloudflarestorage.com";
+  const path = "/" + encodePath("yume-catalog/" + key);
+  const url = "https://" + host + path;
+  const now = new Date();
+  const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, "");
+  const date = amzDate.slice(0, 8);
+  const scope = date + "/auto/s3/aws4_request";
+  const payloadHash = hex(await sha256(""));
+  const canonicalHeaders = "host:" + host + "\n" +
+    "x-amz-content-sha256:" + payloadHash + "\n" +
+    "x-amz-date:" + amzDate + "\n" +
+    "x-amz-security-token:" + credentials.sessionToken + "\n";
+  const signedHeaders = "host;x-amz-content-sha256;x-amz-date;x-amz-security-token";
+  const canonicalRequest = ["GET", path, "", canonicalHeaders, signedHeaders, payloadHash].join("\n");
+  const stringToSign = ["AWS4-HMAC-SHA256", amzDate, scope, hex(await sha256(canonicalRequest))].join("\n");
+  const kDate = await hmac("AWS4" + credentials.secretAccessKey, date);
+  const kRegion = await hmac(kDate, "auto");
+  const kService = await hmac(kRegion, "s3");
+  const kSigning = await hmac(kService, "aws4_request");
+  const signature = hex(await hmac(kSigning, stringToSign));
+  const authorization = "AWS4-HMAC-SHA256 Credential=" + credentials.accessKeyId + "/" + scope +
+    ", SignedHeaders=" + signedHeaders + ", Signature=" + signature;
+  return fetch(url, {
+    method: "GET",
+    headers: {
+      Authorization: authorization,
+      "x-amz-content-sha256": payloadHash,
+      "x-amz-date": amzDate,
+      "x-amz-security-token": credentials.sessionToken,
+    },
+    signal: AbortSignal.timeout(8000),
+  });
 }
-function json(data:unknown,status=200,headers?:HeadersInit):Response{
-  return Response.json(data,{status,headers:{"Cache-Control":"private, no-store",...Object.fromEntries(new Headers(headers))}});
+
+async function readR2Text(env: Env, key: string): Promise<{ body: string; checksum: string | null } | null> {
+  const response = await signedGet(env, key);
+  if (response.status === 404) return null;
+  if (!response.ok) throw new Error("R2 object read failed with HTTP " + response.status);
+  return {
+    body: await response.text(),
+    checksum: response.headers.get("x-amz-meta-checksum"),
+  };
 }
-function jsonText(body:string,status=200,headers?:HeadersInit):Response{
-  return new Response(body,{status,headers:{"Cache-Control":"private, no-store","Content-Type":"application/json; charset=utf-8",...Object.fromEntries(new Headers(headers))}});
+
+async function readCurrentPointer(env: Env): Promise<CatalogPointer | null> {
+  const object = await readR2Text(env, CATALOG_CURRENT_KEY);
+  if (!object) return null;
+  const pointer = JSON.parse(object.body) as unknown;
+  return validPointer(pointer) ? pointer : null;
 }
-function validToken(supplied:string,expected:string):boolean{
-  if(!expected||supplied.length!==expected.length)return false;
-  const a=encoder.encode(supplied),b=encoder.encode(expected);let mismatch=0;
-  for(let i=0;i<a.length;i++)mismatch|=a[i]!^b[i]!;
-  return mismatch===0;
+
+async function readRevisionBody(
+  env: Env,
+  revision: number,
+  expectedChecksum?: string,
+): Promise<{ body: string; checksum: string } | null> {
+  const key = CATALOG_REVISION_PREFIX + revision + ".json";
+  const object = await readR2Text(env, key);
+  if (!object) return null;
+  const checksum = object.checksum;
+  if (!checksum || !/^[a-f0-9]{64}$/i.test(checksum) ||
+      (expectedChecksum && checksum !== expectedChecksum)) return null;
+  return { body: object.body, checksum };
 }
-function safeR2Body(value:string):string {
-  return value.slice(0,2048)
-    .replace(/(authorization|x-amz-security-token|secretaccesskey|accesskeyid|token)\s*[:=]\s*[^\s<"]+/gi,"$1=[REDACTED]")
-    .replace(/Bearer\s+[^\s<"]+/gi,"Bearer [REDACTED]");
+
+function stateIsValid(state: unknown, revision: number): state is CatalogState {
+  if (!state || typeof state !== "object") return false;
+  const value = state as Partial<CatalogState>;
+  return value.schemaVersion === 1 &&
+    value.revision === revision &&
+    Array.isArray(value.items);
 }
-async function readObjectText(env:Env,key:string):Promise<string|null>{
-  const retryableStatuses=new Set([429,500,502,503,504]);
-  let lastError:unknown;
-  for(let attempt=0;attempt<3;attempt++){
-    const startedAt=Date.now();
-    try{
-      const response=await signedGet(env,key);
-      if(response.status===404)return null;
-      if(response.ok)return await response.text();
-      const body=safeR2Body(await response.text().catch(()=> ""));
-      const code=/<Code>([^<]{1,120})<\/Code>/i.exec(body)?.[1]??null;
-      const requestId=/<RequestId>([^<]{1,160})<\/RequestId>/i.exec(body)?.[1]??response.headers.get("x-amz-request-id");
-      console.error("[YUME][CATALOG_READER] R2 upstream rejected object read.",{
-        resource:key,status:response.status,code,requestId,attempt:attempt+1,
-        durationMs:Date.now()-startedAt,body:body||null,
-      });
-      lastError=new Error("R2 read failed with HTTP "+response.status+(code?" ("+code+")":""));
-      if(!retryableStatuses.has(response.status)||attempt===2)break;
-      const retryAfter=Number(response.headers.get("retry-after"));
-      await new Promise(resolve=>setTimeout(resolve,Number.isFinite(retryAfter)&&retryAfter>0?Math.min(5000,retryAfter*1000):250*Math.pow(2,attempt)));
-    }catch(error){
-      lastError=error;
-      console.error("[YUME][CATALOG_READER] R2 object read threw.",{
-        resource:key,attempt:attempt+1,durationMs:Date.now()-startedAt,
-        errorName:error instanceof Error?error.name:"UnknownError",
-        errorMessage:error instanceof Error?error.message:"Unknown R2 read error",
-      });
-      const retryable=error instanceof Error&&(error.name==="TimeoutError"||error.name==="AbortError"||error instanceof TypeError);
-      if(!retryable||attempt===2)break;
-      await new Promise(resolve=>setTimeout(resolve,250*Math.pow(2,attempt)));
+
+function responseFor(request: Request, body: string, revision: number): Response {
+  const headers = { "X-Yume-Catalog-Revision": String(revision) };
+  return request.method === "HEAD"
+    ? new Response(null, { status: 200, headers: { "Cache-Control": "private, no-store", ...headers } })
+    : jsonText(body, 200, headers);
+}
+
+async function loadAdminSnapshot(request: Request, env: Env): Promise<Response> {
+  const pointer = await readCatalogAdminCachePointer(env.YUME_CATALOG_CACHE);
+  if (pointer) {
+    let body = cachedAdminRevision === pointer.revision ? cachedAdminBody : null;
+    if (!body) body = await readCatalogSnapshotCacheDirectText(env.YUME_CATALOG_CACHE, pointer.revision);
+    if (!body) {
+      const snapshot = await readRevisionBody(env, pointer.revision);
+      if (!snapshot) return json({ error: "admin_catalog_checkpoint_unavailable" }, 503);
+      body = snapshot.body;
+      try {
+        await writeCatalogSnapshotCacheText(env.YUME_CATALOG_CACHE, pointer.revision, body, snapshot.checksum);
+      } catch (error) {
+        console.warn("[YUME][CATALOG_READER] Admin cache migration failed.", error);
+      }
     }
+    cachedAdminRevision = pointer.revision;
+    cachedAdminBody = body;
+    return responseFor(request, body, pointer.revision);
   }
-  throw lastError instanceof Error?lastError:new Error("R2 object read failed.");
+
+  const current = await readCurrentPointer(env);
+  if (!current) {
+    const empty = JSON.stringify(emptyCatalogState());
+    return request.method === "HEAD" ? new Response(null, { status: 200 }) : jsonText(empty);
+  }
+  const snapshot = await readRevisionBody(env, current.revision, current.checksum);
+  if (!snapshot) return json({ error: "admin_catalog_checkpoint_unavailable" }, 503);
+  return responseFor(request, snapshot.body, current.revision);
 }
-async function readObject<T>(env:Env,key:string):Promise<T|null>{
-  const body=await readObjectText(env,key);
-  return body===null?null:JSON.parse(body) as T;
+
+async function loadPublicSnapshot(request: Request, env: Env): Promise<Response> {
+  const cachePointer = await readCatalogCachePointer(env.YUME_CATALOG_CACHE);
+  if (cachePointer) {
+    let body = cachedPublicRevision === cachePointer.revision ? cachedPublicBody : null;
+    if (!body) body = await readCatalogSnapshotCacheDirectText(env.YUME_CATALOG_CACHE, cachePointer.revision);
+    if (!body) {
+      const snapshot = await readRevisionBody(env, cachePointer.revision);
+      if (!snapshot) return json({ error: "published_catalog_snapshot_unavailable" }, 503);
+      body = snapshot.body;
+      try {
+        await writeCatalogSnapshotCacheText(env.YUME_CATALOG_CACHE, cachePointer.revision, body, snapshot.checksum);
+      } catch (error) {
+        console.warn("[YUME][CATALOG_READER] Public cache migration failed.", error);
+      }
+    }
+    cachedPublicRevision = cachePointer.revision;
+    cachedPublicBody = body;
+    return responseFor(request, body, cachePointer.revision);
+  }
+
+  const current = await readCurrentPointer(env);
+  if (!current) {
+    const empty = JSON.stringify(emptyCatalogState());
+    return request.method === "HEAD" ? new Response(null, { status: 200 }) : jsonText(empty);
+  }
+  const snapshot = await readRevisionBody(env, current.revision, current.checksum);
+  if (!snapshot) return json({ error: "published_catalog_snapshot_unavailable" }, 503);
+
+  let state: unknown;
+  try {
+    state = JSON.parse(snapshot.body);
+  } catch {
+    return json({ error: "invalid_catalog_revision" }, 503);
+  }
+  if (!stateIsValid(state, current.revision)) return json({ error: "invalid_catalog_revision" }, 503);
+  if (state.metadata?.admin_import_cache_pending === "1") {
+    return json({ error: "published_catalog_cache_unavailable" }, 503);
+  }
+
+  try {
+    await writeCatalogSnapshotCacheText(env.YUME_CATALOG_CACHE, current.revision, snapshot.body, snapshot.checksum);
+    await publishCatalogSnapshotCachePointer(env.YUME_CATALOG_CACHE, state);
+  } catch (error) {
+    console.warn("[YUME][CATALOG_READER] Public cache bootstrap failed.", error);
+  }
+  cachedPublicRevision = current.revision;
+  cachedPublicBody = snapshot.body;
+  return responseFor(request, snapshot.body, current.revision);
 }
+
 export default {
-  async fetch(request:Request,env:Env):Promise<Response>{
-    if(request.method!=="GET"&&request.method!=="HEAD")return json({error:"method_not_allowed"},405,{Allow:"GET, HEAD"});
-    if(!validToken(request.headers.get("X-Yume-Reader-Token")??"",env.CATALOG_READER_TOKEN??""))return json({error:"unauthorized"},401);
-    if(new URL(request.url).pathname!=="/v1/state")return json({error:"not_found"},404);
-    try{
-      const fresh=new URL(request.url).searchParams.get("fresh")==="1";
-      if(fresh){
-        // Admin reads follow the private checkpoint pointer without parsing the
-        // complete snapshot in this Worker. The cached JSON is already verified
-        // by its manifest checksum and was written by the trusted coordinator.
-        const adminPointer=await readCatalogAdminCachePointer(env.YUME_CATALOG_CACHE);
-        if(adminPointer){
-          const adminBody=cachedAdminRevision===adminPointer.revision&&cachedAdminBody
-            ?cachedAdminBody
-            :await readCatalogSnapshotCacheText(env.YUME_CATALOG_CACHE,adminPointer.revision);
-          if(adminBody){
-            cachedAdminRevision=adminPointer.revision;
-            cachedAdminBody=adminBody;
-            return request.method==="HEAD"
-              ?new Response(null,{status:200,headers:{"X-Yume-Catalog-Revision":String(adminPointer.revision)}})
-              :jsonText(adminBody,200,{"X-Yume-Catalog-Revision":String(adminPointer.revision)});
-          }
-        }
-      }
+  async fetch(request: Request, env: Env): Promise<Response> {
+    if (request.method !== "GET" && request.method !== "HEAD") {
+      return json({ error: "method_not_allowed" }, 405, { Allow: "GET, HEAD" });
+    }
+    if (!validToken(request.headers.get("X-Yume-Reader-Token") ?? "", env.CATALOG_READER_TOKEN ?? "")) {
+      return json({ error: "unauthorized" }, 401);
+    }
+    if (new URL(request.url).pathname !== "/v1/state") return json({ error: "not_found" }, 404);
 
-      const cachePointer=fresh?null:await readCatalogCachePointer(env.YUME_CATALOG_CACHE);
-      let pointer:CatalogPointer|null=cachePointer
-        ?{schemaVersion:1,revision:cachePointer.revision,key:CATALOG_REVISION_PREFIX+cachePointer.revision+".json",operationId:"shared-cache",checksum:"",updatedAt:cachePointer.updatedAt}
-        :await readObject<CatalogPointer>(env,CATALOG_CURRENT_KEY);
-      if(!pointer){
-        const empty=JSON.stringify(emptyCatalogState());
-        return request.method==="HEAD"?new Response(null,{status:200}):jsonText(empty);
-      }
-      if(pointer.schemaVersion!==1||!Number.isSafeInteger(pointer.revision)||pointer.key!==CATALOG_REVISION_PREFIX+pointer.revision+".json")return json({error:"invalid_catalog_pointer"},503);
-
-      let body:string|null=!fresh&&cachedPublicRevision===pointer.revision?cachedPublicBody:null;
-      if(!fresh&&!body)body=await readCatalogSnapshotCacheText(env.YUME_CATALOG_CACHE,pointer.revision);
-
-      if(!body){
-        // KV is eventually consistent. On a cold/missing cache, resolve the
-        // authoritative R2 pointer before loading data so a stale KV pointer
-        // cannot poison the cache.
-        if(cachePointer&&!fresh){
-          const latestPointer=await readObject<CatalogPointer>(env,CATALOG_CURRENT_KEY);
-          if(!latestPointer||latestPointer.schemaVersion!==1||!Number.isSafeInteger(latestPointer.revision)||latestPointer.key!==CATALOG_REVISION_PREFIX+latestPointer.revision+".json")return json({error:"invalid_catalog_pointer"},503);
-          const latestBody=await readObjectText(env,latestPointer.key);
-          if(latestBody===null||hex(await sha256(latestBody))!==latestPointer.checksum)return json({error:"catalog_revision_checksum_mismatch"},503);
-          const latestState=JSON.parse(latestBody) as CatalogState;
-          if(!latestState||latestState.schemaVersion!==1||latestState.revision!==latestPointer.revision||!Array.isArray(latestState.items))return json({error:"invalid_catalog_revision"},503);
-          if(latestState.metadata?.admin_import_cache_pending==="1"){
-            // During an import, never repair a cold public cache from the
-            // in-progress R2 revision. Serve only the last published snapshot.
-            pointer={...latestPointer,revision:cachePointer.revision,key:CATALOG_REVISION_PREFIX+cachePointer.revision+".json"};
-            body=cachedPublicRevision===pointer.revision?cachedPublicBody:await readCatalogSnapshotCacheText(env.YUME_CATALOG_CACHE,pointer.revision);
-            if(!body)return json({error:"published_catalog_cache_unavailable"},503);
-          }else{
-            pointer=latestPointer;
-            body=latestBody;
-            try{await writeCatalogSnapshotCache(env.YUME_CATALOG_CACHE,latestState,false);}
-            catch(error){console.warn("[YUME][CATALOG_READER] Shared cache repair failed.",error);}
-          }
-        }
-
-        if(!body&&!fresh&&!cachePointer){
-          // With no published KV pointer there is no safe revision to serve
-          // during an import. Recover from R2 only after verifying it is published.
-          const fallbackBody=await readObjectText(env,pointer.key);
-          if(fallbackBody===null||hex(await sha256(fallbackBody))!==pointer.checksum)return json({error:"catalog_revision_checksum_mismatch"},503);
-          const fallbackState=JSON.parse(fallbackBody) as CatalogState;
-          if(!fallbackState||fallbackState.schemaVersion!==1||fallbackState.revision!==pointer.revision||!Array.isArray(fallbackState.items))return json({error:"invalid_catalog_revision"},503);
-          if(fallbackState.metadata?.admin_import_cache_pending==="1")return json({error:"published_catalog_cache_unavailable"},503);
-          body=fallbackBody;
-          try{await writeCatalogSnapshotCache(env.YUME_CATALOG_CACHE,fallbackState,false);}
-          catch(error){console.warn("[YUME][CATALOG_READER] Shared cache repair failed.",error);}
-        }
-
-        if(!body){
-          if(!fresh)return json({error:"published_catalog_cache_unavailable"},503);
-          const freshBody=await readObjectText(env,pointer.key);
-          if(freshBody===null||hex(await sha256(freshBody))!==pointer.checksum)return json({error:"catalog_revision_checksum_mismatch"},503);
-          const freshState=JSON.parse(freshBody) as CatalogState;
-          if(!freshState||freshState.schemaVersion!==1||freshState.revision!==pointer.revision||!Array.isArray(freshState.items))return json({error:"invalid_catalog_revision"},503);
-          body=freshBody;
-        }
-      }
-
-      if(!body)return json({error:"catalog_unavailable"},503);
-      if(!fresh){cachedPublicRevision=pointer.revision;cachedPublicBody=body;}
-      return request.method==="HEAD"
-        ?new Response(null,{status:200,headers:{"X-Yume-Catalog-Revision":String(pointer.revision)}})
-        :jsonText(body,200,{"X-Yume-Catalog-Revision":String(pointer.revision)});
-    }catch(error){console.error("[YUME][CATALOG_READER] Failed to read R2 catalogue.",error);return json({error:"catalog_unavailable"},503);}
+    try {
+      return new URL(request.url).searchParams.get("fresh") === "1"
+        ? await loadAdminSnapshot(request, env)
+        : await loadPublicSnapshot(request, env);
+    } catch (error) {
+      console.error("[YUME][CATALOG_READER] Failed to read catalogue snapshot.", {
+        errorName: error instanceof Error ? error.name : "UnknownError",
+        errorMessage: error instanceof Error ? error.message : "Unknown catalogue reader error",
+      });
+      return json({ error: "catalog_unavailable" }, 503);
+    }
   },
 } satisfies ExportedHandler<Env>;

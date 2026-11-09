@@ -2,6 +2,7 @@ import type { CatalogState } from "@/data/catalog-r2.shared";
 
 const PREFIX = "yume:catalog:v1";
 const CHUNK_BYTES = 512 * 1024;
+const MAX_SINGLE_VALUE_BYTES = 24 * 1024 * 1024;
 const encoder = new TextEncoder();
 
 type CacheManifest = {
@@ -40,10 +41,13 @@ function fromBase64(value: string): Uint8Array {
 }
 
 export async function writeCatalogSnapshotCache(kv: KVNamespace, state: CatalogState, publishPointer = true): Promise<void> {
-  const bytes = encoder.encode(JSON.stringify(state));
+  const body = JSON.stringify(state);
+  const bytes = encoder.encode(body);
   const chunks: Uint8Array[] = [];
-  for (let offset = 0; offset < bytes.length; offset += CHUNK_BYTES) {
-    chunks.push(bytes.slice(offset, Math.min(offset + CHUNK_BYTES, bytes.length)));
+  if (bytes.byteLength > MAX_SINGLE_VALUE_BYTES) {
+    for (let offset = 0; offset < bytes.length; offset += CHUNK_BYTES) {
+      chunks.push(bytes.slice(offset, Math.min(offset + CHUNK_BYTES, bytes.length)));
+    }
   }
   const base = `${PREFIX}:revision:${state.revision}`;
   const manifest: CacheManifest = {
@@ -54,7 +58,12 @@ export async function writeCatalogSnapshotCache(kv: KVNamespace, state: CatalogS
     checksum: await digest(bytes),
   };
 
-  await Promise.all(chunks.map((chunk, index) => kv.put(`${base}:chunk:${index}`, toBase64(chunk))));
+  if (chunks.length === 0) {
+    await kv.put(`${base}:body`, body);
+  } else {
+    await kv.delete(`${base}:body`);
+    await Promise.all(chunks.map((chunk, index) => kv.put(`${base}:chunk:${index}`, toBase64(chunk))));
+  }
   await kv.put(`${base}:manifest`, JSON.stringify(manifest));
   if (publishPointer) await publishCatalogSnapshotCachePointer(kv, state);
 }
@@ -117,6 +126,7 @@ async function deleteCatalogSnapshotCache(kv: KVNamespace, revision: number): Pr
     if (!Number.isSafeInteger(manifest.chunks) || manifest.chunks < 0 || manifest.chunks > 10000) return;
     await Promise.all([
       ...Array.from({ length: manifest.chunks }, (_, index) => kv.delete(`${base}:chunk:${index}`)),
+      kv.delete(`${base}:body`),
       kv.delete(`${base}:manifest`),
     ]);
   } catch {
@@ -135,8 +145,9 @@ export async function readCatalogSnapshotCacheText(kv: KVNamespace, revision: nu
     return null;
   }
   if (manifest.schemaVersion !== 1 || manifest.revision !== revision ||
-      !Number.isSafeInteger(manifest.chunks) || manifest.chunks < 1 || manifest.chunks > 10000 ||
+      !Number.isSafeInteger(manifest.chunks) || manifest.chunks < 0 || manifest.chunks > 10000 ||
       !Number.isSafeInteger(manifest.byteLength) || manifest.byteLength < 1) return null;
+  if (manifest.chunks === 0) return kv.get(`${base}:body`);
 
   const encoded = await Promise.all(
     Array.from({ length: manifest.chunks }, (_, index) => kv.get(`${base}:chunk:${index}`)),
@@ -156,6 +167,38 @@ export async function readCatalogSnapshotCacheText(kv: KVNamespace, revision: nu
   }
   if (bytes.byteLength !== manifest.byteLength || await digest(bytes) !== manifest.checksum) return null;
   return new TextDecoder().decode(bytes);
+}
+
+export async function readCatalogSnapshotCacheDirectText(kv: KVNamespace, revision: number): Promise<string | null> {
+  const base = `${PREFIX}:revision:${revision}`;
+  const manifestRaw = await kv.get(`${base}:manifest`);
+  if (!manifestRaw) return null;
+  try {
+    const manifest = JSON.parse(manifestRaw) as CacheManifest;
+    if (manifest.schemaVersion !== 1 || manifest.revision !== revision || manifest.chunks !== 0) return null;
+    return await kv.get(`${base}:body`);
+  } catch {
+    return null;
+  }
+}
+
+export async function writeCatalogSnapshotCacheText(
+  kv: KVNamespace,
+  revision: number,
+  body: string,
+  checksum: string,
+): Promise<void> {
+  const byteLength = encoder.encode(body).byteLength;
+  if (!/^[a-f0-9]{64}$/i.test(checksum) || byteLength > MAX_SINGLE_VALUE_BYTES) return;
+  const base = `${PREFIX}:revision:${revision}`;
+  await kv.put(`${base}:body`, body);
+  await kv.put(`${base}:manifest`, JSON.stringify({
+    schemaVersion: 1,
+    revision,
+    chunks: 0,
+    byteLength,
+    checksum,
+  } satisfies CacheManifest));
 }
 
 export async function readCatalogSnapshotCache(kv: KVNamespace, revision: number): Promise<CatalogState | null> {
@@ -199,6 +242,7 @@ export async function pruneCatalogSnapshotCache(kv: KVNamespace, currentRevision
   if (!Number.isSafeInteger(manifest.chunks) || manifest.chunks < 0 || manifest.chunks > 10000) return;
   await Promise.all([
     ...Array.from({ length: manifest.chunks }, (_, index) => kv.delete(`${base}:chunk:${index}`)),
+    kv.delete(`${base}:body`),
     kv.delete(`${base}:manifest`),
   ]);
 }
