@@ -188,14 +188,15 @@ export async function writeCatalogSnapshotCacheText(
   body: string,
   checksum: string,
 ): Promise<void> {
-  if (!/^[a-f0-9]{64}$/i.test(checksum) || body.length > MAX_SINGLE_VALUE_BYTES) return;
+  const byteLength = encoder.encode(body).byteLength;
+  if (!/^[a-f0-9]{64}$/i.test(checksum) || byteLength > MAX_SINGLE_VALUE_BYTES) return;
   const base = `${PREFIX}:revision:${revision}`;
   await kv.put(`${base}:body`, body);
   await kv.put(`${base}:manifest`, JSON.stringify({
     schemaVersion: 1,
     revision,
     chunks: 0,
-    byteLength: body.length,
+    byteLength,
     checksum,
   } satisfies CacheManifest));
 }
