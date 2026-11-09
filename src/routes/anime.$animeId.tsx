@@ -59,6 +59,7 @@ function formatAnimeDate(value: string | undefined, language: "ru" | "en", inclu
 }
 
 export const Route = createFileRoute("/anime/$animeId")({
+  staleTime: 30_000,
   loader: async ({ params }) => {
     // Read the current title and a bounded related-title set directly from D1.
     const result = await getShikimoriAnimeDetails({ data: { animeId: params.animeId } });
