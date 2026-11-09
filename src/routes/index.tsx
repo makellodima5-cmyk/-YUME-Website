@@ -25,6 +25,7 @@ import {
 const homeSocialImage = "/images/yubera/yubera_banner.webp";
 import { absoluteImageUrl, canonicalUrl } from "@/data/seo";
 import { getTelegramWebApp, telegramHapticImpact } from "@/lib/telegram-mini-app";
+import { clearAnimeNavigationOrigin, markAnimeNavigationOrigin } from "@/data/anime-navigation";
 import { setProfileStorageAuthenticated, syncTelegramLibrary } from "@/data/profile-storage";
 import { USER_NOTIFICATIONS } from "@/data/notifications.shared";
 import { runAdminTrailerUpdate, type AdminTrailerStats } from "@/data/admin-trailer-update";
@@ -1375,11 +1376,7 @@ function Index() {
   const [collection, setCollection] = useState<string | null>(null);
 
   useEffect(() => {
-    try {
-      window.sessionStorage.removeItem("yume-anime-return-available-v1");
-    } catch {
-      // Back navigation falls back to the catalogue without session storage.
-    }
+    clearAnimeNavigationOrigin(window.sessionStorage);
   }, []);
 
   useEffect(() => {
@@ -1461,11 +1458,7 @@ function Index() {
     window.requestAnimationFrame(() => document.getElementById("collection-anime-list")?.scrollIntoView({ behavior: "smooth", block: "start" }));
   };
   const select = (anime: Anime) => {
-    try {
-      window.sessionStorage.setItem("yume-anime-return-available-v1", "1");
-    } catch {
-      // Browser Back still works when session storage is unavailable.
-    }
+    markAnimeNavigationOrigin(window.sessionStorage);
     if (view === "catalog") {
       try {
         window.sessionStorage.setItem(CATALOG_RETURN_STORAGE_KEY, serializeCatalogReturnState({
@@ -1650,12 +1643,12 @@ function Index() {
   const visibleNewReleaseAnime = newReleaseAnime.slice((newReleasesPage - 1) * catalogPageSize, newReleasesPage * catalogPageSize);
 
   const sortedPopularAnime = useMemo(() => {
-    const source = sectionFeeds?.popular ?? (popularAnime.length ? popularAnime : ANIME);
+    const source = popularAnime.length ? popularAnime : ANIME;
     return source
       .filter((anime) => (anime.rating ?? 0) >= 8)
       .slice()
       .sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1));
-  }, [sectionFeeds, popularAnime, ANIME]);
+  }, [popularAnime, ANIME]);
   const popularCards = sortedPopularAnime.slice(0, 12);
   const totalPopularPages = Math.max(1, Math.ceil(sortedPopularAnime.length / catalogPageSize));
   const visiblePopularAnime = sortedPopularAnime.slice((popularPage - 1) * catalogPageSize, popularPage * catalogPageSize);
