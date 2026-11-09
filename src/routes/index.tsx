@@ -4,6 +4,7 @@ import { ArrowDownWideNarrow, ChevronDown, ChevronRight, Search, SlidersHorizont
 import { COLLECTIONS, type Anime } from "@/data/anime";
 import { getShikimoriCatalog, getShikimoriAnimes, getGlobalHomeFeatured } from "@/data/shikimori";
 import { getExactReleaseDate, isNewRelease, isUpcomingAnnouncement } from "@/data/anime-sections";
+import { isHomeFeaturedEligible } from "@/data/home-featured.shared";
 import { Header, type View } from "@/components/yume/Header";
 import { HomeExperience } from "@/components/yume/HomeExperience";
 import { AuthPage } from "@/components/yume/AuthPage";
@@ -183,7 +184,7 @@ export const Route = createFileRoute("/")({
     let featuredAnime: Anime[] = [];
     if (!deps.section || deps.section === "home") {
       try {
-        featuredAnime = (await getGlobalHomeFeatured(refreshedItems.filter((anime) => isNewRelease(anime)))).items;
+        featuredAnime = (await getGlobalHomeFeatured(refreshedItems.filter((anime) => isHomeFeaturedEligible(anime)))).items;
       } catch (error) {
         console.error("[YUME] Global home featured selection is unavailable; no alternate titles are fabricated.", error);
       }
