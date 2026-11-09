@@ -78,6 +78,7 @@ function saveLocalNotificationIds(ids: string[]): boolean {
 type MetadataCatalogStats = { total:number; incomplete:number; complete:number; announced:number; missingTrailer:number; hasTrailer:number; savedScreenshotUrls:number; screenshotDone:number; screenshotRetry:number; screenshotFailed:number };
 
 export const Route = createFileRoute("/")({
+  staleTime: 30_000,
   head: () => {
     const image = absoluteImageUrl(homeSocialImage);
     return {
