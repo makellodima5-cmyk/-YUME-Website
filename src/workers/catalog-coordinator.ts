@@ -2,6 +2,7 @@ import { DurableObject } from "cloudflare:workers";
 import { applyCatalogMutation, CATALOG_CURRENT_KEY, CATALOG_REVISION_PREFIX, emptyCatalogState, type CatalogMutation, type CatalogPointer, type CatalogState } from "@/data/catalog-r2.shared";
 import { pruneCatalogSnapshotCache, publishCatalogSnapshotCachePointer, writeCatalogAdminSnapshotCache } from "@/data/catalog-kv-cache.shared";
 import type { Anime } from "@/data/anime";
+import { isHomeFeaturedEligible } from "@/data/home-featured.shared";
 
 type CoordinatorEnv = { CATALOG_BUCKET:R2Bucket; YUME_DB:D1Database; YUME_CATALOG_CACHE:KVNamespace };
 type Env = { CATALOG_COORDINATOR:DurableObjectNamespace<CatalogCoordinator> };
@@ -38,7 +39,7 @@ export class CatalogCoordinator extends DurableObject<CoordinatorEnv>{
         const item=value as Partial<Anime>;
         if(typeof item.id!=="string"||!/^[0-9]{1,12}$/.test(item.id)||seen.has(item.id)||
           typeof item.title!=="string"||!item.title.trim()||typeof item.posterUrl!=="string"||!item.posterUrl.trim()||
-          typeof item.rating!=="number"||!Number.isFinite(item.rating)||item.rating<0||item.rating>10)continue;
+          typeof item.rating!=="number"||!Number.isFinite(item.rating)||item.rating<9||item.rating>10)continue;
         seen.add(item.id);
         candidates.push(item as Anime);
       }
@@ -101,7 +102,7 @@ export class CatalogCoordinator extends DurableObject<CoordinatorEnv>{
       const published=JSON.parse(publishedBody) as CatalogState;
       if(published.schemaVersion!==1||published.revision!==pointer.revision||!Array.isArray(published.items))throw new Error("Published catalogue snapshot is invalid.");
       const publishedById=new Map(published.items.map(item=>[item.id,item]));
-      const ranked=candidates.filter(item=>publishedById.has(item.id)).map(item=>publishedById.get(item.id)!).sort((a,b)=>(b.rating??-1)-(a.rating??-1)||a.id.localeCompare(b.id));
+      const ranked=candidates.filter(item=>publishedById.has(item.id)).map(item=>publishedById.get(item.id)!).filter(item=>isHomeFeaturedEligible(item,new Date(now))).sort((a,b)=>(b.rating??-1)-(a.rating??-1)||a.id.localeCompare(b.id));
       if(!ranked.length)throw new Error("No rated poster-backed catalogue entries are available.");
       const previousIds=new Set((previous?.items??[]).map(item=>item.id));
       const alternatives=ranked.filter(item=>!previousIds.has(item.id));

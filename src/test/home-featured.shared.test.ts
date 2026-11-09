@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { rankFeaturedCandidates } from "@/data/home-featured.shared";
+import { isHomeFeaturedEligible, rankFeaturedCandidates } from "@/data/home-featured.shared";
 import type { Anime } from "@/data/anime";
 
 function candidate(id: string, rating: number | null, posterUrl = `https://cdn.example.test/${id}.jpg`): Anime {
   return {
     id, title: `Anime ${id}`, original: `Original ${id}`, year: 2025, episodes: 12,
-    rating, genres: [], status: "Вышел", description: "Saved catalogue description.",
+    rating, genres: [], status: "Вышел", airedOn: "2026-10-01", description: "Saved catalogue description.",
     hue: 0, glyph: "A", posterUrl,
   };
 }
@@ -37,6 +37,18 @@ describe("global home featured candidates", () => {
       candidate("31", 9.9), candidate("32", 9.8), candidate("33", 9.7), candidate("34", 9.6),
     ], ["31", "32", "33"]);
     expect(result.map((item) => item.id)).toEqual(["34", "31", "32"]);
+  });
+
+  it("requires a rating of at least 9 and accepts ongoing titles independently of their release date", () => {
+    const now = new Date("2026-11-09T12:00:00.000Z");
+    const ongoing = { ...candidate("50", 9.0), status: "Онгоинг" as const, airedOn: undefined };
+    const lowRatedOngoing = { ...candidate("51", 8.99), status: "Онгоинг" as const, airedOn: undefined };
+    const recentReleased = { ...candidate("52", 9.4), airedOn: "2025-11-10" };
+    const oldReleased = { ...candidate("53", 10), airedOn: "2025-11-08" };
+    expect(isHomeFeaturedEligible(ongoing, now)).toBe(true);
+    expect(isHomeFeaturedEligible(lowRatedOngoing, now)).toBe(false);
+    expect(isHomeFeaturedEligible(recentReleased, now)).toBe(true);
+    expect(isHomeFeaturedEligible(oldReleased, now)).toBe(false);
   });
 
   it("returns only the available number of titles and no placeholder entries", () => {
