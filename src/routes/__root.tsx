@@ -182,12 +182,12 @@ function RootComponent() {
     const initialHref = initialLocation.href;
     navigationStack.current = [initialHref];
     if (!initialLocation.pathname.startsWith("/anime/")) {
-      clearAnimeNavigationOrigin(window.sessionStorage);
+      try { clearAnimeNavigationOrigin(window.sessionStorage); } catch { /* Session storage is optional. */ }
     }
     return router.history.subscribe(({ location, action }) => {
       const href = location.href;
       if (!location.pathname.startsWith("/anime/")) {
-        clearAnimeNavigationOrigin(window.sessionStorage);
+        try { clearAnimeNavigationOrigin(window.sessionStorage); } catch { /* Session storage is optional. */ }
       }
       const stack = navigationStack.current;
       if (action.type === "PUSH") {
