@@ -66,6 +66,25 @@ describe("Profile and My library pages", () => {
     expect(screen.getByText(/Добавляй в список аниме/i)).toBeInTheDocument();
   });
 
+  it("shows the Telegram notifications entry and unread indicator when requested", async () => {
+    const onNavigate = vi.fn();
+    render(withPreferences(
+      <MyHub
+        animeList={[]}
+        onNavigate={onNavigate}
+        onSelect={vi.fn()}
+        showNotifications
+        unreadNotificationCount={2}
+      />,
+    ));
+
+    const notificationsCard = screen.getByRole("button", { name: /Уведомления/ });
+    expect(notificationsCard).toHaveTextContent("Непрочитанных: 2");
+    expect(notificationsCard.querySelector('[aria-label="Есть непрочитанные уведомления"]')).toBeInTheDocument();
+    notificationsCard.click();
+    expect(onNavigate).toHaveBeenCalledWith("notifications");
+  });
+
   it.each([1, 2, 3, 4])(
     "shows the exact preview size for %i unique history titles",
     async titleCount => {
