@@ -1375,6 +1375,14 @@ function Index() {
   const [collection, setCollection] = useState<string | null>(null);
 
   useEffect(() => {
+    try {
+      window.sessionStorage.removeItem("yume-anime-return-available-v1");
+    } catch {
+      // Back navigation falls back to the catalogue without session storage.
+    }
+  }, []);
+
+  useEffect(() => {
     const openAuth = (event: Event) => {
       const detail = (event as CustomEvent<{ mode?: unknown }>).detail;
       setViewRaw(detail?.mode === "register" ? "register" : "login");
@@ -1453,6 +1461,11 @@ function Index() {
     window.requestAnimationFrame(() => document.getElementById("collection-anime-list")?.scrollIntoView({ behavior: "smooth", block: "start" }));
   };
   const select = (anime: Anime) => {
+    try {
+      window.sessionStorage.setItem("yume-anime-return-available-v1", "1");
+    } catch {
+      // Browser Back still works when session storage is unavailable.
+    }
     if (view === "catalog") {
       try {
         window.sessionStorage.setItem(CATALOG_RETURN_STORAGE_KEY, serializeCatalogReturnState({
@@ -1621,8 +1634,9 @@ function Index() {
   const activeCollectionAnime = activeCollection ? ANIME : [];
   const totalCollectionTitles = activeCollection ? initialCatalogTotal : 0;
   const totalCollectionPages = getCatalogPageCount(totalCollectionTitles, 20);
-  const newReleaseAnime = (sectionFeeds?.newReleases ?? ANIME
+  const newReleaseAnime = useMemo(() => (sectionFeeds?.newReleases ?? ANIME
     .filter((anime) => isNewRelease(anime)))
+    .slice()
     .sort((a, b) => {
       const aDate = getExactReleaseDate(a.airedOn);
       const bDate = getExactReleaseDate(b.airedOn);
@@ -1630,17 +1644,23 @@ function Index() {
       if (aDate) return -1;
       if (bDate) return 1;
       return (b.rating ?? -1) - (a.rating ?? -1);
-    });
+    }), [sectionFeeds, ANIME]);
   const newReleaseCards = newReleaseAnime.slice(0, 12);
   const totalNewReleasesPages = Math.max(1, Math.ceil(newReleaseAnime.length / catalogPageSize));
   const visibleNewReleaseAnime = newReleaseAnime.slice((newReleasesPage - 1) * catalogPageSize, newReleasesPage * catalogPageSize);
 
-  const sortedPopularAnime = popularAnime.filter((anime) => (anime.rating ?? 0) >= 8);
+  const sortedPopularAnime = useMemo(() => {
+    const source = sectionFeeds?.popular ?? (popularAnime.length ? popularAnime : ANIME);
+    return source
+      .filter((anime) => (anime.rating ?? 0) >= 8)
+      .slice()
+      .sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1));
+  }, [sectionFeeds, popularAnime, ANIME]);
   const popularCards = sortedPopularAnime.slice(0, 12);
   const totalPopularPages = Math.max(1, Math.ceil(sortedPopularAnime.length / catalogPageSize));
   const visiblePopularAnime = sortedPopularAnime.slice((popularPage - 1) * catalogPageSize, popularPage * catalogPageSize);
 
-  const announcementAnime = sectionFeeds
+  const announcementAnime = useMemo(() => sectionFeeds
     ? sectionFeeds.announcements
     : ANIME
       .filter((anime) => isUpcomingAnnouncement(anime))
@@ -1651,16 +1671,16 @@ function Index() {
         if (aDate) return -1;
         if (bDate) return 1;
         return a.year - b.year || (b.rating ?? -1) - (a.rating ?? -1);
-      });
+      }), [sectionFeeds, ANIME]);
   const announcementCards = announcementAnime.slice(0, 12);
   const totalAnnouncementsPages = Math.max(1, Math.ceil(announcementAnime.length / catalogPageSize));
   const visibleAnnouncementAnime = announcementAnime.slice((announcementsPage - 1) * catalogPageSize, announcementsPage * catalogPageSize);
 
-  const airingAnime = sectionFeeds
+  const airingAnime = useMemo(() => sectionFeeds
     ? sectionFeeds.airing
     : ANIME
       .filter((anime) => isEligibleAiringAnime(anime))
-      .sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? "") || b.year - a.year);
+      .sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? "") || b.year - a.year), [sectionFeeds, ANIME]);
   const airingCards = airingAnime.slice(0, 12);
   const totalAiringPages = Math.max(1, Math.ceil(airingAnime.length / catalogPageSize));
   const visibleAiringAnime = airingAnime.slice((airingPage - 1) * catalogPageSize, airingPage * catalogPageSize);
@@ -2043,7 +2063,7 @@ function Index() {
           )}
         </main>
       ) : view === "my" ? (
-        <MyHub animeList={ANIME} onNavigate={setView} onSelect={select} showNotifications={isTelegramMiniApp} unreadNotificationCount={unreadNotificationCount} />
+        <MyHub animeList={ANIME} onNavigate={setView} onSelect={select} showNotifications unreadNotificationCount={unreadNotificationCount} />
       ) : view === "tracked-titles" ? (
         <TrackedTitlesPage animeList={ANIME} onNavigate={setView} onSelect={select} />
       ) : view === "news" ? (
@@ -2411,7 +2431,7 @@ function Index() {
             { id: "profile" as View, label: language === "ru" ? "Профиль" : "Profile", icon: UserRound, active: ["profile", "admin", "privacy", "privacy-policy", "rules", "rights"].includes(view) },
           ].map((item) => {
             const Icon = item.icon;
-            const hasUnread = item.id === "my" && isTelegramMiniApp && unreadNotificationCount > 0;
+            const hasUnread = item.id === "my" && unreadNotificationCount > 0;
             return <button key={item.id} type="button" onClick={() => setView(item.id)} aria-current={item.active ? "page" : undefined} aria-label={hasUnread ? (language === "ru" ? "Моё, есть непрочитанные уведомления" : "My, unread notifications") : item.label}><span className="relative inline-flex"><Icon className="h-5 w-5" />{hasUnread && <span className="absolute -right-1 -top-0.5 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-[#101116]" aria-hidden="true" />}</span><span>{item.label}</span></button>;
           })}
         </nav>
