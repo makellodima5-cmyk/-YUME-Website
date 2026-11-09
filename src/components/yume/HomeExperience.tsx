@@ -169,7 +169,7 @@ export function HomeExperience({
               tabIndex={-1}
             />
             <div className="yubera-home-featured-copy">
-              <span className="yubera-home-featured-label">{ru ? "ПОПУЛЯРНОЕ" : "POPULAR"}</span>
+              <span className="yubera-home-featured-label">{ru ? "НОВИНКИ" : "NEW RELEASES"}</span>
               <h1>{displayAnimeTitle(featured, language)}</h1>
               {featured.description.trim() && <p>{featured.description}</p>}
               <div className="yubera-home-featured-meta">

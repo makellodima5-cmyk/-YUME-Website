@@ -36,7 +36,7 @@ export class CatalogCoordinator extends DurableObject<CoordinatorEnv>{
       for(const value of input.candidates){
         if(!value||typeof value!=="object")continue;
         const item=value as Partial<Anime>;
-        if(typeof item.id!=="string"||!/^\\d{1,12}$/.test(item.id)||seen.has(item.id)||
+        if(typeof item.id!=="string"||!/^[0-9]{1,12}$/.test(item.id)||seen.has(item.id)||
           typeof item.title!=="string"||!item.title.trim()||typeof item.posterUrl!=="string"||!item.posterUrl.trim()||
           typeof item.rating!=="number"||!Number.isFinite(item.rating)||item.rating<0||item.rating>10)continue;
         seen.add(item.id);

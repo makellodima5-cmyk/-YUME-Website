@@ -172,7 +172,7 @@ export async function getGlobalHomeFeatured(candidates: Anime[]): Promise<HomeFe
   const coordinator = environment().YUME_CATALOG_COORDINATOR;
   if (!coordinator) throw new Error("YUME_CATALOG_COORDINATOR binding is unavailable.");
   const eligible = candidates
-    .filter((item) => /^\\d{1,12}$/.test(item.id) && typeof item.posterUrl === "string" && item.posterUrl.trim() &&
+    .filter((item) => /^[0-9]{1,12}$/.test(item.id) && typeof item.posterUrl === "string" && item.posterUrl.trim() &&
       typeof item.rating === "number" && Number.isFinite(item.rating) && item.rating >= 0 && item.rating <= 10)
     .sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1) || a.id.localeCompare(b.id))
     .slice(0, 100);

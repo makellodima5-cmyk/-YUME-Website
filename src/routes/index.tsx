@@ -183,7 +183,7 @@ export const Route = createFileRoute("/")({
     let featuredAnime: Anime[] = [];
     if (!deps.section || deps.section === "home") {
       try {
-        featuredAnime = (await getGlobalHomeFeatured(refreshedItems)).items;
+        featuredAnime = (await getGlobalHomeFeatured(refreshedItems.filter((anime) => isNewRelease(anime)))).items;
       } catch (error) {
         console.error("[YUME] Global home featured selection is unavailable; no alternate titles are fabricated.", error);
       }
