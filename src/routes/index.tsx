@@ -1623,46 +1623,56 @@ function Index() {
   const activeCollectionAnime = activeCollection ? ANIME : [];
   const totalCollectionTitles = activeCollection ? initialCatalogTotal : 0;
   const totalCollectionPages = getCatalogPageCount(totalCollectionTitles, 20);
-  const newReleaseAnime = useMemo(() => (sectionFeeds?.newReleases ?? ANIME
-    .filter((anime) => isNewRelease(anime)))
-    .slice()
-    .sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? "") || (b.rating ?? -1) - (a.rating ?? -1)), [sectionFeeds, ANIME]);
+  const shouldBuildHomeShelves = view === "home" && !searching;
+  const newReleaseAnime = useMemo(() => {
+    if (!shouldBuildHomeShelves && view !== "new-releases") return [];
+    return (sectionFeeds?.newReleases ?? ANIME.filter((anime) => isNewRelease(anime)))
+      .slice()
+      .sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? "") || (b.rating ?? -1) - (a.rating ?? -1));
+  }, [sectionFeeds, ANIME, shouldBuildHomeShelves, view]);
   const newReleaseCards = newReleaseAnime.slice(0, 12);
   const totalNewReleasesPages = Math.max(1, Math.ceil(newReleaseAnime.length / catalogPageSize));
   const visibleNewReleaseAnime = newReleaseAnime.slice((newReleasesPage - 1) * catalogPageSize, newReleasesPage * catalogPageSize);
 
   const sortedPopularAnime = useMemo(() => {
+    if (!shouldBuildHomeShelves && view !== "popular") return [];
     const source = popularAnime.length ? popularAnime : ANIME;
     return source
       .filter((anime) => (anime.rating ?? 0) >= 8)
       .slice()
       .sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1));
-  }, [popularAnime, ANIME]);
+  }, [popularAnime, ANIME, shouldBuildHomeShelves, view]);
   const popularCards = sortedPopularAnime.slice(0, 12);
   const totalPopularPages = Math.max(1, Math.ceil(sortedPopularAnime.length / catalogPageSize));
   const visiblePopularAnime = sortedPopularAnime.slice((popularPage - 1) * catalogPageSize, popularPage * catalogPageSize);
 
-  const announcementAnime = useMemo(() => sectionFeeds
-    ? sectionFeeds.announcements
-    : ANIME
-      .filter((anime) => isUpcomingAnnouncement(anime))
-      .sort((a, b) => {
-        const aDate = getExactReleaseDate(a.airedOn);
-        const bDate = getExactReleaseDate(b.airedOn);
-        if (aDate && bDate) return aDate.localeCompare(bDate);
-        if (aDate) return -1;
-        if (bDate) return 1;
-        return a.year - b.year || (b.rating ?? -1) - (a.rating ?? -1);
-      }), [sectionFeeds, ANIME]);
+  const announcementAnime = useMemo(() => {
+    if (!shouldBuildHomeShelves && view !== "announcements") return [];
+    return sectionFeeds
+      ? sectionFeeds.announcements
+      : ANIME
+        .filter((anime) => isUpcomingAnnouncement(anime))
+        .sort((a, b) => {
+          const aDate = getExactReleaseDate(a.airedOn);
+          const bDate = getExactReleaseDate(b.airedOn);
+          if (aDate && bDate) return aDate.localeCompare(bDate);
+          if (aDate) return -1;
+          if (bDate) return 1;
+          return a.year - b.year || (b.rating ?? -1) - (a.rating ?? -1);
+        });
+  }, [sectionFeeds, ANIME, shouldBuildHomeShelves, view]);
   const announcementCards = announcementAnime.slice(0, 12);
   const totalAnnouncementsPages = Math.max(1, Math.ceil(announcementAnime.length / catalogPageSize));
   const visibleAnnouncementAnime = announcementAnime.slice((announcementsPage - 1) * catalogPageSize, announcementsPage * catalogPageSize);
 
-  const airingAnime = useMemo(() => sectionFeeds
-    ? sectionFeeds.airing
-    : ANIME
-      .filter((anime) => anime.status === "Онгоинг")
-      .sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? "") || b.year - a.year), [sectionFeeds, ANIME]);
+  const airingAnime = useMemo(() => {
+    if (!shouldBuildHomeShelves && view !== "airing") return [];
+    return sectionFeeds
+      ? sectionFeeds.airing
+      : ANIME
+        .filter((anime) => anime.status === "Онгоинг")
+        .sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? "") || b.year - a.year);
+  }, [sectionFeeds, ANIME, shouldBuildHomeShelves, view]);
   const airingCards = airingAnime.slice(0, 12);
   const totalAiringPages = Math.max(1, Math.ceil(airingAnime.length / catalogPageSize));
   const visibleAiringAnime = airingAnime.slice((airingPage - 1) * catalogPageSize, airingPage * catalogPageSize);
