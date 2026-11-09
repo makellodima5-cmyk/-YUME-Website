@@ -35,6 +35,22 @@ describe("shared catalogue snapshot KV cache", () => {
     expect(await readCatalogSnapshotCache(kv as unknown as KVNamespace, 8)).toEqual(state);
   });
 
+  it("reads legacy chunked snapshots for Reader cache migration", async () => {
+    const kv = new MemoryKV();
+    const state = { ...emptyCatalogState(), revision: 9, items: [anime("3", "Integrity")] };
+    const body = JSON.stringify(state);
+    const bytes = new TextEncoder().encode(body);
+    const checksumBuffer = await crypto.subtle.digest("SHA-256", bytes);
+    const checksum = [...new Uint8Array(checksumBuffer)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+    const base = "yume:catalog:v1:revision:9";
+    kv.values.set(base + ":chunk:0", btoa(String.fromCharCode(...bytes)));
+    kv.values.set(base + ":manifest", JSON.stringify({
+      schemaVersion: 1, revision: 9, chunks: 1, byteLength: bytes.byteLength, checksum,
+    }));
+    expect(await readCatalogSnapshotCacheText(kv as unknown as KVNamespace, 9)).toBe(body);
+    expect(await readCatalogSnapshotCacheDirectText(kv as unknown as KVNamespace, 9)).toBeNull();
+  });
+
   it("treats missing or corrupted chunks as a cache miss", async () => {
     const kv = new MemoryKV();
     const state = { ...emptyCatalogState(), revision: 9, items: [anime("3", "Integrity")] };
