@@ -252,12 +252,12 @@ export function News({ animeList, onDetailChange, telegramMiniApp = false }: { a
                     const saved = bookmarks.includes(article.id);
                     return (
                       <article key={article.id} className="flex gap-3 rounded-2xl border border-border bg-card p-3">
-                        <button type="button" onClick={() => setSelectedArticle(article)} className="h-[88px] w-[88px] shrink-0 overflow-hidden rounded-xl bg-secondary">
+                        <button type="button" onClick={() => openArticle(article)} className="h-[88px] w-[88px] shrink-0 overflow-hidden rounded-xl bg-secondary">
                           {related ? <PosterArt anime={related} className="h-full w-full" /> : article.linkedPosterUrl ? <img src={article.linkedPosterUrl} alt="" className="h-full w-full object-cover" /> : <img src="/images/yubera/yubera_banner.webp" alt="" className="h-full w-full object-cover" />}
                         </button>
                         <div className="min-w-0 flex-1">
                           <span className="text-[9px] font-bold uppercase tracking-wide text-primary">{categoryLabel(article.category, language)}</span>
-                          <button type="button" onClick={() => setSelectedArticle(article)} className="mt-1 block line-clamp-3 text-left text-xs font-bold leading-snug">{article.title}</button>
+                          <button type="button" onClick={() => openArticle(article)} className="mt-1 block line-clamp-3 text-left text-xs font-bold leading-snug">{article.title}</button>
                           <div className="mt-2 flex items-center justify-between gap-2">
                             <span className="text-[10px] text-muted-foreground">{formatDate(article.createdAt, language)}</span>
                             <button type="button" onClick={() => toggleBookmark(article.id)} aria-pressed={saved} aria-label={saved ? "Saved" : "Bookmark"} className="text-muted-foreground hover:text-primary"><Bookmark className={`h-4 w-4 ${saved ? "fill-current text-primary" : ""}`} /></button>
