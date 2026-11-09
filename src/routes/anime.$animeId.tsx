@@ -495,7 +495,7 @@ function AnimeDetailPage() {
     }
     if (view === "catalog") {
       try {
-        if (canReturnToAnimeOrigin(window.sessionStorage, window.history.length)) {
+        if (canReturnToAnimeOrigin(window.sessionStorage, window.history.length, document.referrer, window.location.origin)) {
           window.history.back();
           return;
         }
