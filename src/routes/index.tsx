@@ -1377,7 +1377,7 @@ function Index() {
   const [collection, setCollection] = useState<string | null>(null);
 
   useEffect(() => {
-    clearAnimeNavigationOrigin(window.sessionStorage);
+    try { clearAnimeNavigationOrigin(window.sessionStorage); } catch { /* Storage can be unavailable in restricted browser contexts. */ }
   }, []);
 
   useEffect(() => {
@@ -1459,7 +1459,7 @@ function Index() {
     window.requestAnimationFrame(() => document.getElementById("collection-anime-list")?.scrollIntoView({ behavior: "smooth", block: "start" }));
   };
   const select = (anime: Anime) => {
-    markAnimeNavigationOrigin(window.sessionStorage);
+    try { markAnimeNavigationOrigin(window.sessionStorage); } catch { /* Native history remains the fallback. */ }
     if (view === "catalog") {
       try {
         window.sessionStorage.setItem(CATALOG_RETURN_STORAGE_KEY, serializeCatalogReturnState({
