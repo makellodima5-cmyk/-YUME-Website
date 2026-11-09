@@ -4,7 +4,7 @@
 
 **Goal:** Add a dedicated YUBERA support page matching the supplied mobile references, place a compact support card between the home hero and Popular, and make the visible payment outcome depend on the server-confirmed Telegram Stars transaction.
 
-**Architecture:** Keep the existing TanStack Start, React, Tailwind/CSS, Cloudflare D1 and Telegram Bot API design. Reuse the existing `yume_stars_donations` table, initData validation, invoice creation route, webhook and `openInvoice`; add an authenticated status endpoint keyed by a server-generated opaque invoice payload, and move the current modal UI into a dedicated route. Do not build a second payment subsystem or alter the Cloudflare cache/Worker topology.
+**Architecture:** Keep the existing TanStack Start, React, Tailwind/CSS, Cloudflare D1 and Telegram Bot API design. Reuse the existing `yume_stars_donations` table, initData validation, invoice creation route, webhook and `openInvoice`; add an authenticated status endpoint keyed by a server-generated opaque invoice payload, and render a dedicated support screen through the app’s existing `section=support` view state so the shared header and bottom navigation remain intact. Do not build a second payment subsystem or alter the Cloudflare cache/Worker topology.
 
 **Tech Stack:** React 19, TanStack Start/Router, TypeScript, Tailwind CSS, Lucide, Cloudflare Workers/D1, Telegram Mini Apps API and Telegram Bot API (XTR).
 
@@ -78,7 +78,7 @@
 - [ ] **Step 2: Add component/route tests** for dedicated support page rendering, page scroll area, preserved navigation and title/copy.
 - [ ] **Step 3: Run focused tests** and verify failure before implementation.
 - [ ] **Step 4: Add compact horizontal home card** with gold Stars artwork, Telegram badge, divider, title/subtitle and orange arrow; preserve every existing home section and its order.
-- [ ] **Step 5: Add support route** and integrate it with the existing header, app container and fixed bottom navigation; do not convert it into a query-string modal.
+- [ ] **Step 5: Add the dedicated support view** to the existing SPA section router (`?section=support`) and integrate it with the existing header, app container and fixed bottom navigation. This follows the project’s established in-page section architecture rather than adding a parallel TanStack file route.
 - [ ] **Step 6: Use supplied banner asset** with right-weighted artwork and left-side dark overlay; build the page sections: banner, amount card, spending-purpose list, Telegram Stars info card.
 - [ ] **Step 7: Style page** using existing CSS tokens and YUBERA orange; use graphite surfaces, low-contrast borders and gold icons. Do not add purple gradients or loud glows.
 - [ ] **Step 8: Run focused UI tests** and verify support card appears after hero and before Popular, and support route is independently addressable.
