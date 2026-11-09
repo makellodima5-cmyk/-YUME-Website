@@ -71,9 +71,10 @@ type Props = {
   initialPanel?: ProfilePanel;
   isAdmin?: boolean;
   onAdmin?: () => void;
+  telegramMiniApp?: boolean;
 };
 
-export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overview", isAdmin = false, onAdmin }: Props) {
+export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overview", isAdmin = false, onAdmin, telegramMiniApp = false }: Props) {
   const { t, language, theme, setTheme, setLanguage } = useYumePreferences();
   const [panel, setPanel] = useState<ProfilePanel>(initialPanel);
   const [settingsExpanded, setSettingsExpanded] = useState(false);
@@ -348,6 +349,17 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
     window.scrollTo({ top: 0, behavior: "auto" });
   };
 
+  useEffect(() => {
+    if (!telegramMiniApp || panel === "overview") return;
+
+    const handleTelegramBack = (event: Event) => {
+      event.preventDefault();
+      navigatePanel(backPanel);
+    };
+    window.addEventListener("yume-telegram-back", handleTelegramBack);
+    return () => window.removeEventListener("yume-telegram-back", handleTelegramBack);
+  }, [telegramMiniApp, panel, backPanel]);
+
   const requestAuth = (mode: "login" | "register") => {
     window.dispatchEvent(new CustomEvent("yume-open-auth", { detail: { mode } }));
   };
@@ -456,7 +468,7 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
     </button>
   );
 
-  const backButton = (target: ProfilePanel = backPanel) => (
+  const backButton = (target: ProfilePanel = backPanel) => !telegramMiniApp && (
     <button
       type="button"
       onClick={() => navigatePanel(target)}
