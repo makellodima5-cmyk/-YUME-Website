@@ -214,28 +214,52 @@ export async function handleTelegramWebhook(request: Request): Promise<Response>
       typeof preCheckout.invoice_payload === "string" && preCheckout.currency === "XTR" &&
       typeof preCheckout.total_amount === "number" && Number.isSafeInteger(preCheckout.total_amount);
     let approved = false;
+    let alreadyPreCheckedOut = false;
     if (validShape && db) {
       try {
         const order = await db.prepare("SELECT telegram_user_id, amount, currency, status FROM yume_stars_donations WHERE payload = ?")
           .bind(preCheckout.invoice_payload).first<{ telegram_user_id: string; amount: number; currency: string; status: string }>();
-        approved = Boolean(order && order.telegram_user_id === String(preCheckout.from!.id) &&
-          order.amount === preCheckout.total_amount && order.currency === preCheckout.currency && order.status === "pending");
-        if (approved) {
-          await db.prepare("UPDATE yume_stars_donations SET status = 'pre_checkout' WHERE payload = ? AND status = 'pending'")
-            .bind(preCheckout.invoice_payload).run();
-        }
+        const matches = Boolean(order && order.telegram_user_id === String(preCheckout.from!.id) &&
+          order.amount === preCheckout.total_amount && order.currency === preCheckout.currency);
+        alreadyPreCheckedOut = Boolean(matches && order?.status === "pre_checkout");
+        approved = Boolean(matches && (order?.status === "pending" || alreadyPreCheckedOut));
       } catch (error) {
         console.error("[YUBERA][STARS] Pre-checkout validation failed.", error);
       }
     }
+
+    let telegramAccepted = false;
     try {
-      await telegramApi(token, "answerPreCheckoutQuery", {
+      const answer = await telegramApi(token, "answerPreCheckoutQuery", {
         pre_checkout_query_id: preCheckout.id,
         ok: approved,
         ...(!approved ? { error_message: "Не удалось подтвердить этот платёж. Создайте новый счёт и попробуйте снова." } : {}),
       });
+      if (answer.ok) {
+        const payload = await answer.json() as { ok?: unknown };
+        telegramAccepted = payload.ok === true;
+      }
     } catch (error) {
       console.error("[YUBERA][STARS] Could not answer pre-checkout query.", error);
+    }
+
+    if (approved && telegramAccepted && !alreadyPreCheckedOut && db) {
+      try {
+        const result = await db.prepare("UPDATE yume_stars_donations SET status = 'pre_checkout' WHERE payload = ? AND status = 'pending'")
+          .bind(preCheckout.invoice_payload).run() as { meta?: { changes?: number } };
+        if (Number(result.meta?.changes ?? 0) !== 1) {
+          console.error("[YUBERA][STARS] Accepted pre-checkout answer did not update exactly one pending order.", {
+            payload: preCheckout.invoice_payload, changes: result.meta?.changes,
+          });
+          return json({ ok: false, error: "pre_checkout_state_conflict" }, 503);
+        }
+      } catch (error) {
+        console.error("[YUBERA][STARS] Could not persist accepted pre-checkout state.", error);
+        return json({ ok: false, error: "pre_checkout_persistence_failed" }, 503);
+      }
+    }
+    if (approved && !telegramAccepted) {
+      return json({ ok: false, error: "pre_checkout_answer_not_confirmed" }, 503);
     }
     return json({ ok: true, action: approved ? "stars_pre_checkout_approved" : "stars_pre_checkout_rejected" });
   }

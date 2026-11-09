@@ -18,14 +18,19 @@ function loadTelegramWebAppAfterConsent(): void {
     return;
   }
 
-  const existing = document.querySelector<HTMLScriptElement>(`script[data-yume-telegram-webapp="true"]`);
-  if (existing) return;
-
+  const existing = document.querySelector<HTMLScriptElement>('script[data-yume-telegram-webapp="true"]');
+  if (existing) {
+    if (existing.dataset.loaded === "true" || window.Telegram?.WebApp) {
+      window.dispatchEvent(new Event("yume-telegram-webapp-ready"));
+    }
+    return;
+  }
   const script = document.createElement("script");
-  script.src = "https://telegram.org/js/telegram-web-app.js";
+  script.src = "https://telegram.org/js/telegram-web-app.js?64";
   script.async = true;
   script.dataset.yumeTelegramWebapp = "true";
   script.addEventListener("load", () => {
+    script.dataset.loaded = "true";
     window.dispatchEvent(new Event("yume-telegram-webapp-ready"));
   }, { once: true });
   document.head.appendChild(script);
