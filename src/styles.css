@@ -758,7 +758,7 @@ html.telegram-mini-app .yubera-topbar-inner > div:first-child {
   transform:translateX(-50%);
 }
 html.telegram-mini-app .yubera-topbar-inner > div:first-child > button,
-html.telegram-mini-app .yubera-topbar-inner > div:last-child {
+html.telegram-mini-app .yubera-topbar-actions {
   display:none;
 }
 html.telegram-mini-app .yubera-home-search-shell {
