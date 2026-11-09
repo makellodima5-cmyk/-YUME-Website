@@ -33,7 +33,7 @@ export function Header({ setView, unreadNotificationCount = 0, variant = "app" }
           </div>
         </div>
 
-        {variant === "app" && <div className="flex items-center gap-1.5">
+        {variant === "app" && <div className="yubera-topbar-actions flex items-center gap-1.5">
           <button
             type="button"
             onClick={() => { telegramHapticImpact("light"); setView("notifications"); }}
