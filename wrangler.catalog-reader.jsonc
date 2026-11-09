@@ -14,6 +14,12 @@
   "vars": {
     "R2_ACCOUNT_ID": "8a759ec4125475f60d793affe37779b7"
   },
+  "r2_buckets": [
+    {
+      "binding": "CATALOG_BUCKET",
+      "bucket_name": "yume-catalog"
+    }
+  ],
   "kv_namespaces": [
     {
       "binding": "YUME_CATALOG_CACHE",
