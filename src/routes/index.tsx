@@ -1668,7 +1668,7 @@ function Index() {
   const airingAnime = useMemo(() => sectionFeeds
     ? sectionFeeds.airing
     : ANIME
-      .filter((anime) => isEligibleAiringAnime(anime))
+      .filter((anime) => anime.status === "Онгоинг")
       .sort((a, b) => (b.airedOn ?? "").localeCompare(a.airedOn ?? "") || b.year - a.year), [sectionFeeds, ANIME]);
   const airingCards = airingAnime.slice(0, 12);
   const totalAiringPages = Math.max(1, Math.ceil(airingAnime.length / catalogPageSize));
