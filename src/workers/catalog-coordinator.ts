@@ -1,10 +1,15 @@
 import { DurableObject } from "cloudflare:workers";
 import { applyCatalogMutation, CATALOG_CURRENT_KEY, CATALOG_REVISION_PREFIX, emptyCatalogState, type CatalogMutation, type CatalogPointer, type CatalogState } from "@/data/catalog-r2.shared";
 import { pruneCatalogSnapshotCache, publishCatalogSnapshotCachePointer, writeCatalogAdminSnapshotCache } from "@/data/catalog-kv-cache.shared";
+import type { Anime } from "@/data/anime";
 
 type CoordinatorEnv = { CATALOG_BUCKET:R2Bucket; YUME_DB:D1Database; YUME_CATALOG_CACHE:KVNamespace };
 type Env = { CATALOG_COORDINATOR:DurableObjectNamespace<CatalogCoordinator> };
 type Operation = { id:string; mutation:CatalogMutation; acceptedAt:string; sequence:number; status:"pending"|"committed"; revision?:number };
+type FeaturedSnapshot = { items:Anime[]; generatedAt:string; expiresAt:number; revision:number; retryAfter?:number };
+const FEATURED_SNAPSHOT_KEY = "home:featured:v1";
+const FEATURED_TTL_MS = 24 * 60 * 60 * 1000;
+const FEATURED_RETRY_MS = 5 * 60 * 1000;
 
 function validMutation(value:unknown):value is CatalogMutation {
   if(!value||typeof value!=="object")return false;
@@ -22,6 +27,23 @@ export class CatalogCoordinator extends DurableObject<CoordinatorEnv>{
   constructor(ctx:DurableObjectState,env:CoordinatorEnv){super(ctx,env);}
 
   async fetch(request:Request):Promise<Response>{
+    if(request.method==="POST"&&new URL(request.url).pathname==="/internal/v1/featured"){
+      let input:{candidates?:unknown};
+      try{input=await request.json() as typeof input;}catch{return Response.json({error:"invalid_json"},{status:400});}
+      if(!Array.isArray(input.candidates)||input.candidates.length>100)return Response.json({error:"invalid_featured_candidates"},{status:400});
+      const candidates:Anime[]=[];
+      const seen=new Set<string>();
+      for(const value of input.candidates){
+        if(!value||typeof value!=="object")continue;
+        const item=value as Partial<Anime>;
+        if(typeof item.id!=="string"||!/^[0-9]{1,12}$/.test(item.id)||seen.has(item.id)||
+          typeof item.title!=="string"||!item.title.trim()||typeof item.posterUrl!=="string"||!item.posterUrl.trim()||
+          typeof item.rating!=="number"||!Number.isFinite(item.rating)||item.rating<0||item.rating>10)continue;
+        seen.add(item.id);
+        candidates.push(item as Anime);
+      }
+      return this.ctx.blockConcurrencyWhile(async()=>Response.json(await this.getFeaturedSnapshot(candidates)));
+    }
     if(request.method!=="POST")return Response.json({error:"method_not_allowed"},{status:405});
     let input:{operationId?:string;mutation?:unknown};
     try{input=await request.json() as typeof input;}catch{return Response.json({error:"invalid_json"},{status:400});}
@@ -56,6 +78,43 @@ export class CatalogCoordinator extends DurableObject<CoordinatorEnv>{
         return Response.json({error:"catalog_mutation_pending",operationId:operation.id},{status:503});
       }
     });
+  }
+
+
+  private async getFeaturedSnapshot(candidates:Anime[]):Promise<FeaturedSnapshot & {stale?:boolean}>{
+    const now=Date.now();
+    const previous=await this.ctx.storage.get<FeaturedSnapshot>(FEATURED_SNAPSHOT_KEY);
+    if(previous&&previous.expiresAt>now)return previous;
+    if(previous&&previous.retryAfter&&previous.retryAfter>now)return {...previous,stale:true};
+    if(!candidates.length){
+      if(previous){const fallback={...previous,retryAfter:now+FEATURED_RETRY_MS};await this.ctx.storage.put(FEATURED_SNAPSHOT_KEY,fallback);return {...fallback,stale:true};}
+      return {items:[],generatedAt:new Date(now).toISOString(),expiresAt:now,revision:0,stale:true};
+    }
+    try{
+      const pointerObject=await this.env.CATALOG_BUCKET.get(CATALOG_CURRENT_KEY);
+      const pointer=pointerObject?await pointerObject.json<CatalogPointer>():null;
+      if(!pointer||pointer.schemaVersion!==1||!Number.isSafeInteger(pointer.revision)||pointer.key!==CATALOG_REVISION_PREFIX+pointer.revision+".json")throw new Error("Published catalogue pointer is unavailable or invalid.");
+      const publishedObject=await this.env.CATALOG_BUCKET.get(pointer.key);
+      if(!publishedObject)throw new Error("Published catalogue revision is missing.");
+      const publishedBody=await publishedObject.text();
+      if(await sha256(publishedBody)!==pointer.checksum)throw new Error("Published catalogue checksum mismatch.");
+      const published=JSON.parse(publishedBody) as CatalogState;
+      if(published.schemaVersion!==1||published.revision!==pointer.revision||!Array.isArray(published.items))throw new Error("Published catalogue snapshot is invalid.");
+      const publishedById=new Map(published.items.map(item=>[item.id,item]));
+      const ranked=candidates.filter(item=>publishedById.has(item.id)).map(item=>publishedById.get(item.id)!).sort((a,b)=>(b.rating??-1)-(a.rating??-1)||a.id.localeCompare(b.id));
+      if(!ranked.length)throw new Error("No rated poster-backed catalogue entries are available.");
+      const previousIds=new Set((previous?.items??[]).map(item=>item.id));
+      const alternatives=ranked.filter(item=>!previousIds.has(item.id));
+      const preferred=alternatives.length>=Math.min(3,ranked.length)?alternatives:ranked;
+      const uniqueSelection=[...preferred,...ranked.filter(item=>!preferred.some(entry=>entry.id===item.id))].slice(0,3);
+      const snapshot:FeaturedSnapshot={items:uniqueSelection,generatedAt:new Date(now).toISOString(),expiresAt:now+FEATURED_TTL_MS,revision:pointer.revision};
+      await this.ctx.storage.put(FEATURED_SNAPSHOT_KEY,snapshot);
+      return snapshot;
+    }catch(error){
+      console.warn("[YUME][CATALOG_COORDINATOR] Daily featured refresh failed; preserving the last published set.",error);
+      if(previous){const fallback={...previous,retryAfter:now+FEATURED_RETRY_MS};await this.ctx.storage.put(FEATURED_SNAPSHOT_KEY,fallback);return {...fallback,stale:true};}
+      throw error;
+    }
   }
 
   private async processPending():Promise<Operation[]>{
@@ -188,6 +247,7 @@ export class CatalogCoordinator extends DurableObject<CoordinatorEnv>{
 
 export default {
   async fetch(request:Request,env:Env):Promise<Response>{
+    if(request.method==="POST"&&new URL(request.url).pathname==="/internal/v1/featured")return env.CATALOG_COORDINATOR.getByName("yume-catalog").fetch(request);
     if(request.method!=="POST"||new URL(request.url).pathname!=="/internal/v1/mutate")return new Response("Not Found",{status:404});
     return env.CATALOG_COORDINATOR.getByName("yume-catalog").fetch(request);
   },
