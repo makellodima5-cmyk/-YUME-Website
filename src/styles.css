@@ -337,6 +337,16 @@ html.telegram-mini-app body {
   min-height: var(--yume-tg-viewport-height, 100vh);
 }
 
+/* Telegram's content safe area includes its own header chrome, unlike the
+   device-only safe area. Keep the Yubera app bar and page content below it. */
+html.telegram-mini-app .yubera-topbar {
+  height: calc(64px + max(env(safe-area-inset-top, 0px), var(--yume-tg-content-safe-top, var(--yume-tg-safe-top, 0px))));
+  padding-top: max(env(safe-area-inset-top, 0px), var(--yume-tg-content-safe-top, var(--yume-tg-safe-top, 0px)));
+}
+html.telegram-mini-app main#main-content {
+  padding-top: calc(78px + max(env(safe-area-inset-top, 0px), var(--yume-tg-content-safe-top, var(--yume-tg-safe-top, 0px)))) !important;
+}
+
 
 /* Telegram Mini App touch reliability: decorative poster layers must never
    become independent hit targets, and interactive controls use native taps. */
