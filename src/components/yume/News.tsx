@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowUpRight, Bookmark, CalendarDays, Newspaper, RefreshCw, Search } from "lucide-react";
 import type { Anime } from "@/data/anime";
 import { displayAnimeTitle, useYumePreferences } from "@/data/preferences";
@@ -48,10 +48,11 @@ function relatedAnime(article: YuberaNewsArticle, animeList: Anime[]): Anime | u
   );
 }
 
-export function News({ animeList, onDetailChange }: { animeList: Anime[]; onDetailChange?: (open: boolean) => void }) {
+export function News({ animeList, onDetailChange, telegramMiniApp = false }: { animeList: Anime[]; onDetailChange?: (open: boolean) => void; telegramMiniApp?: boolean }) {
   const { language } = useYumePreferences();
   const [articles, setArticles] = useState<YuberaNewsArticle[]>([]);
   const [selectedArticle, setSelectedArticle] = useState<YuberaNewsArticle | null>(null);
+  const listScrollPosition = useRef(0);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<Category>("ALL");
   const [savedOnly, setSavedOnly] = useState(false);
@@ -59,6 +60,23 @@ export function News({ animeList, onDetailChange }: { animeList: Anime[]; onDeta
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const ru = language === "ru";
+
+  useEffect(() => {
+    if (selectedArticle) {
+      const frame = window.requestAnimationFrame(() => {
+        window.scrollTo(0, 0);
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
+      });
+      return () => window.cancelAnimationFrame(frame);
+    }
+    if (listScrollPosition.current > 0) {
+      const restorePosition = listScrollPosition.current;
+      const frame = window.requestAnimationFrame(() => window.scrollTo(0, restorePosition));
+      listScrollPosition.current = 0;
+      return () => window.cancelAnimationFrame(frame);
+    }
+  }, [selectedArticle]);
 
   useEffect(() => {
     if (!selectedArticle) return;
@@ -98,6 +116,7 @@ export function News({ animeList, onDetailChange }: { animeList: Anime[]; onDeta
   }, [articles, bookmarks, category, language, query, savedOnly, ru]);
 
   const openArticle = (article: YuberaNewsArticle) => {
+    listScrollPosition.current = window.scrollY;
     onDetailChange?.(true);
     setSelectedArticle(article);
   };
@@ -115,6 +134,7 @@ export function News({ animeList, onDetailChange }: { animeList: Anime[]; onDeta
       <NewsArticle
         article={selectedArticle}
         animeList={animeList}
+        showBackButton={!telegramMiniApp}
         onBack={() => {
           setBookmarks(readBookmarks());
           setSelectedArticle(null);
@@ -206,7 +226,7 @@ export function News({ animeList, onDetailChange }: { animeList: Anime[]; onDeta
                         {related ? <PosterArt anime={related} className="h-full w-full" /> : article.linkedPosterUrl ? <img src={article.linkedPosterUrl} alt="" className="h-full w-full object-cover" /> : <img src="/images/yubera/yubera_banner.webp" alt="" className="h-full w-full object-cover" />}
                       </button>
                       <div className="flex min-w-0 flex-1 flex-col justify-between py-0.5">
-                        <button type="button" onClick={() => setSelectedArticle(article)} className="text-left">
+                        <button type="button" onClick={() => openArticle(article)} className="text-left">
                           <span className="text-[9px] font-bold uppercase tracking-wide text-primary">{categoryLabel(article.category, language)}</span>
                           <span className="mt-1 block line-clamp-3 text-xs font-bold leading-snug">{article.title}</span>
                         </button>
@@ -232,12 +252,12 @@ export function News({ animeList, onDetailChange }: { animeList: Anime[]; onDeta
                     const saved = bookmarks.includes(article.id);
                     return (
                       <article key={article.id} className="flex gap-3 rounded-2xl border border-border bg-card p-3">
-                        <button type="button" onClick={() => setSelectedArticle(article)} className="h-[88px] w-[88px] shrink-0 overflow-hidden rounded-xl bg-secondary">
+                        <button type="button" onClick={() => openArticle(article)} className="h-[88px] w-[88px] shrink-0 overflow-hidden rounded-xl bg-secondary">
                           {related ? <PosterArt anime={related} className="h-full w-full" /> : article.linkedPosterUrl ? <img src={article.linkedPosterUrl} alt="" className="h-full w-full object-cover" /> : <img src="/images/yubera/yubera_banner.webp" alt="" className="h-full w-full object-cover" />}
                         </button>
                         <div className="min-w-0 flex-1">
                           <span className="text-[9px] font-bold uppercase tracking-wide text-primary">{categoryLabel(article.category, language)}</span>
-                          <button type="button" onClick={() => setSelectedArticle(article)} className="mt-1 block line-clamp-3 text-left text-xs font-bold leading-snug">{article.title}</button>
+                          <button type="button" onClick={() => openArticle(article)} className="mt-1 block line-clamp-3 text-left text-xs font-bold leading-snug">{article.title}</button>
                           <div className="mt-2 flex items-center justify-between gap-2">
                             <span className="text-[10px] text-muted-foreground">{formatDate(article.createdAt, language)}</span>
                             <button type="button" onClick={() => toggleBookmark(article.id)} aria-pressed={saved} aria-label={saved ? "Saved" : "Bookmark"} className="text-muted-foreground hover:text-primary"><Bookmark className={`h-4 w-4 ${saved ? "fill-current text-primary" : ""}`} /></button>

@@ -1672,10 +1672,13 @@ function Index() {
   const airingCards = airingAnime.slice(0, 12);
   const totalAiringPages = Math.max(1, Math.ceil(airingAnime.length / catalogPageSize));
   const visibleAiringAnime = airingAnime.slice((airingPage - 1) * catalogPageSize, airingPage * catalogPageSize);
+  const unreadNotificationCount = notificationStateLoaded && notificationRemoteAccount
+    ? notificationItems.filter((item) => !notificationReadIds.includes(item.id) && !notificationDismissedIds.includes(item.id)).length
+    : 0;
   return (
     <div className="relative isolate min-h-screen pb-8 yubera-with-bottom-nav">
       <div className="relative z-10">
-      <Header setView={setView} unreadNotificationCount={notificationStateLoaded && notificationRemoteAccount ? notificationItems.filter((item) => !notificationReadIds.includes(item.id) && !notificationDismissedIds.includes(item.id)).length : 0} />
+      <Header setView={setView} unreadNotificationCount={unreadNotificationCount} />
       {view === "home" && (
         <HomeSearchBar
           query={query}
@@ -2048,11 +2051,11 @@ function Index() {
           )}
         </main>
       ) : view === "my" ? (
-        <MyHub animeList={ANIME} onNavigate={setView} onSelect={select} />
+        <MyHub animeList={ANIME} onNavigate={setView} onSelect={select} showNotifications={isTelegramMiniApp} unreadNotificationCount={unreadNotificationCount} />
       ) : view === "tracked-titles" ? (
         <TrackedTitlesPage animeList={ANIME} onNavigate={setView} onSelect={select} />
       ) : view === "news" ? (
-        <News animeList={ANIME} onDetailChange={setNewsDetailOpen} />
+        <News animeList={ANIME} onDetailChange={setNewsDetailOpen} telegramMiniApp={isTelegramMiniApp} />
       ) : view === "profile" ? (
         <Profile animeList={ANIME} onSelect={select} onCatalog={() => setView("catalog")} isAdmin={isAdmin} onAdmin={() => setView("admin")}  />
       ) : view === "favorites" ? (
@@ -2416,7 +2419,8 @@ function Index() {
             { id: "profile" as View, label: language === "ru" ? "Профиль" : "Profile", icon: UserRound, active: ["profile", "admin", "privacy", "privacy-policy", "rules", "rights"].includes(view) },
           ].map((item) => {
             const Icon = item.icon;
-            return <button key={item.id} type="button" onClick={() => setView(item.id)} aria-current={item.active ? "page" : undefined}><Icon className="h-5 w-5" /><span>{item.label}</span></button>;
+            const hasUnread = item.id === "my" && isTelegramMiniApp && unreadNotificationCount > 0;
+            return <button key={item.id} type="button" onClick={() => setView(item.id)} aria-current={item.active ? "page" : undefined} aria-label={hasUnread ? (language === "ru" ? "Моё, есть непрочитанные уведомления" : "My, unread notifications") : item.label}><span className="relative inline-flex"><Icon className="h-5 w-5" />{hasUnread && <span className="absolute -right-1 -top-0.5 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-[#101116]" aria-hidden="true" />}</span><span>{item.label}</span></button>;
           })}
         </nav>
       )}

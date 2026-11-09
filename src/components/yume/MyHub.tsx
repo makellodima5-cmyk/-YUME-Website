@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Bookmark, ChevronRight, Clock3, Radio } from "lucide-react";
+import { Bell, Bookmark, ChevronRight, Clock3, Radio } from "lucide-react";
 import type { Anime } from "@/data/anime";
 import type { View } from "./Header";
 import { useYumePreferences, displayAnimeTitle } from "@/data/preferences";
@@ -8,7 +8,7 @@ import { PosterArt } from "./Poster";
 import { getShikimoriAnimes } from "@/data/shikimori";
 import { FAVORITES_STORAGE_KEY, PROFILE_UPDATED_EVENT, readSavedAnimeIds, WATCHLIST_STORAGE_KEY } from "@/data/profile-storage";
 
-type Props = { animeList: Anime[]; onNavigate: (view: View) => void; onSelect: (anime: Anime) => void };
+type Props = { animeList: Anime[]; onNavigate: (view: View) => void; onSelect: (anime: Anime) => void; showNotifications?: boolean; unreadNotificationCount?: number };
 const PREVIEW_KEY = "yubera-my-preview-v1";
 const PREVIEW_LIMIT = 3;
 
@@ -44,7 +44,7 @@ function MiniPosterStack({ items }: { items: Anime[] }) {
   </span>;
 }
 
-export function MyHub({ animeList, onNavigate, onSelect }: Props) {
+export function MyHub({ animeList, onNavigate, onSelect, showNotifications = false, unreadNotificationCount = 0 }: Props) {
   const { language } = useYumePreferences();
   const ru = language === "ru";
   const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
@@ -143,6 +143,16 @@ export function MyHub({ animeList, onNavigate, onSelect }: Props) {
         <div className="scrollbar-none flex gap-3 overflow-x-auto pb-2">{favorites.slice(0, 8).map(anime => <button key={anime.id} type="button" onClick={() => onSelect(anime)} className="w-[104px] shrink-0 text-left"><PosterArt anime={anime} className="aspect-[2/3] w-full rounded-[16px] border border-border" /><span className="mt-2 block line-clamp-2 min-h-8 text-[12px] leading-snug">{displayAnimeTitle(anime, language)}</span></button>)}</div>}
     </section>
     <div className="mt-5 grid gap-3">
+      {showNotifications && (
+        <button type="button" onClick={() => onNavigate("notifications")} className="flex min-h-[88px] w-full items-center gap-3 rounded-[22px] border border-border bg-card/90 px-4 py-4 text-left shadow-sm transition hover:border-primary/40">
+          <span className="relative grid h-14 w-14 shrink-0 place-items-center rounded-full bg-[#292A31] text-primary">
+            <Bell className="h-7 w-7" />
+            {unreadNotificationCount > 0 && <span className="absolute right-1 top-1 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-[#292A31]" aria-label={ru ? "Есть непрочитанные уведомления" : "Unread notifications"} />}
+          </span>
+          <span className="min-w-0 flex-1"><span className="block text-[17px] font-bold">{ru ? "Уведомления" : "Notifications"}</span><span className="mt-1 block text-sm text-muted-foreground">{unreadNotificationCount > 0 ? (ru ? `Непрочитанных: ${unreadNotificationCount}` : `Unread: ${unreadNotificationCount}`) : (ru ? "Новости и сообщения Yubera" : "Yubera news and messages")}</span></span>
+          <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" />
+        </button>
+      )}
       {listCard("watchlist", ru ? "Смотреть позже" : "Watch later", ru ? "Отложенные аниме" : "Anime saved for later", Bookmark, watchIds.length, watchlistPreview)}
       {historyIds.length > 0 && listCard("history", ru ? "История просмотра" : "Viewing history", ru ? "Ранее просмотренные" : "Previously watched anime", Clock3, historyIds.length, historyPreview)}
       <button type="button" onClick={() => onNavigate("tracked-titles")} className="flex min-h-[96px] w-full items-center gap-3 rounded-[22px] border border-border bg-card/90 px-4 py-4 text-left shadow-sm transition hover:border-primary/40">

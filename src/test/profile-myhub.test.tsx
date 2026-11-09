@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import type { Anime } from "@/data/anime";
 import { YumePreferencesProvider } from "@/data/preferences";
@@ -64,6 +64,26 @@ describe("Profile and My library pages", () => {
 
     expect(await screen.findByRole("heading", { name: "Смотреть позже" })).toBeInTheDocument();
     expect(screen.getByText(/Добавляй в список аниме/i)).toBeInTheDocument();
+  });
+
+  it("shows the Telegram notifications entry and unread indicator when requested", async () => {
+    const onNavigate = vi.fn();
+    render(withPreferences(
+      <MyHub
+        animeList={[]}
+        onNavigate={onNavigate}
+        onSelect={vi.fn()}
+        showNotifications
+        unreadNotificationCount={2}
+      />,
+    ));
+
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
+    const notificationsCard = screen.getByRole("button", { name: /Уведомления/ });
+    expect(notificationsCard).toHaveTextContent("Непрочитанных: 2");
+    expect(notificationsCard.querySelector('[aria-label="Есть непрочитанные уведомления"]')).toBeInTheDocument();
+    fireEvent.click(notificationsCard);
+    expect(onNavigate).toHaveBeenCalledWith("notifications");
   });
 
   it.each([1, 2, 3, 4])(

@@ -750,6 +750,21 @@ html[data-theme="light"] .yubera-wordmark {
   background:var(--primary);
   box-shadow:0 0 0 2px var(--background);
 }
+
+/* Telegram Mini App uses Telegram's own navigation controls and centered branding. */
+html.telegram-mini-app .yubera-topbar-inner > div:first-child {
+  position:absolute;
+  left:50%;
+  transform:translateX(-50%);
+}
+html.telegram-mini-app .yubera-topbar-inner > div:first-child > button,
+html.telegram-mini-app .yubera-topbar-actions {
+  display:none;
+}
+html.telegram-mini-app .yubera-home-search-shell {
+  padding-top:calc(78px + max(env(safe-area-inset-top, 0px), var(--yume-tg-content-safe-top, var(--yume-tg-safe-top, 0px))));
+}
+
 .yubera-section-banner {
   position:relative;
   isolation:isolate;
