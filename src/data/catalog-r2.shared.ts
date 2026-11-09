@@ -23,6 +23,15 @@ export type CatalogPointer = {
   updatedAt: string;
 };
 
+/** A revision remains live while either the public or private admin pointer references it. */
+export function isCatalogRevisionPinned(
+  revision: number,
+  publicRevision: number | null | undefined,
+  adminRevision: number | null | undefined,
+): boolean {
+  return revision > 0 && (revision === publicRevision || revision === adminRevision);
+}
+
 export type CatalogMutation =
   | { type: "replace"; items: Anime[] }
   | { type: "upsert"; items: Anime[] }
