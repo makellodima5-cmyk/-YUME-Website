@@ -196,7 +196,7 @@ function Composer({
       />
       <button
         type="button"
-        onClick={() => disabled ? toast.warning(COPY.ru.login, { duration: 3500 }) : onSubmit()}
+        onClick={() => disabled ? toast.warning(loginNotice, { duration: 3500 }) : onSubmit()}
         disabled={!disabled && (loading || !value.trim())}
         aria-label={sendLabel}
         title={sendLabel}
