@@ -674,7 +674,7 @@ export const getShikimoriAnimeDetails = createServerFn({ method: "GET" })
     animeId: typeof input?.animeId === "string" && /^\d{1,12}$/.test(input.animeId) ? input.animeId : "",
   }))
   .handler(async ({ data }) => {
-    const empty = { anime: null, relatedAnime: [] as Anime[], apiError: null as string | null };
+    const empty = { anime: null, relatedAnime: [] as Anime[], apiError: null as string | null, ratingEnabled: false };
     if (!data.animeId) return empty;
     let state;
     try {
@@ -708,6 +708,7 @@ export const getShikimoriAnimeDetails = createServerFn({ method: "GET" })
       anime: visibleById.get(stored.id) ?? null,
       relatedAnime: related.map((item) => visibleById.get(item.id)).filter((item): item is Anime => Boolean(item)),
       apiError,
+      ratingEnabled: stored.status !== "Анонс",
     };
   });
 
