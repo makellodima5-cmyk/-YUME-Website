@@ -42,12 +42,13 @@ class FakeDb {
 
 const runtimeEnv = cloudflareEnv as unknown as Record<string, unknown>;
 
-function configure(db = new FakeDb()) {
+function configure(db = new FakeDb(), rateLimitSuccess = true) {
   Object.assign(runtimeEnv, {
     YUME_DB: db,
     YUME_AUTH_SESSION_SECRET: "test-session-secret-with-at-least-32-characters",
     TELEGRAM_OIDC_CLIENT_ID: "test-client-id",
     TELEGRAM_OIDC_CLIENT_SECRET: "test-client-secret",
+    ADMIN_PASSWORD_RATE_LIMITER: { async limit() { return { success: rateLimitSuccess }; } },
   });
   return db;
 }
@@ -57,6 +58,7 @@ afterEach(() => {
   delete runtimeEnv.YUME_AUTH_SESSION_SECRET;
   delete runtimeEnv.TELEGRAM_OIDC_CLIENT_ID;
   delete runtimeEnv.TELEGRAM_OIDC_CLIENT_SECRET;
+  delete runtimeEnv.ADMIN_PASSWORD_RATE_LIMITER;
 });
 
 describe("Telegram OIDC browser binding", () => {
@@ -95,6 +97,37 @@ describe("Telegram OIDC browser binding", () => {
     expect(response.status).toBe(400);
     expect(await response.json()).toEqual({ error: "consent_required" });
     expect(db.executed.some(statement => statement.sql.includes("INSERT INTO yume_telegram_oidc_states"))).toBe(false);
+  });
+
+  it("fails closed when the browser OIDC start has no client IP for rate limiting", async () => {
+    const db = configure();
+    const response = await handleTelegramOidc(new Request("https://yume.test/api/telegram/oidc", {
+      method: "POST",
+      headers: {
+        Origin: "https://yume.test",
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: "flow=login",
+    }));
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ error: "rate_limit_unavailable" });
+    expect(db.executed).toHaveLength(0);
+  });
+
+  it("rejects browser OIDC starts over the per-IP rate limit", async () => {
+    const db = configure(new FakeDb(), false);
+    const response = await handleTelegramOidc(new Request("https://yume.test/api/telegram/oidc", {
+      method: "POST",
+      headers: {
+        Origin: "https://yume.test",
+        "CF-Connecting-IP": "203.0.113.11",
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: "flow=login",
+    }));
+    expect(response.status).toBe(429);
+    expect(await response.json()).toEqual({ error: "rate_limited" });
+    expect(db.executed).toHaveLength(0);
   });
 
   it("stores accepted registration choices in D1 and redirects without exposing them in the URL", async () => {
@@ -146,6 +179,7 @@ describe("Telegram native OIDC start", () => {
     const challenge = "c".repeat(64);
     const response = await handleTelegramNativeOidcStart(new Request(
       "https://yume.test/api/telegram/oidc?native=1&flow=login&state=" + state + "&code_challenge=" + challenge,
+      { headers: { "CF-Connecting-IP": "203.0.113.10" } },
     ));
 
     expect(response.status).toBe(303);
