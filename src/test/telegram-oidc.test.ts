@@ -48,7 +48,7 @@ function configure(db = new FakeDb(), rateLimitSuccess = true) {
     YUME_AUTH_SESSION_SECRET: "test-session-secret-with-at-least-32-characters",
     TELEGRAM_OIDC_CLIENT_ID: "test-client-id",
     TELEGRAM_OIDC_CLIENT_SECRET: "test-client-secret",
-    ADMIN_PASSWORD_RATE_LIMITER: { async limit() { return { success: rateLimitSuccess }; } },
+    TELEGRAM_OIDC_RATE_LIMITER: { async limit() { return { success: rateLimitSuccess }; } },
   });
   return db;
 }
@@ -58,7 +58,7 @@ afterEach(() => {
   delete runtimeEnv.YUME_AUTH_SESSION_SECRET;
   delete runtimeEnv.TELEGRAM_OIDC_CLIENT_ID;
   delete runtimeEnv.TELEGRAM_OIDC_CLIENT_SECRET;
-  delete runtimeEnv.ADMIN_PASSWORD_RATE_LIMITER;
+  delete runtimeEnv.TELEGRAM_OIDC_RATE_LIMITER;
 });
 
 describe("Telegram OIDC browser binding", () => {
