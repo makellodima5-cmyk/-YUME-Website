@@ -24,7 +24,12 @@ function createDatabase(options: { failRun?: boolean } = {}) {
           if (options.failRun) throw new Error("temporary D1 failure");
           return {};
         },
-        async first<T>() { return ({ id: "episode-123-7" } as T); },
+        async first<T>() {
+          if (sql.includes("SELECT d.chat_id,d.status,t.bot_active")) {
+            return ({ chat_id: "123456", status: "pending", bot_active: 0 } as T);
+          }
+          return ({ id: "episode-123-7" } as T);
+        },
         async all<T>() { return ({ results: [{ user_id: "user-1" }] } as T); },
       };
       return statement;
@@ -60,6 +65,35 @@ describe("episode notification Queue", () => {
     expect(statements.some(sql => sql.includes("INSERT OR IGNORE INTO yume_notification_targets"))).toBe(true);
     expect(statements.some(sql => sql.includes("UPDATE yume_notifications SET active=1"))).toBe(true);
     expect(statements.some(sql => sql.includes("SELECT user_id FROM yume_anime_subscriptions"))).toBe(true);
+  });
+
+  it("marks episode deliveries blocked when the Telegram bot is inactive", async () => {
+    const { database, statements } = createDatabase();
+    let acknowledged = false;
+    let retried = false;
+    await handleEpisodeNotificationQueue({
+      messages: [{
+        body: {
+          type: "telegram_episode_delivery",
+          notificationId: "episode-123-7",
+          userId: "user-1",
+          animeId: "123",
+          episodeNumber: 7,
+          animeTitle: "Тестовое аниме",
+        },
+        ack() { acknowledged = true; },
+        retry() { retried = true; },
+      }],
+    }, {
+      YUME_DB: database,
+      TELEGRAM_BOT_TOKEN: "test-token",
+    });
+    expect(acknowledged).toBe(true);
+    expect(retried).toBe(false);
+    expect(statements.some(sql =>
+      sql.includes("UPDATE yume_telegram_episode_deliveries SET status='blocked'") &&
+      sql.includes("Telegram bot is inactive"),
+    )).toBe(true);
   });
 
   it("retries failed D1 operations instead of acknowledging the queue message", async () => {
