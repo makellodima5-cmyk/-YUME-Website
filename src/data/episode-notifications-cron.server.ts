@@ -93,10 +93,15 @@ export async function runScheduledEpisodeNotifications(input: unknown): Promise<
     const total = Math.max(0, Number(source.episodes ?? old.episodes) || 0);
     const status = storedStatus(source.status, old.status);
     const key = "episode_last_aired:" + old.id;
-    const baseline = Number(state.metadata[key] ?? old.episodesAired ?? 0);
+    const baselineValue = Number(state.metadata[key] ?? old.episodesAired ?? 0);
+    const baseline = Number.isSafeInteger(baselineValue) && baselineValue >= 0
+      ? baselineValue
+      : Math.max(0, Number(old.episodesAired ?? 0) || 0);
     if (aired > baseline) {
       const posterUrl = safePosterUrl(source.poster);
-      await enqueueEpisodeNotification(e, old.id, aired, source.russian || source.name || old.title, posterUrl);
+      for (let episodeNumber = baseline + 1; episodeNumber <= aired; episodeNumber += 1) {
+        await enqueueEpisodeNotification(e, old.id, episodeNumber, source.russian || source.name || old.title, posterUrl);
+      }
     }
     metadata[key] = String(Math.max(baseline, aired));
     updated.push({
