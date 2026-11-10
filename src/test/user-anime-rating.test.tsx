@@ -104,4 +104,5 @@ describe("YUBERA user rating block", () => {
     expect(screen.getByRole("button", { name: "Подтвердить" })).toBeDisabled();
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole("link", { name: "Войти через Telegram" })).toBeNull();
-  });});
+  });
+});
