@@ -248,6 +248,7 @@ export default {
     const isProtectedApiMutation = isMutation && (
       (requestUrl.pathname.startsWith("/api/telegram/") && requestUrl.pathname !== "/api/telegram/webhook") ||
       requestUrl.pathname === "/api/anime-subscriptions" ||
+      requestUrl.pathname === "/api/anime-comments" ||
       requestUrl.pathname === "/api/notifications" ||
       requestUrl.pathname === "/api/admin-notifications"
     );
