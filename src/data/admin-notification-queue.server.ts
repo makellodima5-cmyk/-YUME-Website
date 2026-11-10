@@ -127,7 +127,13 @@ async function processDelivery(db: Database, env: Environment, job: DeliveryJob)
   ).bind(job.notificationId, job.userId).first<{
     chat_id: string; status: string; bot_active: number; title: string; body: string; target_url: string | null;
   }>();
-  if (!row || row.status === "sent" || row.status === "blocked" || row.bot_active !== 1) return;
+  if (!row || row.status === "sent" || row.status === "blocked") return;
+  if (row.bot_active !== 1) {
+    await db.prepare(
+      "UPDATE yume_telegram_admin_deliveries SET status='blocked',lease_expires_at=NULL,last_error='Telegram bot is inactive',updated_at=CURRENT_TIMESTAMP WHERE notification_id=? AND user_id=? AND status IN ('pending','sending')",
+    ).bind(job.notificationId, job.userId).run();
+    return;
+  }
 
   const now = Math.floor(Date.now() / 1000);
   const lease = await db.prepare(
