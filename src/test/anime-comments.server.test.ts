@@ -153,7 +153,7 @@ class FakeStatement {
       let replyToUserId: string | null = null;
       if (isReply) {
         const parent = this.db.comments.get(parentId!);
-        if (!parent || parent.anime_id !== animeId || parent.deleted_at || parent.expires_at <= createdAt) {
+        if (!parent || parent.anime_id !== animeId || parent.user_id === userId || parent.deleted_at || parent.expires_at <= createdAt) {
           return { meta: { changes: 0, rows_read: 0, rows_written: 0 } };
         }
         rootId = parent.thread_root_id;
@@ -416,6 +416,21 @@ describe("anime comments API", () => {
     expect(payload.comment.threadRootId).toBe(root.id);
     expect(payload.comment.replyToUserId).toBe(USER_A);
     expect(payload.comment.replyToName).toBe("Akira");
+  });
+
+  it("rejects replying to the current user's own comment", async () => {
+    const rootId = "43000000-0000-4000-8000-000000000004";
+    db.comments.set(rootId, {
+      id: rootId, anime_id: ANIME_A, user_id: USER_A, parent_id: null, thread_root_id: rootId,
+      reply_to_user_id: null, body: "My own comment", like_count: 0, created_at: new Date().toISOString(),
+      expires_at: "2027-01-01T00:00:00.000Z", deleted_at: null, idempotency_key: null,
+    });
+    const response = await handleAnimeComments(request("POST", undefined, {
+      action: "reply", animeId: ANIME_A, parentId: rootId, text: "I reply to myself",
+      idempotencyKey: "44000000-0000-4000-8000-000000000004",
+    }));
+    expect(response.status).toBe(404);
+    expect(db.comments.size).toBe(1);
   });
 
   it("rejects cross-anime parents, invalid IDs, empty text and messages over 1000 characters", async () => {
