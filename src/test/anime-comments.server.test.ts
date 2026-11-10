@@ -447,7 +447,7 @@ describe("anime comments API", () => {
     expect(payload.totalCount).toBe(2);
     expect(payload.comment.parentId).toBe(root.id);
     expect(payload.comment.threadRootId).toBe(root.id);
-    expect(payload.comment.replyToUserId).toBe(USER_A);
+    expect(payload.comment.replyToUserId).toBe(USER_B);
     expect(payload.comment.replyToName).toBe("Akira");
   });
 
