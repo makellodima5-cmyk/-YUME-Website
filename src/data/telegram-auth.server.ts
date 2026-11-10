@@ -655,6 +655,7 @@ export async function handleTelegramAccountDelete(request: Request): Promise<Res
       db.prepare("DELETE FROM yume_notification_targets WHERE user_id = ?").bind(userId),
       db.prepare("DELETE FROM yume_notification_reads WHERE user_id = ?").bind(userId),
       db.prepare("DELETE FROM yume_notification_dismissals WHERE user_id = ?").bind(userId),
+      db.prepare("DELETE FROM yume_anime_ratings WHERE user_id = ?").bind(userId),
       db.prepare("DELETE FROM yume_anime_subscriptions WHERE user_id = ?").bind(userId),
       db.prepare("DELETE FROM yume_view_history WHERE user_id = ?").bind(userId),
       db.prepare("DELETE FROM yume_saved_anime WHERE user_id = ?").bind(userId),
