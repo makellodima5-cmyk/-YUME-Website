@@ -27,6 +27,10 @@ CREATE TABLE yume_anime_comments (
 
 CREATE INDEX idx_yume_anime_comments_anime_roots
   ON yume_anime_comments(anime_id, parent_id, created_at DESC, id DESC);
+CREATE INDEX idx_yume_anime_comments_parent_created
+  ON yume_anime_comments(parent_id, created_at ASC, id ASC);
+CREATE INDEX idx_yume_anime_comments_reply_to_user
+  ON yume_anime_comments(reply_to_user_id);
 CREATE INDEX idx_yume_anime_comments_thread_created
   ON yume_anime_comments(anime_id, thread_root_id, created_at ASC, id ASC);
 CREATE INDEX idx_yume_anime_comments_expiry
