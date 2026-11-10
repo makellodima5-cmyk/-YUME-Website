@@ -77,7 +77,6 @@ type CountRow = { active_count: number; expired_count: number };
 type RuntimeResult = { rows_read?: number; rows_written?: number; changes?: number };
 
 const SESSION_COOKIE = "__Host-yume-session";
-const ANIME_ID_PATTERN = /^\d{1,12}$/;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const BEARER_PATTERN = /^Bearer ([A-Za-z0-9_-]{30,60})$/;
 const MAX_BODY_LENGTH = 4096;
@@ -225,8 +224,10 @@ async function readCommentCount(db: Database, animeId: string, now: string): Pro
     "FROM (SELECT ? AS anime_id) target " +
     "LEFT JOIN yume_anime_comment_summary summary ON summary.anime_id = target.anime_id " +
     "LIMIT 1",
-  ).bind(now, animeId).first<CountRow & RuntimeResult>();
-  return Math.max(0, Number(result?.active_count ?? 0) - Number(result?.expired_count ?? 0));
+  ).bind(now, animeId).all<CountRow>();
+  logD1("read_comment_count", result.meta);
+  const row = result.results[0];
+  return Math.max(0, Number(row?.active_count ?? 0) - Number(row?.expired_count ?? 0));
 }
 
 async function readLikedIds(db: Database, userId: string | null, comments: CommentRow[]): Promise<Set<string>> {
@@ -430,9 +431,7 @@ async function handleRead(request: Request): Promise<Response> {
 }
 
 async function writeComment(
-  request: Request,
   db: Database,
-  env: Environment,
   viewer: Viewer,
   body: Record<string, unknown>,
 ): Promise<Response> {
@@ -595,7 +594,7 @@ export async function handleAnimeComments(request: Request): Promise<Response> {
       if (body.action === "create" && body.parentId !== undefined && body.parentId !== null) {
         return json({ error: "invalid_parent_id" }, 400);
       }
-      return writeComment(request, db, env, viewer, {
+      return writeComment(db, viewer, {
         ...body,
         parentId: body.action === "reply" ? body.parentId : null,
       });
