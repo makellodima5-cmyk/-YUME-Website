@@ -14,10 +14,7 @@ type ApiRatingResponse = RatingStats & {
   error?: string;
 };
 
-type Props = {
-  animeId: string;
-  onRequestAuth: () => void;
-};
+type Props = { animeId: string };
 
 const EMPTY_STATS: RatingStats = {
   averageRating: null,
@@ -40,7 +37,7 @@ function parseStats(value: ApiRatingResponse): RatingStats {
   return { averageRating, voteCount, myRating };
 }
 
-export function UserAnimeRating({ animeId, onRequestAuth }: Props) {
+export function UserAnimeRating({ animeId }: Props) {
   const { language } = useYumePreferences();
   const ru = language === "ru";
   const [stats, setStats] = useState<RatingStats>(EMPTY_STATS);
@@ -190,9 +187,9 @@ export function UserAnimeRating({ animeId, onRequestAuth }: Props) {
           {authRequired && (
             <>
               {" "}
-              <button type="button" className="yubera-user-rating-auth-link" onClick={onRequestAuth}>
+              <a href="/?section=login" className="yubera-user-rating-auth-link">
                 {ru ? "Войти через Telegram" : "Sign in with Telegram"}
-              </button>
+              </a>
             </>
           )}
         </p>
