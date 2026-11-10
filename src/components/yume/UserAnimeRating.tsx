@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Star } from "lucide-react";
 import { useYumePreferences } from "@/data/preferences";
 
@@ -47,6 +47,7 @@ export function UserAnimeRating({ animeId }: Props) {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [authRequired, setAuthRequired] = useState(false);
+  const submitLockRef = useRef(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -91,7 +92,8 @@ export function UserAnimeRating({ animeId }: Props) {
     : "—";
 
   const saveRating = async () => {
-    if (!canSubmit || selected === null) return;
+    if (!canSubmit || selected === null || submitLockRef.current) return;
+    submitLockRef.current = true;
     setSaving(true);
     setError("");
     setNotice("");
@@ -125,6 +127,7 @@ export function UserAnimeRating({ animeId }: Props) {
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : (ru ? "Не удалось сохранить оценку." : "Could not save your rating."));
     } finally {
+      submitLockRef.current = false;
       setSaving(false);
     }
   };
