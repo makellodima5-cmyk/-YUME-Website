@@ -293,6 +293,27 @@ describe("anime comments API", () => {
     expect(getR2Anime).not.toHaveBeenCalled();
   });
 
+  it("hides expired roots and their still-young replies before the daily cleanup runs", async () => {
+    const rootId = "b0000000-0000-4000-8000-000000000001";
+    const replyId = "b0000000-0000-4000-8000-000000000002";
+    db.comments.set(rootId, {
+      id: rootId, anime_id: ANIME_A, user_id: USER_A, parent_id: null, thread_root_id: rootId,
+      reply_to_user_id: null, body: "Expired root", like_count: 0, created_at: "2026-10-01T00:00:00.000Z",
+      expires_at: "2026-10-31T00:00:00.000Z", deleted_at: null, idempotency_key: null,
+    });
+    db.comments.set(replyId, {
+      id: replyId, anime_id: ANIME_A, user_id: USER_B, parent_id: rootId, thread_root_id: rootId,
+      reply_to_user_id: USER_A, body: "Younger reply", like_count: 0, created_at: "2026-10-20T00:00:00.000Z",
+      expires_at: "2026-11-19T00:00:00.000Z", deleted_at: null, idempotency_key: null,
+    });
+
+    const response = await handleAnimeComments(request("GET", "/api/anime-comments?animeId=" + ANIME_A, undefined, false));
+    const payload = await response.json() as { comments: unknown[]; totalCount: number };
+    expect(payload.comments).toHaveLength(0);
+    expect(payload.totalCount).toBe(0);
+    expect(db.comments.size).toBe(2);
+  });
+
   it("returns three root comments first and continues with a stable cursor without duplicates", async () => {
     const expiry = "2027-01-01T00:00:00.000Z";
     for (let index = 0; index < 5; index += 1) {
@@ -436,6 +457,19 @@ describe("anime comments API", () => {
     expect(db.comments.get(rootId)?.body).toBe("");
     expect(db.comments.has(replyId)).toBe(true);
     expect(db.likes.has(rootId + ":" + USER_B)).toBe(false);
+  });
+
+  it("physically removes an owned leaf comment", async () => {
+    const id = "91000000-0000-4000-8000-000000000009";
+    db.comments.set(id, {
+      id, anime_id: ANIME_A, user_id: USER_A, parent_id: null, thread_root_id: id, reply_to_user_id: null,
+      body: "Mine", like_count: 0, created_at: new Date().toISOString(),
+      expires_at: "2027-01-01T00:00:00.000Z", deleted_at: null, idempotency_key: null,
+    });
+    const response = await handleAnimeComments(request("DELETE", undefined, { animeId: ANIME_A, commentId: id }));
+    const payload = await response.json() as { deleted: boolean; tombstoned: boolean; totalCount: number };
+    expect(payload).toMatchObject({ deleted: true, tombstoned: false, totalCount: 0 });
+    expect(db.comments.has(id)).toBe(false);
   });
 
   it("does not allow deleting another user's comment", async () => {
