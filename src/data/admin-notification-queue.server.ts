@@ -61,6 +61,28 @@ export async function dispatchPendingAdminNotifications(input: unknown): Promise
       "UPDATE yume_telegram_admin_outbox SET status='queued',updated_at=CURRENT_TIMESTAMP WHERE notification_id=? AND status<>'done'",
     ).bind(row.notification_id).run();
   }
+
+  // A delivery that exhausted Queue retries is moved to the DLQ while its
+  // database row remains pending. Re-enqueue stale rows so the hourly recovery
+  // cron can resume delivery; the per-recipient lease prevents duplicate sends.
+  const deliveries = await db.prepare(
+    "SELECT notification_id,user_id FROM yume_telegram_admin_deliveries " +
+    "WHERE (status='pending' AND updated_at < datetime('now','-10 minutes')) " +
+    "OR (status='sending' AND lease_expires_at IS NOT NULL AND lease_expires_at < ?) " +
+    "ORDER BY updated_at LIMIT 100",
+  ).bind(Math.floor(Date.now() / 1000)).all<{ notification_id: string; user_id: string }>();
+
+  for (const delivery of deliveries.results) {
+    await queue.send({
+      type: "admin_notification_delivery",
+      notificationId: delivery.notification_id,
+      userId: delivery.user_id,
+    }, { contentType: "json" });
+    await db.prepare(
+      "UPDATE yume_telegram_admin_deliveries SET updated_at=CURRENT_TIMESTAMP " +
+      "WHERE notification_id=? AND user_id=? AND status IN ('pending','sending')",
+    ).bind(delivery.notification_id, delivery.user_id).run();
+  }
 }
 
 async function processFanout(db: Database, env: Environment, job: FanoutJob): Promise<void> {
