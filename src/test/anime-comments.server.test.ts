@@ -89,20 +89,31 @@ class FakeStatement {
       const results = ids.flatMap(id => this.db.likes.get(id + ":" + userId)?.active === 1 ? [{ comment_id: id } as T] : []);
       return { results, meta: { rows_read: ids.length, rows_written: 0 } };
     }
-    if (this.sql.includes("WITH ranked_replies")) {
-      const [animeId, ...rest] = this.values as [string, ...unknown[]];
-      const limit = Number(rest[rest.length - 1]);
-      const now = String(rest[rest.length - 2]);
-      const rootIds = rest.slice(0, -2) as string[];
-      const rows = Array.from(this.db.comments.values())
-        .filter(row => row.anime_id === animeId && rootIds.includes(row.thread_root_id) && row.parent_id !== null &&
-          row.expires_at > now && (!row.deleted_at || this.db.hasChildren(row.id)))
-        .sort((a, b) => a.thread_root_id.localeCompare(b.thread_root_id) || a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id));
-      const results = rows.map((row, index) => {
-        const siblings = rows.filter(item => item.thread_root_id === row.thread_root_id);
-        return { ...this.db.row(row), reply_rank: siblings.findIndex(item => item.id === row.id) + 1, reply_count: siblings.length, active_reply_count: siblings.filter(item => !item.deleted_at).length } as T;
-      }).filter(row => Number((row as Record<string, unknown>).reply_rank) <= limit);
-      return { results, meta: { rows_read: rows.length, rows_written: 0 } };
+    if (this.sql.includes("UNION ALL") && this.sql.includes("c.thread_root_id = ?")) {
+      const rows: StoredComment[] = [];
+      for (let index = 0; index < this.values.length; index += 4) {
+        const [animeId, rootId, now, limit] = this.values.slice(index, index + 4) as [string, string, string, number];
+        const branchRows = Array.from(this.db.comments.values())
+          .filter(row => row.anime_id === animeId && row.thread_root_id === rootId && row.parent_id !== null && row.expires_at > now)
+          .sort((a, b) => a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id))
+          .slice(0, limit);
+        rows.push(...branchRows);
+      }
+      rows.sort((a, b) => a.thread_root_id.localeCompare(b.thread_root_id) || a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id));
+      return { results: rows.map(row => this.db.row(row) as T), meta: { rows_read: rows.length, rows_written: 0 } };
+    }
+    if (this.sql.includes("c.thread_root_id = ?") && this.sql.includes("ORDER BY c.created_at ASC")) {
+      const [animeId, rootId, now] = this.values as [string, string, string, ...unknown[]];
+      let rows = Array.from(this.db.comments.values())
+        .filter(row => row.anime_id === animeId && row.thread_root_id === rootId && row.parent_id !== null && row.expires_at > now)
+        .sort((a, b) => a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id));
+      if (this.sql.includes("c.created_at > ?")) {
+        const createdAt = String(this.values[3]);
+        const id = String(this.values[5]);
+        rows = rows.filter(row => row.created_at > createdAt || (row.created_at === createdAt && row.id > id));
+      }
+      const limit = Number(this.values[this.values.length - 1]);
+      return { results: rows.slice(0, limit).map(row => this.db.row(row) as T), meta: { rows_read: rows.length, rows_written: 0 } };
     }
     if (this.sql.includes("FROM yume_anime_comments c")) {
       const [animeId, second, third] = this.values as [string, string, string];
@@ -337,6 +348,37 @@ describe("anime comments API", () => {
     expect(secondPage.comments).toHaveLength(2);
     expect(secondPage.hasMore).toBe(false);
     expect(new Set([...firstPage.comments, ...secondPage.comments].map(comment => comment.id)).size).toBe(5);
+  });
+
+  it("loads only twenty replies per thread and paginates the rest chronologically", async () => {
+    const rootId = "a1000000-0000-4000-8000-000000000001";
+    const expiry = "2027-01-01T00:00:00.000Z";
+    db.comments.set(rootId, {
+      id: rootId, anime_id: ANIME_A, user_id: USER_A, parent_id: null, thread_root_id: rootId,
+      reply_to_user_id: null, body: "Thread", like_count: 0, created_at: "2026-11-10T10:00:00.000Z",
+      expires_at: expiry, deleted_at: null, idempotency_key: null,
+    });
+    for (let index = 0; index < 22; index += 1) {
+      const id = "a2000000-0000-4000-8000-" + String(index + 1).padStart(12, "0");
+      db.comments.set(id, {
+        id, anime_id: ANIME_A, user_id: USER_B, parent_id: rootId, thread_root_id: rootId,
+        reply_to_user_id: USER_A, body: "Reply " + index, like_count: 0,
+        created_at: new Date(Date.UTC(2026, 10, 10, 10, index + 1)).toISOString(),
+        expires_at: expiry, deleted_at: null, idempotency_key: null,
+      });
+    }
+    const first = await handleAnimeComments(request("GET", "/api/anime-comments?animeId=" + ANIME_A, undefined, false));
+    const firstPage = await first.json() as { comments: Array<{ id: string; replies: Array<{ id: string }>; hasMoreReplies: boolean; replyCursor: string | null }> };
+    expect(firstPage.comments[0]?.replies).toHaveLength(20);
+    expect(firstPage.comments[0]?.hasMoreReplies).toBe(true);
+    expect(firstPage.comments[0]?.replyCursor).toBeTruthy();
+
+    const nextUrl = "/api/anime-comments?animeId=" + ANIME_A + "&threadId=" + rootId + "&cursor=" + encodeURIComponent(firstPage.comments[0]!.replyCursor!);
+    const next = await handleAnimeComments(request("GET", nextUrl, undefined, false));
+    const nextPage = await next.json() as { replies: Array<{ body: string }>; hasMore: boolean };
+    expect(nextPage.replies).toHaveLength(2);
+    expect(nextPage.replies.map(reply => reply.body)).toEqual(["Reply 20", "Reply 21"]);
+    expect(nextPage.hasMore).toBe(false);
   });
 
   it("creates a trimmed plain-text comment with server-owned thirty-day expiry and idempotency", async () => {
