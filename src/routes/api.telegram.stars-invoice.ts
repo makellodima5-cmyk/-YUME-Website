@@ -17,10 +17,10 @@ function environment(): Env {
   return injected && typeof injected === "object" ? injected as Env : {};
 }
 
-function json(payload: unknown, status = 200): Response {
+function json(payload: unknown, status = 200, extraHeaders: Record<string, string> = {}): Response {
   return new Response(JSON.stringify(payload), {
     status,
-    headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" },
+    headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", ...extraHeaders },
   });
 }
 
