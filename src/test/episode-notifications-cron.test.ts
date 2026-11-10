@@ -45,12 +45,22 @@ describe("scheduled episode notification durability with R2 catalogue state", ()
     };
     return {db,restore:()=>{bindings.YUME_CATALOG_READER=previous.reader;bindings.YUME_CATALOG_COORDINATOR=previous.coordinator;bindings.YUME_CATALOG_READER_TOKEN=previous.token;}};
   }
-  function stubShikimori(){vi.stubGlobal("fetch",vi.fn(async()=>Response.json({data:{animes:[{id:"123",name:"Anime",russian:"Аниме",status:"ongoing",episodes:12,episodesAired:6,nextEpisodeAt:"2026-11-06T10:00:00+00:00"}]}})));}
+  function stubShikimori(aired=6){vi.stubGlobal("fetch",vi.fn(async()=>Response.json({data:{animes:[{id:"123",name:"Anime",russian:"Аниме",status:"ongoing",episodes:12,episodesAired:aired,nextEpisodeAt:"2026-11-06T10:00:00+00:00"}]}})));}
   it("does not publish catalogue state when Queue delivery fails",async()=>{
     const events:string[]=[];const {db,restore}=setup(events);stubShikimori();
     try {
       await expect(runScheduledEpisodeNotifications({YUME_DB:db,YUME_WEB_TASKS:{async send(){events.push("send-queue-job");throw new Error("temporary Queue failure");}}})).rejects.toThrow("temporary Queue failure");
       expect(events).toEqual(["read-subscribers","read-r2-catalog","send-queue-job"]);
+    } finally {restore();vi.unstubAllGlobals();}
+  });
+  it("enqueues every episode missed between hourly polls",async()=>{
+    const events:string[]=[];const {db,restore}=setup(events);stubShikimori(8);
+    const jobs:unknown[]=[];
+    try {
+      await runScheduledEpisodeNotifications({YUME_DB:db,YUME_WEB_TASKS:{async send(message){jobs.push(message);events.push("send-queue-job");}}});
+      expect(jobs.map(job=>(job as {episodeNumber:number}).episodeNumber)).toEqual([6,7,8]);
+      expect(jobs.map(job=>(job as {notificationId:string}).notificationId)).toEqual(["episode-123-6","episode-123-7","episode-123-8"]);
+      expect(events.indexOf("send-queue-job")).toBeLessThan(events.indexOf("publish-r2"));
     } finally {restore();vi.unstubAllGlobals();}
   });
   it("sends the Queue job before publishing the updated R2 catalogue",async()=>{

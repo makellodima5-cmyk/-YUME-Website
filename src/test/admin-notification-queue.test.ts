@@ -5,7 +5,7 @@ import {
   isAdminNotificationJob,
 } from "@/data/admin-notification-queue.server";
 
-function createDatabase(options: { notice?: boolean; targetCount?: number; deliveryCount?: number; leaseChanges?: number } = {}) {
+function createDatabase(options: { notice?: boolean; targetCount?: number; deliveryCount?: number; leaseChanges?: number; botActive?: number } = {}) {
   const sql: string[] = [];
   const binds: unknown[][] = [];
   const db = {
@@ -26,7 +26,7 @@ function createDatabase(options: { notice?: boolean; targetCount?: number; deliv
             return {
               chat_id: "123456",
               status: "pending",
-              bot_active: 1,
+              bot_active: options.botActive ?? 1,
               title: "Обновление Yubera",
               body: "Появилась важная новость",
               target_url: "/",
@@ -156,6 +156,24 @@ describe("admin Telegram notification Queue", () => {
     });
     expect(sql.some(query => query.includes("SET bot_active=0"))).toBe(true);
     expect(sql.some(query => query.includes("SET status='blocked'"))).toBe(true);
+    expect(msg.state().acked).toBe(true);
+  });
+
+  it("marks deliveries blocked when the user has already blocked the bot", async () => {
+    const { db, sql } = createDatabase({ botActive: 0 });
+    const fetch = vi.fn();
+    vi.stubGlobal("fetch", fetch);
+    const msg = queueMessage({ type: "admin_notification_delivery", notificationId: "notice-1", userId: "user-1" });
+    await handleAdminNotificationQueue({ messages: [msg.message] }, {
+      YUME_DB: db,
+      TELEGRAM_BOT_TOKEN: "test-token",
+    });
+    expect(fetch).not.toHaveBeenCalled();
+    expect(sql.some(query =>
+      query.includes("SET status='blocked'") &&
+      query.includes("Telegram bot is inactive") &&
+      query.includes("status IN ('pending','sending')"),
+    )).toBe(true);
     expect(msg.state().acked).toBe(true);
   });
 
