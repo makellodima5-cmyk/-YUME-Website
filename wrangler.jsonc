@@ -17,6 +17,14 @@
       }
     },
     {
+      "name": "TELEGRAM_STARS_RATE_LIMITER",
+      "namespace_id": "202611015",
+      "simple": {
+        "limit": 5,
+        "period": 60
+      }
+    },
+    {
       "name": "TELEGRAM_OIDC_RATE_LIMITER",
       "namespace_id": "202611014",
       "simple": {
