@@ -27,7 +27,7 @@ describe("automatic Worker maintenance", () => {
     expect(queueConfig).toContain('"workers_dev": false');
     expect(queueConfig).toContain('"preview_urls": false');
     expect(queueConsumer).toContain("INSERT OR IGNORE INTO yume_notification_targets");
-    expect(queueConsumer).toContain("message.retry({ delaySeconds: RETRY_DELAY_SECONDS })");
+    expect(queueConsumer).toContain("message.retry({delaySeconds:Number.isFinite(delay)?Math.max(1,delay):RETRY_DELAY_SECONDS})");
     expect(queueWorker).toContain("runScheduledNotificationCleanup(env)");
     expect(queueWorker).toContain("runScheduledEpisodeNotifications(env)");
     expect(queueWorker).toContain("runScheduledAnimeCommentCleanup(env)");
