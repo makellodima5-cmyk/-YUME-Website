@@ -162,6 +162,7 @@ function Composer({
   loading,
   placeholder,
   sendLabel,
+  loginNotice,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -170,6 +171,7 @@ function Composer({
   loading: boolean;
   placeholder: string;
   sendLabel: string;
+  loginNotice: string;
 }) {
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === "Enter" && !event.shiftKey) {
@@ -185,7 +187,7 @@ function Composer({
         value={value}
         onChange={event => onChange(event.target.value)}
         onKeyDown={handleKeyDown}
-        onFocus={() => { if (disabled) toast.warning(COPY.ru.login, { duration: 3500 }); }}
+        onFocus={() => { if (disabled) toast.warning(loginNotice, { duration: 3500 }); }}
         readOnly={disabled}
         rows={1}
         maxLength={1000}
@@ -472,6 +474,7 @@ export function AnimeComments({ animeId, language }: Props) {
             loading={posting}
             placeholder={copy.composer}
             sendLabel={copy.send}
+            loginNotice={copy.login}
           />
         </div>
       </div>
