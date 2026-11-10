@@ -591,7 +591,7 @@ export async function handleAnimeComments(request: Request): Promise<Response> {
     if (!viewer) return json({ error: "authentication_required" }, 401);
     if (request.method === "DELETE") return deleteComment(db, viewer, body);
     if (body.action === "create" || body.action === "reply") {
-      if (body.action === "reply" && body.parentId === undefined) {
+      if (body.action === "reply" && (typeof body.parentId !== "string" || !UUID_PATTERN.test(body.parentId))) {
         return json({ error: "invalid_parent_id" }, 400);
       }
       if (body.action === "create" && body.parentId !== undefined && body.parentId !== null) {
