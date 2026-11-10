@@ -450,7 +450,7 @@ describe("anime comments API", () => {
     expect(payload.comment.parentId).toBe(rootId);
     expect(payload.comment.threadRootId).toBe(rootId);
     expect(payload.comment.replyToUserId).toBe(USER_B);
-    expect(payload.comment.replyToName).toBe("Akira");
+    expect(payload.comment.replyToName).toBe("Haru");
   });
 
   it("rejects replying to the current user's own comment", async () => {
