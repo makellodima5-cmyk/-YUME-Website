@@ -117,6 +117,23 @@ describe("Telegram Mini App initData validation", () => {
     }
   });
 
+  it("returns a photo URL only when it is HTTPS and covered by Telegram's valid signature", async () => {
+    const now = Date.now();
+    const signed = await signInitData({
+      auth_date: String(Math.floor(now / 1000)),
+      user: JSON.stringify({ id: 12345, first_name: "Yume", photo_url: "https://t.me/i/userpic/320/yume.jpg" }),
+    });
+    const valid = await validateTelegramInitData(signed, BOT_TOKEN, now);
+    expect(valid.ok && valid.user.photoUrl).toBe("https://t.me/i/userpic/320/yume.jpg");
+
+    const insecure = await signInitData({
+      auth_date: String(Math.floor(now / 1000)),
+      user: JSON.stringify({ id: 12345, first_name: "Yume", photo_url: "http://attacker.test/avatar.png" }),
+    });
+    const rejectedPhoto = await validateTelegramInitData(insecure, BOT_TOKEN, now);
+    expect(rejectedPhoto.ok && rejectedPhoto.user.photoUrl).toBeUndefined();
+  });
+
   it("rejects tampered initData", async () => {
     const now = Date.now();
     const initData = await signInitData({
