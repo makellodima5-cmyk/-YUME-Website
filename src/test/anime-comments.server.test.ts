@@ -2,8 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { env as cloudflareEnv } from "cloudflare:workers";
 import { handleAnimeComments } from "@/data/anime-comments.server";
 import { getR2Anime } from "@/data/catalog-r2.server";
+import { validateTelegramInitData } from "@/data/telegram-init-data";
 
 vi.mock("@/data/catalog-r2.server", () => ({ getR2Anime: vi.fn() }));
+vi.mock("@/data/telegram-init-data", () => ({ validateTelegramInitData: vi.fn() }));
 
 const SECRET = "comments-test-session-secret-with-more-than-32-characters";
 const TOKEN = "A".repeat(40);
@@ -271,12 +273,14 @@ function request(method: string, path = "/api/anime-comments", body?: unknown, a
 let db: FakeCommentsDb;
 beforeEach(() => {
   db = new FakeCommentsDb();
-  Object.assign(cloudflareEnv, { YUME_DB: db, YUME_AUTH_SESSION_SECRET: SECRET });
+  Object.assign(cloudflareEnv, { YUME_DB: db, YUME_AUTH_SESSION_SECRET: SECRET, TELEGRAM_BOT_TOKEN: "comments-test-bot-token" });
+  vi.mocked(validateTelegramInitData).mockResolvedValue({ ok: false, error: "invalid_request" });
   vi.mocked(getR2Anime).mockImplementation(async id => ({ id } as Awaited<ReturnType<typeof getR2Anime>>));
 });
 afterEach(() => {
   delete (cloudflareEnv as Record<string, unknown>).YUME_DB;
   delete (cloudflareEnv as Record<string, unknown>).YUME_AUTH_SESSION_SECRET;
+  delete (cloudflareEnv as Record<string, unknown>).TELEGRAM_BOT_TOKEN;
   vi.clearAllMocks();
 });
 
@@ -302,6 +306,35 @@ describe("anime comments API", () => {
     expect(payload.totalCount).toBe(1);
     expect(payload.viewer).toBeNull();
     expect(getR2Anime).not.toHaveBeenCalled();
+  });
+
+  it("returns the Telegram Mini App avatar only after validating signed initData", async () => {
+    vi.mocked(validateTelegramInitData).mockResolvedValue({
+      ok: true,
+      authDate: Math.floor(Date.now() / 1000),
+      user: {
+        id: 987654321,
+        firstName: "Telegram",
+        username: "telegram_user",
+        photoUrl: "https://t.me/i/userpic/320/telegram.jpg",
+      },
+    });
+    const response = await handleAnimeComments(new Request(
+      "https://yubera.test/api/anime-comments?animeId=" + ANIME_A,
+      {
+        headers: {
+          Origin: "https://yubera.test",
+          "X-Telegram-Init-Data": "signed-init-data",
+        },
+      },
+    ));
+    const payload = await response.json() as { telegramProfile: { name: string; avatarUrl: string | null } | null };
+    expect(response.status).toBe(200);
+    expect(validateTelegramInitData).toHaveBeenCalledWith("signed-init-data", "comments-test-bot-token");
+    expect(payload.telegramProfile).toEqual({
+      name: "telegram_user",
+      avatarUrl: "https://t.me/i/userpic/320/telegram.jpg",
+    });
   });
 
   it("hides expired roots and their still-young replies before the daily cleanup runs", async () => {
