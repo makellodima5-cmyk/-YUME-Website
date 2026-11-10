@@ -89,6 +89,7 @@ describe("Telegram OIDC browser binding", () => {
       method: "POST",
       headers: {
         Origin: "https://yume.test",
+        "CF-Connecting-IP": "203.0.113.13",
         "Content-Type": "application/x-www-form-urlencoded",
       },
       body: "flow=register&privacyConsent=true&termsAccepted=false",
@@ -107,7 +108,7 @@ describe("Telegram OIDC browser binding", () => {
         Origin: "https://yume.test",
         "Content-Type": "application/x-www-form-urlencoded",
       },
-      body: "flow=login",
+      body: "flow=login&privacyConsent=false&termsAccepted=false",
     }));
     expect(response.status).toBe(503);
     expect(await response.json()).toEqual({ error: "rate_limit_unavailable" });
