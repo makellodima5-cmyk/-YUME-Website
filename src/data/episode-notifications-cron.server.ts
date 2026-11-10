@@ -24,7 +24,7 @@ function env(): Env {
   }
 }
 const API = "https://shikimori.io/api/graphql";
-const STATUS: Record<string, Anime["status"]> = { ongoing: "Онгоинг", anons: "Анонс", released: "Вышел };
+const STATUS: Record<string, Anime["status"]> = { ongoing: "Онгоинг", anons: "Анонс", released: "Вышел" };
 
 export function storedStatus(status: string | null | undefined, fallback: Anime["status"]): Anime["status"] {
   return typeof status === "string" && STATUS[status]
@@ -54,7 +54,7 @@ export async function runScheduledEpisodeNotifications(input: unknown): Promise<
   const subscribedRows = await db.prepare(
     "SELECT DISTINCT anime_id FROM yume_anime_subscriptions WHERE active=1 ORDER BY anime_id",
   ).all<{ anime_id: string }>();
-  const subscribedIds = [...new Set(subscribedRows.results.map((row) => String(row.anime_id)).filter((id) => /^\d{1,20}$/.test(id)))];
+  const subscribedIds = [...new Set(subscribedRows.results.map((row) => String(row.anime_id)).filter((id) => /^\\d{1,20}$/.test(id)))];
   if (!subscribedIds.length) return;
 
   const state = await readCatalogState();
