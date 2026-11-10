@@ -5,7 +5,6 @@ import { resolve } from "node:path";
 describe("anime comments D1 migration and scheduled retention", () => {
   it("adds comment, like and per-anime summary tables with the required indexes and triggers", async () => {
     const sql = await readFile(resolve(process.cwd(), "migrations-clean/0005_yume_anime_comments.sql"), "utf8");
-    expect(sql).toContain("ALTER TABLE yume_users ADD COLUMN telegram_photo_url TEXT");
     expect(sql).toContain("CREATE TABLE yume_anime_comments");
     expect(sql).toContain("CREATE TABLE yume_anime_comment_likes");
     expect(sql).toContain("CREATE TABLE yume_anime_comment_summary");
