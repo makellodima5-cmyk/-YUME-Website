@@ -7,7 +7,7 @@ type Environment = Record<string, unknown> & {
   TELEGRAM_OIDC_CLIENT_SECRET?: string;
   YUME_AUTH_SESSION_SECRET?: string;
   YUME_DB?: unknown;
-  ADMIN_PASSWORD_RATE_LIMITER?: unknown;
+  TELEGRAM_OIDC_RATE_LIMITER?: unknown;
 };
 type Statement = {
   bind(...values: unknown[]): Statement;
@@ -76,7 +76,7 @@ function redirect(url: URL, cookies: string[] = [], status = 302): Response {
 }
 async function enforceOidcStartRateLimit(request: Request, environment: Environment, scope: "browser" | "native"): Promise<Response | null> {
   const clientIp = request.headers.get("CF-Connecting-IP")?.trim() ?? "";
-  const limiter = environment.ADMIN_PASSWORD_RATE_LIMITER as {
+  const limiter = environment.TELEGRAM_OIDC_RATE_LIMITER as {
     limit?: (input: { key: string }) => Promise<{ success: boolean }>;
   } | undefined;
   if (!clientIp || !limiter || typeof limiter.limit !== "function") {
