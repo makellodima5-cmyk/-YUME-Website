@@ -136,6 +136,7 @@ describe("Telegram OIDC browser binding", () => {
       method: "POST",
       headers: {
         Origin: "https://yume.test",
+        "CF-Connecting-IP": "203.0.113.12",
         "Sec-Fetch-Site": "same-origin",
         "Content-Type": "application/x-www-form-urlencoded",
       },
