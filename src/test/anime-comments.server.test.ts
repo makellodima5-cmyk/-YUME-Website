@@ -367,8 +367,9 @@ describe("anime comments API", () => {
     const response = await handleAnimeComments(request("POST", undefined, {
       action: "reply", animeId: ANIME_A, parentId: root.id, text: "Reply", idempotencyKey: replyKey,
     }));
-    const payload = await response.json() as { comment: CommentLike };
+    const payload = await response.json() as { comment: CommentLike; totalCount: number };
     expect(response.status).toBe(201);
+    expect(payload.totalCount).toBe(2);
     expect(payload.comment.parentId).toBe(root.id);
     expect(payload.comment.threadRootId).toBe(root.id);
     expect(payload.comment.replyToUserId).toBe(USER_A);
@@ -422,10 +423,8 @@ describe("anime comments API", () => {
     });
     const set = () => handleAnimeComments(request("POST", undefined, { action: "like", animeId: ANIME_A, commentId: id, liked: true }));
     const remove = () => handleAnimeComments(request("POST", undefined, { action: "like", animeId: ANIME_A, commentId: id, liked: false }));
-    const first = await set();
-    const second = await set();
-    const third = await remove();
-    const last = await remove();
+    const [first, second] = await Promise.all([set(), set()]);
+    const [third, last] = await Promise.all([remove(), remove()]);
     expect(await first.json()).toMatchObject({ liked: true, likeCount: 1 });
     expect(await second.json()).toMatchObject({ liked: true, likeCount: 1 });
     expect(await third.json()).toMatchObject({ liked: false, likeCount: 0 });
