@@ -23,6 +23,7 @@ type UserRow = {
   telegram_last_name: string | null;
   telegram_username: string | null;
   telegram_language_code: string | null;
+  telegram_photo_url?: string | null;
   created_at: string;
 };
 type SessionRow = UserRow & { expires_at: number };
@@ -142,12 +143,13 @@ function userPayload(user: UserRow) {
     ...(user.telegram_last_name ? { lastName: user.telegram_last_name } : {}),
     ...(user.telegram_username ? { username: user.telegram_username } : {}),
     ...(user.telegram_language_code ? { languageCode: user.telegram_language_code } : {}),
+    ...(user.telegram_photo_url ? { photoUrl: user.telegram_photo_url } : {}),
     createdAt: user.created_at,
   };
 }
 
 async function findTelegramUser(db: TelegramDatabase, telegramId: number): Promise<UserRow | null> {
-  return db.prepare("SELECT id, telegram_user_id, telegram_first_name, telegram_last_name, telegram_username, telegram_language_code, created_at FROM yume_users WHERE telegram_user_id = ?").bind(String(telegramId)).first<UserRow>();
+  return db.prepare("SELECT id, telegram_user_id, telegram_first_name, telegram_last_name, telegram_username, telegram_language_code, telegram_photo_url, created_at FROM yume_users WHERE telegram_user_id = ?").bind(String(telegramId)).first<UserRow>();
 }
 
 async function upsertTelegramUser(
@@ -162,11 +164,11 @@ async function upsertTelegramUser(
   const current = await findTelegramUser(db, user.id);
   if (!current) {
     const acceptedAt = new Date().toISOString();
-    await db.prepare("INSERT OR IGNORE INTO yume_users (id, provider, provider_user_id, telegram_user_id, telegram_first_name, telegram_last_name, telegram_username, telegram_language_code, privacy_consent_at, privacy_policy_version, terms_agreed_at, terms_version) VALUES (?, 'telegram', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-      .bind(crypto.randomUUID(), telegramId, telegramId, user.firstName, user.lastName ?? null, user.username ?? null, user.languageCode ?? null, acceptedAt, PRIVACY_POLICY_VERSION, acceptedAt, TERMS_VERSION).run();
+    await db.prepare("INSERT OR IGNORE INTO yume_users (id, provider, provider_user_id, telegram_user_id, telegram_first_name, telegram_last_name, telegram_username, telegram_language_code, telegram_photo_url, privacy_consent_at, privacy_policy_version, terms_agreed_at, terms_version) VALUES (?, 'telegram', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+       .bind(crypto.randomUUID(), telegramId, telegramId, user.firstName, user.lastName ?? null, user.username ?? null, user.languageCode ?? null, user.photoUrl ?? null, acceptedAt, PRIVACY_POLICY_VERSION, acceptedAt, TERMS_VERSION).run();
   } else {
-    await db.prepare("UPDATE yume_users SET telegram_first_name = ?, telegram_last_name = ?, telegram_username = ?, telegram_language_code = ? WHERE telegram_user_id = ?")
-      .bind(user.firstName, user.lastName ?? null, user.username ?? null, user.languageCode ?? null, telegramId).run();
+    await db.prepare("undefined")
+       .bind(user.firstName, user.lastName ?? null, user.username ?? null, user.languageCode ?? null, telegramId).run();
   }
   return findTelegramUser(db, user.id);
 }
@@ -716,7 +718,7 @@ export async function handleTelegramMobileAuth(request: Request): Promise<Respon
       .bind(codeHash, challenge, Date.now()).run();
     if (Number(claimed.meta?.changes ?? 0) !== 1) return jsonResponse({ error: "native_auth_code_already_used" }, 401);
 
-    const user = await db.prepare("SELECT id, telegram_user_id, telegram_first_name, telegram_last_name, telegram_username, telegram_language_code, created_at FROM yume_users WHERE id = ? AND telegram_user_id = ? AND provider = 'telegram'")
+    const user = await db.prepare("SELECT id, telegram_user_id, telegram_first_name, telegram_last_name, telegram_username, telegram_language_code, telegram_photo_url, created_at FROM yume_users WHERE id = ? AND telegram_user_id = ? AND provider = 'telegram'")
       .bind(pending.user_id, pending.telegram_user_id).first<UserRow>();
     if (!user) {
       await db.prepare("DELETE FROM yume_browser_auth WHERE token_hash = ?").bind(codeHash).run();
@@ -768,7 +770,7 @@ export async function handleTelegramSession(request: Request): Promise<Response>
     if (!secret) return jsonResponse({ error: "telegram_auth_not_configured" }, 503);
     try {
       await ensureSchema(db);
-      const row = await db.prepare("SELECT u.id, u.telegram_user_id, u.telegram_first_name, u.telegram_last_name, u.telegram_username, u.telegram_language_code, u.created_at, s.expires_at FROM yume_sessions s JOIN yume_users u ON u.id = s.user_id WHERE s.token_hash = ?")
+      const row = await db.prepare("SELECT u.id, u.telegram_user_id, u.telegram_first_name, u.telegram_last_name, u.telegram_username, u.telegram_language_code, u.telegram_photo_url, u.created_at, s.expires_at FROM yume_sessions s JOIN yume_users u ON u.id = s.user_id WHERE s.token_hash = ?")
         .bind(await sessionTokenHash(token, secret)).first<SessionRow>();
       if (!row || row.expires_at <= Date.now()) {
         if (row) await db.prepare("DELETE FROM yume_sessions WHERE token_hash = ?").bind(await sessionTokenHash(token, secret)).run();
@@ -834,8 +836,9 @@ export async function handleTelegramSession(request: Request): Promise<Response>
         validated.user.lastName ?? null,
         validated.user.username ?? null,
         validated.user.languageCode ?? null,
+        validated.user.photoUrl ?? null,
       ] as const;
-      await db.prepare("UPDATE yume_users SET telegram_first_name = ?, telegram_last_name = ?, telegram_username = ?, telegram_language_code = ? WHERE telegram_user_id = ? AND (telegram_first_name IS NOT ? OR telegram_last_name IS NOT ? OR telegram_username IS NOT ? OR telegram_language_code IS NOT ?)")
+      await db.prepare("UPDATE yume_users SET telegram_first_name = ?, telegram_last_name = ?, telegram_username = ?, telegram_language_code = ?, telegram_photo_url = COALESCE(?, telegram_photo_url) WHERE telegram_user_id = ? AND (telegram_first_name IS NOT ? OR telegram_last_name IS NOT ? OR telegram_username IS NOT ? OR telegram_language_code IS NOT ? OR (? IS NOT NULL AND telegram_photo_url IS NOT ?))")
         .bind(...profileValues, String(validated.user.id), ...profileValues).run();
       // The existing row was already selected above; reuse the updated payload instead of issuing the same SELECT again.
       user = {
@@ -844,6 +847,7 @@ export async function handleTelegramSession(request: Request): Promise<Response>
         telegram_last_name: validated.user.lastName ?? null,
         telegram_username: validated.user.username ?? null,
         telegram_language_code: validated.user.languageCode ?? null,
+        telegram_photo_url: validated.user.photoUrl ?? user.telegram_photo_url ?? null,
       };
     }
     if (!user) throw new Error("TELEGRAM_USER_UPSERT_FAILED");
