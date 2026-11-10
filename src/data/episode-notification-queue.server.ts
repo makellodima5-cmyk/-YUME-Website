@@ -145,7 +145,12 @@ async function processTelegramDelivery(db:Database,env:QueueEnvironment,job:Tele
   const delivery=await db.prepare(
     "SELECT d.chat_id,d.status,t.bot_active FROM yume_telegram_episode_deliveries d JOIN yume_users u ON u.id=d.user_id JOIN yume_telegram_subscription_state t ON t.telegram_user_id=u.telegram_user_id WHERE d.notification_id=? AND d.user_id=?",
   ).bind(job.notificationId,job.userId).first<{chat_id:string;status:string;bot_active:number}>();
-  if(!delivery || delivery.status==="sent" || delivery.status==="blocked" || delivery.bot_active!==1)return;
+  if(!delivery || delivery.status==="sent" || delivery.status==="blocked")return;
+  if(delivery.bot_active!==1) {
+    await db.prepare("UPDATE yume_telegram_episode_deliveries SET status='blocked',lease_expires_at=NULL,last_error='Telegram bot is inactive',updated_at=CURRENT_TIMESTAMP WHERE notification_id=? AND user_id=? AND status IN ('pending','sending')")
+      .bind(job.notificationId,job.userId).run();
+    return;
+  }
   const lease=await db.prepare(
     "UPDATE yume_telegram_episode_deliveries SET status='sending',attempts=attempts+1,lease_expires_at=?,updated_at=CURRENT_TIMESTAMP WHERE notification_id=? AND user_id=? AND status IN ('pending','sending') AND (lease_expires_at IS NULL OR lease_expires_at<?)",
   ).bind(Math.floor(Date.now()/1000)+DELIVERY_LEASE_SECONDS,job.notificationId,job.userId,Math.floor(Date.now()/1000)).run() as {meta?:{changes?:number}};
