@@ -74,10 +74,14 @@ class FakeStatement {
 
   async all<T = Record<string, unknown>>(): Promise<{ results: T[]; meta: { rows_read: number; rows_written: number } }> {
     if (this.sql.includes("COALESCE(summary.active_count")) {
-      const [now, animeId] = this.values as [string, string];
+      const [now, rootNow, animeId] = this.values as [string, string, string];
       const rows = Array.from(this.db.comments.values()).filter(row => row.anime_id === animeId);
       const active = rows.filter(row => !row.deleted_at).length;
-      const expired = rows.filter(row => !row.deleted_at && row.expires_at <= now).length;
+      const expired = rows.filter(row => {
+        if (row.deleted_at) return false;
+        const root = this.db.comments.get(row.thread_root_id);
+        return row.expires_at <= now || Boolean(root && root.expires_at <= rootNow);
+      }).length;
       return { results: [{ active_count: active, expired_count: expired } as T], meta: { rows_read: rows.length, rows_written: 0 } };
     }
     if (this.sql.includes("SELECT comment_id FROM yume_anime_comment_likes")) {
