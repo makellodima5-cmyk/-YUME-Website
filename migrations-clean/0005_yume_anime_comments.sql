@@ -93,6 +93,21 @@ BEGIN
   DELETE FROM yume_anime_comment_likes WHERE comment_id = NEW.id;
 END;
 
+-- A deleted parent is only a structural placeholder while descendants remain.
+-- Remove the tombstone automatically when its last direct reply disappears.
+CREATE TRIGGER yume_anime_comments_prune_empty_tombstone
+AFTER DELETE ON yume_anime_comments
+WHEN OLD.parent_id IS NOT NULL
+BEGIN
+  DELETE FROM yume_anime_comments
+  WHERE id = OLD.parent_id
+    AND deleted_at IS NOT NULL
+    AND NOT EXISTS (
+      SELECT 1 FROM yume_anime_comments AS child
+      WHERE child.parent_id = OLD.parent_id
+    );
+END;
+
 CREATE TRIGGER yume_anime_comment_likes_after_insert
 AFTER INSERT ON yume_anime_comment_likes
 WHEN NEW.active = 1
