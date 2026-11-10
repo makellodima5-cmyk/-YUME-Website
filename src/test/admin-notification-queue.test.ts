@@ -5,7 +5,7 @@ import {
   isAdminNotificationJob,
 } from "@/data/admin-notification-queue.server";
 
-function createDatabase(options: { notice?: boolean; targetCount?: number; leaseChanges?: number } = {}) {
+function createDatabase(options: { notice?: boolean; targetCount?: number; deliveryCount?: number; leaseChanges?: number } = {}) {
   const sql: string[] = [];
   const binds: unknown[][] = [];
   const db = {
@@ -44,6 +44,14 @@ function createDatabase(options: { notice?: boolean; targetCount?: number; lease
           }
           if (query.includes("SELECT notification_id FROM yume_telegram_admin_outbox")) {
             return { results: [{ notification_id: "notice-1" }] as T[] };
+          }
+          if (query.includes("SELECT notification_id,user_id FROM yume_telegram_admin_deliveries")) {
+            return {
+              results: Array.from({ length: options.deliveryCount ?? 0 }, (_, i) => ({
+                notification_id: "notice-1",
+                user_id: "user-" + String(i + 1),
+              })) as T[],
+            };
           }
           return { results: [] as T[] };
         },
@@ -177,5 +185,25 @@ describe("admin Telegram notification Queue", () => {
       { contentType: "json" },
     );
     expect(sql.some(query => query.includes("updated_at < datetime('now','-10 minutes')"))).toBe(true);
+  });
+
+  it("recovers stale per-user deliveries after Queue retries are exhausted", async () => {
+    const { db, sql } = createDatabase({ deliveryCount: 1 });
+    const send = vi.fn(async () => {});
+    await dispatchPendingAdminNotifications({
+      YUME_DB: db,
+      YUME_WEB_TASKS: { send },
+    });
+    expect(send).toHaveBeenCalledWith(
+      { type: "admin_notification_delivery", notificationId: "notice-1", userId: "user-1" },
+      { contentType: "json" },
+    );
+    expect(sql.some(query =>
+      query.includes("FROM yume_telegram_admin_deliveries") &&
+      query.includes("status='pending'") &&
+      query.includes("lease_expires_at < ?"),
+    )).toBe(true);
+    expect(sql.some(query => query.includes("SET updated_at=CURRENT_TIMESTAMP") &&
+      query.includes("status IN ('pending','sending')"))).toBe(true);
   });
 });
