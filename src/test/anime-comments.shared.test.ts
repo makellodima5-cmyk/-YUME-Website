@@ -24,7 +24,7 @@ describe("anime comments shared validation", () => {
   });
 
   it("round-trips opaque pagination cursors and rejects malformed cursors", () => {
-    const cursor = { createdAt: "2026-11-10T12:00:00.000Z", id: "comment-123" };
+    const cursor = { createdAt: "2026-11-10T12:00:00.000Z", id: "123e4567-e89b-42d3-a456-426614174000" };
     expect(decodeCommentCursor(encodeCommentCursor(cursor))).toEqual(cursor);
     expect(decodeCommentCursor("%%%")).toBeNull();
     expect(decodeCommentCursor("")).toBeNull();
