@@ -92,8 +92,8 @@ class FakeStatement {
     if (this.sql.includes("WITH ranked_replies")) {
       const [animeId, ...rest] = this.values as [string, ...unknown[]];
       const limit = Number(rest[rest.length - 1]);
-      const now = String(rest[rest.length - 3]);
-      const rootIds = rest.slice(0, -3) as string[];
+      const now = String(rest[rest.length - 2]);
+      const rootIds = rest.slice(0, -2) as string[];
       const rows = Array.from(this.db.comments.values())
         .filter(row => row.anime_id === animeId && rootIds.includes(row.thread_root_id) && row.parent_id !== null &&
           row.expires_at > now && (!row.deleted_at || this.db.hasChildren(row.id)))
