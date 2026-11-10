@@ -77,6 +77,7 @@ describe("Telegram account personal-data deletion", () => {
       "yume_notification_targets",
       "yume_notification_reads",
       "yume_notification_dismissals",
+      "yume_anime_ratings",
       "yume_anime_subscriptions",
       "yume_view_history",
       "yume_saved_anime",

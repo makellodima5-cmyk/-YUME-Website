@@ -2,8 +2,9 @@ import type { Anime } from "@/data/anime";
 
 /**
  * Keep catalogue identity fields stable while treating details as provider-owned
- * data. A live score wins when present; a missing provider score does not erase
- * the last known value.
+ * data. Anime.rating remains the Shikimori catalogue score used by existing
+ * catalogue ranking/sorting and related-title selection; the detail-page user
+ * rating is a separate D1-backed value and must never be merged into this field.
  */
 export function mergeLiveAnimeDetails(stored: Anime, live: Anime): Anime {
   return {

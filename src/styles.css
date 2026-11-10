@@ -1677,3 +1677,193 @@ html[data-theme="light"] .yubera-home-filter-button {
 .yubera-support-page {
   padding-top: calc(80px + max(env(safe-area-inset-top, 0px), var(--yume-tg-content-safe-top, var(--yume-tg-safe-top, 0px))));
 }
+
+ 
+/* Compact YUBERA user rating block on anime detail pages. */
+.yubera-user-rating {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 19px;
+  background: var(--card);
+}
+.yubera-user-rating-heading {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.yubera-user-rating-title,
+.yubera-user-rating-summary {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+}
+.yubera-user-rating-title { gap: 9px; }
+.yubera-user-rating-title h2 {
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+.yubera-user-rating-accent {
+  width: 5px;
+  height: 25px;
+  flex: 0 0 5px;
+  border-radius: 99px;
+  background: var(--primary);
+}
+.yubera-user-rating-summary { gap: 7px; white-space: nowrap; }
+.yubera-user-rating-summary strong { font-size: 18px; font-weight: 850; font-variant-numeric: tabular-nums; }
+.yubera-user-rating-summary > span { color: var(--muted-foreground); font-size: 12px; }
+.yubera-user-rating-summary-star { width: 19px; height: 19px; fill: #F1A92B; color: #F1A92B; }
+.yubera-user-rating-controls {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  margin-top: 10px;
+}
+.yubera-user-rating-label { color: var(--foreground); font-size: 12px; white-space: nowrap; }
+.yubera-user-rating-stars { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 1px; }
+.yubera-user-rating-star-button {
+  display: inline-grid;
+  width: 25px;
+  height: 28px;
+  flex: 0 1 25px;
+  place-items: center;
+  padding: 0;
+  color: #74747C;
+  transition: color .12s, transform .12s;
+}
+.yubera-user-rating-star-button svg { width: 21px; height: 21px; fill: transparent; stroke-width: 2; }
+.yubera-user-rating-star-button.is-active { color: #F1A92B; }
+.yubera-user-rating-star-button.is-active svg { fill: currentColor; }
+.yubera-user-rating-star-button:disabled { cursor: wait; opacity: .65; }
+.yubera-user-rating-star-button:focus-visible,
+.yubera-user-rating-submit:focus-visible,
+.yubera-user-rating-auth-link:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 6px; }
+.yubera-user-rating-submit {
+  display: inline-flex;
+  min-width: 102px;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--primary);
+  padding: 0 13px;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+  transition: filter .15s, opacity .15s;
+}
+.yubera-user-rating-submit:not(:disabled):hover { filter: brightness(1.08); }
+.yubera-user-rating-submit:disabled { cursor: not-allowed; background: #33343B; color: #9B9BA2; }
+.yubera-user-rating-message { margin-top: 8px; color: #72D6A5; font-size: 12px; line-height: 1.4; }
+.yubera-user-rating-message.is-error { color: #F39A9A; }
+.yubera-user-rating-auth-link { display: inline; color: var(--primary); font-weight: 750; text-decoration: underline; text-underline-offset: 3px; }
+@media(max-width: 420px) {
+  .yubera-user-rating { padding: 11px 12px; }
+  .yubera-user-rating-controls { grid-template-columns: minmax(0, 1fr) auto; row-gap: 6px; }
+  .yubera-user-rating-label { grid-column: 1; grid-row: 1; }
+  .yubera-user-rating-submit { grid-column: 2; grid-row: 1; min-width: 100px; }
+  .yubera-user-rating-stars { grid-column: 1 / -1; grid-row: 2; width: 100%; }
+  .yubera-user-rating-star-button { width: 27px; height: 29px; flex-basis: 27px; }
+  .yubera-user-rating-star-button svg { width: 21px; height: 21px; }
+}
+
+
+/* Compact YUBERA user rating block on anime detail pages. */
+.yubera-user-rating {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 19px;
+  background: var(--card);
+}
+.yubera-user-rating-heading {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.yubera-user-rating-title,
+.yubera-user-rating-summary {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+}
+.yubera-user-rating-title { gap: 9px; }
+.yubera-user-rating-title h2 {
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+.yubera-user-rating-accent {
+  width: 5px;
+  height: 25px;
+  flex: 0 0 5px;
+  border-radius: 99px;
+  background: var(--primary);
+}
+.yubera-user-rating-summary { gap: 7px; white-space: nowrap; }
+.yubera-user-rating-summary strong { font-size: 18px; font-weight: 850; font-variant-numeric: tabular-nums; }
+.yubera-user-rating-summary > span { color: var(--muted-foreground); font-size: 12px; }
+.yubera-user-rating-summary-star { width: 19px; height: 19px; fill: #F1A92B; color: #F1A92B; }
+.yubera-user-rating-controls {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  margin-top: 10px;
+}
+.yubera-user-rating-label { color: var(--foreground); font-size: 12px; white-space: nowrap; }
+.yubera-user-rating-stars { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 1px; }
+.yubera-user-rating-star-button {
+  display: inline-grid;
+  width: 25px;
+  height: 28px;
+  flex: 0 1 25px;
+  place-items: center;
+  padding: 0;
+  color: #74747C;
+  transition: color .12s, transform .12s;
+}
+.yubera-user-rating-star-button svg { width: 21px; height: 21px; fill: transparent; stroke-width: 2; }
+.yubera-user-rating-star-button.is-active { color: #F1A92B; }
+.yubera-user-rating-star-button.is-active svg { fill: currentColor; }
+.yubera-user-rating-star-button:disabled { cursor: wait; opacity: .65; }
+.yubera-user-rating-star-button:focus-visible,
+.yubera-user-rating-submit:focus-visible,
+.yubera-user-rating-auth-link:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 6px; }
+.yubera-user-rating-submit {
+  display: inline-flex;
+  min-width: 102px;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--primary);
+  padding: 0 13px;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+  transition: filter .15s, opacity .15s;
+}
+.yubera-user-rating-submit:not(:disabled):hover { filter: brightness(1.08); }
+.yubera-user-rating-submit:disabled { cursor: not-allowed; background: #33343B; color: #9B9BA2; }
+.yubera-user-rating-message { margin-top: 8px; color: #72D6A5; font-size: 12px; line-height: 1.4; }
+.yubera-user-rating-message.is-error { color: #F39A9A; }
+.yubera-user-rating-auth-link { display: inline; color: var(--primary); font-weight: 750; text-decoration: underline; text-underline-offset: 3px; }
+@media(max-width: 420px) {
+  .yubera-user-rating { padding: 11px 12px; }
+  .yubera-user-rating-controls { grid-template-columns: minmax(0, 1fr) auto; row-gap: 6px; }
+  .yubera-user-rating-label { grid-column: 1; grid-row: 1; }
+  .yubera-user-rating-submit { grid-column: 2; grid-row: 1; min-width: 100px; }
+  .yubera-user-rating-stars { grid-column: 1 / -1; grid-row: 2; width: 100%; }
+  .yubera-user-rating-star-button { width: 27px; height: 29px; flex-basis: 27px; }
+  .yubera-user-rating-star-button svg { width: 21px; height: 21px; }
+}
