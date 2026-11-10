@@ -13,6 +13,10 @@ describe("anime comments D1 migration and scheduled retention", () => {
     expect(sql).toContain("ON yume_anime_comments(expires_at, parent_id, id)");
     expect(sql).toContain("ON yume_anime_comments(anime_id, expires_at, deleted_at)");
     expect(sql).toContain("ON yume_anime_comments(anime_id, thread_root_id, created_at ASC, id ASC)");
+    expect(sql).toContain("ON yume_anime_comments(parent_id, created_at ASC, id ASC)");
+    expect(sql).toContain("ON yume_anime_comments(reply_to_user_id)");
+    expect(sql).toContain("ON DELETE SET NULL");
+    expect(sql).toContain("ON DELETE CASCADE");
     expect(sql).toContain("PRIMARY KEY (comment_id, user_id)");
     expect(sql).toContain("yume_anime_comments_after_insert");
     expect(sql).toContain("yume_anime_comments_after_tombstone");
