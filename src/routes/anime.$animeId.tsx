@@ -122,7 +122,7 @@ function AnimeDetailPage() {
   const { language, t } = useYumePreferences();
   const { animeId } = Route.useParams();
   const navigate = useNavigate();
-  const { anime, relatedAnime, apiError } = Route.useLoaderData();
+  const { anime, relatedAnime, apiError, ratingEnabled } = Route.useLoaderData();
   const playerSectionRef = useRef<HTMLElement | null>(null);
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
   const [inList, setInList] = useState(false);
@@ -701,7 +701,7 @@ function AnimeDetailPage() {
               {authRequired ? (language === "ru" ? "Избранное и «Смотреть позже» доступны после входа в аккаунт." : "Favorites and Watch Later are available after signing in.") : saveSyncError ? (language === "ru" ? "Не удалось синхронизировать список с аккаунтом. Проверь соединение и повтори действие." : "Could not sync this list to your account. Check your connection and try again.") : (language === "ru" ? "Сохранено в аккаунте Yubera." : "Saved to your Yubera account.")}
               {authRequired && <span className="mt-2 flex flex-wrap gap-2"><button type="button" onClick={() => requestAuth("login")} className="font-semibold text-primary underline underline-offset-4">{language === "ru" ? "Войти через Telegram" : "Sign in with Telegram"}</button><button type="button" onClick={() => requestAuth("register")} className="font-semibold text-primary underline underline-offset-4">{language === "ru" ? "Регистрация" : "Register"}</button></span>}
             </p>}
-            {anime.status !== "Анонс" && <UserAnimeRating animeId={anime.id} language={language} />}
+            {ratingEnabled && <UserAnimeRating animeId={anime.id} language={language} />}
             <div className="mt-6">
               <h2 className="mb-2 text-xl font-bold">{t("anime.description")}</h2>
               {descriptionText("anime-description")}
