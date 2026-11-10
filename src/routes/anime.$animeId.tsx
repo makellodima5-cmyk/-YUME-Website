@@ -39,6 +39,7 @@ import { toSameOriginShikimoriScreenshot } from "@/lib/shikimori-image-proxy";
 import { PLAYBACK_PROGRESS_UPDATED_EVENT, readPlaybackProgress, savePlaybackProgress, markPlaybackEpisodeCompleted, type PlaybackProgressEntry } from "@/data/playback-progress";
 import { parseKodikPlaybackMessage } from "@/data/kodik-playback-events";
 import { UserAnimeRating } from "@/components/yume/UserAnimeRating";
+import { AnimeComments } from "@/components/yume/AnimeComments";
 import { canReturnToAnimeOrigin } from "@/data/anime-navigation";
 
 function formatAnimeDate(value: string | undefined, language: "ru" | "en", includeTime = false): string | null {
@@ -867,6 +868,7 @@ function AnimeDetailPage() {
               </button>)}
             </div>
           </section>
+          <AnimeComments animeId={anime.id} language={language} onAuthRequired={requestAuth} />
         </div>
       </main>
 
