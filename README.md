@@ -1,63 +1,45 @@
 # Yubera
 
-Веб-каталог аниме с поиском, фильтрами и карточками тайтлов. Проект находится в разработке; доступность функций зависит от текущей конфигурации и проверок окружения.
+Yubera is an anime discovery and viewing web application built with TanStack Start, React and TypeScript, deployed as Cloudflare Workers. The source of truth for current behavior is the code and tests on `main`; historical plans and dated audits may describe older product stages.
 
-**Публичная версия:** https://yume-website.yumesupport833.workers.dev/
+**Public Worker URL:** https://yume-website.yumesupport833.workers.dev/
 
-> Адрес `workers.dev` временный. Публичная версия может отличаться от текущего состояния кода в репозитории. Наличие изменений в `main` само по себе не подтверждает их публикацию.
+> The `workers.dev` URL is a temporary public origin, not a claim that the latest Git commit is deployed. A successful GitHub CI run validates the commit's checks and deployment artifacts, not production publication.
 
-## Возможности
+## Implemented application areas
 
-- Каталог метаданных аниме на основе Shikimori с хранением в Cloudflare D1.
-- Главная страница и подборки: популярное, новинки, анонсы и выходящие сейчас тайтлы. Секция онгоинга требует актуального статуса Shikimori «Онгоинг» и свежего подтверждения серий в Kodik.
-- Страницы тайтлов с описаниями, рейтингами, похожими тайтлами и доступными YouTube-трейлерами.
-- Поиск, фильтры, сортировка и постраничная навигация с состоянием в URL.
-- Русский и английский интерфейсы.
-- «Избранное» и «Мой список» с хранением в `localStorage` текущего браузера.
+- Anime catalogue, home sections, title details, search, filtering, sorting and URL-backed navigation.
+- Shikimori metadata integration and private, versioned R2 catalogue storage through dedicated Reader and Coordinator Workers.
+- Anime detail pages with available metadata, related titles, screenshots where available, YouTube trailer mode and Kodik episode/player integration.
+- Russian and English interface.
+- Telegram-linked authentication and Telegram Mini App flows.
+- Authenticated server-backed favourites/watch-later library and viewing history, alongside browser-local preferences/guest state.
+- Anime comments and user ratings.
+- Anime episode subscriptions, in-app notifications and Telegram delivery flows.
+- Administrative catalogue operations and notification tooling.
 
-Каталог хранится в Cloudflare D1 и может расширяться через административные инструменты. Общий объём ограничен реальными квотами и ёмкостью Cloudflare, но код приложения не должен вводить искусственный общий лимит на число записей. Это каталог метаданных, а не исчерпывающая база всех аниме.
+Feature implementation in source does not guarantee that every external provider has content for every title or that every production secret, binding, Telegram setting or live integration is configured. In particular, Kodik availability is controlled by an external provider.
 
-## Ограничения текущей версии
+## Architecture
 
-- **Просмотр серий:** страница тайтла содержит интеграцию с Kodik; фактическая доступность серий зависит от настройки токена, ответа API и правил самого внешнего провайдера. На страницах могут быть доступны YouTube-трейлеры.
-- **История просмотра:** некоторые данные прогресса просмотра хранятся локально; их полная синхронизация между устройствами должна проверяться отдельно.
-- **Аккаунты и синхронизация:** предусмотрены Telegram-связанные сценарии; их готовность требует отдельного регрессионного тестирования и проверки конфигурации окружения.
-- **Telegram Mini App:** перед публичным запуском нужна отдельная проверка сценариев и настройки окружения.
-- **Реклама:** рекламные места удалены из пользовательского интерфейса. Рекламные кампании не включены.
-- **Правовые документы:** проекты документов в `docs/legal/` требуют заполнения и проверки перед публикацией.
-- **Домен:** постоянный собственный домен ещё не указан.
+- React, TypeScript, TanStack Start and TanStack Router.
+- Vite, Tailwind CSS and Bun.
+- Cloudflare Workers and Nitro.
+- Private R2 catalogue state, read through the catalogue Reader Worker.
+- Catalogue Coordinator Durable Object for serialized catalogue mutations and durable operation state.
+- Cloudflare D1 (`YUME_DB`) for user identity/session data, library/history, subscriptions, notifications and operational delivery state; catalogue changes are recorded through a compact append-only journal.
+- Shikimori for anime metadata; Kodik and YouTube for external video availability/playback.
 
-## Технологии
+## Local development
 
-- React, TypeScript
-- TanStack Start и TanStack Router
-- Vite и Tailwind CSS
-- Bun
-- Cloudflare Workers и Nitro
-- Cloudflare D1, binding базы данных: `YUME_DB`
-- Shikimori API как источник метаданных
-
-## Локальная разработка
-
-### Требования
-
-Установите Bun и совместимую с зависимостями версию Node.js.
-
-### Установка
+Requirements: Bun and a Node.js version compatible with the locked dependencies.
 
 ```bash
 bun install --frozen-lockfile
-```
-
-### Запуск dev-сервера
-
-```bash
 bun run dev
 ```
 
-## Проверки
-
-Перед отправкой изменений запустите:
+## Checks
 
 ```bash
 bun run test
@@ -65,23 +47,23 @@ bun run lint
 bun run build
 ```
 
-Доступны также `bun run test:watch` для запуска тестов в режиме наблюдения и `bun run preview` для локального просмотра production-сборки.
+The repository also has GitHub Actions checks for dependency audit, Worker builds, configuration/binding validation, migration validation and Wrangler deploy dry-runs. A dry-run is not a production deploy.
 
-## Публикация в Cloudflare
+## Cloudflare deployment
 
-Конфигурация находится в `wrangler.jsonc`. Команда публикации:
+Deployment configuration is maintained in the Wrangler configuration files. The package script is:
 
 ```bash
 bun run deploy:cloudflare
 ```
 
-Перед запуском проверьте целевой аккаунт Cloudflare, настройки окружения, необходимые секреты и binding базы D1 `YUME_DB`. Команда публикации разворачивает приложение; не запускайте её, пока не убедитесь, что выбран правильный аккаунт и целевая среда.
+Before deploying, verify the intended Cloudflare account, environment, secrets, D1 database, R2 bucket, Service Bindings, Durable Object and Queue configuration. Do not run production deployment without explicit authorization and a reviewed release plan.
 
-## Документация
+## Documentation
 
-- [Состояние проекта](docs/project-status.md)
-- [Кэш доступности Kodik и секция онгоинга](docs/technical/kodik-availability.md)
-- [Критерии готовности MVP и QA](docs/mvp-readiness.md)
-- [Индекс документации](docs/index.md)
+- [Project status](docs/project-status.md)
+- [MVP readiness and historical QA record](docs/mvp-readiness.md)
+- [Kodik availability](docs/technical/kodik-availability.md)
+- [Documentation index](docs/index.md)
 
-README описывает подтверждённое состояние проекта и отделяет доступные функции от незавершённых интеграций и планов.
+Historical audit documents must be read with their stated date and commit baseline. They are not automatically current specifications.
