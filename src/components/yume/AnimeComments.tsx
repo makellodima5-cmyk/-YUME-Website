@@ -444,7 +444,8 @@ export function AnimeComments({ animeId, language, onAuthRequired }: Props) {
   };
 
   const number = new Intl.NumberFormat(language === "en" ? "en-US" : "ru-RU").format(count);
-  const canExpand = hasMore || expanded;
+  const canExpand = hasMore || expanded || comments.length > 3;
+  const visibleComments = expanded ? comments : comments.slice(0, 3);
 
   return (
     <section id="anime-comments" className="mt-8 scroll-mt-24 border-t border-white/10 pt-6 md:mt-10" aria-labelledby="anime-comments-title">
@@ -489,7 +490,7 @@ export function AnimeComments({ animeId, language, onAuthRequired }: Props) {
         </div>
       ) : (
         <div className="divide-y divide-white/10">
-          {comments.map(root => (
+          {visibleComments.map(root => (
             <article key={root.id} className="min-w-0 py-4 first:pt-1">
               <CommentRow
                 comment={root}
