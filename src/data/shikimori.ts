@@ -626,7 +626,10 @@ export const getGlobalHomeFeatured = createServerFn({ method: "GET" })
       const cached = globalHomeFeaturedCache.result;
       return { ...cached, items: await applyPublicAnimeRatings(cached.items) };
     }
-    if (globalHomeFeaturedRequest) return globalHomeFeaturedRequest;
+    if (globalHomeFeaturedRequest) {
+      const pending = await globalHomeFeaturedRequest;
+      return { ...pending, items: await applyPublicAnimeRatings(pending.items) };
+    }
 
     const request = (async (): Promise<GlobalHomeFeaturedResult> => {
       const catalog = await getR2Catalog();
