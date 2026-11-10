@@ -137,8 +137,8 @@ export function CatalogFilters({
 
       <div className="mt-3">
         <div className="mb-1 flex items-center justify-between"><label htmlFor="catalog-min-rating" className="text-xs text-muted-foreground">{t("filters.ratingFrom")}</label><span className="text-xs font-semibold tabular-nums">{draft.minRating.toFixed(1)}</span></div>
-        <input id="catalog-min-rating" type="range" min="0" max="9" step="0.5" value={draft.minRating} onChange={(e) => update({ minRating: Number(e.target.value) })} className="h-2 w-full cursor-pointer accent-fuchsia-400" />
-        <div className="flex justify-between text-[10px] text-muted-foreground"><span>0</span><span>9</span></div>
+        <input id="catalog-min-rating" type="range" min="0" max="10" step="0.5" value={draft.minRating} onChange={(e) => update({ minRating: Number(e.target.value) })} className="h-2 w-full cursor-pointer accent-primary" />
+        <div className="flex justify-between text-[10px] text-muted-foreground"><span>0</span><span>10</span></div>
       </div>
 
       <label className="mt-3 block"><span className={labelClass}>{t("filters.ageRating")}</span><span className="relative block"><select className={selectClass} value={draft.ageRating} onChange={(e) => { telegramHapticSelection(); update({ ageRating: e.target.value }); }}><option value="Любой">{t("filters.any")}</option>{ageRatings.map((rating) => <option key={rating} value={rating}>{rating === "Без ограничений" ? t("filters.unrestricted") : rating}</option>)}</select><ChevronDown className="pointer-events-none absolute right-2.5 top-3 h-3.5 w-3.5 text-muted-foreground" /></span></label>
