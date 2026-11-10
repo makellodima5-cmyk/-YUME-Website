@@ -162,7 +162,7 @@ async function processDelivery(db: Database, env: Environment, job: DeliveryJob)
   if (payload.parameters?.retry_after) {
     throw Object.assign(new Error(reason), { retryDelay: Math.min(3600, payload.parameters.retry_after) });
   }
-  if (response.status >= 500 || !response.ok) throw new Error(reason);
+  if (payload.ok !== true) throw new Error(reason);
 }
 
 export async function handleAdminNotificationQueue(batch: QueueBatch, input: unknown): Promise<void> {
