@@ -289,48 +289,51 @@ async function readRootPage(
   const rootIds = roots.map(root => root.id);
   let replies: CommentRow[] = [];
   if (rootIds.length) {
-    const placeholders = rootIds.map(() => "?").join(", ");
+    // One bounded index-backed branch per visible root. Each branch stops at
+    // 21 rows (20 shown + one look-ahead) instead of ranking/scanning every
+    // reply in a potentially very large discussion.
+    const replyBranches = rootIds.map(() =>
+      "SELECT * FROM (" + COMMENT_SELECT +
+      "WHERE c.anime_id = ? AND c.thread_root_id = ? AND c.parent_id IS NOT NULL " +
+      "AND c.expires_at > ? ORDER BY c.created_at ASC, c.id ASC LIMIT ?)",
+    );
+    const replyValues = rootIds.flatMap(rootId => [
+      animeId, rootId, now, ANIME_COMMENT_REPLY_PAGE_SIZE + 1,
+    ]);
     const replyResult = await db.prepare(
-      "WITH ranked_replies AS (" +
-      "SELECT c.id, c.anime_id, c.parent_id, c.thread_root_id, c.reply_to_user_id, c.body, c.like_count, " +
-      "c.created_at, c.expires_at, c.deleted_at, c.user_id AS author_id, " +
-      "CASE WHEN c.deleted_at IS NULL THEN COALESCE(NULLIF(u.telegram_username, ''), " +
-      "NULLIF(TRIM(COALESCE(u.telegram_first_name, '') || ' ' || COALESCE(u.telegram_last_name, '')), ''), 'Yubera user') ELSE NULL END AS author_name, " +
-      "CASE WHEN c.deleted_at IS NULL THEN u.telegram_photo_url ELSE NULL END AS avatar_url, " +
-      "CASE WHEN c.deleted_at IS NULL THEN COALESCE(NULLIF(reply_to.telegram_username, ''), " +
-      "NULLIF(TRIM(COALESCE(reply_to.telegram_first_name, '') || ' ' || COALESCE(reply_to.telegram_last_name, '')), '')) ELSE NULL END AS reply_to_name, " +
-      "ROW_NUMBER() OVER (PARTITION BY c.thread_root_id ORDER BY c.created_at ASC, c.id ASC) AS reply_rank, " +
-      "COUNT(*) OVER (PARTITION BY c.thread_root_id) AS reply_count, " +
-      "SUM(CASE WHEN c.deleted_at IS NULL THEN 1 ELSE 0 END) OVER (PARTITION BY c.thread_root_id) AS active_reply_count " +
-      "FROM yume_anime_comments c " +
-      "LEFT JOIN yume_users u ON u.id = c.user_id " +
-      "LEFT JOIN yume_users reply_to ON reply_to.id = c.reply_to_user_id " +
-      "WHERE c.anime_id = ? AND c.thread_root_id IN (" + placeholders + ") AND c.parent_id IS NOT NULL " +
-      "AND c.expires_at > ?" +
-      ") SELECT * FROM ranked_replies WHERE reply_rank <= ? ORDER BY thread_root_id, reply_rank",
-    ).bind(animeId, ...rootIds, now, ANIME_COMMENT_REPLY_PAGE_SIZE).all<CommentRow>();
+      "SELECT * FROM (" + replyBranches.join(" UNION ALL ") +
+      ") ORDER BY thread_root_id ASC, created_at ASC, id ASC",
+    ).bind(...replyValues).all<CommentRow>();
     replies = replyResult.results;
     logD1("read_thread_replies", replyResult.meta);
   }
 
-  const allRows = [...roots, ...replies];
-  const likedIds = await readLikedIds(db, viewer?.id ?? null, allRows);
   const repliesByRoot = new Map<string, CommentRow[]>();
   for (const reply of replies) {
     const list = repliesByRoot.get(reply.thread_root_id) ?? [];
     list.push(reply);
     repliesByRoot.set(reply.thread_root_id, list);
   }
+  const visibleRepliesByRoot = new Map<string, CommentRow[]>();
+  for (const rootId of rootIds) {
+    visibleRepliesByRoot.set(
+      rootId,
+      (repliesByRoot.get(rootId) ?? []).slice(0, ANIME_COMMENT_REPLY_PAGE_SIZE),
+    );
+  }
+  const allRows = [...roots, ...Array.from(visibleRepliesByRoot.values()).flat()];
+  const likedIds = await readLikedIds(db, viewer?.id ?? null, allRows);
   const comments = roots.map(root => {
-    const rootReplies = repliesByRoot.get(root.id) ?? [];
-    const lastReply = rootReplies[rootReplies.length - 1];
+    const rootReplies = visibleRepliesByRoot.get(root.id) ?? [];
+    const hasMoreReplies = (repliesByRoot.get(root.id) ?? []).length > ANIME_COMMENT_REPLY_PAGE_SIZE;
+    const lastVisibleReply = rootReplies[rootReplies.length - 1];
     return {
       ...commentDto(root, likedIds),
       replies: rootReplies.map(reply => commentDto(reply, likedIds)),
-      replyCount: Math.max(0, Number(lastReply?.active_reply_count ?? 0)),
-      hasMoreReplies: Number(lastReply?.reply_count ?? 0) > rootReplies.length,
-      replyCursor: rootReplies.length && Number(lastReply?.reply_count ?? 0) > rootReplies.length
-        ? encodeCommentCursor({ createdAt: rootReplies[rootReplies.length - 1]!.created_at, id: rootReplies[rootReplies.length - 1]!.id })
+      replyCount: rootReplies.filter(reply => !reply.deleted_at).length,
+      hasMoreReplies,
+      replyCursor: hasMoreReplies && lastVisibleReply
+        ? encodeCommentCursor({ createdAt: lastVisibleReply.created_at, id: lastVisibleReply.id })
         : null,
     };
   });
