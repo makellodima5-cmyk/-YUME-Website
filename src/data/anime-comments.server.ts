@@ -80,7 +80,10 @@ const SESSION_COOKIE = "__Host-yume-session";
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const BEARER_PATTERN = /^Bearer ([A-Za-z0-9_-]{30,60})$/;
 const MAX_BODY_LENGTH = 4096;
-const CLEANUP_PAGE_SIZE = 40;
+const CLEANUP_ROOT_PAGE_SIZE = 20;
+const CLEANUP_ROOT_REPLY_BATCH_SIZE = 500;
+const CLEANUP_EXPIRED_REPLY_PAGE_SIZE = 10;
+const CLEANUP_REPLY_CHILD_BATCH_SIZE = 100;
 const CLEANUP_MAX_BATCHES = 5;
 
 function environment(): Environment {
@@ -621,7 +624,7 @@ function changedRows(result: unknown): number {
 export async function cleanupExpiredAnimeComments(
   db: Database,
   now = new Date().toISOString(),
-  pageSize = CLEANUP_PAGE_SIZE,
+  pageSize = CLEANUP_ROOT_PAGE_SIZE,
   maxBatches = CLEANUP_MAX_BATCHES,
 ): Promise<number> {
   let deleted = 0;
@@ -632,46 +635,74 @@ export async function cleanupExpiredAnimeComments(
       "ORDER BY expires_at ASC, id ASC LIMIT ?",
     ).bind(now, pageSize).all<{ id: string }>();
     logD1("cleanup_select_expired_roots", roots.meta);
+
     if (roots.results.length) {
       const ids = roots.results.map(row => row.id);
       const placeholders = ids.map(() => "?").join(", ");
-      const result = await db.prepare(
-        "DELETE FROM yume_anime_comments WHERE thread_root_id IN (" + placeholders + ")",
+      // Remove only leaves in bounded batches. Deleting a root before its
+      // descendants are gone would invoke an unbounded FK cascade.
+      const leaves = await db.prepare(
+        "DELETE FROM yume_anime_comments WHERE id IN (" +
+        "SELECT candidate.id FROM yume_anime_comments candidate " +
+        "WHERE candidate.thread_root_id IN (" + placeholders + ") " +
+        "AND candidate.parent_id IS NOT NULL " +
+        "AND NOT EXISTS (SELECT 1 FROM yume_anime_comments child WHERE child.parent_id = candidate.id) " +
+        "ORDER BY candidate.expires_at ASC, candidate.id ASC LIMIT ?)",
+      ).bind(...ids, CLEANUP_ROOT_REPLY_BATCH_SIZE).run();
+      logD1("cleanup_delete_expired_thread_leaves", leaves.meta);
+      deleted += changedRows(leaves);
+
+      // A root is physically removed only after the last descendant has gone.
+      const rootsRemoved = await db.prepare(
+        "DELETE FROM yume_anime_comments AS root " +
+        "WHERE root.id IN (" + placeholders + ") AND root.parent_id IS NULL " +
+        "AND NOT EXISTS (SELECT 1 FROM yume_anime_comments child WHERE child.parent_id = root.id)",
       ).bind(...ids).run();
-      logD1("cleanup_delete_expired_threads", result.meta);
-      deleted += changedRows(result);
+      logD1("cleanup_delete_expired_roots", rootsRemoved.meta);
+      deleted += changedRows(rootsRemoved);
     }
 
     const replies = await db.prepare(
-      "SELECT id, parent_id FROM yume_anime_comments " +
-      "WHERE parent_id IS NOT NULL AND expires_at <= ? " +
-      "ORDER BY expires_at ASC, id ASC LIMIT ?",
-    ).bind(now, pageSize).all<{ id: string; parent_id: string }>();
+      "SELECT reply.id FROM yume_anime_comments reply " +
+      "WHERE reply.parent_id IS NOT NULL AND reply.expires_at <= ? " +
+      "AND NOT EXISTS (" +
+      "SELECT 1 FROM yume_anime_comments root " +
+      "WHERE root.id = reply.thread_root_id AND root.parent_id IS NULL AND root.expires_at <= ?" +
+      ") ORDER BY reply.expires_at ASC, reply.id ASC LIMIT ?",
+    ).bind(now, now, CLEANUP_EXPIRED_REPLY_PAGE_SIZE).all<{ id: string }>();
     logD1("cleanup_select_expired_replies", replies.meta);
+
     if (replies.results.length) {
       const statements: Statement[] = [];
       for (const reply of replies.results) {
+        // The parent's parent is read inside the UPDATE. This remains correct
+        // when an earlier statement in this same batch has already expired and
+        // removed an ancestor of this reply.
         statements.push(
           db.prepare(
-            "UPDATE yume_anime_comments SET parent_id = ? " +
-            "WHERE parent_id = ? AND thread_root_id IN (" +
-            "SELECT thread_root_id FROM yume_anime_comments WHERE id = ?" +
-            ")",
-          ).bind(reply.parent_id, reply.id, reply.id),
+            "UPDATE yume_anime_comments SET parent_id = (" +
+            "SELECT parent_id FROM yume_anime_comments WHERE id = ?" +
+            ") WHERE id IN (" +
+            "SELECT id FROM yume_anime_comments WHERE parent_id = ? " +
+            "ORDER BY created_at ASC, id ASC LIMIT ?)",
+          ).bind(reply.id, reply.id, CLEANUP_REPLY_CHILD_BATCH_SIZE),
         );
         statements.push(
-          db.prepare("DELETE FROM yume_anime_comments WHERE id = ? AND expires_at <= ?")
-            .bind(reply.id, now),
+          db.prepare(
+            "DELETE FROM yume_anime_comments WHERE id = ? AND expires_at <= ? " +
+            "AND NOT EXISTS (SELECT 1 FROM yume_anime_comments child WHERE child.parent_id = yume_anime_comments.id)",
+          ).bind(reply.id, now),
         );
       }
       const results = await db.batch(statements);
-      for (let index = 1; index < results.length; index += 2) {
-        deleted += changedRows(results[index]);
-        logD1("cleanup_delete_expired_reply", results[index]?.meta);
+      for (let index = 0; index < results.length; index += 2) {
+        logD1("cleanup_reparent_expired_reply_children", results[index]?.meta);
+        deleted += changedRows(results[index + 1]);
+        logD1("cleanup_delete_expired_reply", results[index + 1]?.meta);
       }
     }
 
-    if (roots.results.length < pageSize && replies.results.length < pageSize) break;
+    if (roots.results.length === 0 && replies.results.length === 0) break;
   }
   return deleted;
 }
