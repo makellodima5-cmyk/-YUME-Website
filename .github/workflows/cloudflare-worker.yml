@@ -158,9 +158,9 @@ jobs:
             throw new Error("Dedicated Queue Worker entry does not invoke the episode notification consumer.");
           }
           if (!queueEntry.includes("handleAdminNotificationQueue") || !queueEntry.includes("dispatchPendingAdminNotifications")) {
-  throw new Error("Queue consumer Worker entry does not invoke admin Telegram notification delivery and recovery.");
-}
-if (!queueEntry.includes("runScheduledNotificationCleanup")) {
+            throw new Error("Queue consumer Worker entry does not invoke admin Telegram notification delivery and recovery.");
+          }
+          if (!queueEntry.includes("runScheduledNotificationCleanup")) {
             throw new Error("Dedicated Queue Worker entry does not invoke scheduled notification cleanup.");
           }
           if (!queueEntry.includes("runScheduledEpisodeNotifications")) {
