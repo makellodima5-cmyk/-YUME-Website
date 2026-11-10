@@ -220,11 +220,15 @@ async function readCommentCount(db: Database, animeId: string, now: string): Pro
   const result = await db.prepare(
     "SELECT COALESCE(summary.active_count, 0) AS active_count, " +
     "(SELECT COUNT(*) FROM yume_anime_comments expired " +
-    " WHERE expired.anime_id = target.anime_id AND expired.deleted_at IS NULL AND expired.expires_at <= ?) AS expired_count " +
+    " WHERE expired.anime_id = target.anime_id AND expired.deleted_at IS NULL AND (" +
+    " expired.expires_at <= ? OR EXISTS (" +
+    " SELECT 1 FROM yume_anime_comments expired_root " +
+    " WHERE expired_root.id = expired.thread_root_id AND expired_root.parent_id IS NULL AND expired_root.expires_at <= ?" +
+    "))) AS expired_count " +
     "FROM (SELECT ? AS anime_id) target " +
     "LEFT JOIN yume_anime_comment_summary summary ON summary.anime_id = target.anime_id " +
     "LIMIT 1",
-  ).bind(now, animeId).all<CountRow>();
+  ).bind(now, now, animeId).all<CountRow>();
   logD1("read_comment_count", result.meta);
   const row = result.results[0];
   return Math.max(0, Number(row?.active_count ?? 0) - Number(row?.expired_count ?? 0));
@@ -263,7 +267,7 @@ async function readRootPage(
   limit: number,
   now: string,
 ): Promise<{ comments: Array<CommentDto & { replies: CommentDto[]; replyCount: number; hasMoreReplies: boolean; replyCursor: string | null }>; nextCursor: string | null; hasMore: boolean; totalCount: number }> {
-  const values: unknown[] = [animeId, now, now];
+  const values: unknown[] = [animeId, now];
   let cursorSql = "";
   if (cursor) {
     cursorSql = " AND (c.created_at < ? OR (c.created_at = ? AND c.id < ?))";
@@ -273,9 +277,7 @@ async function readRootPage(
   const rootsResult = await db.prepare(
     COMMENT_SELECT +
     "WHERE c.anime_id = ? AND c.parent_id IS NULL AND c.expires_at > ? " +
-    "AND (c.deleted_at IS NULL OR EXISTS (" +
-    "SELECT 1 FROM yume_anime_comments child WHERE child.parent_id = c.id AND child.expires_at > ?" +
-    "))" + cursorSql +
+    "" + cursorSql +
     " ORDER BY c.created_at DESC, c.id DESC LIMIT ?",
   ).bind(...values).all<CommentRow>();
   logD1("read_root_page", rootsResult.meta);
@@ -306,7 +308,7 @@ async function readRootPage(
       "SELECT 1 FROM yume_anime_comments child WHERE child.parent_id = c.id AND child.expires_at > ?" +
       "))" +
       ") SELECT * FROM ranked_replies WHERE reply_rank <= ? ORDER BY thread_root_id, reply_rank",
-    ).bind(animeId, ...rootIds, now, now, ANIME_COMMENT_REPLY_PAGE_SIZE).all<CommentRow>();
+    ).bind(animeId, ...rootIds, now, ANIME_COMMENT_REPLY_PAGE_SIZE).all<CommentRow>();
     replies = replyResult.results;
     logD1("read_thread_replies", replyResult.meta);
   }
@@ -353,7 +355,7 @@ async function readMoreReplies(
   ).bind(rootId, animeId, now).first<{ id: string }>();
   if (!root) throw new Error("comment_thread_not_found");
 
-  const values: unknown[] = [animeId, rootId, now, now];
+  const values: unknown[] = [animeId, rootId, now];
   let cursorSql = "";
   if (cursor) {
     cursorSql = " AND (c.created_at > ? OR (c.created_at = ? AND c.id > ?))";
@@ -363,9 +365,7 @@ async function readMoreReplies(
   const result = await db.prepare(
     COMMENT_SELECT +
     "WHERE c.anime_id = ? AND c.thread_root_id = ? AND c.parent_id IS NOT NULL " +
-    "AND c.expires_at > ? AND (c.deleted_at IS NULL OR EXISTS (" +
-    "SELECT 1 FROM yume_anime_comments child WHERE child.parent_id = c.id AND child.expires_at > ?" +
-    "))" + cursorSql +
+    "AND c.expires_at > ?" + cursorSql +
     " ORDER BY c.created_at ASC, c.id ASC LIMIT ?",
   ).bind(...values).all<CommentRow>();
   logD1("read_more_replies", result.meta);
