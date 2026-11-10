@@ -2,7 +2,7 @@ import { env as cloudflareEnv } from "cloudflare:workers";
 import { hasAdminPasswordSession, isAdminPasswordConfigured } from "@/lib/admin-password.server";
 import { normalizeInternalRedirect } from "@/lib/request-security";
 
-type Env = Record<string, unknown> & { YUME_DB?: unknown; YUME_AUTH_SESSION_SECRET?: string; TELEGRAM_ADMIN_ID?: string; YUME_ADMIN_PASSWORD?: string };
+type Env = Record<string, unknown> & { YUME_DB?: unknown; YUME_WEB_TASKS?: { send(message: { type: "admin_notification_fanout"; notificationId: string }, options?: { contentType?: "json" }): Promise<void> }; YUME_AUTH_SESSION_SECRET?: string; TELEGRAM_ADMIN_ID?: string; YUME_ADMIN_PASSWORD?: string };
 type Statement = { bind(...values: unknown[]): Statement; first<T = Record<string, unknown>>(): Promise<T | null>; all<T = Record<string, unknown>>(): Promise<{ results: T[] }>; run(): Promise<unknown> };
 type DB = { prepare(sql: string): Statement; batch(statements: Statement[]): Promise<unknown[]> };
 const COOKIE = "__Host-yume-session";
@@ -39,7 +39,19 @@ export async function handleAdminNotifications(request: Request) {
       db.prepare("INSERT INTO yume_notifications(id,title,body,target_url,created_by,active) VALUES(?,?,?,?,?,0)").bind(id, title.trim(), body.trim(), target, session.id),
       db.prepare("INSERT OR IGNORE INTO yume_notification_targets(notification_id,user_id) SELECT ?,id FROM yume_users").bind(id),
       db.prepare("UPDATE yume_notifications SET active=1 WHERE id=? AND active=0").bind(id),
+      db.prepare("INSERT INTO yume_telegram_admin_outbox(notification_id,status) VALUES(?,'pending')").bind(id),
     ]);
-    return json({ ok: true, notification: { id, title: title.trim(), body: body.trim(), targetUrl: target } }, 201);
+    let telegramQueued = false;
+    try {
+      const queue = e.YUME_WEB_TASKS;
+      if (queue && typeof queue.send === "function") {
+        await queue.send({ type: "admin_notification_fanout", notificationId: id }, { contentType: "json" });
+        await db.prepare("UPDATE yume_telegram_admin_outbox SET status='queued',updated_at=CURRENT_TIMESTAMP WHERE notification_id=? AND status<>'done'").bind(id).run();
+        telegramQueued = true;
+      }
+    } catch (queueError) {
+      console.error("[YUME][ADMIN_NOTIFICATIONS] Telegram enqueue deferred to scheduled retry.", queueError);
+    }
+    return json({ ok: true, telegramQueued, notification: { id, title: title.trim(), body: body.trim(), targetUrl: target } }, 201);
   } catch (error) { console.error("[YUME][ADMIN_NOTIFICATIONS]", error); return json({ error: "notification_publish_failed" }, 503); }
 }
