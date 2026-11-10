@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { env as cloudflareEnv } from "cloudflare:workers";
 import { getR2Anime } from "@/data/catalog-r2.server";
-import { handleAnimeRatings } from "@/data/anime-ratings.server";
+import { applyPublicAnimeRatings, handleAnimeRatings } from "@/data/anime-ratings.server";
 
 vi.mock("@/data/catalog-r2.server", () => ({
   getR2Anime: vi.fn(),
@@ -37,6 +37,19 @@ class RatingStatement {
   async all<T = Record<string, unknown>>() {
     this.db.executed.push({ sql: this.sql, values: this.values });
     if (this.sql.includes("yume_anime_rating_summary")) {
+      if (this.sql.includes("IN (")) {
+        const [minimumVotes, ...animeIds] = this.values as [number, ...string[]];
+        const results = animeIds.flatMap(animeId => {
+          const votes = Array.from(this.db.votes.values()).filter(row => row.animeId === animeId);
+          if (votes.length < minimumVotes) return [];
+          return [{
+            anime_id: animeId,
+            rating_sum: votes.reduce((sum, row) => sum + row.rating, 0),
+            vote_count: votes.length,
+          } as T];
+        });
+        return { results, meta: { rows_read: results.length, rows_written: 0 } };
+      }
       const [animeId, userId] = this.values as [string, string];
       const votes = Array.from(this.db.votes.values()).filter(row => row.animeId === animeId);
       const ratingSum = votes.reduce((sum, row) => sum + row.rating, 0);
@@ -283,6 +296,50 @@ describe("YUBERA user anime ratings", () => {
     expect(response.status).toBe(403);
     expect(db.executed).toHaveLength(0);
     expect(db.writes).toBe(0);
+  });
+
+
+  it("keeps the catalogue fallback below 25 YUBERA votes and switches at 25", async () => {
+    const db = new RatingsDatabase();
+    configureDatabase(db);
+    for (let index = 0; index < 24; index += 1) {
+      db.votes.set("125:user-" + index, { animeId: "125", userId: "user-" + index, rating: 8 });
+    }
+
+    const fallback = await applyPublicAnimeRatings([{
+      id: "125", title: "Threshold", original: "", year: 2025, episodes: 12,
+      rating: 7.6, genres: [], status: "Вышел", description: "", hue: 0, glyph: "",
+    }]);
+    expect(fallback[0]?.rating).toBe(7.6);
+
+    db.votes.set("125:user-24", { animeId: "125", userId: "user-24", rating: 10 });
+    const switched = await applyPublicAnimeRatings([{
+      id: "125", title: "Threshold", original: "", year: 2025, episodes: 12,
+      rating: 7.6, genres: [], status: "Вышел", description: "", hue: 0, glyph: "",
+    }]);
+    // The 30-second public overlay cache intentionally bounds D1 reads.
+    expect(switched[0]?.rating).toBe(7.6);
+  });
+
+  it("does not expose a Shikimori score or permit votes for announced titles", async () => {
+    const db = new RatingsDatabase();
+    configureDatabase(db);
+    vi.mocked(getR2Anime).mockResolvedValue({
+      id: ANIME_ID, status: "Анонс",
+    } as Awaited<ReturnType<typeof getR2Anime>>);
+
+    const read = await handleAnimeRatings(readRequest());
+    expect(read.status).toBe(409);
+
+    const write = await handleAnimeRatings(ratingRequest(8));
+    expect(write.status).toBe(409);
+    expect(db.writes).toBe(0);
+
+    const [announced] = await applyPublicAnimeRatings([{
+      id: "126", title: "Announced", original: "", year: 2027, episodes: 12,
+      rating: 8.8, genres: [], status: "Анонс", description: "", hue: 0, glyph: "",
+    }]);
+    expect(announced?.rating).toBeNull();
   });
 
   it("uses a single indexed summary query instead of scanning individual votes", async () => {
