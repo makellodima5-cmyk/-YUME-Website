@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { Star } from "lucide-react";
-import { useYumePreferences } from "@/data/preferences";
 
 type RatingStats = {
   averageRating: number | null;
@@ -14,7 +13,7 @@ type ApiRatingResponse = RatingStats & {
   error?: string;
 };
 
-type Props = { animeId: string };
+type Props = { animeId: string; language: "ru" | "en" };
 
 const EMPTY_STATS: RatingStats = {
   averageRating: null,
@@ -37,8 +36,7 @@ function parseStats(value: ApiRatingResponse): RatingStats {
   return { averageRating, voteCount, myRating };
 }
 
-export function UserAnimeRating({ animeId }: Props) {
-  const { language } = useYumePreferences();
+export function UserAnimeRating({ animeId, language }: Props) {
   const ru = language === "ru";
   const [stats, setStats] = useState<RatingStats>(EMPTY_STATS);
   const [selected, setSelected] = useState<number | null>(null);
