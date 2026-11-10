@@ -2,7 +2,7 @@ import { env as cloudflareEnv } from "cloudflare:workers";
 import { createFileRoute } from "@tanstack/react-router";
 import { validateTelegramInitData } from "@/data/telegram-init-data";
 
-type Env = { TELEGRAM_BOT_TOKEN?: string; YUME_DB?: unknown };
+type Env = { TELEGRAM_BOT_TOKEN?: string; YUME_DB?: unknown; TELEGRAM_STARS_RATE_LIMITER?: unknown };
 type Db = { prepare(sql: string): { bind(...values: unknown[]): { run(): Promise<unknown> } } };
 type RuntimeGlobal = typeof globalThis & { __YUME_RUNTIME_ENV__?: unknown };
 const MIN_STARS = 1;
@@ -39,7 +39,7 @@ async function telegramApi(token: string, method: string, body: Record<string, u
   });
 }
 
-async function handleCreateStarsInvoice(request: Request): Promise<Response> {
+export async function handleCreateStarsInvoice(request: Request): Promise<Response> {
   if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405);
   if (!sameOrigin(request)) return json({ error: "cross_origin_request" }, 403);
 
@@ -61,6 +61,19 @@ async function handleCreateStarsInvoice(request: Request): Promise<Response> {
 
   const validation = await validateTelegramInitData(input.initData, token);
   if (!validation.ok) return json({ error: "telegram_auth_expired" }, 401);
+
+  const limiter = env.TELEGRAM_STARS_RATE_LIMITER as {
+    limit?: (input: { key: string }) => Promise<{ success: boolean }>;
+  } | undefined;
+  if (!limiter || typeof limiter.limit !== "function") {
+    return json({ error: "payment_rate_limit_unavailable" }, 503);
+  }
+  try {
+    const result = await limiter.limit({ key: "telegram-stars-invoice:" + validation.user.id });
+    if (!result.success) return json({ error: "rate_limited" }, 429, { "Retry-After": "60" });
+  } catch {
+    return json({ error: "payment_rate_limit_unavailable" }, 503);
+  }
 
   const id = crypto.randomUUID();
   const payload = `yubera_support:${id}`;
