@@ -31,6 +31,8 @@ CREATE INDEX idx_yume_anime_comments_thread_created
   ON yume_anime_comments(anime_id, thread_root_id, created_at ASC, id ASC);
 CREATE INDEX idx_yume_anime_comments_expiry
   ON yume_anime_comments(expires_at, parent_id, id);
+CREATE INDEX idx_yume_anime_comments_anime_expiry
+  ON yume_anime_comments(anime_id, expires_at, deleted_at);
 CREATE INDEX idx_yume_anime_comments_user_created
   ON yume_anime_comments(user_id, created_at);
 CREATE UNIQUE INDEX idx_yume_anime_comments_user_idempotency
