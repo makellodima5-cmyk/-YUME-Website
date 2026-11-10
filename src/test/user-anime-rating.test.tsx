@@ -24,7 +24,7 @@ describe("YUBERA user rating block", () => {
     }));
     vi.stubGlobal("fetch", fetchMock);
 
-    render(<UserAnimeRating animeId="123" />);
+    render(<UserAnimeRating animeId="123" language="ru" />);
 
     expect(screen.getByRole("heading", { name: "Оценка пользователей" })).toBeInTheDocument();
     expect(screen.getByText("—")).toBeInTheDocument();
@@ -41,7 +41,7 @@ describe("YUBERA user rating block", () => {
       .mockResolvedValueOnce(response({ averageRating: 8, voteCount: 1, myRating: 8, authenticated: true }));
     vi.stubGlobal("fetch", fetchMock);
 
-    render(<UserAnimeRating animeId="123" />);
+    render(<UserAnimeRating animeId="123" language="ru" />);
     const star8 = await screen.findByRole("button", { name: "Оценка 8 из 10" });
     fireEvent.click(star8);
 
@@ -66,7 +66,7 @@ describe("YUBERA user rating block", () => {
       .mockResolvedValueOnce(response({ averageRating: 9, voteCount: 2, myRating: 10, authenticated: true }));
     vi.stubGlobal("fetch", fetchMock);
 
-    render(<UserAnimeRating animeId="123" />);
+    render(<UserAnimeRating animeId="123" language="ru" />);
 
     const confirm = await screen.findByRole("button", { name: "Подтвердить" });
     expect(confirm).toBeDisabled();
@@ -86,7 +86,7 @@ describe("YUBERA user rating block", () => {
       .mockResolvedValueOnce(response({ error: "authentication_required" }, 401));
     vi.stubGlobal("fetch", fetchMock);
 
-    render(<UserAnimeRating animeId="123" />);
+    render(<UserAnimeRating animeId="123" language="ru" />);
     fireEvent.click(await screen.findByRole("button", { name: "Оценка 9 из 10" }));
     fireEvent.click(screen.getByRole("button", { name: "Подтвердить" }));
 
