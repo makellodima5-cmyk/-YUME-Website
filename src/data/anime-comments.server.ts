@@ -535,8 +535,6 @@ async function deleteComment(
   if (!isValidAnimeCommentId(animeId)) return json({ error: "invalid_anime_id" }, 400);
   if (!UUID_PATTERN.test(commentId)) return json({ error: "invalid_comment_id" }, 400);
 
-  const anime = await getR2Anime(animeId);
-  if (!anime) return json({ error: "anime_not_found" }, 404);
   const now = new Date().toISOString();
   const owned = await db.prepare(
     "SELECT id FROM yume_anime_comments " +
