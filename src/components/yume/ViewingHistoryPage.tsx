@@ -217,7 +217,7 @@ export function ViewingHistoryPage({ onNavigate, onSelect }: Props) {
                           <div className="relative aspect-[2/3] overflow-hidden rounded-[16px] border border-border bg-card">
                             <PosterArt anime={anime} className="h-full w-full" />
                             <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-transparent to-transparent" />
-                            {typeof anime.rating === "number" && Number.isFinite(anime.rating) && <span className="absolute left-2 top-2 rounded-lg bg-black/70 px-2 py-1 text-[11px] font-bold text-white">{anime.rating.toFixed(1)}</span>}
+                            {anime.status !== "Анонс" && typeof anime.rating === "number" && Number.isFinite(anime.rating) && <span className="absolute left-2 top-2 rounded-lg bg-black/70 px-2 py-1 text-[11px] font-bold text-white">{anime.rating.toFixed(1)}</span>}
                             <span className="absolute inset-x-2 bottom-2 line-clamp-2 text-sm font-bold text-white">{displayAnimeTitle(anime, language)}</span>
                           </div>
                         </button>

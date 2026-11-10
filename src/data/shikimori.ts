@@ -8,6 +8,7 @@ import { isHomeFeaturedEligible } from "@/data/home-featured.shared";
 import { retryAfterMilliseconds } from "@/data/retry-after";
 export { retryAfterMilliseconds };
 import { filterCatalogForCurrentRequest } from "@/data/territorial-restrictions.server";
+import { applyPublicAnimeRatings } from "@/data/anime-ratings.server";
 
 const API_URL = "https://shikimori.io/api/graphql";
 const SCREENSHOT_API_URL = "https://shikimori.one/api/animes/";
@@ -622,9 +623,13 @@ let globalHomeFeaturedRequest: Promise<GlobalHomeFeaturedResult> | null = null;
 export const getGlobalHomeFeatured = createServerFn({ method: "GET" })
   .handler(async () => {
     if (globalHomeFeaturedCache && globalHomeFeaturedCache.expiresAt > Date.now()) {
-      return globalHomeFeaturedCache.result;
+      const cached = globalHomeFeaturedCache.result;
+      return { ...cached, items: await applyPublicAnimeRatings(cached.items) };
     }
-    if (globalHomeFeaturedRequest) return globalHomeFeaturedRequest;
+    if (globalHomeFeaturedRequest) {
+      const pending = await globalHomeFeaturedRequest;
+      return { ...pending, items: await applyPublicAnimeRatings(pending.items) };
+    }
 
     const request = (async (): Promise<GlobalHomeFeaturedResult> => {
       const catalog = await getR2Catalog();
@@ -640,7 +645,7 @@ export const getGlobalHomeFeatured = createServerFn({ method: "GET" })
         result,
         expiresAt: Date.now() + GLOBAL_HOME_FEATURED_CACHE_TTL_MS,
       };
-      return result;
+      return { ...result, items: await applyPublicAnimeRatings(result.items) };
     } finally {
       if (globalHomeFeaturedRequest === request) globalHomeFeaturedRequest = null;
     }
@@ -656,7 +661,8 @@ export const getShikimoriCatalog = createServerFn({ method: "GET" })
     if (result.error) {
       return { items: [], error: result.error, progress: { status: "partial" as const, imported: 0, target: null } };
     }
-    return filterCatalogForCurrentRequest(readyCatalog(result.items));
+    const ratedItems = await applyPublicAnimeRatings(result.items);
+    return filterCatalogForCurrentRequest(readyCatalog(ratedItems));
   });
 
 /**
@@ -695,7 +701,8 @@ export const getShikimoriAnimeDetails = createServerFn({ method: "GET" })
       apiError = "Не удалось обновить данные из Shikimori.";
       anime = { ...stored, nextEpisodeAt: isUpcomingEpisodeDate(stored.nextEpisodeAt) ? stored.nextEpisodeAt : undefined };
     }
-    const filtered = filterCatalogForCurrentRequest({ items: [anime, ...related] }).items;
+    const ratedItems = await applyPublicAnimeRatings([anime, ...related]);
+    const filtered = filterCatalogForCurrentRequest({ items: ratedItems }).items;
     const visibleById = new Map(filtered.map((item) => [item.id, item]));
     return {
       anime: visibleById.get(stored.id) ?? null,

@@ -1,5 +1,6 @@
 import { env as cloudflareEnv } from "cloudflare:workers";
 import { getR2Anime } from "@/data/catalog-r2.server";
+import type { Anime } from "@/data/anime";
 import { isSameOriginRequest } from "@/lib/request-security";
 
 type Environment = Record<string, unknown> & {
@@ -37,6 +38,87 @@ const SESSION_COOKIE = "__Host-yume-session";
 const MAX_BODY_LENGTH = 2_048;
 const ANIME_ID_PATTERN = /^\d{1,12}$/;
 const BEARER_PATTERN = /^Bearer ([A-Za-z0-9_-]{30,60})$/;
+
+
+const PUBLIC_RATING_MIN_VOTES = 25;
+const PUBLIC_RATING_CACHE_TTL_MS = 30_000;
+const publicRatingCache = new Map<string, { rating: number | null; expiresAt: number }>();
+
+/**
+ * Announced titles never expose a score. Until 25 YUBERA votes exist, the
+ * Shikimori catalogue score remains the fallback. At 25 votes, the YUBERA
+ * arithmetic mean replaces it. Only aggregate rows are queried in indexed,
+ * bounded batches; the result is cached briefly per Worker isolate.
+ */
+export async function applyPublicAnimeRatings(items: readonly Anime[]): Promise<Anime[]> {
+  const now = Date.now();
+  if (publicRatingCache.size > 5_000) {
+    for (const [animeId, entry] of publicRatingCache) {
+      if (entry.expiresAt <= now) publicRatingCache.delete(animeId);
+    }
+  }
+
+  const eligibleIds = Array.from(new Set(items
+    .filter((item) => item.status !== "Анонс" && ANIME_ID_PATTERN.test(item.id))
+    .map((item) => item.id)));
+  const missingIds = eligibleIds.filter((animeId) => {
+    const cached = publicRatingCache.get(animeId);
+    return !cached || cached.expiresAt <= now;
+  });
+
+  if (missingIds.length > 0) {
+    const db = database(environment());
+    if (db) {
+      try {
+        for (let offset = 0; offset < missingIds.length; offset += 400) {
+          const batch = missingIds.slice(offset, offset + 400);
+          const placeholders = batch.map(() => "?").join(", ");
+          const query = await db.prepare(
+            "SELECT anime_id, rating_sum, vote_count FROM yume_anime_rating_summary " +
+            "WHERE vote_count >= ? AND anime_id IN (" + placeholders + ")",
+          ).bind(PUBLIC_RATING_MIN_VOTES, ...batch).all<{
+            anime_id: string;
+            rating_sum: number;
+            vote_count: number;
+          }>();
+          const found = new Map<string, number>();
+          for (const row of query.results) {
+            const voteCount = Number(row.vote_count);
+            const ratingSum = Number(row.rating_sum);
+            if (Number.isSafeInteger(voteCount) && voteCount >= PUBLIC_RATING_MIN_VOTES &&
+                Number.isSafeInteger(ratingSum) && ratingSum >= voteCount && ratingSum <= voteCount * 10) {
+              found.set(row.anime_id, Math.round((ratingSum / voteCount) * 10) / 10);
+            }
+          }
+          for (const animeId of batch) {
+            publicRatingCache.set(animeId, {
+              rating: found.get(animeId) ?? null,
+              expiresAt: Date.now() + PUBLIC_RATING_CACHE_TTL_MS,
+            });
+          }
+          if (query.meta) {
+            console.debug("[YUBERA][ANIME_RATINGS][D1]", {
+              operation: "read_public_rating_batch",
+              requested: batch.length,
+              rowsRead: query.meta.rows_read ?? null,
+              rowsWritten: query.meta.rows_written ?? 0,
+            });
+          }
+        }
+      } catch (error) {
+        console.error("[YUBERA][ANIME_RATINGS] Public rating overlay unavailable; retaining catalogue scores.", error);
+      }
+    }
+  }
+
+  return items.map((item) => {
+    if (item.status === "Анонс") return item.rating === null ? item : { ...item, rating: null };
+    const cached = publicRatingCache.get(item.id);
+    return cached && cached.expiresAt > Date.now() && cached.rating !== null
+      ? { ...item, rating: cached.rating }
+      : item;
+  });
+}
 
 const RATING_STATS_SQL = `
   SELECT
@@ -216,6 +298,7 @@ async function handleRead(request: Request): Promise<Response> {
   try {
     const anime = await getR2Anime(animeId);
     if (!anime) return json({ error: "anime_not_found" }, 404);
+    if (anime.status === "Анонс") return json({ error: "ratings_unavailable_for_announced" }, 409);
     const userId = readSessionToken(request)
       ? await authenticatedUserId(request, db, env)
       : null;
@@ -259,6 +342,7 @@ async function handleWrite(request: Request): Promise<Response> {
 
     const anime = await getR2Anime(animeId);
     if (!anime) return json({ error: "anime_not_found" }, 404);
+    if (anime.status === "Анонс") return json({ error: "ratings_unavailable_for_announced" }, 409);
 
     // The composite primary key makes this an upsert, never a second vote.
     // Its SQLite triggers update the aggregate in the same atomic D1 statement.
@@ -278,6 +362,7 @@ async function handleWrite(request: Request): Promise<Response> {
       });
     }
 
+    if ((write.meta?.changes ?? 1) > 0) publicRatingCache.delete(animeId);
     const result = await getStats(db, animeId, userId);
     return json(result);
   } catch (error) {

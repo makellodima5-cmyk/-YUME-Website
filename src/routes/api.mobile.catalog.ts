@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { getR2Catalog } from "@/data/catalog-r2.server";
+import { applyPublicAnimeRatings } from "@/data/anime-ratings.server";
 import {
   filterMobileCatalog,
   getMobileCatalogPageCount,
@@ -31,7 +32,8 @@ export async function handleMobileCatalog(request: Request): Promise<Response> {
   const catalog = await getR2Catalog();
   if (catalog.error) return json({ error: "catalog_unavailable" }, 503);
 
-  const filtered = filterMobileCatalog(catalog.items, query);
+  const ratedItems = await applyPublicAnimeRatings(catalog.items);
+  const filtered = filterMobileCatalog(ratedItems, query);
   const total = filtered.length;
   return json({
     schemaVersion: 1,

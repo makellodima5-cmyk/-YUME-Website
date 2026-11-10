@@ -70,11 +70,11 @@ export function AnimeModal({ anime, note, onClose }: { anime: Anime | null; note
         <div className="flex flex-col gap-6 p-6 md:flex-row">
           <PosterArt anime={anime} className="mx-auto aspect-[2/3] w-40 shrink-0 rounded-xl ring-1 ring-border md:w-52" />
           <div className="flex-1">
-            {note && <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-magenta">{note}</div>}
+            {note && <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-primary">{note}</div>}
             <h2 id="anime-modal-title" className="break-words text-2xl font-bold">{anime.title}</h2>
             <div className="text-sm text-muted-foreground">{anime.original}</div>
             <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-              <span className="flex items-center gap-1 rounded-full bg-secondary px-2.5 py-1 font-semibold"><Star className="h-3 w-3 fill-gold text-gold" />{anime.rating.toFixed(1)}</span>
+              {anime.status !== "Анонс" && typeof anime.rating === "number" && <span className="flex items-center gap-1 rounded-full bg-secondary px-2.5 py-1 font-semibold"><Star className="h-3 w-3 fill-gold text-gold" />{anime.rating.toFixed(1)}</span>}
               <span className="rounded-full bg-secondary px-2.5 py-1">{anime.year}</span>
               <span className="rounded-full bg-secondary px-2.5 py-1">{anime.episodes} эп.</span>
               <span className="rounded-full bg-accent px-2.5 py-1">{anime.status}</span>
