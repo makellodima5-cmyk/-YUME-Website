@@ -101,7 +101,6 @@ export function UserAnimeRating({ animeId, language }: Props) {
     setSaving(true);
     setError("");
     setNotice("");
-    setAuthenticated(false);
     try {
       const response = await fetch("/api/anime-ratings", {
         method: "POST",
@@ -171,7 +170,7 @@ export function UserAnimeRating({ animeId, language }: Props) {
                   setError("");
                   setNotice("");
                 }}
-              >      >
+              >
                 <Star aria-hidden="true" />
               </button>
             );
