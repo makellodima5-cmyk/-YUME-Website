@@ -78,7 +78,7 @@ export function validateCatalogSearch(search: Record<string, unknown>): CatalogS
       : undefined,
     from: from !== undefined && Number.isInteger(from) ? Math.max(1900, Math.min(from, 2100)) : undefined,
     to: to !== undefined && Number.isInteger(to) ? Math.max(1900, Math.min(to, 2100)) : undefined,
-    rating: rating !== undefined ? Math.max(0, Math.min(rating, 9)) : undefined,
+    rating: rating !== undefined ? Math.max(0, Math.min(rating, 10)) : undefined,
     kind: typeof search.kind === "string" ? search.kind.slice(0, 80) : undefined,
     age: typeof search.age === "string" ? search.age.slice(0, 30) : undefined,
     lang: search.lang === "ru" || search.lang === "en" ? search.lang : undefined,
