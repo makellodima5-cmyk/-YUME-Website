@@ -17,6 +17,14 @@
       }
     },
     {
+      "name": "TELEGRAM_OIDC_RATE_LIMITER",
+      "namespace_id": "202611014",
+      "simple": {
+        "limit": 10,
+        "period": 60
+      }
+    },
+    {
       "name": "KODIK_RATE_LIMITER",
       "namespace_id": "202610271",
       "simple": {
