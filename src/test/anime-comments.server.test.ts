@@ -112,7 +112,8 @@ class FakeStatement {
         (!row.deleted_at || this.db.hasChildren(row.id)),
       );
       if (this.sql.includes("c.created_at < ?")) {
-        const [, , , createdAt, , id] = this.values as [string, string, string, string, string, string, number];
+        const createdAt = String(this.values[2]);
+        const id = String(this.values[4]);
         rows = rows.filter(row => row.created_at < createdAt || (row.created_at === createdAt && row.id < id));
       }
       rows.sort((a, b) => b.created_at.localeCompare(a.created_at) || b.id.localeCompare(a.id));
@@ -290,6 +291,31 @@ describe("anime comments API", () => {
     expect(payload.totalCount).toBe(1);
     expect(payload.viewer).toBeNull();
     expect(getR2Anime).not.toHaveBeenCalled();
+  });
+
+  it("returns three root comments first and continues with a stable cursor without duplicates", async () => {
+    const expiry = "2027-01-01T00:00:00.000Z";
+    for (let index = 0; index < 5; index += 1) {
+      const id = "a0000000-0000-4000-8000-" + String(index + 1).padStart(12, "0");
+      const createdAt = new Date(Date.UTC(2026, 10, 10, 12, index)).toISOString();
+      db.comments.set(id, {
+        id, anime_id: ANIME_A, user_id: USER_A, parent_id: null, thread_root_id: id,
+        reply_to_user_id: null, body: "Root " + index, like_count: 0, created_at: createdAt,
+        expires_at: expiry, deleted_at: null, idempotency_key: null,
+      });
+    }
+    const first = await handleAnimeComments(request("GET", "/api/anime-comments?animeId=" + ANIME_A, undefined, false));
+    const firstPage = await first.json() as { comments: Array<{ id: string }>; hasMore: boolean; nextCursor: string | null; totalCount: number };
+    expect(firstPage.comments).toHaveLength(3);
+    expect(firstPage.hasMore).toBe(true);
+    expect(firstPage.totalCount).toBe(5);
+    expect(firstPage.nextCursor).toBeTruthy();
+
+    const second = await handleAnimeComments(request("GET", "/api/anime-comments?animeId=" + ANIME_A + "&cursor=" + encodeURIComponent(firstPage.nextCursor!), undefined, false));
+    const secondPage = await second.json() as { comments: Array<{ id: string }>; hasMore: boolean; nextCursor: string | null };
+    expect(secondPage.comments).toHaveLength(2);
+    expect(secondPage.hasMore).toBe(false);
+    expect(new Set([...firstPage.comments, ...secondPage.comments].map(comment => comment.id)).size).toBe(5);
   });
 
   it("creates a trimmed plain-text comment with server-owned thirty-day expiry and idempotency", async () => {
