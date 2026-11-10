@@ -143,8 +143,8 @@ jobs:
               && item.dead_letter_queue === "yume-web-tasks-dlq",
           );
           const cleanupCron = queueConfig.triggers?.crons ?? [];
-          if (cleanupCron.length !== 1 || cleanupCron[0] !== "0 3 * * *") {
-            throw new Error("Queue consumer Worker must run the daily notification cleanup cron.");
+          if (cleanupCron.length !== 1 || cleanupCron[0] !== "0 * * * *") {
+            throw new Error("Queue consumer Worker must run the hourly episode notification cron.");
           }
           const queueDatabase = (queueConfig.d1_databases ?? []).find(
             (item) => item.binding === "YUME_DB"
