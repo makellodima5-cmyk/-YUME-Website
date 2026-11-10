@@ -7,6 +7,7 @@ type Environment = Record<string, unknown> & {
   TELEGRAM_OIDC_CLIENT_SECRET?: string;
   YUME_AUTH_SESSION_SECRET?: string;
   YUME_DB?: unknown;
+  ADMIN_PASSWORD_RATE_LIMITER?: unknown;
 };
 type Statement = {
   bind(...values: unknown[]): Statement;
@@ -73,6 +74,22 @@ function redirect(url: URL, cookies: string[] = [], status = 302): Response {
   cookies.forEach(value => headers.append("Set-Cookie", value));
   return new Response(null, { status, headers });
 }
+async function enforceOidcStartRateLimit(request: Request, environment: Environment, scope: "browser" | "native"): Promise<Response | null> {
+  const clientIp = request.headers.get("CF-Connecting-IP")?.trim() ?? "";
+  const limiter = environment.ADMIN_PASSWORD_RATE_LIMITER as {
+    limit?: (input: { key: string }) => Promise<{ success: boolean }>;
+  } | undefined;
+  if (!clientIp || !limiter || typeof limiter.limit !== "function") {
+    return response({ error: "rate_limit_unavailable" }, 503);
+  }
+  try {
+    const result = await limiter.limit({ key: "telegram-oidc-" + scope + ":" + clientIp });
+    return result.success ? null : response({ error: "rate_limited" }, 429);
+  } catch {
+    return response({ error: "rate_limit_unavailable" }, 503);
+  }
+}
+
 function errorRedirect(origin: string, code: string): Response {
   const url = new URL("/", origin); url.searchParams.set("section", "register"); url.searchParams.set("auth_error", code);
   return redirect(url, [clearOidcStateCookie()]);
@@ -136,16 +153,8 @@ export async function handleTelegramNativeOidcStart(request: Request): Promise<R
     return response({ error: "telegram_login_not_configured" }, 503);
   }
 
-  const clientIp = request.headers.get("CF-Connecting-IP");
-  const limiter = environment.ADMIN_PASSWORD_RATE_LIMITER as { limit?: (input: { key: string }) => Promise<{ success: boolean }> } | undefined;
-  if (clientIp && limiter?.limit) {
-    try {
-      const limited = await limiter.limit({ key: "telegram-native-oidc:" + clientIp });
-      if (!limited.success) return response({ error: "rate_limited" }, 429);
-    } catch {
-      return response({ error: "rate_limit_unavailable" }, 503);
-    }
-  }
+  const rateLimitResponse = await enforceOidcStartRateLimit(request, environment, "native");
+  if (rateLimitResponse) return rateLimitResponse;
 
   try {
     await db.prepare("DELETE FROM yume_telegram_oidc_states WHERE expires_at <= ?").bind(Date.now()).run();
@@ -216,6 +225,10 @@ export async function handleTelegramOidc(request: Request): Promise<Response> {
   const clientId = typeof environment.TELEGRAM_OIDC_CLIENT_ID === "string" ? environment.TELEGRAM_OIDC_CLIENT_ID.trim() : "";
   const clientSecret = typeof environment.TELEGRAM_OIDC_CLIENT_SECRET === "string" ? environment.TELEGRAM_OIDC_CLIENT_SECRET.trim() : "";
   if (!db || !secret || !clientId || !clientSecret) return callback ? errorRedirect(origin, "telegram_login_not_configured") : response({ error: "telegram_login_not_configured" }, 503);
+  if (!callback) {
+    const rateLimitResponse = await enforceOidcStartRateLimit(request, environment, "browser");
+    if (rateLimitResponse) return rateLimitResponse;
+  }
   const redirectUri = origin + "/api/telegram/oidc/callback";
   try {
     if (!callback) {
