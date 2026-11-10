@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { env as cloudflareEnv } from "cloudflare:workers";
 import { getR2Anime } from "@/data/catalog-r2.server";
 import { handleAnimeRatings } from "@/data/anime-ratings.server";
