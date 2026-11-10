@@ -20,6 +20,7 @@ describe("anime comments D1 migration and scheduled retention", () => {
     expect(sql).toContain("PRIMARY KEY (comment_id, user_id)");
     expect(sql).toContain("yume_anime_comments_after_insert");
     expect(sql).toContain("yume_anime_comments_after_tombstone");
+    expect(sql).toContain("yume_anime_comments_prune_empty_tombstone");
     expect(sql).toContain("yume_anime_comment_likes_after_toggle");
     expect(sql).toContain("yume_users_before_delete_anime_comments");
     expect(sql).not.toMatch(/REFERENCES\s+(?:anime_catalog|yume_catalog)/i);
