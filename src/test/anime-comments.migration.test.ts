@@ -25,7 +25,7 @@ describe("anime comments D1 migration and scheduled retention", () => {
     expect(sql).not.toMatch(/REFERENCES\s+(?:anime_catalog|yume_catalog)/i);
   });
 
-  it("reuses the existing daily Queue Worker Cron and does not add another schedule or Worker", async () => {
+  it("reuses the existing hourly Queue Worker Cron and does not add another schedule or Worker", async () => {
     const [config, worker, server, route] = await Promise.all([
       readFile(resolve(process.cwd(), "wrangler.queue.jsonc"), "utf8"),
       readFile(resolve(process.cwd(), "src/queue-worker.ts"), "utf8"),
