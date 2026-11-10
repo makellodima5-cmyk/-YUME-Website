@@ -1,4 +1,5 @@
 import { handleEpisodeNotificationQueue } from "./data/episode-notification-queue.server";
+import { dispatchPendingAdminNotifications, handleAdminNotificationQueue, isAdminNotificationJob } from "./data/admin-notification-queue.server";
 import { runScheduledNotificationCleanup } from "./data/notification-cleanup.server";
 import { runScheduledEpisodeNotifications } from "./data/episode-notifications-cron.server";
 import { runScheduledAnimeCommentCleanup } from "./data/anime-comments.server";
@@ -13,6 +14,7 @@ type ScheduledJobOverrides = {
   cleanup?: (env: unknown) => Promise<void>;
   episodeNotifications?: (env: unknown) => Promise<void>;
   animeComments?: (env: unknown) => Promise<void>;
+  adminNotifications?: (env: unknown) => Promise<void>;
 };
 
 // Keep the maintenance jobs independent: a cleanup failure must not prevent
@@ -31,6 +33,12 @@ export async function runScheduledMaintenance(
       run: () => overrides.episodeNotifications
         ? overrides.episodeNotifications(env)
         : runScheduledEpisodeNotifications(env),
+    },
+    {
+      name: "admin notification dispatch",
+      run: () => overrides.adminNotifications
+        ? overrides.adminNotifications(env)
+        : dispatchPendingAdminNotifications(env),
     },
     {
       name: "anime comment cleanup",
@@ -57,7 +65,10 @@ export async function runScheduledMaintenance(
 // Dedicated Worker consumer keeps Queue delivery separate from the Nitro HTTP Worker.
 export default {
   async queue(batch: QueueBatch, env: unknown): Promise<void> {
-    await handleEpisodeNotificationQueue(batch, env);
+    const adminMessages = batch.messages.filter((message) => isAdminNotificationJob(message.body));
+    const episodeMessages = batch.messages.filter((message) => !isAdminNotificationJob(message.body));
+    if (episodeMessages.length) await handleEpisodeNotificationQueue({ messages: episodeMessages }, env);
+    if (adminMessages.length) await handleAdminNotificationQueue({ messages: adminMessages }, env);
   },
 
   async scheduled(_controller: unknown, env: unknown): Promise<void> {
