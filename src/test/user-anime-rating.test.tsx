@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { UserAnimeRating } from "@/components/yume/UserAnimeRating";
+import { toast } from "sonner";
+
+vi.mock("sonner", () => ({ toast: { warning: vi.fn() } }));
 
 function response(payload: Record<string, unknown>, status = 200) {
   return new Response(JSON.stringify(payload), {
@@ -80,17 +83,26 @@ describe("YUBERA user rating block", () => {
     expect(screen.getByText("(2)")).toBeInTheDocument();
   });
 
-  it("asks unauthenticated visitors to sign in through Telegram after selecting a score", async () => {
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce(response({ averageRating: 7, voteCount: 1, myRating: null, authenticated: false }))
-      .mockResolvedValueOnce(response({ error: "authentication_required" }, 401));
+  it("blocks rating for unregistered visitors and shows a registration toast", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(response({
+      averageRating: 7,
+      voteCount: 1,
+      myRating: null,
+      authenticated: false,
+    }));
     vi.stubGlobal("fetch", fetchMock);
 
     render(<UserAnimeRating animeId="123" language="ru" />);
-    fireEvent.click(await screen.findByRole("button", { name: "Оценка 9 из 10" }));
-    fireEvent.click(screen.getByRole("button", { name: "Подтвердить" }));
+    const star = await screen.findByRole("button", { name: "Оценка 9 из 10" });
+    await waitFor(() => expect(star).toHaveAttribute("aria-disabled", "true"));
+    fireEvent.click(star);
 
-    expect(await screen.findByText("Войдите через Telegram, чтобы сохранить свою оценку.")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Войти через Telegram" })).toHaveAttribute("href", "/?section=login");
+    expect(toast.warning).toHaveBeenCalledWith(
+      "Зарегистрируйтесь в YUBERA, чтобы оценивать аниме.",
+      { duration: 3500 },
+    );
+    expect(screen.getByRole("button", { name: "Подтвердить" })).toBeDisabled();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("link", { name: "Войти через Telegram" })).toBeNull();
   });
 });

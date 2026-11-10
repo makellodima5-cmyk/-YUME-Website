@@ -2,8 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { env as cloudflareEnv } from "cloudflare:workers";
 import { handleAnimeComments } from "@/data/anime-comments.server";
 import { getR2Anime } from "@/data/catalog-r2.server";
+import { validateTelegramInitData } from "@/data/telegram-init-data";
 
 vi.mock("@/data/catalog-r2.server", () => ({ getR2Anime: vi.fn() }));
+vi.mock("@/data/telegram-init-data", () => ({ validateTelegramInitData: vi.fn() }));
 
 const SECRET = "comments-test-session-secret-with-more-than-32-characters";
 const TOKEN = "A".repeat(40);
@@ -153,7 +155,7 @@ class FakeStatement {
       let replyToUserId: string | null = null;
       if (isReply) {
         const parent = this.db.comments.get(parentId!);
-        if (!parent || parent.anime_id !== animeId || parent.deleted_at || parent.expires_at <= createdAt) {
+        if (!parent || parent.anime_id !== animeId || parent.user_id === userId || parent.deleted_at || parent.expires_at <= createdAt) {
           return { meta: { changes: 0, rows_read: 0, rows_written: 0 } };
         }
         rootId = parent.thread_root_id;
@@ -271,12 +273,14 @@ function request(method: string, path = "/api/anime-comments", body?: unknown, a
 let db: FakeCommentsDb;
 beforeEach(() => {
   db = new FakeCommentsDb();
-  Object.assign(cloudflareEnv, { YUME_DB: db, YUME_AUTH_SESSION_SECRET: SECRET });
+  Object.assign(cloudflareEnv, { YUME_DB: db, YUME_AUTH_SESSION_SECRET: SECRET, TELEGRAM_BOT_TOKEN: "comments-test-bot-token" });
+  vi.mocked(validateTelegramInitData).mockResolvedValue({ ok: false, error: "invalid_request" });
   vi.mocked(getR2Anime).mockImplementation(async id => ({ id } as Awaited<ReturnType<typeof getR2Anime>>));
 });
 afterEach(() => {
   delete (cloudflareEnv as Record<string, unknown>).YUME_DB;
   delete (cloudflareEnv as Record<string, unknown>).YUME_AUTH_SESSION_SECRET;
+  delete (cloudflareEnv as Record<string, unknown>).TELEGRAM_BOT_TOKEN;
   vi.clearAllMocks();
 });
 
@@ -302,6 +306,35 @@ describe("anime comments API", () => {
     expect(payload.totalCount).toBe(1);
     expect(payload.viewer).toBeNull();
     expect(getR2Anime).not.toHaveBeenCalled();
+  });
+
+  it("returns the Telegram Mini App avatar only after validating signed initData", async () => {
+    vi.mocked(validateTelegramInitData).mockResolvedValue({
+      ok: true,
+      authDate: Math.floor(Date.now() / 1000),
+      user: {
+        id: 987654321,
+        firstName: "Telegram",
+        username: "telegram_user",
+        photoUrl: "https://t.me/i/userpic/320/telegram.jpg",
+      },
+    });
+    const response = await handleAnimeComments(new Request(
+      "https://yubera.test/api/anime-comments?animeId=" + ANIME_A,
+      {
+        headers: {
+          Origin: "https://yubera.test",
+          "X-Telegram-Init-Data": "signed-init-data",
+        },
+      },
+    ));
+    const payload = await response.json() as { telegramProfile: { name: string; avatarUrl: string | null } | null };
+    expect(response.status).toBe(200);
+    expect(validateTelegramInitData).toHaveBeenCalledWith("signed-init-data", "comments-test-bot-token");
+    expect(payload.telegramProfile).toEqual({
+      name: "telegram_user",
+      avatarUrl: "https://t.me/i/userpic/320/telegram.jpg",
+    });
   });
 
   it("hides expired roots and their still-young replies before the daily cleanup runs", async () => {
@@ -400,22 +433,39 @@ describe("anime comments API", () => {
   });
 
   it("creates replies in the same anime thread and preserves reply-to-user information", async () => {
-    const rootKey = "41000000-0000-4000-8000-000000000004";
-    await handleAnimeComments(request("POST", undefined, {
-      action: "create", animeId: ANIME_A, text: "Root", idempotencyKey: rootKey,
-    }));
-    const root = Array.from(db.comments.values())[0]!;
+    const rootId = "41000000-0000-4000-8000-000000000004";
+    db.comments.set(rootId, {
+      id: rootId, anime_id: ANIME_A, user_id: USER_B, parent_id: null, thread_root_id: rootId,
+      reply_to_user_id: null, body: "Root by another user", like_count: 0,
+      created_at: new Date().toISOString(), expires_at: "2027-01-01T00:00:00.000Z",
+      deleted_at: null, idempotency_key: null,
+    });
     const replyKey = "42000000-0000-4000-8000-000000000004";
     const response = await handleAnimeComments(request("POST", undefined, {
-      action: "reply", animeId: ANIME_A, parentId: root.id, text: "Reply", idempotencyKey: replyKey,
+      action: "reply", animeId: ANIME_A, parentId: rootId, text: "Reply", idempotencyKey: replyKey,
     }));
     const payload = await response.json() as { comment: CommentLike; totalCount: number };
     expect(response.status).toBe(201);
     expect(payload.totalCount).toBe(2);
-    expect(payload.comment.parentId).toBe(root.id);
-    expect(payload.comment.threadRootId).toBe(root.id);
-    expect(payload.comment.replyToUserId).toBe(USER_A);
-    expect(payload.comment.replyToName).toBe("Akira");
+    expect(payload.comment.parentId).toBe(rootId);
+    expect(payload.comment.threadRootId).toBe(rootId);
+    expect(payload.comment.replyToUserId).toBe(USER_B);
+    expect(payload.comment.replyToName).toBe("Haru");
+  });
+
+  it("rejects replying to the current user's own comment", async () => {
+    const rootId = "43000000-0000-4000-8000-000000000004";
+    db.comments.set(rootId, {
+      id: rootId, anime_id: ANIME_A, user_id: USER_A, parent_id: null, thread_root_id: rootId,
+      reply_to_user_id: null, body: "My own comment", like_count: 0, created_at: new Date().toISOString(),
+      expires_at: "2027-01-01T00:00:00.000Z", deleted_at: null, idempotency_key: null,
+    });
+    const response = await handleAnimeComments(request("POST", undefined, {
+      action: "reply", animeId: ANIME_A, parentId: rootId, text: "I reply to myself",
+      idempotencyKey: "44000000-0000-4000-8000-000000000004",
+    }));
+    expect(response.status).toBe(404);
+    expect(db.comments.size).toBe(1);
   });
 
   it("rejects cross-anime parents, invalid IDs, empty text and messages over 1000 characters", async () => {

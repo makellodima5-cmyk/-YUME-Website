@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Star } from "lucide-react";
+import { toast } from "sonner";
 
 type RatingStats = {
   averageRating: number | null;
@@ -44,7 +45,7 @@ export function UserAnimeRating({ animeId, language }: Props) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const [authRequired, setAuthRequired] = useState(false);
+  const [authenticated, setAuthenticated] = useState(false);
   const submitLockRef = useRef(false);
 
   useEffect(() => {
@@ -55,7 +56,7 @@ export function UserAnimeRating({ animeId, language }: Props) {
     setSaving(false);
     setError("");
     setNotice("");
-    setAuthRequired(false);
+    setAuthenticated(false);
 
     fetch("/api/anime-ratings?animeId=" + encodeURIComponent(animeId), {
       method: "GET",
@@ -68,6 +69,7 @@ export function UserAnimeRating({ animeId, language }: Props) {
         const payload = await response.json().catch(() => ({})) as ApiRatingResponse;
         if (!response.ok) throw new Error(payload.error ?? "ratings_unavailable");
         const next = parseStats(payload);
+        setAuthenticated(payload.authenticated === true);
         setStats(next);
         setSelected(next.myRating);
       })
@@ -83,19 +85,22 @@ export function UserAnimeRating({ animeId, language }: Props) {
     return () => controller.abort();
   }, [animeId, ru]);
 
-  const canSubmit = selected !== null && selected !== stats.myRating && !loading && !saving;
+  const canSubmit = authenticated && selected !== null && selected !== stats.myRating && !loading && !saving;
   const voteCountLabel = stats.voteCount.toLocaleString(ru ? "ru-RU" : "en-US");
   const averageLabel = stats.voteCount > 0 && stats.averageRating !== null
     ? stats.averageRating.toFixed(1)
     : "—";
 
   const saveRating = async () => {
+    if (!authenticated) {
+      toast.warning(ru ? "Зарегистрируйтесь в YUBERA, чтобы оценивать аниме." : "Register with YUBERA to rate anime.", { duration: 3500 });
+      return;
+    }
     if (!canSubmit || selected === null || submitLockRef.current) return;
     submitLockRef.current = true;
     setSaving(true);
     setError("");
     setNotice("");
-    setAuthRequired(false);
     try {
       const response = await fetch("/api/anime-ratings", {
         method: "POST",
@@ -106,10 +111,7 @@ export function UserAnimeRating({ animeId, language }: Props) {
       });
       const payload = await response.json().catch(() => ({})) as ApiRatingResponse;
       if (response.status === 401) {
-        setAuthRequired(true);
-        setError(ru
-          ? "Войдите через Telegram, чтобы сохранить свою оценку."
-          : "Sign in with Telegram to save your rating.");
+        toast.warning(ru ? "Зарегистрируйтесь в YUBERA, чтобы оценивать аниме." : "Register with YUBERA to rate anime.", { duration: 3500 });
         return;
       }
       if (response.status === 404) {
@@ -154,15 +156,19 @@ export function UserAnimeRating({ animeId, language }: Props) {
               <button
                 key={value}
                 type="button"
-                className={`yubera-user-rating-star-button ${active ? "is-active" : ""}`}
+                className={`yubera-user-rating-star-button ${active ? "is-active" : ""} ${!authenticated ? "is-locked" : ""}`}
                 aria-label={ru ? `Оценка ${value} из 10` : `Rate ${value} out of 10`}
                 aria-pressed={selected === value}
+                aria-disabled={!authenticated}
                 disabled={loading || saving}
                 onClick={() => {
+                  if (!authenticated) {
+                    toast.warning(ru ? "Зарегистрируйтесь в YUBERA, чтобы оценивать аниме." : "Register with YUBERA to rate anime.", { duration: 3500 });
+                    return;
+                  }
                   setSelected(value);
                   setError("");
                   setNotice("");
-                  setAuthRequired(false);
                 }}
               >
                 <Star aria-hidden="true" />
@@ -182,19 +188,7 @@ export function UserAnimeRating({ animeId, language }: Props) {
         </button>
       </div>
 
-      {error && (
-        <p className="yubera-user-rating-message is-error" role="alert">
-          {error}
-          {authRequired && (
-            <>
-              {" "}
-              <a href="/?section=login" className="yubera-user-rating-auth-link">
-                {ru ? "Войти через Telegram" : "Sign in with Telegram"}
-              </a>
-            </>
-          )}
-        </p>
-      )}
+      {error && <p className="yubera-user-rating-message is-error" role="alert">{error}</p>}
       {notice && <p className="yubera-user-rating-message" role="status">{notice}</p>}
     </section>
   );

@@ -1,5 +1,6 @@
 import { env as cloudflareEnv } from "cloudflare:workers";
 import { getR2Anime } from "@/data/catalog-r2.server";
+import { validateTelegramInitData } from "@/data/telegram-init-data";
 import { isSameOriginRequest } from "@/lib/request-security";
 import {
   ANIME_COMMENT_FIRST_PAGE_SIZE,
@@ -16,6 +17,7 @@ import {
 type Environment = Record<string, unknown> & {
   YUME_DB?: unknown;
   YUME_AUTH_SESSION_SECRET?: string;
+  TELEGRAM_BOT_TOKEN?: string;
 };
 type D1Meta = { changes?: number; rows_read?: number; rows_written?: number };
 type Statement = {
@@ -168,6 +170,25 @@ function safePhotoUrl(value: unknown): string | null {
   } catch {
     return null;
   }
+}
+
+async function telegramProfileFromInitData(
+  request: Request,
+  env: Environment,
+): Promise<{ name: string; avatarUrl: string | null } | null> {
+  const initData = request.headers.get("x-telegram-init-data");
+  const botToken = typeof env.TELEGRAM_BOT_TOKEN === "string" ? env.TELEGRAM_BOT_TOKEN.trim() : "";
+  if (!initData || !botToken) return null;
+  const validated = await validateTelegramInitData(initData, botToken);
+  if (!validated.ok) return null;
+  return {
+    name: displayName(
+      validated.user.firstName,
+      validated.user.lastName ?? null,
+      validated.user.username ?? null,
+    ),
+    avatarUrl: safePhotoUrl(validated.user.photoUrl),
+  };
 }
 
 async function authenticatedViewer(request: Request, db: Database, env: Environment): Promise<Viewer | null> {
@@ -408,6 +429,9 @@ async function handleRead(request: Request): Promise<Response> {
 
   try {
     const viewer = await authenticatedViewer(request, db, env);
+    const telegramProfile = !viewer || !viewer.avatarUrl
+      ? await telegramProfileFromInitData(request, env)
+      : null;
     const threadId = url.searchParams.get("threadId");
     if (threadId) {
       if (!UUID_PATTERN.test(threadId)) return json({ error: "invalid_thread_id" }, 400);
@@ -415,7 +439,7 @@ async function handleRead(request: Request): Promise<Response> {
       const cursor = rawCursor ? decodeCommentCursor(rawCursor) : null;
       if (rawCursor && !cursor) return json({ error: "invalid_cursor" }, 400);
       const page = await readMoreReplies(db, animeId, threadId, viewer, cursor, now);
-      return json({ ...page, viewer });
+      return json({ ...page, viewer, telegramProfile });
     }
 
     const rawCursor = url.searchParams.get("cursor");
@@ -423,7 +447,7 @@ async function handleRead(request: Request): Promise<Response> {
     if (rawCursor && !cursor) return json({ error: "invalid_cursor" }, 400);
     const limit = rawCursor ? ANIME_COMMENT_PAGE_SIZE : ANIME_COMMENT_FIRST_PAGE_SIZE;
     const page = await readRootPage(db, animeId, viewer, cursor, limit, now);
-    return json({ ...page, viewer });
+    return json({ ...page, viewer, telegramProfile });
   } catch (error) {
     if (error instanceof Error && error.message === "comment_thread_not_found") {
       return json({ error: "comment_thread_not_found" }, 404);
@@ -469,8 +493,9 @@ async function writeComment(
       "(id, anime_id, user_id, parent_id, thread_root_id, reply_to_user_id, body, created_at, expires_at, idempotency_key) " +
       "SELECT ?, ?, ?, parent.id, parent.thread_root_id, parent.user_id, ?, ?, ?, ? " +
       "FROM yume_anime_comments parent " +
-      "WHERE parent.id = ? AND parent.anime_id = ? AND parent.deleted_at IS NULL AND parent.expires_at > ?",
-    ).bind(id, animeId, viewer.id, text, now, expiresAt, idempotencyKey, parentId, animeId, now).run();
+      "WHERE parent.id = ? AND parent.anime_id = ? AND parent.deleted_at IS NULL " +
+      "AND parent.expires_at > ? AND parent.user_id <> ?",
+    ).bind(id, animeId, viewer.id, text, now, expiresAt, idempotencyKey, parentId, animeId, now, viewer.id).run();
   }
   logD1("create_comment", writeResult.meta);
 

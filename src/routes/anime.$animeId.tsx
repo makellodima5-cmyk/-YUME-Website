@@ -868,7 +868,7 @@ function AnimeDetailPage() {
               </button>)}
             </div>
           </section>
-          <AnimeComments animeId={anime.id} language={language} onAuthRequired={requestAuth} />
+          <AnimeComments animeId={anime.id} language={language} />
         </div>
       </main>
 

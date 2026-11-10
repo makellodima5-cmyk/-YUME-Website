@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { toast } from "sonner";
+import { getTelegramWebApp } from "@/lib/telegram-mini-app";
 import {
   ChevronDown,
   ChevronUp,
@@ -40,6 +42,7 @@ type PageResponse = {
   hasMore: boolean;
   totalCount: number;
   viewer: Viewer;
+  telegramProfile?: { name: string; avatarUrl: string | null } | null;
 };
 type ReplyPageResponse = {
   replies: Comment[];
@@ -60,7 +63,6 @@ type MutationResponse = {
 type Props = {
   animeId: string;
   language: Language;
-  onAuthRequired: () => void;
 };
 
 const COPY = {
@@ -85,7 +87,7 @@ const COPY = {
     sendError: "Не удалось отправить сообщение. Попробуй ещё раз.",
     sent: "Комментарий опубликован.",
     deletedSuccess: "Комментарий удалён.",
-    login: "Войди через Telegram, чтобы участвовать в обсуждении.",
+    login: "Зарегистрируйся в YUBERA, чтобы участвовать в обсуждении.",
     justNow: "Только что",
     minutes: "мин. назад",
     hours: "ч. назад",
@@ -114,7 +116,7 @@ const COPY = {
     sendError: "Could not publish the comment. Please try again.",
     sent: "Comment published.",
     deletedSuccess: "Comment deleted.",
-    login: "Sign in with Telegram to join the discussion.",
+    login: "Register with YUBERA to join the discussion.",
     justNow: "Just now",
     minutes: "m ago",
     hours: "h ago",
@@ -160,7 +162,7 @@ function Composer({
   loading,
   placeholder,
   sendLabel,
-  onAuthRequired,
+  loginNotice,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -169,32 +171,32 @@ function Composer({
   loading: boolean;
   placeholder: string;
   sendLabel: string;
-  onAuthRequired: () => void;
+  loginNotice: string;
 }) {
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
-      if (disabled) onAuthRequired();
-      else onSubmit();
+      if (disabled) return;
+      onSubmit();
     }
   };
   return (
     <div className="flex min-w-0 items-end gap-2 rounded-full border border-white/20 bg-white/[0.055] px-3 py-2 shadow-inner focus-within:border-primary/70">
       <textarea
+        className="yubera-comment-composer-input max-h-28 min-h-7 min-w-0 flex-1 resize-y bg-transparent px-1 py-1 text-sm leading-6 text-foreground placeholder:text-muted-foreground"
         value={value}
         onChange={event => onChange(event.target.value)}
         onKeyDown={handleKeyDown}
-        onFocus={() => { if (disabled) onAuthRequired(); }}
+        onFocus={() => { if (disabled) toast.warning(loginNotice, { duration: 3500 }); }}
         readOnly={disabled}
         rows={1}
         maxLength={1000}
         placeholder={placeholder}
         aria-label={placeholder}
-        className="max-h-28 min-h-7 min-w-0 flex-1 resize-y bg-transparent px-1 py-1 text-sm leading-6 text-foreground outline-none placeholder:text-muted-foreground"
       />
       <button
         type="button"
-        onClick={() => disabled ? onAuthRequired() : onSubmit()}
+        onClick={() => disabled ? toast.warning(loginNotice, { duration: 3500 }) : onSubmit()}
         disabled={!disabled && (loading || !value.trim())}
         aria-label={sendLabel}
         title={sendLabel}
@@ -206,10 +208,11 @@ function Composer({
   );
 }
 
-export function AnimeComments({ animeId, language, onAuthRequired }: Props) {
+export function AnimeComments({ animeId, language }: Props) {
   const copy = COPY[language];
   const [comments, setComments] = useState<ThreadComment[]>([]);
   const [viewer, setViewer] = useState<Viewer>(null);
+  const [telegramProfile, setTelegramProfile] = useState<{ name: string; avatarUrl: string | null } | null>(null);
   const [count, setCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -236,13 +239,17 @@ export function AnimeComments({ animeId, language, onAuthRequired }: Props) {
       const response = await fetch("/api/anime-comments?animeId=" + encodeURIComponent(animeId), {
         credentials: "same-origin",
         cache: "no-store",
-        headers: { Accept: "application/json" },
+        headers: {
+          Accept: "application/json",
+          ...(getTelegramWebApp()?.initData ? { "X-Telegram-Init-Data": getTelegramWebApp()!.initData } : {}),
+        },
       });
       const payload = await response.json().catch(() => ({})) as Partial<PageResponse>;
       if (!response.ok || !Array.isArray(payload.comments)) throw new Error("comments_load_failed");
       setComments(payload.comments);
       setCount(Math.max(0, Number(payload.totalCount) || 0));
       setViewer(payload.viewer ?? null);
+      setTelegramProfile(payload.telegramProfile ?? null);
       setHasMore(payload.hasMore === true);
       setNextCursor(payload.nextCursor ?? null);
     } catch {
@@ -311,7 +318,7 @@ export function AnimeComments({ animeId, language, onAuthRequired }: Props) {
 
   const post = useCallback(async (text: string, parent: Comment | null) => {
     if (!viewer) {
-      onAuthRequired();
+      toast.warning(copy.login, { duration: 3500 });
       return;
     }
     if (requestLock.current || !text.trim()) return;
@@ -361,11 +368,11 @@ export function AnimeComments({ animeId, language, onAuthRequired }: Props) {
       setPosting(false);
       setReplyPosting(false);
     }
-  }, [animeId, copy.sendError, copy.sent, onAuthRequired, viewer]);
+  }, [animeId, copy.login, copy.sendError, copy.sent, viewer]);
 
   const toggleLike = useCallback(async (comment: Comment) => {
     if (!viewer) {
-      onAuthRequired();
+      toast.warning(copy.login, { duration: 3500 });
       return;
     }
     if (comment.deleted || busyLikeIds.current.has(comment.id)) return;
@@ -398,11 +405,11 @@ export function AnimeComments({ animeId, language, onAuthRequired }: Props) {
         return next;
       });
     }
-  }, [animeId, language, onAuthRequired, viewer]);
+  }, [animeId, copy.login, language, viewer]);
 
   const removeComment = useCallback(async (comment: Comment) => {
     if (!viewer) {
-      onAuthRequired();
+      toast.warning(copy.login, { duration: 3500 });
       return;
     }
     if (!window.confirm(copy.confirmDelete)) return;
@@ -432,11 +439,11 @@ export function AnimeComments({ animeId, language, onAuthRequired }: Props) {
     } catch {
       setStatus(language === "en" ? "Could not delete the comment." : "Не удалось удалить комментарий.");
     }
-  }, [animeId, copy.confirmDelete, copy.deletedSuccess, language, onAuthRequired, viewer]);
+  }, [animeId, copy.confirmDelete, copy.deletedSuccess, copy.login, language, viewer]);
 
   const beginReply = (comment: Comment) => {
     if (!viewer) {
-      onAuthRequired();
+      toast.warning(copy.login, { duration: 3500 });
       return;
     }
     setReplyTarget(comment);
@@ -444,6 +451,8 @@ export function AnimeComments({ animeId, language, onAuthRequired }: Props) {
   };
 
   const number = new Intl.NumberFormat(language === "en" ? "en-US" : "ru-RU").format(count);
+  const composerName = viewer?.name ?? telegramProfile?.name ?? "Yubera";
+  const composerAvatarUrl = viewer?.avatarUrl ?? telegramProfile?.avatarUrl ?? null;
   const canExpand = hasMore || expanded || comments.length > 3;
   const visibleComments = expanded ? comments : comments.slice(0, 3);
 
@@ -455,7 +464,7 @@ export function AnimeComments({ animeId, language, onAuthRequired }: Props) {
       </div>
 
       <div className="mb-4 flex min-w-0 items-center gap-3">
-        <Avatar name={viewer?.name ?? "Yubera"} url={viewer?.avatarUrl ?? null} size="h-11 w-11" />
+        <Avatar name={composerName} url={composerAvatarUrl} size="h-11 w-11" />
         <div className="min-w-0 flex-1">
           <Composer
             value={draft}
@@ -465,13 +474,12 @@ export function AnimeComments({ animeId, language, onAuthRequired }: Props) {
             loading={posting}
             placeholder={copy.composer}
             sendLabel={copy.send}
-            onAuthRequired={onAuthRequired}
+            loginNotice={copy.login}
           />
         </div>
       </div>
 
       {status && <p role="status" className="mb-3 px-1 text-xs text-muted-foreground">{status}</p>}
-      {!viewer && <p className="mb-3 px-1 text-xs text-muted-foreground">{copy.login}</p>}
 
       {loading ? (
         <div role="status" className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
@@ -544,8 +552,7 @@ export function AnimeComments({ animeId, language, onAuthRequired }: Props) {
                     loading={replyPosting}
                     placeholder={copy.replyComposer}
                     sendLabel={copy.send}
-                    onAuthRequired={onAuthRequired}
-                  />
+                          />
                   <button type="button" onClick={() => { setReplyTarget(null); setReplyDraft(""); }} className="mt-1 px-1 text-xs text-muted-foreground hover:text-foreground">
                     {language === "en" ? "Cancel" : "Отмена"}
                   </button>
@@ -649,9 +656,11 @@ function CommentRow({
               <ThumbsUp className={"h-4 w-4 " + (comment.liked ? "fill-primary/20" : "")} />
               <span className="tabular-nums">{new Intl.NumberFormat(language === "en" ? "en-US" : "ru-RU").format(comment.likeCount)}</span>
             </button>
-            <button type="button" onClick={onReply} className="inline-flex min-h-7 items-center gap-1.5 transition hover:text-primary">
-              <MessageCircle className="h-4 w-4" />{copy.reply}
-            </button>
+            {!own && (
+              <button type="button" onClick={onReply} className="inline-flex min-h-7 items-center gap-1.5 transition hover:text-primary">
+                <MessageCircle className="h-4 w-4" />{copy.reply}
+              </button>
+            )}
           </div>
         )}
       </div>

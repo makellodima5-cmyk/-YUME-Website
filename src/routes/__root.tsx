@@ -19,6 +19,7 @@ import { getTelegramWebApp, initializeTelegramMiniApp } from "@/lib/telegram-min
 import { clearAnimeNavigationOrigin } from "@/data/anime-navigation";
 import { TelegramSubscriptionGate } from "@/components/yume/TelegramSubscriptionGate";
 import { CookieConsentBanner } from "@/components/yume/CookieConsentBanner";
+import { Toaster } from "@/components/ui/sonner";
 
 type InterfaceLanguage = "ru" | "en";
 
@@ -290,6 +291,7 @@ function RootComponent() {
         <SkipToContent />
         <TelegramSubscriptionGate><Outlet /></TelegramSubscriptionGate>
         <CookieConsentBanner />
+        <Toaster position="top-center" closeButton={false} />
       </YumePreferencesProvider>
     </QueryClientProvider>
   );
