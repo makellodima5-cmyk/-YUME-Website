@@ -312,13 +312,13 @@ describe("YUBERA user anime ratings", () => {
     }]);
     expect(fallback[0]?.rating).toBe(7.6);
 
-    db.votes.set("125:user-24", { animeId: "125", userId: "user-24", rating: 10 });
+    db.sessionUserId = "user-24";
+    await handleAnimeRatings(ratingRequest(10, "user-24", "125"));
     const switched = await applyPublicAnimeRatings([{
       id: "125", title: "Threshold", original: "", year: 2025, episodes: 12,
       rating: 7.6, genres: [], status: "Вышел", description: "", hue: 0, glyph: "",
     }]);
-    // The 30-second public overlay cache intentionally bounds D1 reads.
-    expect(switched[0]?.rating).toBe(7.6);
+    expect(switched[0]?.rating).toBe(8.1);
   });
 
   it("does not expose a Shikimori score or permit votes for announced titles", async () => {
