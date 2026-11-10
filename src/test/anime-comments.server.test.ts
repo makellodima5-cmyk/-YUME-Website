@@ -472,6 +472,11 @@ describe("anime comments API", () => {
     expect(await third.json()).toMatchObject({ liked: false, likeCount: 0 });
     expect(await last.json()).toMatchObject({ liked: false, likeCount: 0 });
     expect(db.comments.get(id)?.like_count).toBe(0);
+
+    await set();
+    const refreshed = await handleAnimeComments(request("GET", "/api/anime-comments?animeId=" + ANIME_A));
+    const refreshedPayload = await refreshed.json() as { comments: Array<{ liked: boolean; likeCount: number }> };
+    expect(refreshedPayload.comments[0]).toMatchObject({ liked: true, likeCount: 1 });
   });
 
   it("tombstones a parent with replies, removes its likes and preserves the replies", async () => {
