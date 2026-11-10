@@ -15,7 +15,8 @@ class CleanupStatement {
   bind(...values: unknown[]) { this.values = values; return this; }
 
   async all<T = Record<string, unknown>>(): Promise<{ results: T[]; meta: { rows_read: number; rows_written: number } }> {
-    const [now, limit] = this.values as [string, number];
+    const now = String(this.values[0]);
+    const limit = Number(this.values[this.values.length - 1]);
     const expired = Array.from(this.db.rows.values())
       .filter(row => row.expires_at <= now)
       .sort((a, b) => a.expires_at.localeCompare(b.expires_at) || a.id.localeCompare(b.id));
@@ -25,40 +26,58 @@ class CleanupStatement {
     }
     if (this.sql.includes("parent_id IS NOT NULL")) {
       const results = expired.filter(row => row.parent_id !== null).slice(0, limit)
-        .map(row => ({ id: row.id, parent_id: row.parent_id! }));
+        .map(row => ({ id: row.id }));
       return { results: results as T[], meta: { rows_read: expired.length, rows_written: 0 } };
     }
     return { results: [], meta: { rows_read: 0, rows_written: 0 } };
   }
 
   async run() {
-    if (this.sql.startsWith("UPDATE yume_anime_comments SET parent_id = ?")) {
-      const [newParent, oldId] = this.values as [string, string, string];
+    if (this.sql.startsWith("UPDATE yume_anime_comments SET parent_id = (")) {
+      const [expiredId, oldId, limit] = this.values as [string, string, number];
+      const expired = this.db.rows.get(expiredId);
       let changes = 0;
-      for (const row of this.db.rows.values()) {
-        if (row.parent_id === oldId) {
-          row.parent_id = newParent;
-          changes += 1;
+      if (expired) {
+        for (const row of this.db.rows.values()) {
+          if (row.parent_id === oldId && changes < limit) {
+            row.parent_id = expired.parent_id;
+            changes += 1;
+          }
         }
       }
       return { meta: { changes, rows_written: changes } };
     }
-    if (this.sql.startsWith("DELETE FROM yume_anime_comments WHERE thread_root_id IN")) {
-      const ids = new Set(this.values as string[]);
-      let changes = 0;
-      for (const [id, row] of Array.from(this.db.rows.entries())) {
-        if (ids.has(row.thread_root_id)) {
-          this.db.rows.delete(id);
-          this.db.likes.delete(id);
-          changes += 1;
-        }
+    if (this.sql.startsWith("DELETE FROM yume_anime_comments WHERE id IN (")) {
+      const values = this.values as unknown[];
+      const ids = new Set(values.slice(0, -1) as string[]);
+      const limit = Number(values[values.length - 1]);
+      const leaves = Array.from(this.db.rows.values())
+        .filter(row => ids.has(row.thread_root_id) && row.parent_id !== null &&
+          !Array.from(this.db.rows.values()).some(child => child.parent_id === row.id))
+        .slice(0, limit);
+      for (const row of leaves) {
+        this.db.rows.delete(row.id);
+        this.db.likes.delete(row.id);
       }
-      return { meta: { changes, rows_written: changes } };
+      return { meta: { changes: leaves.length, rows_written: leaves.length } };
+    }
+    if (this.sql.startsWith("DELETE FROM yume_anime_comments AS root")) {
+      const ids = new Set(this.values as string[]);
+      const roots = Array.from(this.db.rows.values()).filter(row =>
+        ids.has(row.id) && row.parent_id === null &&
+        !Array.from(this.db.rows.values()).some(child => child.parent_id === row.id),
+      );
+      for (const row of roots) {
+        this.db.rows.delete(row.id);
+        this.db.likes.delete(row.id);
+      }
+      return { meta: { changes: roots.length, rows_written: roots.length } };
     }
     if (this.sql.startsWith("DELETE FROM yume_anime_comments WHERE id = ?")) {
       const [id, now] = this.values as [string, string];
       const row = this.db.rows.get(id);
-      if (!row || row.expires_at > now) return { meta: { changes: 0, rows_written: 0 } };
+      const hasChildren = Array.from(this.db.rows.values()).some(child => child.parent_id === id);
+      if (!row || row.expires_at > now || hasChildren) return { meta: { changes: 0, rows_written: 0 } };
       this.db.rows.delete(id);
       this.db.likes.delete(id);
       return { meta: { changes: 1, rows_written: 1 } };
