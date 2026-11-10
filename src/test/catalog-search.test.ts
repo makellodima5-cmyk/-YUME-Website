@@ -32,7 +32,7 @@ describe("catalog URL search validation", () => {
       status: "Онгоинг",
       from: 1900,
       to: 2100,
-      rating: 9,
+      rating: 10,
       kind: "TV",
       age: "12+",
       lang: "en",
