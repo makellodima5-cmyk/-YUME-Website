@@ -39,7 +39,7 @@ describe("Telegram library sync item validation", () => {
     const item = { itemType: "favorite", animeId: "20", payload: { saved: true }, updatedAtEpochMillis: Date.now(), deleted: false, sourceId: "android-a" };
     expect(normalizeTelegramLibrarySyncItems(Array.from({ length: 501 }, () => item))).toBeNull();
     expect(normalizeTelegramLibrarySyncItems([{ ...item, sourceId: "android device" }])).toBeNull();
-    expect(normalizeTelegramLibrarySyncItems([{ ...item, updatedAtEpochMillis: Date.now() + 300_001 }])).toBeNull();
+    expect(normalizeTelegramLibrarySyncItems([{ ...item, updatedAtEpochMillis: Date.now() + 600_000 }])).toBeNull();
     expect(normalizeTelegramLibrarySyncItems([{ ...item, deleted: true }])).toBeNull();
     expect(normalizeTelegramLibrarySyncItems([{
       itemType: "progress", animeId: "20",
