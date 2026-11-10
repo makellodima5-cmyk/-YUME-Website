@@ -227,6 +227,7 @@ export function AnimeComments({ animeId, language, onAuthRequired }: Props) {
   const [status, setStatus] = useState("");
   const requestLock = useRef(false);
   const pageLock = useRef(false);
+  const busyLikeIds = useRef(new Set<string>());
 
   const loadInitial = useCallback(async () => {
     setLoading(true);
@@ -367,7 +368,8 @@ export function AnimeComments({ animeId, language, onAuthRequired }: Props) {
       onAuthRequired();
       return;
     }
-    if (comment.deleted || busyLikes.has(comment.id)) return;
+    if (comment.deleted || busyLikeIds.current.has(comment.id)) return;
+    busyLikeIds.current.add(comment.id);
     setBusyLikes(current => new Set(current).add(comment.id));
     try {
       const response = await fetch("/api/anime-comments", {
@@ -389,13 +391,14 @@ export function AnimeComments({ animeId, language, onAuthRequired }: Props) {
     } catch {
       setStatus(language === "en" ? "Could not update the like." : "Не удалось обновить отметку «Нравится».");
     } finally {
+      busyLikeIds.current.delete(comment.id);
       setBusyLikes(current => {
         const next = new Set(current);
         next.delete(comment.id);
         return next;
       });
     }
-  }, [animeId, busyLikes, language, onAuthRequired, viewer]);
+  }, [animeId, language, onAuthRequired, viewer]);
 
   const removeComment = useCallback(async (comment: Comment) => {
     if (!viewer) {
