@@ -20,11 +20,11 @@ class CleanupStatement {
     const expired = Array.from(this.db.rows.values())
       .filter(row => row.expires_at <= now)
       .sort((a, b) => a.expires_at.localeCompare(b.expires_at) || a.id.localeCompare(b.id));
-    if (this.sql.includes("parent_id IS NULL")) {
+    if (this.sql.startsWith("SELECT id FROM yume_anime_comments")) {
       const results = expired.filter(row => row.parent_id === null).slice(0, limit).map(row => ({ id: row.id }));
       return { results: results as T[], meta: { rows_read: expired.length, rows_written: 0 } };
     }
-    if (this.sql.includes("parent_id IS NOT NULL")) {
+    if (this.sql.startsWith("SELECT reply.id FROM yume_anime_comments reply")) {
       const results = expired.filter(row => row.parent_id !== null).slice(0, limit)
         .map(row => ({ id: row.id }));
       return { results: results as T[], meta: { rows_read: expired.length, rows_written: 0 } };
