@@ -125,10 +125,10 @@ class FakeStatement {
       const id = String(values[0]);
       const animeId = String(values[1]);
       const userId = String(values[2]);
-      const body = String(values[isReply ? 3 : 5]);
-      const createdAt = String(values[isReply ? 4 : 6]);
-      const expiresAt = String(values[isReply ? 5 : 7]);
-      const key = String(values[isReply ? 6 : 8]);
+      const body = String(values[isReply ? 3 : 4]);
+      const createdAt = String(values[isReply ? 4 : 5]);
+      const expiresAt = String(values[isReply ? 5 : 6]);
+      const key = String(values[isReply ? 6 : 7]);
       const parentId = isReply ? String(values[7]) : null;
       if (Array.from(this.db.comments.values()).some(row => row.user_id === userId && row.idempotency_key === key)) {
         return { meta: { changes: 0, rows_read: 1, rows_written: 0 } };
@@ -295,10 +295,11 @@ describe("anime comments API", () => {
     const second = await handleAnimeComments(request("POST", undefined, body));
     const firstPayload = await first.json() as { comment: CommentLike; totalCount: number; created: boolean };
     const secondPayload = await second.json() as { comment: CommentLike; totalCount: number; created: boolean };
+    const stored = Array.from(db.comments.values())[0]!;
     expect(first.status).toBe(201);
     expect(second.status).toBe(200);
     expect(firstPayload.comment.body).toBe("<script>alert(1)</script>");
-    expect(Date.parse(firstPayload.comment.expiresAt) - Date.parse(firstPayload.comment.createdAt)).toBe(30 * 24 * 60 * 60 * 1000);
+    expect(Date.parse(stored.expires_at) - Date.parse(stored.created_at)).toBe(30 * 24 * 60 * 60 * 1000);
     expect(firstPayload.created).toBe(true);
     expect(secondPayload.created).toBe(false);
     expect(secondPayload.totalCount).toBe(1);
@@ -306,7 +307,6 @@ describe("anime comments API", () => {
   });
 
   it("creates replies in the same anime thread and preserves reply-to-user information", async () => {
-    const rootId = "40000000-0000-4000-8000-000000000004";
     const rootKey = "41000000-0000-4000-8000-000000000004";
     await handleAnimeComments(request("POST", undefined, {
       action: "create", animeId: ANIME_A, text: "Root", idempotencyKey: rootKey,
@@ -322,7 +322,6 @@ describe("anime comments API", () => {
     expect(payload.comment.threadRootId).toBe(root.id);
     expect(payload.comment.replyToUserId).toBe(USER_A);
     expect(payload.comment.replyToName).toBe("Akira");
-    expect(rootId).not.toBe(root.id);
   });
 
   it("rejects cross-anime parents, invalid IDs, empty text and messages over 1000 characters", async () => {
@@ -432,7 +431,6 @@ type CommentLike = {
   body: string;
   likeCount: number;
   createdAt: string;
-  expiresAt: string;
   deleted: boolean;
   authorId: string | null;
   authorName: string;
