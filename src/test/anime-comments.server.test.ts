@@ -433,20 +433,22 @@ describe("anime comments API", () => {
   });
 
   it("creates replies in the same anime thread and preserves reply-to-user information", async () => {
-    const rootKey = "41000000-0000-4000-8000-000000000004";
-    await handleAnimeComments(request("POST", undefined, {
-      action: "create", animeId: ANIME_A, text: "Root", idempotencyKey: rootKey,
-    }));
-    const root = Array.from(db.comments.values())[0]!;
+    const rootId = "41000000-0000-4000-8000-000000000004";
+    db.comments.set(rootId, {
+      id: rootId, anime_id: ANIME_A, user_id: USER_B, parent_id: null, thread_root_id: rootId,
+      reply_to_user_id: null, body: "Root by another user", like_count: 0,
+      created_at: new Date().toISOString(), expires_at: "2027-01-01T00:00:00.000Z",
+      deleted_at: null, idempotency_key: null,
+    });
     const replyKey = "42000000-0000-4000-8000-000000000004";
     const response = await handleAnimeComments(request("POST", undefined, {
-      action: "reply", animeId: ANIME_A, parentId: root.id, text: "Reply", idempotencyKey: replyKey,
+      action: "reply", animeId: ANIME_A, parentId: rootId, text: "Reply", idempotencyKey: replyKey,
     }));
     const payload = await response.json() as { comment: CommentLike; totalCount: number };
     expect(response.status).toBe(201);
     expect(payload.totalCount).toBe(2);
-    expect(payload.comment.parentId).toBe(root.id);
-    expect(payload.comment.threadRootId).toBe(root.id);
+    expect(payload.comment.parentId).toBe(rootId);
+    expect(payload.comment.threadRootId).toBe(rootId);
     expect(payload.comment.replyToUserId).toBe(USER_B);
     expect(payload.comment.replyToName).toBe("Akira");
   });
