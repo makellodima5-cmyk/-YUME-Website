@@ -74,7 +74,6 @@ type SessionRow = {
   telegram_photo_url: string | null;
 };
 type CountRow = { active_count: number; expired_count: number };
-type RuntimeResult = { rows_read?: number; rows_written?: number; changes?: number };
 
 const SESSION_COOKIE = "__Host-yume-session";
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -307,9 +306,7 @@ async function readRootPage(
       "LEFT JOIN yume_users u ON u.id = c.user_id " +
       "LEFT JOIN yume_users reply_to ON reply_to.id = c.reply_to_user_id " +
       "WHERE c.anime_id = ? AND c.thread_root_id IN (" + placeholders + ") AND c.parent_id IS NOT NULL " +
-      "AND c.expires_at > ? AND (c.deleted_at IS NULL OR EXISTS (" +
-      "SELECT 1 FROM yume_anime_comments child WHERE child.parent_id = c.id AND child.expires_at > ?" +
-      "))" +
+      "AND c.expires_at > ?" +
       ") SELECT * FROM ranked_replies WHERE reply_rank <= ? ORDER BY thread_root_id, reply_rank",
     ).bind(animeId, ...rootIds, now, ANIME_COMMENT_REPLY_PAGE_SIZE).all<CommentRow>();
     replies = replyResult.results;
