@@ -32,7 +32,7 @@ describe("anime comments D1 migration and scheduled retention", () => {
       readFile(resolve(process.cwd(), "src/server.ts"), "utf8"),
       readFile(resolve(process.cwd(), "src/routes/api.anime-comments.ts"), "utf8"),
     ]);
-    expect(config.match(/"0 3 \* \* \*"/g)).toHaveLength(1);
+    expect(config).toContain('"0 * * * *"');
     expect(worker).toContain("runScheduledAnimeCommentCleanup(env)");
     expect(server).toContain('requestUrl.pathname === "/api/anime-comments"');
     expect(route).toContain('createFileRoute("/api/anime-comments")');
