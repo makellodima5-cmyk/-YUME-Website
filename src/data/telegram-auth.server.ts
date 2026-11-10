@@ -167,8 +167,8 @@ async function upsertTelegramUser(
     await db.prepare("INSERT OR IGNORE INTO yume_users (id, provider, provider_user_id, telegram_user_id, telegram_first_name, telegram_last_name, telegram_username, telegram_language_code, telegram_photo_url, privacy_consent_at, privacy_policy_version, terms_agreed_at, terms_version) VALUES (?, 'telegram', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
        .bind(crypto.randomUUID(), telegramId, telegramId, user.firstName, user.lastName ?? null, user.username ?? null, user.languageCode ?? null, user.photoUrl ?? null, acceptedAt, PRIVACY_POLICY_VERSION, acceptedAt, TERMS_VERSION).run();
   } else {
-    await db.prepare("undefined")
-       .bind(user.firstName, user.lastName ?? null, user.username ?? null, user.languageCode ?? null, telegramId).run();
+    await db.prepare("UPDATE yume_users SET telegram_first_name = ?, telegram_last_name = ?, telegram_username = ?, telegram_language_code = ?, telegram_photo_url = COALESCE(?, telegram_photo_url) WHERE telegram_user_id = ?")
+      .bind(user.firstName, user.lastName ?? null, user.username ?? null, user.languageCode ?? null, user.photoUrl ?? null, telegramId).run();
   }
   return findTelegramUser(db, user.id);
 }
@@ -838,8 +838,8 @@ export async function handleTelegramSession(request: Request): Promise<Response>
         validated.user.languageCode ?? null,
         validated.user.photoUrl ?? null,
       ] as const;
-      await db.prepare("UPDATE yume_users SET telegram_first_name = ?, telegram_last_name = ?, telegram_username = ?, telegram_language_code = ?, telegram_photo_url = COALESCE(?, telegram_photo_url) WHERE telegram_user_id = ? AND (telegram_first_name IS NOT ? OR telegram_last_name IS NOT ? OR telegram_username IS NOT ? OR telegram_language_code IS NOT ? OR (? IS NOT NULL AND telegram_photo_url IS NOT ?))")
-        .bind(...profileValues, String(validated.user.id), ...profileValues).run();
+      await db.prepare("UPDATE yume_users SET telegram_first_name = ?, telegram_last_name = ?, telegram_username = ?, telegram_language_code = ?, telegram_photo_url = COALESCE(?, telegram_photo_url) WHERE telegram_user_id = ? AND (telegram_first_name IS NOT ? OR telegram_last_name IS NOT ? OR telegram_username IS NOT ? OR telegram_language_code IS NOT ? OR COALESCE(?, telegram_photo_url) IS NOT telegram_photo_url)")
+        .bind(...profileValues, String(validated.user.id), ...profileValues.slice(0, 4), profileValues[4]).run();
       // The existing row was already selected above; reuse the updated payload instead of issuing the same SELECT again.
       user = {
         ...user,
