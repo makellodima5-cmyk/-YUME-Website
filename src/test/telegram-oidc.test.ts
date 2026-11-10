@@ -124,7 +124,7 @@ describe("Telegram OIDC browser binding", () => {
         "CF-Connecting-IP": "203.0.113.11",
         "Content-Type": "application/x-www-form-urlencoded",
       },
-      body: "flow=login",
+      body: "flow=login&privacyConsent=false&termsAccepted=false",
     }));
     expect(response.status).toBe(429);
     expect(await response.json()).toEqual({ error: "rate_limited" });
