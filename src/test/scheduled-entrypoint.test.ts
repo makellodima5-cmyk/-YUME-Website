@@ -27,11 +27,11 @@ describe("automatic Worker maintenance", () => {
     expect(queueConfig).toContain('"workers_dev": false');
     expect(queueConfig).toContain('"preview_urls": false');
     expect(queueConsumer).toContain("INSERT OR IGNORE INTO yume_notification_targets");
-    expect(queueConsumer).toContain("message.retry({ delaySeconds: RETRY_DELAY_SECONDS })");
+    expect(queueConsumer).toContain("message.retry({delaySeconds:Number.isFinite(delay)?Math.max(1,delay):RETRY_DELAY_SECONDS})");
     expect(queueWorker).toContain("runScheduledNotificationCleanup(env)");
     expect(queueWorker).toContain("runScheduledEpisodeNotifications(env)");
     expect(queueWorker).toContain("runScheduledAnimeCommentCleanup(env)");
-    expect(queueConfig).toContain('"0 3 * * *"');
+    expect(queueConfig).toContain('"0 * * * *"');
     expect(workflow).toContain("Automatic scheduled Worker jobs must remain disabled.");
     expect(workflow).toContain("Generated Worker entry still includes scheduled job");
     expect(workflow).toContain("Dedicated Queue Worker entry does not invoke scheduled episode notifications.");

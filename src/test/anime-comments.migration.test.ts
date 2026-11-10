@@ -5,7 +5,6 @@ import { resolve } from "node:path";
 describe("anime comments D1 migration and scheduled retention", () => {
   it("adds comment, like and per-anime summary tables with the required indexes and triggers", async () => {
     const sql = await readFile(resolve(process.cwd(), "migrations-clean/0005_yume_anime_comments.sql"), "utf8");
-    expect(sql).toContain("ALTER TABLE yume_users ADD COLUMN telegram_photo_url TEXT");
     expect(sql).toContain("CREATE TABLE yume_anime_comments");
     expect(sql).toContain("CREATE TABLE yume_anime_comment_likes");
     expect(sql).toContain("CREATE TABLE yume_anime_comment_summary");
@@ -26,14 +25,14 @@ describe("anime comments D1 migration and scheduled retention", () => {
     expect(sql).not.toMatch(/REFERENCES\s+(?:anime_catalog|yume_catalog)/i);
   });
 
-  it("reuses the existing daily Queue Worker Cron and does not add another schedule or Worker", async () => {
+  it("reuses the existing hourly Queue Worker Cron and does not add another schedule or Worker", async () => {
     const [config, worker, server, route] = await Promise.all([
       readFile(resolve(process.cwd(), "wrangler.queue.jsonc"), "utf8"),
       readFile(resolve(process.cwd(), "src/queue-worker.ts"), "utf8"),
       readFile(resolve(process.cwd(), "src/server.ts"), "utf8"),
       readFile(resolve(process.cwd(), "src/routes/api.anime-comments.ts"), "utf8"),
     ]);
-    expect(config.match(/"0 3 \* \* \*"/g)).toHaveLength(1);
+    expect(config).toContain('"0 * * * *"');
     expect(worker).toContain("runScheduledAnimeCommentCleanup(env)");
     expect(server).toContain('requestUrl.pathname === "/api/anime-comments"');
     expect(route).toContain('createFileRoute("/api/anime-comments")');

@@ -3,9 +3,11 @@ import { env } from "cloudflare:workers";
 import { runScheduledEpisodeNotifications, storedStatus } from "@/data/episode-notifications-cron.server";
 
 describe("scheduled episode notification status mapping", () => {
-  it.each([["ongoing","Неизвестно","Онгоинг"],["anons","Неизвестно","Анонс"],["released","Онгоинг","Вышел"]])("maps Shikimori status %s", (source,fallback,expected) => {
-    expect(storedStatus(source,fallback)).toBe(expected);
-  });
+  it.each([["ongoing","Неизвестно","Онгоинг"],["anons","Неизвестно","Анонс"],["released","Онгоинг","Вышел"]])(
+    "maps Shikimori status %s", (source,fallback,expected) => {
+      expect(storedStatus(source,fallback)).toBe(expected);
+    },
+  );
   it("preserves a valid stored status when Shikimori returns an unknown status", () => {
     expect(storedStatus("unexpected","Онгоинг")).toBe("Онгоинг");
   });
@@ -25,23 +27,38 @@ describe("scheduled episode notification durability with R2 catalogue state", ()
     bindings.YUME_CATALOG_READER={fetch:async (_url:RequestInfo|URL,init?:RequestInit)=>{events.push("read-r2-catalog");expect(new Headers(init?.headers).get("X-Yume-Reader-Token")).toBe("token");return Response.json(state);}};
     bindings.YUME_CATALOG_COORDINATOR={fetch:async (_url:RequestInfo|URL,init?:RequestInit)=>{events.push("publish-r2");const body=JSON.parse(String(init?.body));expect(body.mutation).toBeTruthy();return Response.json({ok:true,revision:8});}};
     bindings.YUME_CATALOG_READER_TOKEN="token";
-    const db={prepare(sql:string){return{bind(){return this;},async first(){if(sql.includes("yume_anime_subscriptions")){events.push("read-subscribers");return{found:1};}return null;},async run(){events.push("deactivate-subscriptions");return{meta:{changes:0}};}};}};
+    const db={
+      prepare(sql:string) {
+        const statement={
+          bind(){return statement;},
+          async all<T>() {
+            if(sql.includes("SELECT DISTINCT anime_id")) {
+              events.push("read-subscribers");
+              return {results:[{anime_id:"123"}] as T[]};
+            }
+            return {results:[] as T[]};
+          },
+          async run(){events.push("deactivate-subscriptions");return{meta:{changes:0}};},
+        };
+        return statement;
+      },
+    };
     return {db,restore:()=>{bindings.YUME_CATALOG_READER=previous.reader;bindings.YUME_CATALOG_COORDINATOR=previous.coordinator;bindings.YUME_CATALOG_READER_TOKEN=previous.token;}};
   }
   function stubShikimori(){vi.stubGlobal("fetch",vi.fn(async()=>Response.json({data:{animes:[{id:"123",name:"Anime",russian:"Аниме",status:"ongoing",episodes:12,episodesAired:6,nextEpisodeAt:"2026-11-06T10:00:00+00:00"}]}})));}
   it("does not publish catalogue state when Queue delivery fails",async()=>{
     const events:string[]=[];const {db,restore}=setup(events);stubShikimori();
-    try{
+    try {
       await expect(runScheduledEpisodeNotifications({YUME_DB:db,YUME_WEB_TASKS:{async send(){events.push("send-queue-job");throw new Error("temporary Queue failure");}}})).rejects.toThrow("temporary Queue failure");
-      expect(events).toEqual(["read-r2-catalog","read-subscribers","send-queue-job"]);
-    }finally{restore();vi.unstubAllGlobals();}
+      expect(events).toEqual(["read-subscribers","read-r2-catalog","send-queue-job"]);
+    } finally {restore();vi.unstubAllGlobals();}
   });
   it("sends the Queue job before publishing the updated R2 catalogue",async()=>{
     const events:string[]=[];const {db,restore}=setup(events);stubShikimori();
-    try{
+    try {
       await runScheduledEpisodeNotifications({YUME_DB:db,YUME_WEB_TASKS:{async send(){events.push("send-queue-job");}}});
       expect(events.indexOf("send-queue-job")).toBeLessThan(events.indexOf("publish-r2"));
       expect(events.filter(x=>x==="publish-r2")).toHaveLength(1);
-    }finally{restore();vi.unstubAllGlobals();}
+    } finally {restore();vi.unstubAllGlobals();}
   });
 });

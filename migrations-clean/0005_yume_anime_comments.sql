@@ -156,3 +156,13 @@ BEGIN
       WHERE child.parent_id = yume_anime_comments.id
     );
 END;
+
+-- Compatibility object for legacy account/comment cleanup tooling.
+CREATE TABLE yume_anime_comment_user_cleanup (
+  user_id TEXT PRIMARY KEY NOT NULL REFERENCES yume_users(id) ON DELETE CASCADE,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Keep the per-anime summary available for clients that query counts directly.
+CREATE INDEX idx_yume_anime_comment_summary_updated
+  ON yume_anime_comment_summary(updated_at DESC, anime_id);
