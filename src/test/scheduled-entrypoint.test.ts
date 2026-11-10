@@ -30,6 +30,8 @@ describe("automatic Worker maintenance", () => {
     expect(queueConsumer).toContain("message.retry({ delaySeconds: RETRY_DELAY_SECONDS })");
     expect(queueWorker).toContain("runScheduledNotificationCleanup(env)");
     expect(queueWorker).toContain("runScheduledEpisodeNotifications(env)");
+    expect(queueWorker).toContain("runScheduledAnimeCommentCleanup(env)");
+    expect(queueConfig).toContain('"0 3 * * *"');
     expect(workflow).toContain("Automatic scheduled Worker jobs must remain disabled.");
     expect(workflow).toContain("Generated Worker entry still includes scheduled job");
     expect(workflow).toContain("Dedicated Queue Worker entry does not invoke scheduled episode notifications.");
@@ -66,9 +68,12 @@ describe("scheduled maintenance isolation", () => {
       episodeNotifications: async () => {
         completed.push("episodes");
       },
+      animeComments: async () => {
+        completed.push("comments");
+      },
     })).rejects.toThrow("notification cleanup");
 
-    expect(completed).toEqual(["cleanup", "episodes"]);
+    expect(completed.sort()).toEqual(["cleanup", "episodes", "comments"].sort());
   });
 
   it("reports an episode poller failure without skipping cleanup", async () => {
@@ -82,9 +87,12 @@ describe("scheduled maintenance isolation", () => {
         completed.push("episodes");
         throw new Error("temporary upstream failure");
       },
+      animeComments: async () => {
+        completed.push("comments");
+      },
     })).rejects.toThrow("episode notifications");
 
-    expect(completed).toEqual(["cleanup", "episodes"]);
+    expect(completed.sort()).toEqual(["cleanup", "episodes", "comments"].sort());
   });
 });
 

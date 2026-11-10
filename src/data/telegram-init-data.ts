@@ -9,6 +9,7 @@ export type TelegramValidatedUser = {
   lastName?: string;
   username?: string;
   languageCode?: string;
+  photoUrl?: string;
 };
 
 export type TelegramInitDataResult =
@@ -121,6 +122,18 @@ export async function validateTelegramInitData(
   const lastName = stringField(candidate.last_name);
   const username = stringField(candidate.username);
   const languageCode = stringField(candidate.language_code);
+  const rawPhotoUrl = stringField(candidate.photo_url);
+  let photoUrl: string | undefined;
+  if (rawPhotoUrl) {
+    try {
+      const parsedPhotoUrl = new URL(rawPhotoUrl);
+      if (parsedPhotoUrl.protocol === "https:" && !parsedPhotoUrl.username && !parsedPhotoUrl.password && rawPhotoUrl.length <= 2048) {
+        photoUrl = parsedPhotoUrl.toString();
+      }
+    } catch {
+      // A malformed optional photo URL is ignored; the signed user identity remains valid.
+    }
+  }
   return {
     ok: true,
     authDate,
@@ -130,6 +143,7 @@ export async function validateTelegramInitData(
       ...(lastName ? { lastName } : {}),
       ...(username ? { username } : {}),
       ...(languageCode ? { languageCode } : {}),
+      ...(photoUrl ? { photoUrl } : {}),
     },
   };
 }

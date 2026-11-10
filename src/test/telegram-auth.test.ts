@@ -38,6 +38,7 @@ type TestUserRow = {
   telegram_last_name: string | null;
   telegram_username: string | null;
   telegram_language_code: string | null;
+  telegram_photo_url?: string | null;
   created_at: string;
 };
 
@@ -83,6 +84,7 @@ class FakeTelegramDb {
     telegram_last_name: null,
     telegram_username: "yume_test",
     telegram_language_code: "ru",
+    telegram_photo_url: null,
     created_at: "2026-10-24 09:15:00",
   };
   readonly executed: Array<{ sql: string; values: unknown[] }> = [];
@@ -115,6 +117,23 @@ describe("Telegram Mini App initData validation", () => {
     }
   });
 
+  it("returns a photo URL only when it is HTTPS and covered by Telegram's valid signature", async () => {
+    const now = Date.now();
+    const signed = await signInitData({
+      auth_date: String(Math.floor(now / 1000)),
+      user: JSON.stringify({ id: 12345, first_name: "Yume", photo_url: "https://t.me/i/userpic/320/yume.jpg" }),
+    });
+    const valid = await validateTelegramInitData(signed, BOT_TOKEN, now);
+    expect(valid.ok && valid.user.photoUrl).toBe("https://t.me/i/userpic/320/yume.jpg");
+
+    const insecure = await signInitData({
+      auth_date: String(Math.floor(now / 1000)),
+      user: JSON.stringify({ id: 12345, first_name: "Yume", photo_url: "http://attacker.test/avatar.png" }),
+    });
+    const rejectedPhoto = await validateTelegramInitData(insecure, BOT_TOKEN, now);
+    expect(rejectedPhoto.ok && rejectedPhoto.user.photoUrl).toBeUndefined();
+  });
+
   it("rejects tampered initData", async () => {
     const now = Date.now();
     const initData = await signInitData({
@@ -145,7 +164,7 @@ describe("Telegram Mini App initData validation", () => {
     const now = Date.now();
     const initData = await signInitData({
       auth_date: String(Math.floor(now / 1000)),
-      user: JSON.stringify({ id: 12345, first_name: "Yume", username: "yume_test", language_code: "ru" }),
+      user: JSON.stringify({ id: 12345, first_name: "Yume", username: "yume_test", language_code: "ru", photo_url: "https://t.me/i/userpic/320/yume.jpg" }),
     });
     const sessionSecret = "test-session-secret-with-at-least-32-characters";
     Object.assign(cloudflareEnv, {
@@ -160,15 +179,16 @@ describe("Telegram Mini App initData validation", () => {
         headers: { "Content-Type": "application/json", Origin: "https://yume.test" },
         body: JSON.stringify({ initData, mode: "login", privacyConsent: false }),
       }));
-      const payload = await response.json() as { authenticated?: boolean; user?: { id?: string; createdAt?: string } };
+      const payload = await response.json() as { authenticated?: boolean; user?: { id?: string; createdAt?: string; photoUrl?: string } };
 
       expect(response.status).toBe(200);
       expect(payload.authenticated).toBe(true);
       expect(payload.user?.id).toBe("yume-user-test");
       expect(payload.user?.createdAt).toBe("2026-10-24 09:15:00");
+      expect(payload.user?.photoUrl).toBe("https://t.me/i/userpic/320/yume.jpg");
       expect(response.headers.get("set-cookie")).toContain("__Host-yume-session=");
       expect(db.executed.some((statement) =>
-        statement.sql.includes("UPDATE yume_users") && statement.values.length === 9,
+        statement.sql.includes("UPDATE yume_users") && statement.values.length === 11,
       )).toBe(true);
     } finally {
       delete cloudflareEnv.YUME_DB;

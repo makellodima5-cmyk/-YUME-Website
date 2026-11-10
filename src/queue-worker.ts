@@ -1,6 +1,7 @@
 import { handleEpisodeNotificationQueue } from "./data/episode-notification-queue.server";
 import { runScheduledNotificationCleanup } from "./data/notification-cleanup.server";
 import { runScheduledEpisodeNotifications } from "./data/episode-notifications-cron.server";
+import { runScheduledAnimeCommentCleanup } from "./data/anime-comments.server";
 
 type QueueMessage = {
   body: unknown;
@@ -11,6 +12,7 @@ type QueueBatch = { messages: QueueMessage[] };
 type ScheduledJobOverrides = {
   cleanup?: (env: unknown) => Promise<void>;
   episodeNotifications?: (env: unknown) => Promise<void>;
+  animeComments?: (env: unknown) => Promise<void>;
 };
 
 // Keep the maintenance jobs independent: a cleanup failure must not prevent
@@ -29,6 +31,12 @@ export async function runScheduledMaintenance(
       run: () => overrides.episodeNotifications
         ? overrides.episodeNotifications(env)
         : runScheduledEpisodeNotifications(env),
+    },
+    {
+      name: "anime comment cleanup",
+      run: () => overrides.animeComments
+        ? overrides.animeComments(env)
+        : runScheduledAnimeCommentCleanup(env),
     },
   ];
 
