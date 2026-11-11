@@ -4,7 +4,6 @@ import type { Anime } from "@/data/anime";
 import { isNewRelease } from "@/data/anime-sections";
 import { getR2Catalog, readCatalogState, getR2Screenshots } from "@/data/catalog-r2.server";
 import { selectRelatedAnime, mergeLiveAnimeDetails, isUpcomingEpisodeDate } from "@/data/catalog-details";
-import { isHomeFeaturedEligible } from "@/data/home-featured.shared";
 import { retryAfterMilliseconds } from "@/data/retry-after";
 export { retryAfterMilliseconds };
 import { filterCatalogForCurrentRequest } from "@/data/territorial-restrictions.server";
@@ -607,49 +606,6 @@ function readyCatalog(items: Anime[]) {
     progress: { status: "ready" as const, imported: items.length, target: items.length },
   };
 }
-
-type GlobalHomeFeaturedResult = {
-  items: Anime[];
-  generatedAt: string;
-  expiresAt: number;
-  revision: number;
-  stale?: boolean;
-};
-const GLOBAL_HOME_FEATURED_CACHE_TTL_MS = 60_000;
-let globalHomeFeaturedCache: { expiresAt: number; result: GlobalHomeFeaturedResult } | null = null;
-let globalHomeFeaturedRequest: Promise<GlobalHomeFeaturedResult> | null = null;
-
-/** Server boundary for the existing global featured snapshot in the catalogue Coordinator. */
-export const getGlobalHomeFeatured = createServerFn({ method: "GET" })
-  .handler(async () => {
-    if (globalHomeFeaturedCache && globalHomeFeaturedCache.expiresAt > Date.now()) {
-      const cached = globalHomeFeaturedCache.result;
-      return { ...cached, items: await applyPublicAnimeRatings(cached.items) };
-    }
-    if (globalHomeFeaturedRequest) {
-      const pending = await globalHomeFeaturedRequest;
-      return { ...pending, items: await applyPublicAnimeRatings(pending.items) };
-    }
-
-    const request = (async (): Promise<GlobalHomeFeaturedResult> => {
-      const catalog = await getR2Catalog();
-      if (catalog.error) throw new Error(catalog.error);
-      const candidates = catalog.items.filter((anime) => isHomeFeaturedEligible(anime));
-      const { getGlobalHomeFeatured: getGlobalHomeFeaturedFromCoordinator } = await import("@/data/catalog-r2.server");
-      return getGlobalHomeFeaturedFromCoordinator(candidates);
-    })();
-    globalHomeFeaturedRequest = request;
-    try {
-      const result = await request;
-      globalHomeFeaturedCache = {
-        result,
-        expiresAt: Date.now() + GLOBAL_HOME_FEATURED_CACHE_TTL_MS,
-      };
-      return { ...result, items: await applyPublicAnimeRatings(result.items) };
-    } finally {
-      if (globalHomeFeaturedRequest === request) globalHomeFeaturedRequest = null;
-    }
-  });
 
 export const getShikimoriCatalog = createServerFn({ method: "GET" })
   .validator((input: { forceRefresh?: boolean; progressOnly?: boolean }) => ({

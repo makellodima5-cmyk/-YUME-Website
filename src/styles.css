@@ -922,11 +922,6 @@ html[data-theme="light"] .yubera-bottom-nav { background:rgba(247,245,246,.96); 
 
 /* Reference-accurate YUBERA home shelves. */
 .yubera-home-page { padding-inline: clamp(12px,3.2vw,24px); }
-.yubera-home-hero {
-  position:relative; isolation:isolate; overflow:hidden; width:100%;
-  min-height:210px; aspect-ratio:2.55 / 1; max-height:300px;
-  border:1px solid var(--border); border-radius:24px; background:#171820;
-}
 .yubera-home-section { margin-top:26px; }
 .yubera-home-section-heading {
   display:flex; align-items:center; justify-content:space-between; gap:12px;
@@ -961,13 +956,11 @@ html[data-theme="light"] .yubera-bottom-nav { background:rgba(247,245,246,.96); 
   background:var(--card); text-align:left;
 }
 @media(min-width:640px) {
-  .yubera-home-hero { min-height:240px; }
   .yubera-home-section { margin-top:30px; }
   .yubera-home-announcement { flex-basis:calc(50% - 6px); }
   .yubera-home-collections { grid-auto-columns:calc(33.333% - 7px); }
 }
 @media(max-width:420px) {
-  .yubera-home-hero { min-height:190px; aspect-ratio:2.25 / 1; border-radius:19px; }
   .yubera-home-anime-card { flex-basis:clamp(116px,30vw,148px); }
   .yubera-home-section { margin-top:23px; }
   .yubera-home-section-heading { margin-bottom:10px; }
@@ -1609,67 +1602,38 @@ html[data-theme="light"] .yubera-home-filter-button {
 }
 
 
-/* Home featured carousel: blurred background and sharp poster reuse the same saved catalogue image. */
-.yubera-home-featured {
-  min-height:clamp(230px,62vw,270px);
-  aspect-ratio:2.45 / 1;
-  border-color:#3A3B43;
-  background:#171820;
-  touch-action:pan-y;
-  user-select:none;
-  -webkit-user-select:none;
+/* Static YUBERA discovery banner with a standalone random-anime action. */
+.yubera-home-discovery {
+  position:relative; isolation:isolate; overflow:hidden; width:100%;
+  aspect-ratio:1400 / 788;
+  border:1px solid #3A3B43; border-radius:21px; background:#171820;
 }
-.yubera-home-featured-backdrop {
-  position:absolute; inset:-22px; width:calc(100% + 44px); height:calc(100% + 44px);
-  object-fit:cover; object-position:center 35%; filter:blur(18px) brightness(.48) saturate(.9);
-  transform:scale(1.04); pointer-events:none;
+.yubera-home-discovery-image {
+  position:absolute; inset:0; display:block; width:100%; height:100%;
+  object-fit:cover; object-position:center;
 }
-.yubera-home-featured-shade {
-  position:absolute; inset:0; z-index:0; pointer-events:none;
-  background:linear-gradient(90deg,rgba(13,14,19,.96) 0%,rgba(13,14,19,.88) 43%,rgba(13,14,19,.48) 67%,rgba(13,14,19,.12) 100%),linear-gradient(0deg,rgba(9,10,14,.58),transparent 48%);
+.yubera-home-discovery-button {
+  position:absolute; left:4.2%; bottom:7.2%; z-index:1;
+  display:inline-flex; min-height:48px; align-items:center; justify-content:center; gap:9px;
+  border:0; border-radius:999px; background:#FF5738; padding:0 clamp(14px,2vw,20px);
+  color:#FFF; font-size:clamp(13px,1.35vw,16px); font-weight:800;
+  box-shadow:0 8px 22px rgba(255,87,56,.34);
+  transition:filter .16s ease,transform .16s ease,box-shadow .16s ease;
 }
-.yubera-home-featured-open { position:absolute; inset:0; z-index:1; width:100%; height:100%; border:0; background:transparent; cursor:pointer; }
-.yubera-home-featured-copy { position:relative; z-index:2; display:flex; width:min(64%,520px); min-height:100%; flex-direction:column; align-items:flex-start; justify-content:center; padding:22px 0 31px 22px; pointer-events:none; }
-.yubera-home-featured-label { margin-bottom:10px; color:#FF6848; font-size:11px; font-weight:850; letter-spacing:.16em; line-height:1.2; }
-.yubera-home-featured-copy h1 { display:-webkit-box; max-width:100%; overflow:hidden; color:#FFF; font-size:clamp(19px,3.3vw,30px); font-weight:850; line-height:1.12; -webkit-box-orient:vertical; -webkit-line-clamp:2; text-wrap:pretty; }
-.yubera-home-featured-copy p { display:-webkit-box; max-width:390px; margin-top:9px; overflow:hidden; color:rgba(242,242,247,.76); font-size:clamp(12px,1.55vw,15px); font-weight:450; line-height:1.35; -webkit-box-orient:vertical; -webkit-line-clamp:3; }
-.yubera-home-featured-meta { display:flex; min-height:26px; flex-wrap:wrap; align-items:center; gap:10px; margin-top:11px; color:rgba(235,235,242,.78); font-size:12px; line-height:1.2; }
-.yubera-home-featured-rating { display:inline-flex; align-items:center; gap:5px; border-radius:999px; background:rgba(0,0,0,.48); padding:5px 9px; color:#FFF; font-size:13px; font-weight:780; font-variant-numeric:tabular-nums; }
-.yubera-home-featured-rating svg { width:15px; height:15px; fill:#FFC044; color:#FFC044; }
-.yubera-home-featured-actions { display:flex; align-items:center; gap:10px; margin-top:13px; pointer-events:auto; }
-.yubera-home-featured-watch { display:inline-flex; min-height:43px; align-items:center; justify-content:center; gap:9px; border:0; border-radius:999px; background:#FF5738; padding:0 19px; color:#FFF; font-size:14px; font-weight:780; box-shadow:0 8px 22px rgba(255,87,56,.25); transition:filter .16s ease,transform .16s ease; }
-.yubera-home-featured-watch:hover { filter:brightness(1.08); }
-.yubera-home-featured-watch:active { transform:scale(.97); }
-.yubera-home-featured-watch svg { width:17px; height:17px; fill:currentColor; }
-.yubera-home-featured-bookmark { display:grid; width:43px; height:43px; flex:0 0 43px; place-items:center; border:1px solid rgba(255,255,255,.34); border-radius:50%; background:rgba(13,14,19,.35); color:#FFF; backdrop-filter:blur(8px); transition:background .16s ease,border-color .16s ease; }
-.yubera-home-featured-bookmark:hover { background:rgba(255,255,255,.12); }
-.yubera-home-featured-bookmark svg { width:19px; height:19px; }
-.yubera-home-featured-bookmark svg.is-saved { fill:#FF6848; color:#FF6848; }
-.yubera-home-featured-poster { position:absolute; top:0; right:2.5%; z-index:2; width:34%; height:100%; object-fit:contain; object-position:center; filter:drop-shadow(0 7px 18px rgba(0,0,0,.4)); pointer-events:none; }
-.yubera-home-featured-indicators { position:absolute; right:18px; bottom:13px; z-index:3; display:flex; align-items:center; gap:7px; pointer-events:auto; }
-.yubera-home-featured-indicators button { width:10px; height:10px; flex:0 0 10px; border:0; border-radius:999px; background:rgba(220,220,230,.55); padding:0; transition:width .2s ease,background .2s ease; }
-.yubera-home-featured-indicators button.is-active { width:25px; flex-basis:25px; background:#FF5738; }
-.yubera-home-featured:focus-visible { outline:2px solid #FF6848; outline-offset:3px; }
+.yubera-home-discovery-button:hover:not(:disabled) { filter:brightness(1.08); box-shadow:0 9px 25px rgba(255,87,56,.42); }
+.yubera-home-discovery-button:active:not(:disabled) { transform:scale(.97); }
+.yubera-home-discovery-button:focus-visible {
+  outline:2px solid #FFF; outline-offset:3px;
+  box-shadow:0 0 0 5px rgba(255,87,56,.48),0 8px 22px rgba(255,87,56,.34);
+}
+.yubera-home-discovery-button:disabled { cursor:not-allowed; opacity:.62; filter:saturate(.55); box-shadow:none; }
+.yubera-home-discovery-button svg { width:19px; height:19px; flex:0 0 19px; }
 @media(max-width:420px) {
-  .yubera-home-featured { min-height:225px; aspect-ratio:2.15 / 1; border-radius:20px; }
-  .yubera-home-featured-copy { width:68%; padding:17px 0 32px 15px; }
-  .yubera-home-featured-label { margin-bottom:8px; font-size:10px; }
-  .yubera-home-featured-copy h1 { font-size:clamp(18px,5vw,22px); }
-  .yubera-home-featured-copy p { max-width:100%; margin-top:7px; font-size:12px; line-height:1.28; -webkit-line-clamp:2; }
-  .yubera-home-featured-meta { gap:7px; margin-top:8px; font-size:11px; }
-  .yubera-home-featured-actions { gap:8px; margin-top:10px; }
-  .yubera-home-featured-watch { min-height:40px; padding:0 16px; font-size:13px; }
-  .yubera-home-featured-bookmark { width:40px; height:40px; flex-basis:40px; }
-  .yubera-home-featured-poster { right:0; width:37%; }
-  .yubera-home-featured-indicators { right:12px; bottom:10px; }
-}
-@media(max-width:350px) {
-  .yubera-home-featured-copy { width:72%; padding-left:12px; }
-  .yubera-home-featured-copy h1 { font-size:17px; }
-  .yubera-home-featured-poster { width:34%; opacity:.9; }
+  .yubera-home-discovery { border-radius:19px; }
+  .yubera-home-discovery-button { min-height:44px; gap:8px; padding:0 14px; font-size:13px; }
 }
 @media(prefers-reduced-motion:reduce) {
-  .yubera-home-featured-watch,.yubera-home-featured-bookmark,.yubera-home-featured-indicators button { transition:none !important; }
+  .yubera-home-discovery-button { transition:none; }
 }
 
 
