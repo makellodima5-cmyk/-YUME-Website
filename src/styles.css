@@ -1604,7 +1604,7 @@ html[data-theme="light"] .yubera-home-filter-button {
 
 /* Static YUBERA discovery banner with a standalone random-anime action. */
 .yubera-home-discovery {
-  position:relative; isolation:isolate; overflow:hidden; width:100%;
+  position:relative; isolation:isolate; overflow:hidden; width:100%; max-width:960px; margin-inline:auto;
   aspect-ratio:1400 / 788;
   border:1px solid #3A3B43; border-radius:21px; background:#171820;
 }
