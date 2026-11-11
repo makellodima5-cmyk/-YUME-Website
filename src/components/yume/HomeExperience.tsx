@@ -1,17 +1,14 @@
-import { useEffect, useMemo, useRef, useState, type PointerEvent, type ReactNode, type KeyboardEvent, type MouseEvent } from "react";
-import { Bookmark, ChevronRight, Play, Star, Megaphone, Radio, Layers, Send } from "lucide-react";
+import { useMemo, type ReactNode } from "react";
+import { ChevronRight, Star, Megaphone, Radio, Layers, Send, Shuffle } from "lucide-react";
 import type { Anime } from "@/data/anime";
 import { COLLECTIONS } from "@/data/anime";
 import { displayAnimeTitle, displayAnimeKind, useYumePreferences, type TranslationKey } from "@/data/preferences";
 import { PosterArt } from "./Poster";
 import type { View } from "./Header";
-import { FAVORITES_STORAGE_KEY, PROFILE_UPDATED_EVENT, readSavedAnimeIds, toggleSavedAnimeId } from "@/data/profile-storage";
-import { toSameOriginShikimoriImage } from "@/lib/shikimori-image-proxy";
 import { matchesCollectionGenres } from "@/data/catalog-utils";
 
 type HomeExperienceProps = {
   animeList: Anime[];
-  featuredAnime: Anime[];
   popular: Anime[];
   newReleases: Anime[];
   announcements: Anime[];
@@ -82,51 +79,14 @@ function collectionCountLabel(count: number, language: "ru" | "en", t: (key: Tra
 }
 
 export function HomeExperience({
-  animeList, featuredAnime, popular, newReleases, announcements, airing, onSelect, onSeeAll, onOpenCollection, onSupport, showSupport = false,
+  animeList, popular, newReleases, announcements, airing, onSelect, onSeeAll, onOpenCollection, onSupport, showSupport = false,
 }: HomeExperienceProps) {
   const { language, t } = useYumePreferences();
   const ru = language === "ru";
-  const featuredItems = featuredAnime.slice(0, 3);
-  const [featuredIndex, setFeaturedIndex] = useState(0);
-  const [savedIds, setSavedIds] = useState<string[]>([]);
-  const swipeStart = useRef<{ x:number; y:number; pointerId:number } | null>(null);
-  useEffect(() => {
-    const sync = () => setSavedIds(readSavedAnimeIds(FAVORITES_STORAGE_KEY));
-    sync();
-    window.addEventListener(PROFILE_UPDATED_EVENT, sync);
-    window.addEventListener("storage", sync);
-    return () => {
-      window.removeEventListener(PROFILE_UPDATED_EVENT, sync);
-      window.removeEventListener("storage", sync);
-    };
-  }, []);
-  useEffect(() => setFeaturedIndex(0), [featuredItems.map((item) => item.id).join("|")]);
-  const featured = featuredItems[featuredIndex] ?? featuredItems[0] ?? null;
-  const changeFeatured = (direction: -1 | 1) => {
-    if (!featuredItems.length) return;
-    setFeaturedIndex((index) => (index + direction + featuredItems.length) % featuredItems.length);
-  };
-  const onFeaturedPointerDown = (event: PointerEvent<HTMLElement>) => {
-    if (event.pointerType !== "touch") return;
-    swipeStart.current = { x:event.clientX, y:event.clientY, pointerId:event.pointerId };
-  };
-  const onFeaturedPointerUp = (event: PointerEvent<HTMLElement>) => {
-    const start = swipeStart.current;
-    swipeStart.current = null;
-    if (!start || start.pointerId !== event.pointerId || featuredItems.length < 2) return;
-    const dx = event.clientX - start.x;
-    const dy = event.clientY - start.y;
-    if (Math.abs(dx) < 42 || Math.abs(dx) < Math.abs(dy) * 1.25) return;
-    changeFeatured(dx < 0 ? 1 : -1);
-  };
-  const onFeaturedKeyDown = (event: KeyboardEvent<HTMLElement>) => {
-    if (event.key === "ArrowLeft") { event.preventDefault(); changeFeatured(-1); }
-    if (event.key === "ArrowRight") { event.preventDefault(); changeFeatured(1); }
-  };
-  const toggleFeaturedFavorite = (event: MouseEvent<HTMLButtonElement>, anime: Anime) => {
-    event.stopPropagation();
-    toggleSavedAnimeId(FAVORITES_STORAGE_KEY, anime.id);
-    setSavedIds(readSavedAnimeIds(FAVORITES_STORAGE_KEY));
+  const selectRandomAnime = () => {
+    if (animeList.length === 0) return;
+    const selectedAnime = animeList[Math.floor(Math.random() * animeList.length)] ?? animeList[0];
+    if (selectedAnime) onSelect(selectedAnime);
   };
   const collectionCards = useMemo(() => COLLECTIONS.slice(0, 3).map((collection) => {
     const matches = animeList.filter((anime) => matchesCollectionGenres(anime.genres, collection.genres));
@@ -142,85 +102,25 @@ export function HomeExperience({
   return (
     <main id="main-content" className="yubera-with-bottom-nav yubera-home-page px-3 pb-10 pt-0 sm:px-4">
       <div className="mx-auto w-full max-w-[1120px]">
-        {featured && (
-          <section
-            className="yubera-home-hero yubera-home-featured"
-            aria-label={ru ? "Популярное аниме" : "Popular anime"}
-            aria-roledescription={ru ? "слайдер" : "carousel"}
-            tabIndex={0}
-            onPointerDown={onFeaturedPointerDown}
-            onPointerUp={onFeaturedPointerUp}
-            onPointerCancel={() => { swipeStart.current = null; }}
-            onKeyDown={onFeaturedKeyDown}
+        <section className="yubera-home-discovery">
+          <img
+            src="/images/yubera/yubera_random_discovery.webp"
+            alt={ru ? "YUBERA — Найди своё аниме. Открой для себя что-то новое." : "YUBERA — Find your anime. Discover something new."}
+            className="yubera-home-discovery-image"
+            loading="eager"
+            decoding="async"
+            fetchPriority="high"
+          />
+          <button
+            type="button"
+            onClick={selectRandomAnime}
+            disabled={animeList.length === 0}
+            className="yubera-home-discovery-button"
           >
-            {featured.posterUrl && (
-              <img
-                key={featured.id + "-background"}
-                src={toSameOriginShikimoriImage(featured.posterUrl)}
-                alt=""
-                aria-hidden="true"
-                className="yubera-home-featured-backdrop"
-              />
-            )}
-            <div className="yubera-home-featured-shade" aria-hidden="true" />
-            <button
-              type="button"
-              className="yubera-home-featured-open"
-              aria-label={displayAnimeTitle(featured, language)}
-              onClick={() => onSelect(featured)}
-              tabIndex={-1}
-            />
-            <div className="yubera-home-featured-copy">
-              <span className="yubera-home-featured-label">{ru ? "НОВИНКИ" : "NEW RELEASES"}</span>
-              <h1>{displayAnimeTitle(featured, language)}</h1>
-              {featured.description.trim() && <p>{featured.description}</p>}
-              <div className="yubera-home-featured-meta">
-                {featured.status !== "Анонс" && typeof featured.rating === "number" && Number.isFinite(featured.rating) && (
-                  <span className="yubera-home-featured-rating"><Star aria-hidden="true" />{featured.rating.toFixed(1)}</span>
-                )}
-                {(featured.kind || featured.year > 0) && (
-                  <span>{[featured.kind ? displayAnimeKind(featured.kind, language) : "", featured.year > 0 ? String(featured.year) : ""].filter(Boolean).join(" · ")}</span>
-                )}
-              </div>
-              <div className="yubera-home-featured-actions">
-                <button type="button" onClick={() => onSelect(featured)} className="yubera-home-featured-watch">
-                  <Play aria-hidden="true" />{ru ? "Смотреть" : "Watch"}
-                </button>
-                <button
-                  type="button"
-                  aria-label={savedIds.includes(featured.id) ? (ru ? "Убрать из избранного" : "Remove from favorites") : (ru ? "Добавить в избранное" : "Add to favorites")}
-                  aria-pressed={savedIds.includes(featured.id)}
-                  onClick={(event) => toggleFeaturedFavorite(event, featured)}
-                  className="yubera-home-featured-bookmark"
-                >
-                  <Bookmark aria-hidden="true" className={savedIds.includes(featured.id) ? "is-saved" : ""} />
-                </button>
-              </div>
-            </div>
-            {featured.posterUrl && (
-              <img
-                key={featured.id + "-poster"}
-                src={toSameOriginShikimoriImage(featured.posterUrl)}
-                alt={displayAnimeTitle(featured, language)}
-                className="yubera-home-featured-poster"
-                decoding="async"
-                fetchPriority="high"
-              />
-            )}
-            <div className="yubera-home-featured-indicators" aria-label={ru ? "Выбор слайда" : "Choose slide"}>
-              {featuredItems.map((item, index) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  aria-label={(ru ? "Слайд " : "Slide ") + (index + 1)}
-                  aria-pressed={index === featuredIndex}
-                  onClick={(event) => { event.stopPropagation(); setFeaturedIndex(index); }}
-                  className={index === featuredIndex ? "is-active" : ""}
-                />
-              ))}
-            </div>
-          </section>
-        )}
+            <Shuffle aria-hidden="true" />
+            <span>{ru ? "Случайное аниме" : "Random anime"}</span>
+          </button>
+        </section>
 
         {showSupport && (
         <button type="button" onClick={onSupport} className="yubera-support-entry group my-3 flex min-h-[68px] w-full items-center gap-3 rounded-[19px] border border-[#3a3b43] bg-[#1b1c23] px-3.5 py-2.5 text-left transition-colors hover:border-[#ff765c]/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ff6245] sm:my-4 sm:px-5">
