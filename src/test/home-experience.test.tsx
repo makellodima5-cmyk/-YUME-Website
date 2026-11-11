@@ -19,6 +19,7 @@ function makeAnime(id: string, title: string): Anime {
     original: title,
     year: 2025,
     episodes: 12,
+    rating: null,
     genres: [],
     status: "Вышел",
     description: "",
