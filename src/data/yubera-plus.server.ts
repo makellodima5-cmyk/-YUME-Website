@@ -58,7 +58,15 @@ export async function handleAdminYuberaPlus(r:Request):Promise<Response>{
  if(r.method==="GET"){const [p,a]=await Promise.all([price(d),d.prepare("SELECT id,action,details_json,created_at FROM yume_plus_audit_log ORDER BY id DESC LIMIT 10").all<{id:number;action:string;details_json:string;created_at:string}>()]);return json({isAdmin:true,price:p,periodDays:30,periodSeconds:YUBERA_PLUS_PERIOD_SECONDS,audit:a.results});}
  let body:unknown;try{const raw=await r.text();if(raw.length>2048)return json({error:"request_too_large"},413);body=JSON.parse(raw);}catch{return json({error:"invalid_json"},400);}const value=body&&typeof body==="object"&&!Array.isArray(body)?(body as Record<string,unknown>).price:undefined;if(!isValidPlusPrice(value))return json({error:"invalid_price",min:1,max:10000},400);
  const old=await price(d);if(old===value)return json({isAdmin:true,price:value,unchanged:true});
- try{await d.prepare("INSERT INTO yume_plus_settings(setting_key,setting_value,updated_at,updated_by) VALUES('price_xtr',?,CURRENT_TIMESTAMP,?) ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value,updated_at=CURRENT_TIMESTAMP,updated_by=excluded.updated_by").bind(String(value),admin).run();await d.prepare("INSERT INTO yume_plus_audit_log(actor_user_id,action,details_json,created_at) VALUES(?,'plus_price_changed',?,CURRENT_TIMESTAMP)").bind(admin,JSON.stringify({oldPrice:old,newPrice:value})).run();return json({isAdmin:true,price:value});}catch(error){console.error("[YUBERA][PLUS] Price update failed.",error);return json({error:"price_save_failed"},503);}
+ try{
+  if(!d.batch)return json({error:"atomic_admin_batch_unavailable"},503);
+  const results=await d.batch([
+   d.prepare("UPDATE yume_plus_settings SET setting_value=?,updated_at=CURRENT_TIMESTAMP,updated_by=? WHERE setting_key='price_xtr' AND setting_value=?").bind(String(value),admin,String(old)),
+   d.prepare("INSERT INTO yume_plus_audit_log(actor_user_id,action,details_json,created_at) SELECT ?,'plus_price_changed',?,CURRENT_TIMESTAMP WHERE changes()=1").bind(admin,JSON.stringify({oldPrice:old,newPrice:value}))
+  ]);
+  if(Number(results[0]?.meta?.changes??0)!==1)return json({error:"price_changed_concurrently",price:await price(d)},409);
+  return json({isAdmin:true,price:value});
+ }catch(error){console.error("[YUBERA][PLUS] Price update failed.",error);return json({error:"price_save_failed"},503);}
 }
 export async function recordYuberaPlusSuccessfulPayment(d:DB,telegramId:string,p:Pay):Promise<boolean>{
  const payload=p.invoice_payload??"";if(!payload.startsWith("yubera_plus:"))return false;const charge=p.telegram_payment_charge_id??"",amount=p.total_amount;if(!charge||!Number.isSafeInteger(amount)||amount!<1||p.currency!=="XTR")return true;
