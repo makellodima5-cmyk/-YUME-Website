@@ -1,7 +1,7 @@
 import { env as cloudflareEnv } from "cloudflare:workers";
 import { getAuthenticatedYumeUserId } from "@/data/telegram-auth.server";
 import { getR2Anime } from "@/data/catalog-r2.server";
-import { YUBERA_SUPPORT_LEVELS, YUBERA_XP_LEVELS, YUBERA_XP_REWARDS } from "@/data/yubera-config";
+import { YUBERA_SUPPORT_LEVELS, YUBERA_XP_LEVELS, YUBERA_XP_REWARDS, YUBERA_XP_RULES } from "@/data/yubera-config";
 
 type Statement = {
   bind(...values: unknown[]): Statement;
@@ -334,8 +334,8 @@ export async function handleYuberaCommunity(request: Request): Promise<Response>
         .bind(id, animeId, Number(count?.count ?? 0)),
       database.prepare("INSERT OR IGNORE INTO yume_xp_ledger(id,user_id,event_key,event_type,amount,metadata_json) SELECT ?,?,?,'collection_add',?,? WHERE changes()=1")
         .bind(crypto.randomUUID(), userId, `collection-add:${id}:${animeId}`, YUBERA_XP_REWARDS.collectionTitleAdded, JSON.stringify({ collectionId: id, animeId })),
-      database.prepare("INSERT OR IGNORE INTO yume_xp_ledger(id,user_id,event_key,event_type,amount,metadata_json) SELECT ?,?,?,'collection_milestone',?,? WHERE changes()=1 AND (SELECT COUNT(*) FROM yume_collection_items WHERE collection_id=?)=3")
-        .bind(crypto.randomUUID(), userId, `collection-milestone:${id}`, YUBERA_XP_REWARDS.collectionThreeTitleMilestone, JSON.stringify({ collectionId: id }), id),
+      database.prepare("INSERT OR IGNORE INTO yume_xp_ledger(id,user_id,event_key,event_type,amount,metadata_json) SELECT ?,?,?,'collection_milestone',?,? WHERE changes()=1 AND (SELECT COUNT(*) FROM yume_collection_items WHERE collection_id=?)=?")
+        .bind(crypto.randomUUID(), userId, `collection-milestone:${id}`, YUBERA_XP_REWARDS.collectionThreeTitleMilestone, JSON.stringify({ collectionId: id }), id, YUBERA_XP_RULES.collectionMilestoneTitleCount),
     ]);
     return json({ ok: true });
   }
