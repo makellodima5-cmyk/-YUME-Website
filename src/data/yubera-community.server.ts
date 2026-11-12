@@ -215,7 +215,8 @@ export async function handleYuberaCommunity(request: Request): Promise<Response>
       const page = Math.max(0, Math.min(1000, Number.parseInt(url.searchParams.get("page") ?? "0", 10) || 0));
       const offset = page * 30;
       if (query) {
-        const rows = await database.prepare(`SELECT u.id,u.telegram_first_name,u.telegram_last_name,u.telegram_username,u.telegram_photo_url
+        const rows = await database.prepare(`SELECT u.id,u.telegram_first_name,u.telegram_last_name,u.telegram_username,u.telegram_photo_url,
+          EXISTS(SELECT 1 FROM yume_follows f WHERE f.follower_id = ? AND f.followed_id = u.id) AS is_following
           FROM yume_users u JOIN yume_profiles p ON p.user_id = u.id
           WHERE p.visibility = 'public' AND u.id <> ?
           AND (lower(u.telegram_first_name || ' ' || COALESCE(u.telegram_last_name,'')) LIKE lower(?) OR lower(COALESCE(u.telegram_username,'')) LIKE lower(?))
