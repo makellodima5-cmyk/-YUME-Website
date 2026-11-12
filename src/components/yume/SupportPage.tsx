@@ -166,6 +166,10 @@ export function SupportPage() {
 
         {activeTab === "support" ? <>
         <section className="rounded-[20px] border border-[#383941] bg-[#191a21] p-3.5 sm:p-5">
+          <h2 className="flex items-center gap-2.5 text-[18px] font-bold text-white"><span className="h-7 w-1.5 rounded-full bg-[#ff6245]" />Поддержать проект</h2>
+          <p className="mt-1 text-sm text-white/60">Единовременный вклад в развитие YUBERA.</p>
+        </section>
+        <section className="rounded-[20px] border border-[#383941] bg-[#191a21] p-3.5 sm:p-5">
           <h2 className="flex items-center gap-2.5 text-[18px] font-bold text-white"><span className="h-7 w-1.5 rounded-full bg-[#ff6245]" />Выбери сумму поддержки</h2>
           <div className="mt-4 grid grid-cols-3 gap-2.5">
             {PRESETS.map(value => {
