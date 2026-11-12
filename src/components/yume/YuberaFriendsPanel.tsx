@@ -38,6 +38,8 @@ function PersonAvatar({ person }: { person: CommunityPerson }) {
 export function YuberaFriendsPanel({ onOpenProfile, onFollowChange }: Props) {
   const [following, setFollowing] = useState<CommunityPerson[]>([]);
   const [followingTotal, setFollowingTotal] = useState(0);
+  const [followingPage, setFollowingPage] = useState(0);
+  const [followingHasMore, setFollowingHasMore] = useState(false);
   const [followingLoading, setFollowingLoading] = useState(true);
   const [recommendations, setRecommendations] = useState<CommunityPerson[]>([]);
   const [recommendationPage, setRecommendationPage] = useState(0);
@@ -52,15 +54,21 @@ export function YuberaFriendsPanel({ onOpenProfile, onFollowChange }: Props) {
   const searchRequestId = useRef(0);
   const recommendationRequestId = useRef(0);
 
-  const loadFollowing = useCallback(async () => {
+  const loadFollowing = useCallback(async (page = 0, append = false) => {
     setFollowingLoading(true);
     setLoadError("");
     try {
-      const response = await fetch("/api/yubera/community?action=friends&page=0", { credentials: "same-origin", cache: "no-store" });
+      const response = await fetch(`/api/yubera/community?action=friends&page=${page}`, { credentials: "same-origin", cache: "no-store" });
       const data = await response.json() as PeopleResponse;
       if (!response.ok) throw new Error(data.error || "Не удалось загрузить подписки");
-      setFollowing(Array.isArray(data.users) ? data.users : []);
+      const incoming = Array.isArray(data.users) ? data.users : [];
+      setFollowing((current) => {
+        const combined = append ? [...current, ...incoming] : incoming;
+        return combined.filter((person, index) => combined.findIndex((candidate) => candidate.id === person.id) === index);
+      });
       setFollowingTotal(Number(data.total ?? 0));
+      setFollowingPage(page);
+      setFollowingHasMore(Boolean(data.hasMore));
     } catch (cause) {
       setLoadError(cause instanceof Error ? cause.message : "Не удалось загрузить подписки");
     } finally {
@@ -141,7 +149,7 @@ export function YuberaFriendsPanel({ onOpenProfile, onFollowChange }: Props) {
       if (!response.ok) throw new Error(data.error || "Не удалось подписаться на пользователя");
       setRecommendations((current) => current.filter((item) => item.id !== person.id));
       setSearchResults((current) => current.map((item) => item.id === person.id ? { ...item, is_following: 1 } : item));
-      await loadFollowing();
+      await loadFollowing(0, false);
       await loadRecommendations(0, false);
       await onFollowChange?.();
     } catch (cause) {
@@ -198,7 +206,7 @@ export function YuberaFriendsPanel({ onOpenProfile, onFollowChange }: Props) {
         </div>
         {followingLoading ? <div className="space-y-2" aria-label="Загрузка подписок">{[0,1,2].map((item) => <div key={item} className="h-[82px] animate-pulse rounded-2xl bg-white/[0.04]" />)}</div>
           : loadError && !following.length ? <div className="py-5 text-center"><p className="text-sm text-red-200">{loadError}</p><button type="button" onClick={() => void loadFollowing()} className="mt-3 text-sm text-[#ff9a7f]">Повторить</button></div>
-          : following.length ? <div className="space-y-2">{following.map((person) => personCard(person, "following"))}</div>
+          : following.length ? <><div className="space-y-2">{following.map((person) => personCard(person, "following"))}</div>{followingHasMore && <button type="button" disabled={followingLoading} onClick={() => void loadFollowing(followingPage + 1, true)} className="mt-3 flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-white/10 text-xs text-white/65 disabled:opacity-50">{followingLoading ? <LoaderCircle className="h-4 w-4 animate-spin" /> : "Загрузить ещё подписки"}</button>}</>
           : <div className="py-5 text-center"><Users className="mx-auto mb-2 h-7 w-7 text-white/25" /><p className="text-sm font-medium text-white/75">Вы пока ни на кого не подписаны</p><p className="mt-1 text-xs text-white/45">Найдите пользователей YUBERA и подпишитесь на интересные профили</p></div>}
       </section>
 
