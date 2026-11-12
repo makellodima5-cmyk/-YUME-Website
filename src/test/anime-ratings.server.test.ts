@@ -102,7 +102,7 @@ class RatingsDatabase {
   }
 
   async batch(statements: Statement[]) {
-    const results = [];
+    const results: Array<Awaited<ReturnType<Statement["run"]>>> = [];
     for (const statement of statements) results.push(await statement.run());
     return results;
   }
