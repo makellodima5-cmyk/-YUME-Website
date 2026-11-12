@@ -5,6 +5,11 @@ export const YUBERA_XP_REWARDS = {
   episodeNinetyPercent: 5,
 } as const;
 
+export const YUBERA_XP_RULES = {
+  collectionMilestoneTitleCount: 3,
+  episodeCompletionRatio: 0.9,
+} as const;
+
 export const YUBERA_XP_LEVELS = [
   { level: 1, title: "Начинающий зритель", min: 0, max: 49 },
   { level: 2, title: "Любитель аниме", min: 50, max: 149 },
