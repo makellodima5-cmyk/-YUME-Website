@@ -70,6 +70,8 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
   const [activeCollection, setActiveCollection] = useState<Collection | null>(null);
   const [activeCollectionIsOwner, setActiveCollectionIsOwner] = useState(true);
   const [activeCollectionItems, setActiveCollectionItems] = useState<string[]>([]);
+  const [collectionReturnScreen, setCollectionReturnScreen] = useState<Screen>("home");
+  const [publicProfileReturnScreen, setPublicProfileReturnScreen] = useState<Screen>("home");
   const [publicBioExpanded, setPublicBioExpanded] = useState(false);
   const [animeSearch, setAnimeSearch] = useState("");
 
@@ -113,6 +115,8 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Профиль недоступен");
       if (id === profile?.id) { changeScreen("home"); return; }
+      setPublicProfileReturnScreen(screen);
+      setPublicBioExpanded(false);
       setPublicProfile(data.profile); setPublicCollections(Array.isArray(data.collections) ? data.collections : []); changeScreen("public-profile");
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Профиль недоступен"); }
   };
@@ -168,9 +172,16 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
     if (result) { setMenuId(null); await load(); }
   };
 
+  const goBack = () => {
+    if (screen === "home") onBack();
+    else if (screen === "public-collections") changeScreen("public-profile");
+    else if (screen === "public-profile") changeScreen(publicProfileReturnScreen);
+    else if (screen === "collection-detail" && !activeCollectionIsOwner) changeScreen(collectionReturnScreen);
+    else changeScreen("home");
+  };
   const Header = ({ title: heading, subtitle }: { title: string; subtitle?: string }) => (
     <div className="mb-5 flex items-center gap-3">
-      <button type="button" onClick={() => screen === "home" ? onBack() : screen === "public-collections" || (screen === "collection-detail" && !activeCollectionIsOwner) ? changeScreen("public-profile") : changeScreen("home")} className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/5 text-white" aria-label="Назад"><ArrowLeft className="h-5 w-5" /></button>
+      <button type="button" onClick={goBack} className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/5 text-white" aria-label="Назад"><ArrowLeft className="h-5 w-5" /></button>
       <div className="min-w-0"><h2 className="text-xl font-bold text-white">{heading}</h2>{subtitle && <p className="text-sm text-white/55">{subtitle}</p>}</div>
     </div>
   );
@@ -190,6 +201,7 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
   );
   const openCollection = async (item: Collection, isOwner = true) => {
     try {
+      setCollectionReturnScreen(screen);
       const response = await fetch(`/api/yubera/community?action=collection&id=${encodeURIComponent(item.id)}`, { credentials: "same-origin", cache: "no-store" });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Не удалось открыть подборку");
@@ -218,7 +230,7 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
   if (!profile) return <div className="mx-auto max-w-3xl px-4 py-8 text-white"><Header title="YUBERA" />{error ? <p role="alert" className="text-sm text-red-300">{error}</p> : <div className="animate-pulse space-y-3"><div className="h-28 rounded-2xl bg-white/5"/><div className="h-20 rounded-2xl bg-white/5"/></div>}</div>;
 
   return <div className="mx-auto max-w-3xl px-4 pb-28 pt-5 text-white">
-    <div className="mb-5 flex items-center justify-between"><button onClick={() => screen === "home" ? onBack() : screen === "public-collections" || (screen === "collection-detail" && !activeCollectionIsOwner) ? changeScreen("public-profile") : changeScreen("home")} className="rounded-xl bg-white/5 px-3 py-2 text-sm text-white/80"><ArrowLeft className="mr-2 inline h-4 w-4"/>Назад</button><div className="font-black tracking-[.18em] text-white"><span className="text-[#ff704f]">◆</span> YUBERA</div><span className="w-16"/></div>
+    <div className="mb-5 flex items-center justify-between"><button onClick={goBack} className="rounded-xl bg-white/5 px-3 py-2 text-sm text-white/80"><ArrowLeft className="mr-2 inline h-4 w-4"/>Назад</button><div className="font-black tracking-[.18em] text-white"><span className="text-[#ff704f]">◆</span> YUBERA</div><span className="w-16"/></div>
     {error && <p role="alert" className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">{error}</p>}
     {screen === "home" && <>
       <Card className="overflow-hidden p-0">
