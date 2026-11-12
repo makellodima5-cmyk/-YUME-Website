@@ -44,7 +44,8 @@ describe("YUBERA community foundation", () => {
     expect(server).toContain("WHERE changes()=1");
     expect(server).toContain("`collection-add:${id}:${animeId}`");
     expect(server).toContain("`collection-milestone:${id}`");
-    expect(server).toContain("WHERE changes()=1 AND (SELECT COUNT(*) FROM yume_collection_items WHERE collection_id=?)=3");
+    expect(server).toContain("WHERE changes()=1 AND (SELECT COUNT(*) FROM yume_collection_items WHERE collection_id=?)=?");
+    expect(server).toContain("YUBERA_XP_RULES.collectionMilestoneTitleCount");
   });
 
 
@@ -138,7 +139,7 @@ describe("YUBERA community foundation", () => {
     const config = await readFile(resolve(process.cwd(), "src/data/yubera-config.ts"), "utf8");
     const server = await readFile(resolve(process.cwd(), "src/data/yubera-community.server.ts"), "utf8");
     const webhook = await readFile(resolve(process.cwd(), "src/data/telegram-bot.server.ts"), "utf8");
-    for (const reward of ["firstAnimeRating: 10","collectionTitleAdded: 2","collectionThreeTitleMilestone: 15","episodeNinetyPercent: 5"]) expect(config).toContain(reward);
+    for (const reward of ["firstAnimeRating: 10","collectionTitleAdded: 2","collectionThreeTitleMilestone: 15","episodeNinetyPercent: 5","collectionMilestoneTitleCount: 3","episodeCompletionRatio: 0.9"]) expect(config).toContain(reward);
     expect(config).toContain("level: 10, title: \"Легенда YUBERA\", min: 3200");
     expect(config).toContain("level: 5, title: \"Легенда YUBERA\", min: 10000");
     expect(server).toContain("YUBERA_XP_LEVELS");
