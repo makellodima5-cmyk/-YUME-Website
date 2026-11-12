@@ -1,6 +1,7 @@
 import { env as cloudflareEnv } from "cloudflare:workers";
 import { completeTelegramBrowserAuth, confirmTelegramBrowserAuth } from "@/data/telegram-auth.server";
 import { TELEGRAM_CHANNEL_URL, TELEGRAM_CHANNEL_ID } from "@/data/telegram-channel";
+import { recordTelegramStarsRefund, recordYuberaPlusSuccessfulPayment, recordYuberaPlusSubscriptionUpdate } from "@/data/yubera-plus.server";
 
 type TelegramEnvironment = Record<string, unknown> & {
   TELEGRAM_BOT_TOKEN?: string;
@@ -17,11 +18,14 @@ type TelegramUser = {
 type TelegramUpdate = {
   message?: {
     text?: string; chat?: { id?: number }; from?: TelegramUser;
+    refunded_payment?: { currency?: string; total_amount?: number; invoice_payload?: string; telegram_payment_charge_id?: string };
     successful_payment?: {
       currency?: string; total_amount?: number; invoice_payload?: string;
       telegram_payment_charge_id?: string; provider_payment_charge_id?: string;
+      is_recurring?: boolean; is_first_recurring?: boolean; subscription_expiration_date?: number;
     };
   };
+  subscription?: { user?: TelegramUser; invoice_payload?: string; state?: string };
   pre_checkout_query?: {
     id?: string; from?: TelegramUser; currency?: string; total_amount?: number; invoice_payload?: string;
   };
@@ -208,6 +212,28 @@ export async function handleTelegramWebhook(request: Request): Promise<Response>
   }
 
   const preCheckout = update.pre_checkout_query;
+  if (preCheckout?.invoice_payload?.startsWith("yubera_plus:")) {
+    const db=subscriptionDb(env);
+    const valid=Boolean(db&&typeof preCheckout.id==="string"&&typeof preCheckout.from?.id==="number"&&preCheckout.currency==="XTR"&&Number.isSafeInteger(preCheckout.total_amount));
+    let approved=false,already=false;
+    if(valid&&db){
+      try{
+        const order=await db.prepare("SELECT user_id,amount,currency,status FROM yume_plus_payments WHERE invoice_payload=?").bind(preCheckout.invoice_payload).first<{user_id:string;amount:number;currency:string;status:string}>();
+        const owner=order?await db.prepare("SELECT telegram_user_id FROM yume_users WHERE id=?").bind(order.user_id).first<{telegram_user_id:string}>():null;
+        const matches=Boolean(order&&owner?.telegram_user_id===String(preCheckout.from!.id)&&order.amount===preCheckout.total_amount&&order.currency==="XTR");
+        already=Boolean(matches&&order?.status==="pre_checkout");
+        approved=Boolean(matches&&(order?.status==="pending"||already));
+      }catch(error){console.error("[YUBERA][PLUS] Pre-checkout validation failed.",error);}
+    }
+    const answer=await telegramApi(token,"answerPreCheckoutQuery",{pre_checkout_query_id:preCheckout.id,ok:approved,...(!approved?{error_message:"Не удалось подтвердить подписку. Создайте новый счёт и попробуйте снова."}:{})});
+    const result=await answer.json().catch(()=>({})) as {ok?:boolean};
+    if(!answer.ok||result.ok!==true){if(approved)return json({ok:false,error:"pre_checkout_answer_failed"},503);return json({ok:true,action:"plus_pre_checkout_rejected"});}
+    if(approved&&!already&&db){
+      const saved=await db.prepare("UPDATE yume_plus_payments SET status='pre_checkout' WHERE invoice_payload=? AND status='pending'").bind(preCheckout.invoice_payload).run() as {meta?:{changes?:number}};
+      if(Number(saved.meta?.changes??0)!==1)return json({ok:false,error:"pre_checkout_state_conflict"},503);
+    }
+    return json({ok:true,action:approved?"plus_pre_checkout_approved":"plus_pre_checkout_rejected"});
+  }
   if (preCheckout) {
     const db = subscriptionDb(env);
     const validShape = typeof preCheckout.id === "string" && typeof preCheckout.from?.id === "number" &&
@@ -265,6 +291,12 @@ export async function handleTelegramWebhook(request: Request): Promise<Response>
   }
 
   const successfulPayment = update.message?.successful_payment;
+  if(successfulPayment?.invoice_payload?.startsWith("yubera_plus:")){
+    const db=subscriptionDb(env),userId=update.message?.from?.id;
+    if(!db||typeof userId!=="number"||!Number.isSafeInteger(userId))return json({ok:true,ignored:true});
+    try{await recordYuberaPlusSuccessfulPayment(db as never,String(userId),successfulPayment);return json({ok:true,action:"yubera_plus_payment_processed"});}
+    catch(error){console.error("[YUBERA][PLUS] Successful payment processing failed.",error);return json({ok:false,error:"plus_payment_processing_failed"},503);}
+  }
   if (successfulPayment) {
     const db = subscriptionDb(env);
     const userId = update.message?.from?.id;
@@ -312,6 +344,20 @@ export async function handleTelegramWebhook(request: Request): Promise<Response>
     return json({ ok: true, action: "stars_payment_recorded" });
   }
 
+  if(update.subscription){
+    const db=subscriptionDb(env);
+    if(db){try{await recordYuberaPlusSubscriptionUpdate(db as never,update.subscription);}catch(error){console.error("[YUBERA][PLUS] Subscription state update failed.",error);return json({ok:false,error:"plus_subscription_update_failed"},503);}}
+    return json({ok:true,action:"yubera_plus_subscription_updated"});
+  }
+  const refund=update.message?.refunded_payment;
+  if(refund){
+    const db=subscriptionDb(env),userId=update.message?.from?.id;
+    if(db&&typeof userId==="number"&&Number.isSafeInteger(userId)){
+      try{await recordTelegramStarsRefund(db as never,String(userId),refund,token);}
+      catch(error){console.error("[YUBERA][STARS] Refund processing failed.",error);return json({ok:false,error:"stars_refund_processing_failed"},503);}
+    }
+    return json({ok:true,action:"stars_refund_processed"});
+  }
   const callback = update.callback_query;
   if (callback) {
     if ((callback.data !== PLAYER_HELP_CALLBACK && callback.data !== CHECK_SUBSCRIPTION_CALLBACK) || typeof callback.id !== "string" ||
