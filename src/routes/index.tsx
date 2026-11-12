@@ -1806,7 +1806,7 @@ function Index() {
           onSeeAll={setView}
           onOpenCollection={openCollection}
           onSupport={() => setView("support")}
-          showSupport={isTelegramMiniApp}
+          showSupport={true}
         />
       ) : view === "support" ? (
         <SupportPage />
