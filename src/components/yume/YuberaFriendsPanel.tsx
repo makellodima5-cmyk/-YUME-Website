@@ -43,6 +43,7 @@ export function YuberaFriendsPanel({ onOpenProfile, onFollowChange }: Props) {
   const [followingLoading, setFollowingLoading] = useState(true);
   const [recommendations, setRecommendations] = useState<CommunityPerson[]>([]);
   const [recommendationPage, setRecommendationPage] = useState(0);
+  const [recommendationSeed] = useState(() => Math.floor(Math.random() * 2147483646) + 1);
   const [recommendationsHasMore, setRecommendationsHasMore] = useState(false);
   const [recommendationsLoading, setRecommendationsLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -83,7 +84,7 @@ export function YuberaFriendsPanel({ onOpenProfile, onFollowChange }: Props) {
     setRecommendationsLoading(true);
     setLoadError("");
     try {
-      const response = await fetch(`/api/yubera/community?action=recommendations&page=${page}`, { credentials: "same-origin", cache: "no-store" });
+      const response = await fetch(`/api/yubera/community?action=recommendations&page=${page}&seed=${recommendationSeed}`, { credentials: "same-origin", cache: "no-store" });
       const data = await response.json() as PeopleResponse;
       if (!response.ok) throw new Error(data.error || "Не удалось загрузить рекомендации");
       if (requestId !== recommendationRequestId.current) return;
@@ -99,7 +100,7 @@ export function YuberaFriendsPanel({ onOpenProfile, onFollowChange }: Props) {
     } finally {
       if (requestId === recommendationRequestId.current) setRecommendationsLoading(false);
     }
-  }, []);
+  }, [recommendationSeed]);
 
   useEffect(() => {
     void loadFollowing();
