@@ -1021,7 +1021,7 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
               </section>
             )}
             {panel === "yubera" && (
-              <YuberaProfileHub animeList={animeList} onSelect={onSelect} onBack={() => navigatePanel("overview")} />
+              <YuberaProfileHub animeList={animeList} onSelect={onSelect} onBack={() => navigatePanel("overview")} isAdmin={isAdmin} onSettings={() => { navigatePanel("overview"); setSettingsExpanded(true); }} onLegal={() => navigatePanel("documents")} onAbout={() => navigatePanel("about")} onAdmin={onAdmin} onSupport={() => navigatePanel("support")} onAccount={() => { navigatePanel("overview"); window.requestAnimationFrame(() => document.getElementById("telegram-account")?.scrollIntoView({behavior:"smooth",block:"center"})); }} />
             )}
           </>
         )}
