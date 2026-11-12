@@ -209,4 +209,40 @@ describe("YUBERA community foundation", () => {
     expect(component).toContain("changeScreen(collectionReturnScreen)");
   });
 
+  it("matches the approved collection creation defaults and visibility choices", async () => {
+    const component = await readFile(resolve(process.cwd(), "src/components/yume/YuberaProfileHub.tsx"), "utf8");
+    const formStart = component.indexOf('(screen === "create" || screen === "edit-collection")');
+    const formEnd = component.indexOf('screen === "friends"', formStart);
+    const form = component.slice(formStart, formEnd);
+    expect(component).toContain('useState<string | null>(null)');
+    expect(component).toContain('useState(true)');
+    expect(form).toContain("0 / 50");
+    expect(form).toContain("maxLength={50}");
+    expect(form).toContain("maxLength={250}");
+    expect(form).toContain("aria-pressed={isPublic}");
+    expect(form).toContain("Доступна всем пользователям");
+    expect(form).toContain("Видна только вам");
+    expect(form).toContain("Отменить");
+    expect(form).not.toContain('type="file"');
+    expect(form).not.toContain("Добавить аниме");
+  });
+
+  it("asks before discarding modified collection forms and preserves the entry screen", async () => {
+    const component = await readFile(resolve(process.cwd(), "src/components/yume/YuberaProfileHub.tsx"), "utf8");
+    expect(component).toContain("collectionFormReturnScreen");
+    expect(component).toContain("const cancelCollectionForm = () =>");
+    expect(component).toContain("if (dirty) setDiscardCollectionOpen(true)");
+    expect(component).toContain("confirmDiscardCollectionForm");
+    expect(component).toContain("Введённые данные и выбранные параметры не сохранятся.");
+  });
+
+  it("uses only existing collection cover assets and leaves the cover unselected by default", async () => {
+    const component = await readFile(resolve(process.cwd(), "src/components/yume/YuberaProfileHub.tsx"), "utf8");
+    const tree = await readFile(resolve(process.cwd(), "docs/superpowers/plans/2026-11-12-yubera-stage-3-plan.md"), "utf8");
+    expect(component).toContain('const [cover, setCover] = useState<string | null>(null)');
+    expect(component).toContain("const initial = { title: \"\", description: \"\", cover: null, isPublic: true");
+    expect(component).toContain("covers.map(asset");
+    expect(tree).toContain("Stage 3 scope");
+  });
+
 });
