@@ -187,7 +187,9 @@ describe("YUBERA community foundation", () => {
   it("renders public profiles with public-only counters and read-only collection details", async () => {
     const component = await readFile(resolve(process.cwd(), "src/components/yume/YuberaProfileHub.tsx"), "utf8");
     const server = await readFile(resolve(process.cwd(), "src/data/yubera-community.server.ts"), "utf8");
-    const publicView = component.slice(component.indexOf('screen === "public-profile"'), component.indexOf('screen === "public-collections"'));
+    const publicStart = component.indexOf('{screen === "public-profile"');
+    const publicEnd = component.indexOf('{screen === "public-collections"', publicStart);
+    const publicView = component.slice(publicStart, publicEnd);
     expect(publicView).toContain("yubera_banner.webp");
     expect(publicView).toContain("publicProfile.publicCollections");
     expect(publicView).toContain("publicProfile.publicTitles");
