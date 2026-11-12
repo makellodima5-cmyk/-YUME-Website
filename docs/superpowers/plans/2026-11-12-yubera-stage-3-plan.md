@@ -45,14 +45,14 @@ The repository has a Stage 3 runbook for the separate R2 catalogue launch. The Y
 - [x] Task 3 — Collections index/detail: pinned/unpinned ordering, fixed overlay menu with outside-click dismissal, delete confirmation, correct Russian title-count forms, public/private server enforcement and owner-only item controls.
 - [x] Task 4 — Create/edit collection and profile edit form states: public-by-default collection creation, no preselected cover, horizontal approved-cover gallery, title/description counters, public/private cards, human-readable errors, unsaved-change confirmation for collection and profile edits, and a profile visibility editor matching the supplied v2 specification.
 - [ ] Task 5 — Full tests, lint, Worker build, migration-history validation and diff review (latest run `43264480413` is validating the seeded recommendation query and the full branch diff).
-- [ ] Task 6 — Record final status and remaining live acceptance gates. Do not merge or deploy without a separate owner instruction.
+- [x] Task 6 — Record final status and remaining live acceptance gates. Do not merge or deploy without a separate owner instruction.
 
 ## Current progress
 
 - Stage 3 branch created from the Stage 2 implementation head.
 - Task 1 is implemented and passed CI.
 - Tasks 2 and 3 are implemented; public visitors cannot access owner-only collection controls.
-- Tasks 1–4 are implemented from the supplied Friends, Public Profile, My Collections, Create Collection and Profile Edit specifications.
-- The latest successful full CI before the recommendation shuffle change is run `43264063597`: 75 test files / 423 tests, lint, Worker build, generated binding checks, clean local migration validation and all Worker artifact checks passed.
-- Current CI run `43264480413` is validating the stable seeded recommendation pagination and updated tests.
+- Stage 3 implementation is complete on this branch, based on the supplied Friends, Public Profile, My Collections, Create Collection and Profile Edit specifications.
+- Latest full CI run `43264633724` passed: 75 test files / 424 tests, dependency audit, lint, Worker build, generated binding checks, clean local migration validation/history and all four Worker deploy-artifact validations.
+- Remaining gates are manual visual/responsive review in browser and Telegram Mini App, owner-controlled application of pending Stage 2 migrations 9 and 10, and separate live acceptance. No production deployment or D1 mutation was performed.
 - No production resources have been changed.
