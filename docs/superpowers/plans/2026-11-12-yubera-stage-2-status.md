@@ -17,8 +17,8 @@ Only migrations 9 and 10 are pending:
 ## Implemented in code
 
 - First anime rating: +10 XP only for a first-time rating. Existing ratings are not granted retroactive XP when edited. Rating write and XP ledger entry use an atomic batch.
-- Collection rewards: +2 XP for a newly added unique title and +15 XP only when the third title is newly added. Item and XP writes are atomic; unique event keys prevent re-awards after removal/re-addition.
-- Episode viewing: server-side elapsed-time, position progression and merged watched segments; browser-supplied completion percentages are not trusted. Completion and +5 XP ledger entry require an atomic D1 batch. Expired sessions are cleaned up at session start, episode numbers are checked against catalogue metadata, and each account is capped at five active sessions.
+- Collection rewards: +2 XP for a newly added unique title and +15 XP only when the third title is newly added. Item and XP writes are atomic; unique event keys prevent re-awards after removal/re-addition. The code does not invent a daily XP cap; the XP specification says numeric anti-farm limits need separate approval.
+- Episode viewing: server-side elapsed-time, position progression and merged watched segments; browser-supplied completion percentages are not trusted. Completion and +5 XP ledger entry require an atomic D1 batch. Expired sessions are cleaned up at session start, episode numbers are checked against catalogue metadata, and each account is capped at five active sessions. The 90% threshold, all four reward amounts and ten XP level thresholds are centralized in `src/data/yubera-config.ts`.
 - Support status: based on confirmed one-time Telegram Stars donations minus recorded refunds. Plus subscription payments are excluded. Exact totals are owner-only.
 - Telegram Stars support refunds: idempotent charge tracking and payer/amount/currency validation are covered by tests.
 - Plus payments: first payments and recurring renewals are persisted atomically; duplicate webhook deliveries cannot extend a subscription twice.
@@ -39,11 +39,12 @@ Tests cover rating XP idempotency and legacy ratings, collection XP/milestone gu
 
 ## Release gates still open
 
-1. **CI passed on the current implementation head** (`615e6e3c24a54f2d10369793f0af50ad45bbf4dc`): 75 test files, 411 tests passed; TypeScript lint, Worker build, configuration/binding checks, clean SQLite migration validation/history, and all four Worker deploy-artifact validations passed. See https://github.com/makellodima5-cmyk/-YUME-Website/actions/runs/43258907644.
+1. **CI passed on the current implementation head** (`6b520f262a7c828b6c9e977fe2481fb91df44f26`): 75 test files, 412 tests passed; dependency audit, TypeScript lint, Worker build, configuration/binding checks, clean SQLite migration validation/history, and all four Worker deploy-artifact validations passed. See https://github.com/makellodima5-cmyk/-YUME-Website/actions/runs/43259713978.
 2. Migrations 9 and 10 must be applied by the owner to the existing D1 database, in that order. Do not deploy code that depends on these schema additions before the migrations are applied.
 3. Live Telegram Stars end-to-end checks are still required: invoice creation, first recurring payment, renewal, cancellation, insufficient balance, and refund delivery.
 4. Browser/Telegram Mini App verification is still required for profile editing, frames, collections, donations, Plus purchase/cancellation, public/private profile access and navigation.
-5. Kodik playback cannot be cryptographically attested by the current iframe integration. The current implementation is anti-abuse hardening, not proof that a human watched the episode.
+5. Kodik playback cannot be cryptographically attested by the current iframe integration. Episode duration and position arrive from the iframe's browser message; the server checks plausible progression and elapsed time but cannot independently verify the provider's actual duration or prove that a human watched the episode. This remains anti-abuse hardening, not proof of viewing.
+6. The collection XP anti-farm checks enforce ownership, catalogue validity, unique item insertion, idempotency and the one-time third-title milestone. A numeric daily/weekly XP cap is intentionally not invented; it requires the owner's separate approval under the supplied XP specification.
 
 ## Safety
 
