@@ -81,7 +81,11 @@ class RatingStatement {
     }
     if (this.sql.includes("INSERT OR IGNORE INTO yume_xp_ledger")) {
       const eventKey = this.values[2] as string;
-      if (this.db.xpKeys.has(eventKey)) return { meta: { changes: 0, rows_read: 1, rows_written: 0 } };
+      const animeId = this.values[4] as string;
+      const userId = this.values[5] as string;
+      if (this.db.votes.has(animeId + ":" + userId) || this.db.xpKeys.has(eventKey)) {
+        return { meta: { changes: 0, rows_read: 1, rows_written: 0 } };
+      }
       this.db.xpKeys.add(eventKey);
       return { meta: { changes: 1, rows_read: 0, rows_written: 1 } };
     }
@@ -168,6 +172,17 @@ describe("YUBERA user anime ratings", () => {
     await handleAnimeRatings(ratingRequest(9));
 
     expect(db.xpKeys).toEqual(new Set(["anime-rating:user-1:123"]));
+  });
+
+  it("does not award first-rating XP for ratings that existed before XP was introduced", async () => {
+    const db = new RatingsDatabase();
+    db.votes.set("123:user-1", { animeId: "123", userId: "user-1", rating: 6 });
+    configureDatabase(db);
+
+    await handleAnimeRatings(ratingRequest(9));
+
+    expect(db.xpKeys.size).toBe(0);
+    expect(db.votes.get("123:user-1")?.rating).toBe(9);
   });
 
   it("replaces the same user's previous rating instead of creating another vote", async () => {
