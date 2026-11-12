@@ -1,0 +1,5 @@
+ALTER TABLE yume_plus_subscriptions ADD COLUMN is_recurring INTEGER NOT NULL DEFAULT 0 CHECK (is_recurring IN (0,1));
+ALTER TABLE yume_plus_payments ADD COLUMN invoice_link TEXT;
+CREATE TABLE IF NOT EXISTS yume_plus_payment_events (telegram_payment_charge_id TEXT PRIMARY KEY NOT NULL,user_id TEXT NOT NULL REFERENCES yume_users(id) ON DELETE CASCADE,invoice_payload TEXT NOT NULL,amount INTEGER NOT NULL CHECK (amount BETWEEN 1 AND 10000),currency TEXT NOT NULL CHECK (currency='XTR'),is_recurring INTEGER NOT NULL DEFAULT 0 CHECK (is_recurring IN (0,1)),is_first_recurring INTEGER NOT NULL DEFAULT 0 CHECK (is_first_recurring IN (0,1)),subscription_expiration_date INTEGER,status TEXT NOT NULL CHECK (status IN ('paid','refunded')),created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,refunded_at TEXT);
+CREATE INDEX IF NOT EXISTS idx_yume_plus_payment_events_user_created ON yume_plus_payment_events(user_id,created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_yume_plus_payment_events_payload ON yume_plus_payment_events(invoice_payload);
