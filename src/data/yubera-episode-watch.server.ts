@@ -2,7 +2,7 @@ import { env as cloudflareEnv } from "cloudflare:workers";
 import { getAuthenticatedYumeUserId } from "@/data/telegram-auth.server";
 import { getR2Anime } from "@/data/catalog-r2.server";
 type S={bind(...v:unknown[]):S;first<T=Record<string,unknown>>():Promise<T|null>;run():Promise<{meta?:{changes?:number}}>} ;
-type DB={prepare(sql:string):S;batch?:(statements:S[])=>Promise<Array<{meta?:{changes?:number}>>>};
+type DB={prepare(sql:string):S;batch?:(statements:S[])=>Promise<Array<{meta?:{changes?:number}}>>};
 type E={YUME_DB?:unknown};
 type G=typeof globalThis&{__YUME_RUNTIME_ENV__?:unknown};
 type Interval=[number,number];

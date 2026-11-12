@@ -348,7 +348,7 @@ function AnimeDetailPage() {
       const watchedSeconds = playbackEvent.currentTime;
       const durationSeconds = playbackEvent.durationSeconds;
       if (durationSeconds !== null) lastKnownDuration = durationSeconds;
-      void syncServerWatch(watchedSeconds, durationSeconds);
+      void syncServerWatch(watchedSeconds, durationSeconds ?? lastKnownDuration);
       // Kodik may omit duration. Use a conservative TV-episode estimate only for
       // the completion indicator; the saved duration remains unknown.
       const estimatedTvEpisodeDuration = durationSeconds === null && anime.episodes > 1 ? 24 * 60 : null;
