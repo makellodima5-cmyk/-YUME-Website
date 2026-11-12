@@ -49,7 +49,9 @@ export function YuberaFriendsPanel({ onOpenProfile, onFollowChange }: Props) {
   const [searchResults, setSearchResults] = useState<CommunityPerson[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState("");
-  const [loadError, setLoadError] = useState("");
+  const [followingError, setFollowingError] = useState("");
+  const [recommendationError, setRecommendationError] = useState("");
+  const [actionError, setActionError] = useState("");
   const [busyUserId, setBusyUserId] = useState<string | null>(null);
   const searchRequestId = useRef(0);
   const recommendationRequestId = useRef(0);
@@ -70,7 +72,7 @@ export function YuberaFriendsPanel({ onOpenProfile, onFollowChange }: Props) {
       setFollowingPage(page);
       setFollowingHasMore(Boolean(data.hasMore));
     } catch (cause) {
-      setLoadError(cause instanceof Error ? cause.message : "Не удалось загрузить подписки");
+      setFollowingError(cause instanceof Error ? cause.message : "Не удалось загрузить подписки");
     } finally {
       setFollowingLoading(false);
     }
@@ -93,7 +95,7 @@ export function YuberaFriendsPanel({ onOpenProfile, onFollowChange }: Props) {
       setRecommendationPage(page);
       setRecommendationsHasMore(Boolean(data.hasMore));
     } catch (cause) {
-      if (requestId === recommendationRequestId.current) setLoadError(cause instanceof Error ? cause.message : "Не удалось загрузить рекомендации");
+      if (requestId === recommendationRequestId.current) setRecommendationError(cause instanceof Error ? cause.message : "Не удалось загрузить рекомендации");
     } finally {
       if (requestId === recommendationRequestId.current) setRecommendationsLoading(false);
     }
@@ -137,7 +139,7 @@ export function YuberaFriendsPanel({ onOpenProfile, onFollowChange }: Props) {
   const follow = async (person: CommunityPerson) => {
     if (busyUserId) return;
     setBusyUserId(person.id);
-    setLoadError("");
+    setActionError("");
     try {
       const response = await fetch("/api/yubera/community", {
         method: "POST",
@@ -153,7 +155,7 @@ export function YuberaFriendsPanel({ onOpenProfile, onFollowChange }: Props) {
       await loadRecommendations(0, false);
       await onFollowChange?.();
     } catch (cause) {
-      setLoadError(cause instanceof Error ? cause.message : "Не удалось подписаться на пользователя");
+      setActionError(cause instanceof Error ? cause.message : "Не удалось подписаться на пользователя");
     } finally {
       setBusyUserId(null);
     }
@@ -204,8 +206,8 @@ export function YuberaFriendsPanel({ onOpenProfile, onFollowChange }: Props) {
           <h3 className="flex items-center gap-2 font-semibold text-white"><Users className="h-4 w-4 text-[#ff7658]" />Мои подписки <span className="text-xs font-normal text-white/45">{followingTotal}</span></h3>
           <span className="inline-flex items-center gap-1 rounded-lg border border-white/10 bg-black/15 px-2.5 py-1.5 text-[11px] text-white/55">По дате подписки <ChevronDown className="h-3 w-3" /></span>
         </div>
-        {followingLoading ? <div className="space-y-2" aria-label="Загрузка подписок">{[0,1,2].map((item) => <div key={item} className="h-[82px] animate-pulse rounded-2xl bg-white/[0.04]" />)}</div>
-          : loadError && !following.length ? <div className="py-5 text-center"><p className="text-sm text-red-200">{loadError}</p><button type="button" onClick={() => void loadFollowing()} className="mt-3 text-sm text-[#ff9a7f]">Повторить</button></div>
+        {followingLoading && !following.length ? <div className="space-y-2" aria-label="Загрузка подписок">{[0,1,2].map((item) => <div key={item} className="h-[82px] animate-pulse rounded-2xl bg-white/[0.04]" />)}</div>
+          : followingError && !following.length ? <div className="py-5 text-center"><p className="text-sm text-red-200">{followingError}</p><button type="button" onClick={() => void loadFollowing()} className="mt-3 text-sm text-[#ff9a7f]">Повторить</button></div>
           : following.length ? <><div className="space-y-2">{following.map((person) => personCard(person, "following"))}</div>{followingHasMore && <button type="button" disabled={followingLoading} onClick={() => void loadFollowing(followingPage + 1, true)} className="mt-3 flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-white/10 text-xs text-white/65 disabled:opacity-50">{followingLoading ? <LoaderCircle className="h-4 w-4 animate-spin" /> : "Загрузить ещё подписки"}</button>}</>
           : <div className="py-5 text-center"><Users className="mx-auto mb-2 h-7 w-7 text-white/25" /><p className="text-sm font-medium text-white/75">Вы пока ни на кого не подписаны</p><p className="mt-1 text-xs text-white/45">Найдите пользователей YUBERA и подпишитесь на интересные профили</p></div>}
       </section>
@@ -221,7 +223,8 @@ export function YuberaFriendsPanel({ onOpenProfile, onFollowChange }: Props) {
       ) : (
         <section>
           <div className="mb-3 flex items-center gap-2"><Search className="h-5 w-5 text-[#ff7658]" /><span><h3 className="font-semibold text-white">Найти друзей</h3><p className="text-xs text-white/50">Ищите других пользователей YUBERA</p></span></div>
-          {recommendations.length ? <div className="space-y-2">{recommendations.map((person) => personCard(person, "discover"))}</div>
+          {recommendationError && !recommendations.length ? <div className="rounded-2xl border border-red-500/20 bg-red-500/5 p-4 text-center text-sm text-red-200">{recommendationError}<button type="button" onClick={() => void loadRecommendations(0, false)} className="ml-2 underline">Повторить</button></div>
+            : recommendations.length ? <div className="space-y-2">{recommendations.map((person) => personCard(person, "discover"))}</div>
             : !recommendationsLoading && <p className="rounded-2xl border border-white/10 bg-[#17181e] p-5 text-center text-sm text-white/50">Пока нет пользователей для рекомендации</p>}
           {recommendationsHasMore && <button type="button" disabled={recommendationsLoading} onClick={() => void loadRecommendations(recommendationPage + 1, true)} className="mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-white/15 bg-[#17181e] text-sm text-white/75 disabled:opacity-50">
             {recommendationsLoading ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <>Показать ещё <ChevronDown className="h-4 w-4" /></>}
@@ -229,7 +232,8 @@ export function YuberaFriendsPanel({ onOpenProfile, onFollowChange }: Props) {
           {!recommendationsHasMore && recommendations.length > 0 && !recommendationsLoading && <p className="pt-2 text-center text-xs text-white/35">Больше пользователей пока нет</p>}
         </section>
       )}
-      {loadError && following.length > 0 && <p role="alert" className="rounded-xl border border-red-500/20 bg-red-500/5 p-3 text-xs text-red-200">{loadError}</p>}
+      {actionError && <p role="alert" className="rounded-xl border border-red-500/20 bg-red-500/5 p-3 text-xs text-red-200">{actionError}</p>}
+      {followingError && following.length > 0 && <p role="alert" className="rounded-xl border border-red-500/20 bg-red-500/5 p-3 text-xs text-red-200">{followingError}</p>}
     </div>
   );
 }
