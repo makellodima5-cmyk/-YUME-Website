@@ -21,7 +21,7 @@ export async function handleYuberaEpisodeWatch(r:Request):Promise<Response>{
  if(x.action==="start"){
   const animeId=typeof x.animeId==="string"?x.animeId:"",episode=Number(x.episodeNumber),duration=Number(x.durationSeconds),position=Number(x.currentTime);
   if(!/^\d{1,12}$/.test(animeId)||!Number.isSafeInteger(episode)||episode<1||episode>10000||!finiteNumber(duration)||duration<60||duration>10800||!finiteNumber(position)||position<0||position>duration)return json({error:"invalid_playback_data"},400);
-  let anime;
+  let anime: Awaited<ReturnType<typeof getR2Anime>>;
   try{anime=await getR2Anime(animeId);if(!anime)return json({error:"anime_not_found"},404);}catch{return json({error:"catalog_unavailable"},503);}
   const episodeCount=Number(anime.episodes);
   if(Number.isSafeInteger(episodeCount)&&episodeCount>0&&episode>episodeCount)return json({error:"episode_not_in_catalog"},400);
