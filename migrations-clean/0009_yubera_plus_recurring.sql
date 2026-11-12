@@ -62,7 +62,7 @@ INSERT INTO yume_plus_audit_log(actor_user_id,action,details_json)
 SELECT NULL,'migration_initial_price',
   json_object('oldPrice',CAST(setting_value AS INTEGER),'newPrice',100,'source','owner-approved migration')
 FROM yume_plus_settings
-WHERE setting_key='price_xtr' AND setting_value<>'100';
+WHERE setting_key='price_xtr' AND setting_value<>'100' AND updated_by IS NULL;
 UPDATE yume_plus_settings
 SET setting_value='100',updated_at=CURRENT_TIMESTAMP
-WHERE setting_key='price_xtr';
+WHERE setting_key='price_xtr' AND updated_by IS NULL;
