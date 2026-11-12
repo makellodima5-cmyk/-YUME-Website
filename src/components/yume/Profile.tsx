@@ -544,34 +544,8 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
               onSupport={() => navigatePanel("support")}
               onAccount={() => document.getElementById("telegram-account")?.scrollIntoView({ behavior: "smooth", block: "center" })}
             />
-            <div className="relative isolate overflow-hidden rounded-[20px] border border-border bg-card shadow-[0_10px_34px_rgba(0,0,0,0.24)]">
-              <div className="yubera-profile-cover relative overflow-hidden">
-                <img
-                  src="/images/yubera/yubera_banner.webp"
-                  alt=""
-                  aria-hidden="true"
-                  width={2172}
-                  height={724}
-                  fetchPriority="high"
-                  decoding="async"
-                  className="absolute inset-0 h-full w-full object-cover object-[center_38%]"
-                />
-                <div className="absolute inset-0 bg-gradient-to-b from-black/5 via-[#101116]/5 to-[#101116]/70" />
-                <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-[#101116]/80 to-transparent" />
-              </div>
-
-              <div className="relative -mt-6 rounded-[20px] bg-gradient-to-b from-[#1A1B22]/42 via-[#1A1B22]/52 to-[#101116]/72 px-3 pb-3 pt-0 sm:px-5 sm:pb-5">
-                <div className="flex min-w-0 items-end gap-3 sm:gap-4">
-                  <div className="yubera-profile-avatar relative shrink-0 overflow-hidden rounded-full border-[2.5px] border-primary bg-secondary shadow-[0_0_18px_rgba(255,90,61,0.16)] sm:-mt-11 sm:h-28 sm:w-28">
-                    {telegramUser?.photo_url ? (
-                      <img
-                        src={telegramUser.photo_url}
-                        alt={telegramDisplayName}
-                        referrerPolicy="no-referrer"
-                        decoding="async"
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
+          </>
+        ) : (
                       <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[#FF5A3D] to-[#101116]">
                         <UserRound className="h-11 w-11 text-white sm:h-14 sm:w-14" aria-hidden="true" />
                       </div>
