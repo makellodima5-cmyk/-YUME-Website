@@ -47,4 +47,13 @@ describe("YUBERA community foundation", () => {
     expect(server).toContain("WHERE (SELECT COUNT(*) FROM yume_collection_items WHERE collection_id=?)>=3");
   });
 
+
+  it("recalculates support status from confirmed donations after recorded refunds", async () => {
+    const server = await readFile(resolve(process.cwd(), "src/data/yubera-community.server.ts"), "utf8");
+    expect(server).toContain("LEFT JOIN yume_stars_refunds r ON r.telegram_payment_charge_id = d.telegram_payment_charge_id");
+    expect(server).toContain("d.status = 'paid' AND r.telegram_payment_charge_id IS NULL");
+    expect(server).toContain("progress:");
+    expect(server).toContain("remaining:");
+  });
+
 });
