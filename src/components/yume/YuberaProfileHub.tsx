@@ -50,6 +50,15 @@ const supportLevels = YUBERA_SUPPORT_LEVELS.filter((item) => item.level > 0).map
   `${min.toLocaleString("ru-RU")} ⭐`,
   asset ?? "",
 ] as const);
+function formatCollectionTitleCount(value: number): string {
+  const remainder100 = value % 100;
+  const remainder10 = value % 10;
+  const word = remainder100 >= 11 && remainder100 <= 14 ? "тайтлов"
+    : remainder10 === 1 ? "тайтл"
+    : remainder10 >= 2 && remainder10 <= 4 ? "тайтла"
+    : "тайтлов";
+  return `${value} ${word}`;
+}
 
 export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false, onSettings, onLegal, onAbout, onAdmin, onSupport, onAccount }: Props) {
   const [screen, setScreen] = useState<Screen>("home");
@@ -160,7 +169,7 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
         </span>
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-semibold text-white">{item.title}</span>
-          <span className="block text-xs text-white/45">{item.title_count} тайтлов</span>
+          <span className="block text-xs text-white/45">{formatCollectionTitleCount(item.title_count)}</span>
         </span>
         <ChevronRight className="h-4 w-4 shrink-0 text-white/35" />
       </button>
@@ -264,14 +273,19 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
     <div key={item.id} className="relative flex items-center gap-3 border-b border-white/5 py-3 last:border-0">
       <button type="button" onClick={() => void openCollection(item)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
         <div className="relative h-16 w-20 shrink-0 overflow-hidden rounded-xl bg-white/5">{item.cover_key && <img src={`/images/yubera/${item.cover_key}`} alt="" className="h-full w-full object-cover" />}{Boolean(item.is_pinned) && <span className="absolute left-1 top-1 rounded-full bg-[#ff704f] p-1 text-black"><Pin className="h-3 w-3" /></span>}</div>
-        <span className="min-w-0"><span className="block truncate font-semibold text-white">{item.title}</span><span className="text-xs text-white/50">{item.title_count} тайтлов · {item.like_count} лайков</span></span>
+        <span className="min-w-0"><span className="block truncate font-semibold text-white">{item.title}</span><span className="text-xs text-white/50">{formatCollectionTitleCount(item.title_count)} · {item.like_count} лайков</span></span>
       </button>
       <button type="button" onClick={() => setMenuId(menuId === item.id ? null : item.id)} className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/5 text-white/70" aria-label="Действия подборки">•••</button>
-      {menuId === item.id && <div className="absolute right-10 top-12 z-20 w-48 rounded-xl border border-white/15 bg-[#202127] p-1 shadow-2xl">
-        <button onClick={() => void collectionAction({action:"collection.pin",id:item.id,pinned:!item.is_pinned})} className="w-full rounded-lg px-3 py-2 text-left text-sm text-white hover:bg-white/5">{item.is_pinned ? "Открепить" : "Закрепить"}</button>
-        <button onClick={() => {setCollectionFormReturnScreen("collections");setTitle(item.title);setDescription(item.description);setIsPublic(Boolean(item.is_public));setCover(item.cover_key);setEditingCollectionId(item.id);setCollectionFormInitial({title:item.title,description:item.description,cover:item.cover_key,isPublic:Boolean(item.is_public),editingCollectionId:item.id});setMenuId(null);changeScreen("edit-collection");}} className="w-full rounded-lg px-3 py-2 text-left text-sm text-white hover:bg-white/5">Редактировать</button>
-        <button onClick={() => {setDeleteTarget(item);setMenuId(null);}} className="w-full rounded-lg px-3 py-2 text-left text-sm text-[#ff7658] hover:bg-white/5">Удалить</button>
-      </div>}
+      {menuId === item.id && <>
+        <button type="button" aria-label="Закрыть меню" onClick={() => setMenuId(null)} className="fixed inset-0 z-10 cursor-default" />
+        <div className="absolute right-10 top-12 z-20 w-52 rounded-xl border border-white/15 bg-[#202127] p-1 shadow-2xl">
+          <button onClick={() => void collectionAction({action:"collection.pin",id:item.id,pinned:!item.is_pinned})} className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-white hover:bg-white/5"><Pin className="h-4 w-4 text-white/55"/>{item.is_pinned ? "Открепить" : "Закрепить"}</button>
+          <div className="mx-2 h-px bg-white/10" />
+          <button onClick={() => {setCollectionFormReturnScreen("collections");setTitle(item.title);setDescription(item.description);setIsPublic(Boolean(item.is_public));setCover(item.cover_key);setEditingCollectionId(item.id);setCollectionFormInitial({title:item.title,description:item.description,cover:item.cover_key,isPublic:Boolean(item.is_public),editingCollectionId:item.id});setMenuId(null);changeScreen("edit-collection");}} className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-white hover:bg-white/5"><Pencil className="h-4 w-4 text-white/55"/>Редактировать</button>
+          <div className="mx-2 h-px bg-white/10" />
+          <button onClick={() => {setDeleteTarget(item);setMenuId(null);}} className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-[#ff7658] hover:bg-white/5"><Trash2 className="h-4 w-4"/>Удалить</button>
+        </div>
+      </>}
     </div>
   );
 
