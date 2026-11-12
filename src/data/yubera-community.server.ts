@@ -238,7 +238,7 @@ export async function handleYuberaCommunity(request: Request): Promise<Response>
             EXISTS(SELECT 1 FROM yume_follows mine WHERE mine.follower_id = ? AND mine.followed_id = u.id) AS is_following
             FROM yume_follows f JOIN yume_users u ON u.id = f.follower_id JOIN yume_profiles p ON p.user_id = u.id
             WHERE p.visibility = 'public' AND f.followed_id = ? ORDER BY f.created_at DESC LIMIT 30 OFFSET ?`).bind(Date.now(), userId, userId, offset).all<UserRow>(),
-          database.prepare("SELECT COUNT(*) AS count FROM yume_follows WHERE followed_id = ?").bind(userId).first<{count:number}>(),
+          database.prepare("SELECT COUNT(*) AS count FROM yume_follows f JOIN yume_profiles p ON p.user_id=f.follower_id WHERE f.followed_id = ? AND p.visibility='public'").bind(userId).first<{count:number}>(),
         ]);
         const count = Number(total?.count ?? 0);
         return json({ users: rows.results, total: count, hasMore: offset + rows.results.length < count });
@@ -253,7 +253,7 @@ export async function handleYuberaCommunity(request: Request): Promise<Response>
           f.created_at
           FROM yume_follows f JOIN yume_users u ON u.id = f.followed_id JOIN yume_profiles p ON p.user_id = u.id
           WHERE p.visibility = 'public' AND f.follower_id = ? ORDER BY f.created_at DESC LIMIT 30 OFFSET ?`).bind(Date.now(), userId, offset).all<UserRow>(),
-        database.prepare("SELECT COUNT(*) AS count FROM yume_follows WHERE follower_id = ?").bind(userId).first<{count:number}>(),
+        database.prepare("SELECT COUNT(*) AS count FROM yume_follows f JOIN yume_profiles p ON p.user_id=f.followed_id WHERE f.follower_id = ? AND p.visibility='public'").bind(userId).first<{count:number}>(),
       ]);
       const count = Number(total?.count ?? 0);
       return json({ users: rows.results, total: count, hasMore: offset + rows.results.length < count });
