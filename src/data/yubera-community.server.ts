@@ -11,7 +11,7 @@ type Database = { prepare(sql: string): Statement };
 type Environment = { YUME_DB?: unknown };
 type RuntimeGlobal = typeof globalThis & { __YUME_RUNTIME_ENV__?: unknown };
 type UserRow = {
-  id: string; telegram_first_name: string; telegram_last_name: string | null;
+  id: string; telegram_user_id: string; telegram_first_name: string; telegram_last_name: string | null;
   telegram_username: string | null; telegram_photo_url: string | null;
 };
 type ProfileRow = { bio: string; visibility: "public" | "private"; avatar_frame: string | null };
@@ -23,7 +23,7 @@ const XP_LEVELS: XPLevel[] = [
   { level: 3, title: "Искатель историй", min: 150, max: 299 },
   { level: 4, title: "Исследователь миров", min: 300, max: 499 },
   { level: 5, title: "Коллекционер", min: 500, max: 749 },
-  { level: 6, title: "Эксперт аниме", min: 750, max: 999 },
+  { level: 6, title: "Знаток аниме", min: 750, max: 999 },
   { level: 7, title: "Хранитель историй", min: 1000, max: 1499 },
   { level: 8, title: "Мастер YUBERA", min: 1500, max: 2199 },
   { level: 9, title: "Архивариус YUBERA", min: 2200, max: 3199 },
@@ -82,7 +82,7 @@ function profileAssetFrame(value: unknown): string | null {
   return typeof value === "string" && frames.has(value) ? value : null;
 }
 async function userAndProfile(database: Database, userId: string) {
-  const user = await database.prepare("SELECT id, telegram_first_name, telegram_last_name, telegram_username, telegram_photo_url FROM yume_users WHERE id = ?")
+  const user = await database.prepare("SELECT id, telegram_user_id, telegram_first_name, telegram_last_name, telegram_username, telegram_photo_url FROM yume_users WHERE id = ?")
     .bind(userId).first<UserRow>();
   if (!user) return null;
   await database.prepare("INSERT OR IGNORE INTO yume_profiles(user_id) VALUES (?)").bind(userId).run();
@@ -132,7 +132,7 @@ async function profileSummary(database: Database, userId: string, viewerId: stri
   if (!isOwner && account.profile.visibility !== "public") return { private: true };
   const [xp, support, plus, followers, following, collections] = await Promise.all([
     xpTotal(database, userId).then(xpState),
-    supportState(database, account.user.id),
+    supportState(database, account.user.telegram_user_id),
     plusActive(database, userId),
     database.prepare("SELECT COUNT(*) AS count FROM yume_follows WHERE followed_id = ?").bind(userId).first<{ count: number }>(),
     database.prepare("SELECT COUNT(*) AS count FROM yume_follows WHERE follower_id = ?").bind(userId).first<{ count: number }>(),
@@ -146,7 +146,7 @@ async function profileSummary(database: Database, userId: string, viewerId: stri
     displayName: [account.user.telegram_first_name, account.user.telegram_last_name].filter(Boolean).join(" ") || account.user.telegram_username || "Пользователь",
     username: account.user.telegram_username, photoUrl: account.user.telegram_photo_url,
     bio: account.profile.bio, avatarFrame: account.profile.avatar_frame,
-    visibility: account.profile.visibility, xp, support: { level: support.level, title: support.title, asset: support.asset },
+    visibility: account.profile.visibility, xp: isOwner ? xp : { level: xp.level, title: xp.title }, support: { level: support.level, title: support.title, asset: support.asset },
     isPlus: plus, followers: Number(followers?.count ?? 0), following: Number(following?.count ?? 0),
     publicCollections: Number(collections?.count ?? 0), publicTitles: Number(collections?.titles ?? 0),
     collectionLikes: Number(collections?.likes ?? 0), isFollowing: Boolean(follow),
