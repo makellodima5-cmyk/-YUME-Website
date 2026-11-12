@@ -19,7 +19,7 @@ class FakeStatement {
     }
     return null;
   }
-  async run(): Promise<Result> { if (this.sql.includes("SET auto_renew") && this.db.subscription) { this.db.subscription.auto_renew = Number(this.values[0]); this.db.subscription.renewal_failed_at = Number(this.values[1]) === 1 ? "2026-11-12 12:00:00" : null; return { meta: { changes: 1 } }; } return { meta: { changes: 0 } }; }
+  async run(): Promise<Result> { if (this.sql.includes("SET auto_renew") && this.db.subscription) { this.db.subscription?.auto_renew = Number(this.values[0]); this.db.subscription?.renewal_failed_at = Number(this.values[1]) === 1 ? "2026-11-12 12:00:00" : null; return { meta: { changes: 1 } }; } return { meta: { changes: 0 } }; }
   valuesForBatch() { return this.values; }
 }
 
@@ -104,12 +104,12 @@ describe("YUBERA Plus Telegram payment ledger", () => {
     db.subscription = { id: "payment-1", expires_at: Date.now() + 86_400_000, status: "active", auto_renew: 1, renewal_failed_at: null };
 
     await recordYuberaPlusSubscriptionUpdate(db as never, { user: { id: 12345 }, invoice_payload: "yubera_plus:payment-1", state: "failed" });
-    expect(db.subscription.auto_renew).toBe(0);
-    expect(db.subscription.renewal_failed_at).not.toBeNull();
+    expect(db.subscription?.auto_renew).toBe(0);
+    expect(db.subscription?.renewal_failed_at).not.toBeNull();
 
     await recordYuberaPlusSubscriptionUpdate(db as never, { user: { id: 12345 }, invoice_payload: "yubera_plus:payment-1", state: "active" });
-    expect(db.subscription.auto_renew).toBe(1);
-    expect(db.subscription.renewal_failed_at).toBeNull();
+    expect(db.subscription?.auto_renew).toBe(1);
+    expect(db.subscription?.renewal_failed_at).toBeNull();
   });
 
 });
