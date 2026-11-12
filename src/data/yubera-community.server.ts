@@ -228,13 +228,13 @@ export async function handleYuberaCommunity(request: Request): Promise<Response>
       if (url.searchParams.get("direction") === "followers") {
         const rows = await database.prepare(`SELECT u.id,u.telegram_first_name,u.telegram_last_name,u.telegram_username,u.telegram_photo_url,f.created_at,
           EXISTS(SELECT 1 FROM yume_follows mine WHERE mine.follower_id = ? AND mine.followed_id = u.id) AS is_following
-          FROM yume_follows f JOIN yume_users u ON u.id = f.follower_id
-          WHERE f.followed_id = ? ORDER BY f.created_at DESC LIMIT 30 OFFSET ?`).bind(userId, userId, offset).all<UserRow & { created_at: string; is_following: number }>();
+          FROM yume_follows f JOIN yume_users u ON u.id = f.follower_id JOIN yume_profiles p ON p.user_id = u.id
+          WHERE p.visibility = 'public' AND f.followed_id = ? ORDER BY f.created_at DESC LIMIT 30 OFFSET ?`).bind(userId, userId, offset).all<UserRow & { created_at: string; is_following: number }>();
         return json({ users: rows.results, hasMore: rows.results.length === 30 });
       }
       const rows = await database.prepare(`SELECT u.id,u.telegram_first_name,u.telegram_last_name,u.telegram_username,u.telegram_photo_url,f.created_at
-        FROM yume_follows f JOIN yume_users u ON u.id = f.followed_id
-        WHERE f.follower_id = ? ORDER BY f.created_at DESC LIMIT 30 OFFSET ?`).bind(userId, offset).all<UserRow & { created_at: string }>();
+        FROM yume_follows f JOIN yume_users u ON u.id = f.followed_id JOIN yume_profiles p ON p.user_id = u.id
+        WHERE p.visibility = 'public' AND f.follower_id = ? ORDER BY f.created_at DESC LIMIT 30 OFFSET ?`).bind(userId, offset).all<UserRow & { created_at: string }>();
       return json({ users: rows.results, hasMore: rows.results.length === 30 });
     }
     if (action === "recommendations") {
