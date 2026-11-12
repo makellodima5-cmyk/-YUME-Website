@@ -29,13 +29,15 @@ describe("YUBERA community foundation", () => {
 
   it("exposes collection detail, catalogue add/remove, public profiles and people discovery in the UI", async () => {
     const component = await readFile(resolve(process.cwd(), "src/components/yume/YuberaProfileHub.tsx"), "utf8");
+    const friendsPanel = await readFile(resolve(process.cwd(), "src/components/yume/YuberaFriendsPanel.tsx"), "utf8");
     expect(component).toContain('"collection-detail"');
     expect(component).toContain("Добавить аниме");
     expect(component).toContain("collection.item.add");
     expect(component).toContain("collection.item.remove");
     expect(component).toContain("Публичные подборки");
-    expect(component).toContain("Загрузить ещё");
-    expect(component).toContain("Найти людей");
+    expect(component).toContain("YuberaFriendsPanel");
+    expect(friendsPanel).toContain("Показать ещё");
+    expect(friendsPanel).toContain("Найти друзей");
   });
 
   it("awards collection XP atomically with unique-add and milestone guards", async () => {
