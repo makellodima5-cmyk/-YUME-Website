@@ -133,7 +133,7 @@ describe("YUBERA community foundation", () => {
     const component = await readFile(resolve(process.cwd(), "src/components/yume/YuberaProfileHub.tsx"), "utf8");
     const supportScreen = component.slice(component.indexOf('{screen === "support-status"'), component.indexOf('{screen === "plus"'));
     expect(supportScreen).not.toContain("setDonationOpen(true)");
-    expect(component).toContain('label="Аккаунт Telegram"');
+    expect(component).toContain('<h3 className="text-sm font-semibold text-white">Аккаунт Telegram</h3>');
     expect(component).toContain('onSignOut');
     expect(component).toContain("onClick={()=>setDonationOpen(true)}");
   });
