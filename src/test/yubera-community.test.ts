@@ -246,4 +246,28 @@ describe("YUBERA community foundation", () => {
     expect(tree).toContain("Stage 3 scope");
   });
 
+  it("confirms profile-edit discard through both back and cancel paths", async () => {
+    const component = await readFile(resolve(process.cwd(), "src/components/yume/YuberaProfileHub.tsx"), "utf8");
+    expect(component).toContain("type ProfileFormSnapshot");
+    expect(component).toContain("const cancelProfileEdit = () =>");
+    expect(component).toContain("bio !== profileFormInitial.bio");
+    expect(component).toContain('else if (screen === "edit") cancelProfileEdit()');
+    expect(component).toContain("onClick={cancelProfileEdit}");
+    expect(component).toContain("Отменить изменения профиля?");
+    expect(component).toContain("confirmDiscardProfileEdit");
+  });
+
+  it("presents public and closed profile visibility with server-save semantics", async () => {
+    const component = await readFile(resolve(process.cwd(), "src/components/yume/YuberaProfileHub.tsx"), "utf8");
+    const editStart = component.indexOf('screen === "edit" &&');
+    const editEnd = component.indexOf('(screen === "create" || screen === "edit-collection")', editStart);
+    const edit = component.slice(editStart, editEnd);
+    expect(edit).toContain("Доступен в поиске и открыт для всех");
+    expect(edit).toContain("Не отображается в поиске и недоступен для общего доступа");
+    expect(edit).toContain('setVisibility("public")');
+    expect(edit).toContain('setVisibility("private")');
+    expect(edit).toContain("Аватар и никнейм берутся из Telegram");
+    expect(edit).toContain("maxLength={250}");
+  });
+
 });
