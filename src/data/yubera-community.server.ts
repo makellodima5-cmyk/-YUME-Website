@@ -16,7 +16,6 @@ type UserRow = {
   telegram_username: string | null; telegram_photo_url: string | null;
 };
 type ProfileRow = { bio: string; visibility: "public" | "private"; avatar_frame: string | null };
-type XPEvent = "anime_rating" | "collection_add" | "collection_milestone" | "episode_complete";
 type XPLevel = { level: number; title: string; min: number; max: number | null };
 const XP_LEVELS: XPLevel[] = [
   { level: 1, title: "Начинающий зритель", min: 0, max: 49 },
@@ -38,9 +37,6 @@ const SUPPORT_LEVELS = [
   { level: 4, title: "Почётный покровитель", min: 5000, asset: "YUBERA_Support_Status_Level_04_Pochetnyy_Pokrovitel.webp" },
   { level: 5, title: "Легенда YUBERA", min: 10000, asset: "YUBERA_Support_Status_Level_05_Legenda_YUBERA.webp" },
 ] as const;
-const XP_REWARDS: Record<XPEvent, number> = {
-  anime_rating: 10, collection_add: 2, collection_milestone: 15, episode_complete: 5,
-};
 const FREE_COLLECTIONS = 5;
 const FREE_TITLES = 50;
 const PLUS_COLLECTIONS = 30;
@@ -152,13 +148,6 @@ async function profileSummary(database: Database, userId: string, viewerId: stri
     publicCollections: Number(collections?.count ?? 0), publicTitles: Number(collections?.titles ?? 0),
     collectionLikes: Number(collections?.likes ?? 0), isFollowing: Boolean(follow),
   };
-}
-async function awardXP(database: Database, userId: string, eventType: XPEvent, eventKey: string, metadata: Record<string, unknown> = {}) {
-  if (!/^[A-Za-z0-9:_-]{1,160}$/.test(eventKey)) throw new Error("invalid_xp_event_key");
-  const amount = XP_REWARDS[eventType];
-  const result = await database.prepare("INSERT OR IGNORE INTO yume_xp_ledger(id,user_id,event_key,event_type,amount,metadata_json) VALUES(?,?,?,?,?,?)")
-    .bind(crypto.randomUUID(), userId, eventKey, eventType, amount, JSON.stringify(metadata)).run();
-  return Number(result.meta?.changes ?? 0) === 1 ? amount : 0;
 }
 async function ownedCollection(database: Database, userId: string, collectionId: string) {
   return database.prepare("SELECT id,title,description,cover_key,is_public,is_pinned,created_at,updated_at FROM yume_collections WHERE id = ? AND user_id = ?")
