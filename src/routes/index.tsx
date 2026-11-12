@@ -1808,7 +1808,7 @@ function Index() {
           onSupport={() => setView("support")}
           showSupport={isTelegramMiniApp}
         />
-      ) : view === "support" && isTelegramMiniApp ? (
+      ) : view === "support" ? (
         <SupportPage />
       ) : view === "notifications" && notificationStateLoaded && !notificationRemoteAccount ? (
         <main id="main-content" className="px-4 pb-12 pt-24 md:px-10 md:pt-24">
