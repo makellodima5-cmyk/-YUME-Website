@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Bookmark, Check, ChevronRight, Crown, Heart, Info, Layers3, LifeBuoy, LockKeyhole, LogOut, Pencil, Pin, Plus, Search, Settings, Shield, ShieldCheck, Sparkles, Star, Trash2, Users, X } from "lucide-react";
+import { ArrowLeft, Bookmark, Check, ChevronRight, Crown, Eye, FileText, Globe2, Heart, Image as ImageIcon, Info, Layers3, LifeBuoy, LockKeyhole, LogOut, Pencil, Pin, Plus, Search, Settings, Shield, ShieldCheck, Sparkles, Star, Trash2, Type, Users, X } from "lucide-react";
 import { TelegramStarsDonation } from "./TelegramStarsDonation";
 import { YuberaPlusPanel } from "./YuberaPlusPanel";
 import { YuberaFriendsPanel } from "./YuberaFriendsPanel";
@@ -16,6 +16,7 @@ type ProfileData = {
   stats?: { favorites: number; watchlist: number; history: number } | null;
 };
 type Collection = { id: string; title: string; description: string; cover_key: string | null; is_public: number; is_pinned: number; title_count: number; like_count: number; liked: number };
+type CollectionFormSnapshot = { title: string; description: string; cover: string | null; isPublic: boolean; editingCollectionId: string | null };
 type Props = { animeList: Anime[]; onSelect: (anime: Anime) => void; onBack: () => void; isAdmin?: boolean; onSettings?: () => void; onLegal?: () => void; onAbout?: () => void; onAdmin?: () => void; onSupport?: () => void; onAccount?: () => void };
 
 const covers = [
@@ -62,8 +63,10 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
   const [frameCategory, setFrameCategory] = useState<"support" | "plus">("support");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [cover, setCover] = useState<string | null>(covers[0]);
-  const [isPublic, setIsPublic] = useState(false);
+  const [cover, setCover] = useState<string | null>(null);
+  const [isPublic, setIsPublic] = useState(true);
+  const [collectionFormInitial, setCollectionFormInitial] = useState<CollectionFormSnapshot>({ title: "", description: "", cover: null, isPublic: true, editingCollectionId: null });
+  const [discardCollectionOpen, setDiscardCollectionOpen] = useState(false);
   const [menuId, setMenuId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Collection | null>(null);
   const [editingCollectionId, setEditingCollectionId] = useState<string | null>(null);
@@ -164,12 +167,46 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
     if (result) { await load(); changeScreen("home"); }
   };
   const createCollection = async () => {
-    const result = await request({ action: editingCollectionId ? "collection.update" : "collection.create", ...(editingCollectionId ? { id: editingCollectionId } : {}), title, description, coverKey: cover, isPublic });
-    if (result) { setTitle(""); setDescription(""); setCover(covers[0]); setEditingCollectionId(null); await load(); changeScreen("collections"); }
+    if (!title.trim()) { setError("Укажите название подборки."); return; }
+    const result = await request({ action: editingCollectionId ? "collection.update" : "collection.create", ...(editingCollectionId ? { id: editingCollectionId } : {}), title: title.trim(), description: description.trim(), coverKey: cover, isPublic });
+    if (result) {
+      setTitle(""); setDescription(""); setCover(null); setIsPublic(true); setEditingCollectionId(null);
+      setCollectionFormInitial({ title: "", description: "", cover: null, isPublic: true, editingCollectionId: null });
+      await load(); changeScreen("collections");
+    }
   };
   const collectionAction = async (body: Record<string, unknown>) => {
     const result = await request(body);
     if (result) { setMenuId(null); await load(); }
+  };
+  const startCreateCollection = () => {
+    const initial = { title: "", description: "", cover: null, isPublic: true, editingCollectionId: null };
+    setTitle(initial.title);
+    setDescription(initial.description);
+    setCover(initial.cover);
+    setIsPublic(initial.isPublic);
+    setEditingCollectionId(initial.editingCollectionId);
+    setCollectionFormInitial(initial);
+    changeScreen("create");
+  };
+  const cancelCollectionForm = () => {
+    const dirty = title !== collectionFormInitial.title
+      || description !== collectionFormInitial.description
+      || cover !== collectionFormInitial.cover
+      || isPublic !== collectionFormInitial.isPublic
+      || editingCollectionId !== collectionFormInitial.editingCollectionId;
+    if (dirty) setDiscardCollectionOpen(true);
+    else changeScreen("collections");
+  };
+  const confirmDiscardCollectionForm = () => {
+    setDiscardCollectionOpen(false);
+    setTitle("");
+    setDescription("");
+    setCover(null);
+    setIsPublic(true);
+    setEditingCollectionId(null);
+    setCollectionFormInitial({ title: "", description: "", cover: null, isPublic: true, editingCollectionId: null });
+    changeScreen("collections");
   };
 
   const goBack = () => {
@@ -177,6 +214,7 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
     else if (screen === "public-collections") changeScreen("public-profile");
     else if (screen === "public-profile") changeScreen(publicProfileReturnScreen);
     else if (screen === "collection-detail" && !activeCollectionIsOwner) changeScreen(collectionReturnScreen);
+    else if (screen === "create" || screen === "edit-collection") cancelCollectionForm();
     else changeScreen("home");
   };
   const Header = ({ title: heading, subtitle }: { title: string; subtitle?: string }) => (
