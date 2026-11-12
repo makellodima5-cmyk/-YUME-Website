@@ -56,4 +56,11 @@ describe("YUBERA community foundation", () => {
     expect(server).toContain("remaining:");
   });
 
+
+  it("hides Plus-only avatar frames when the paid period is no longer active", async () => {
+    const server = await readFile(resolve(process.cwd(), "src/data/yubera-community.server.ts"), "utf8");
+    expect(server).toContain("avatarFrame: plus ? account.profile.avatar_frame : null");
+    expect(server).toContain("expires_at > ?");
+  });
+
 });
