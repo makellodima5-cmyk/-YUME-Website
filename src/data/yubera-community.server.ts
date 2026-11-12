@@ -15,6 +15,7 @@ type RuntimeGlobal = typeof globalThis & { __YUME_RUNTIME_ENV__?: unknown };
 type UserRow = {
   id: string; telegram_user_id: string; telegram_first_name: string; telegram_last_name: string | null;
   telegram_username: string | null; telegram_photo_url: string | null;
+  bio?: string; avatar_frame?: string | null; is_following?: number; created_at?: string;
 };
 type ProfileRow = { bio: string; visibility: "public" | "private"; avatar_frame: string | null };
 const FREE_COLLECTIONS = 5;
@@ -204,31 +205,50 @@ export async function handleYuberaCommunity(request: Request): Promise<Response>
       const page = Math.max(0, Math.min(1000, Number.parseInt(url.searchParams.get("page") ?? "0", 10) || 0));
       const offset = page * 30;
       if (query) {
-        const rows = await database.prepare(`SELECT u.id,u.telegram_first_name,u.telegram_last_name,u.telegram_username,u.telegram_photo_url,
-          EXISTS(SELECT 1 FROM yume_follows f WHERE f.follower_id = ? AND f.followed_id = u.id) AS is_following
-          FROM yume_users u JOIN yume_profiles p ON p.user_id = u.id
-          WHERE p.visibility = 'public' AND u.id <> ?
-          AND (lower(u.telegram_first_name || ' ' || COALESCE(u.telegram_last_name,'')) LIKE lower(?) OR lower(COALESCE(u.telegram_username,'')) LIKE lower(?))
-          ORDER BY u.telegram_first_name,u.id LIMIT 30 OFFSET ?`)
-          .bind(userId, userId, `%${query}%`, `%${query.replace(/^@/, "")}%`, offset).all<UserRow & { is_following: number }>();
-        return json({ users: rows.results, hasMore: rows.results.length === 30 });
+        const [rows, total] = await Promise.all([
+          database.prepare(`SELECT u.id,u.telegram_first_name,u.telegram_last_name,u.telegram_username,u.telegram_photo_url,
+            p.bio,p.avatar_frame,
+            EXISTS(SELECT 1 FROM yume_follows f WHERE f.follower_id = ? AND f.followed_id = u.id) AS is_following
+            FROM yume_users u JOIN yume_profiles p ON p.user_id = u.id
+            WHERE p.visibility = 'public' AND u.id <> ?
+            AND (lower(u.telegram_first_name || ' ' || COALESCE(u.telegram_last_name,'')) LIKE lower(?) OR lower(COALESCE(u.telegram_username,'')) LIKE lower(?))
+            ORDER BY u.telegram_first_name,u.id LIMIT 30 OFFSET ?`)
+            .bind(userId, userId, `%${query}%`, `%${query.replace(/^@/, "")}%`, offset).all<UserRow>(),
+          database.prepare(`SELECT COUNT(*) AS count FROM yume_users u JOIN yume_profiles p ON p.user_id=u.id
+            WHERE p.visibility='public' AND u.id<>?
+            AND (lower(u.telegram_first_name || ' ' || COALESCE(u.telegram_last_name,'')) LIKE lower(?) OR lower(COALESCE(u.telegram_username,'')) LIKE lower(?))`)
+            .bind(userId, `%${query}%`, `%${query.replace(/^@/, "")}%`).first<{count:number}>(),
+        ]);
+        const count = Number(total?.count ?? 0);
+        return json({ users: rows.results, total: count, hasMore: offset + rows.results.length < count });
       }
       if (url.searchParams.get("direction") === "followers") {
-        const rows = await database.prepare(`SELECT u.id,u.telegram_first_name,u.telegram_last_name,u.telegram_username,u.telegram_photo_url,f.created_at,
-          EXISTS(SELECT 1 FROM yume_follows mine WHERE mine.follower_id = ? AND mine.followed_id = u.id) AS is_following
-          FROM yume_follows f JOIN yume_users u ON u.id = f.follower_id JOIN yume_profiles p ON p.user_id = u.id
-          WHERE p.visibility = 'public' AND f.followed_id = ? ORDER BY f.created_at DESC LIMIT 30 OFFSET ?`).bind(userId, userId, offset).all<UserRow & { created_at: string; is_following: number }>();
-        return json({ users: rows.results, hasMore: rows.results.length === 30 });
+        const [rows, total] = await Promise.all([
+          database.prepare(`SELECT u.id,u.telegram_first_name,u.telegram_last_name,u.telegram_username,u.telegram_photo_url,
+            p.bio,p.avatar_frame,f.created_at,
+            EXISTS(SELECT 1 FROM yume_follows mine WHERE mine.follower_id = ? AND mine.followed_id = u.id) AS is_following
+            FROM yume_follows f JOIN yume_users u ON u.id = f.follower_id JOIN yume_profiles p ON p.user_id = u.id
+            WHERE p.visibility = 'public' AND f.followed_id = ? ORDER BY f.created_at DESC LIMIT 30 OFFSET ?`).bind(userId, userId, offset).all<UserRow>(),
+          database.prepare("SELECT COUNT(*) AS count FROM yume_follows WHERE followed_id = ?").bind(userId).first<{count:number}>(),
+        ]);
+        const count = Number(total?.count ?? 0);
+        return json({ users: rows.results, total: count, hasMore: offset + rows.results.length < count });
       }
-      const rows = await database.prepare(`SELECT u.id,u.telegram_first_name,u.telegram_last_name,u.telegram_username,u.telegram_photo_url,f.created_at
-        FROM yume_follows f JOIN yume_users u ON u.id = f.followed_id JOIN yume_profiles p ON p.user_id = u.id
-        WHERE p.visibility = 'public' AND f.follower_id = ? ORDER BY f.created_at DESC LIMIT 30 OFFSET ?`).bind(userId, offset).all<UserRow & { created_at: string }>();
-      return json({ users: rows.results, hasMore: rows.results.length === 30 });
+      const [rows, total] = await Promise.all([
+        database.prepare(`SELECT u.id,u.telegram_first_name,u.telegram_last_name,u.telegram_username,u.telegram_photo_url,
+          p.bio,p.avatar_frame,f.created_at
+          FROM yume_follows f JOIN yume_users u ON u.id = f.followed_id JOIN yume_profiles p ON p.user_id = u.id
+          WHERE p.visibility = 'public' AND f.follower_id = ? ORDER BY f.created_at DESC LIMIT 30 OFFSET ?`).bind(userId, offset).all<UserRow>(),
+        database.prepare("SELECT COUNT(*) AS count FROM yume_follows WHERE follower_id = ?").bind(userId).first<{count:number}>(),
+      ]);
+      const count = Number(total?.count ?? 0);
+      return json({ users: rows.results, total: count, hasMore: offset + rows.results.length < count });
     }
     if (action === "recommendations") {
       if (!userId) return json({ error: "authentication_required" }, 401);
       const page = Math.max(0, Math.min(1000, Number.parseInt(url.searchParams.get("page") ?? "0", 10) || 0));
-      const rows = await database.prepare(`SELECT u.id,u.telegram_first_name,u.telegram_last_name,u.telegram_username,u.telegram_photo_url
+      const rows = await database.prepare(`SELECT u.id,u.telegram_first_name,u.telegram_last_name,u.telegram_username,u.telegram_photo_url,
+        p.bio,p.avatar_frame
         FROM yume_users u JOIN yume_profiles p ON p.user_id = u.id
         WHERE p.visibility = 'public' AND u.id <> ?
         AND NOT EXISTS(SELECT 1 FROM yume_follows f WHERE f.follower_id = ? AND f.followed_id = u.id)
