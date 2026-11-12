@@ -622,7 +622,7 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
                 <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
               </button>}
 
-              {profileRow(LifeBuoy, t("profile.support"), t("profile.supportDescription"), "support")}
+              {profileRow(LifeBuoy, language === "ru" ? "Помощь и сообщения о проблемах" : "Help and problem reports", language === "ru" ? "Связаться с командой YUBERA" : "Contact the YUBERA team", "support")}
             </section>
             {settingsExpanded && (
               <section id="app-settings" className="mt-6 rounded-2xl border border-border bg-card p-4 sm:p-5">
