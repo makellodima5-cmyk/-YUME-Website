@@ -1,10 +1,9 @@
 -- Reconcile legacy YUBERA tables before enabling recurring Plus.
--- The production database may contain older tables with the same names as the
--- clean schema. Archive those tables (without dropping data), then create the
--- exact schema expected by the current application.
---
--- The inspected production tables being replaced were empty. The legacy copies
--- remain available under *_legacy_0009 names for audit/rollback.
+-- Production may contain an older schema generation with yume_user_* community
+-- table names. This migration preserves those tables in place and creates the
+-- clean application tables alongside them. Shared-name legacy tables that must
+-- be structurally replaced are renamed to *_legacy_0009, never dropped.
+-- The inspected replacement tables were empty; legacy copies remain available.
 
 -- Remove indexes attached to the legacy tables so the clean indexes can be
 -- recreated on the replacement tables after the rename.
