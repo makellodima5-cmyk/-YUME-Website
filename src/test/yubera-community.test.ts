@@ -211,8 +211,8 @@ describe("YUBERA community foundation", () => {
 
   it("matches the approved collection creation defaults and visibility choices", async () => {
     const component = await readFile(resolve(process.cwd(), "src/components/yume/YuberaProfileHub.tsx"), "utf8");
-    const formStart = component.indexOf('(screen === "create" || screen === "edit-collection")');
-    const formEnd = component.indexOf('screen === "friends"', formStart);
+    const formStart = component.indexOf('{(screen === "create" || screen === "edit-collection")');
+    const formEnd = component.indexOf('{screen === "friends"', formStart);
     const form = component.slice(formStart, formEnd);
     expect(component).toContain('useState<string | null>(null)');
     expect(component).toContain('useState(true)');
