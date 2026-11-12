@@ -218,7 +218,7 @@ export async function handleYuberaCommunity(request: Request): Promise<Response>
           WHERE p.visibility = 'public' AND u.id <> ?
           AND (lower(u.telegram_first_name || ' ' || COALESCE(u.telegram_last_name,'')) LIKE lower(?) OR lower(COALESCE(u.telegram_username,'')) LIKE lower(?))
           ORDER BY u.telegram_first_name LIMIT 30`)
-          .bind(userId, `%${query}%`, `%${query.replace(/^@/, "")}%`).all<UserRow>();
+          .bind(userId, userId, `%${query}%`, `%${query.replace(/^@/, "")}%`).all<UserRow & { is_following: number }>();
         return json({ users: rows.results });
       }
       const rows = await database.prepare(`SELECT u.id,u.telegram_first_name,u.telegram_last_name,u.telegram_username,u.telegram_photo_url,f.created_at
