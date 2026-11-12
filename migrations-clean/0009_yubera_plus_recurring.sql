@@ -200,6 +200,10 @@ WHERE (SELECT COALESCE(SUM(d.amount),0) FROM yume_stars_donations d
     AND r.telegram_payment_charge_id IS NULL)>=10000;
 
 -- Owner-approved launch price: 100 Telegram Stars for 30 days.
+-- Production may have the settings table but no price row at all.
+-- Insert the default only when absent; never overwrite an owner-configured value.
+INSERT OR IGNORE INTO yume_plus_settings(setting_key,setting_value,updated_by,updated_at)
+VALUES ('price_xtr','100',NULL,CURRENT_TIMESTAMP);
 INSERT INTO yume_plus_audit_log(actor_user_id,action,details_json)
 SELECT NULL,'migration_initial_price',
   json_object('oldPrice',CAST(setting_value AS INTEGER),'newPrice',100,'source','owner-approved migration')
