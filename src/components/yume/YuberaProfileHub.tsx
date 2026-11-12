@@ -9,7 +9,7 @@ import { YUBERA_SUPPORT_LEVELS, YUBERA_XP_LEVELS, YUBERA_XP_REWARDS, YUBERA_XP_R
 type Screen = "home" | "edit" | "collections" | "collection-detail" | "create" | "edit-collection" | "friends" | "level" | "support-status" | "plus" | "public-profile";
 type ProfileData = {
   id: string; displayName: string; username: string | null; photoUrl: string | null; bio: string;
-  avatarFrame: string | null; availableSupportFrames?: string[]; visibility: "public" | "private"; isPlus: boolean;
+  avatarFrame: string | null; availableSupportFrames?: string[]; visibility: "public" | "private"; isPlus: boolean; isFollowing?: boolean;
   followers: number; following: number; publicCollections: number; publicTitles: number; collectionLikes: number;
   xp: { total?: number; level: number; title: string; nextLevel?: number | null; nextTitle?: string | null; nextThreshold?: number | null; progress?: number; remaining?: number };
   support: { level: number; title: string; asset: string | null; total?: number; nextThreshold?: number | null; progress?: number; remaining?: number };
