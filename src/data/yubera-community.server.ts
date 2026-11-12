@@ -350,7 +350,7 @@ export async function handleYuberaCommunity(request: Request): Promise<Response>
         .bind(id, animeId, Number(count?.count ?? 0)),
       database.prepare("INSERT OR IGNORE INTO yume_xp_ledger(id,user_id,event_key,event_type,amount,metadata_json) SELECT ?,?,?,'collection_add',2,? WHERE changes()=1")
         .bind(crypto.randomUUID(), userId, `collection-add:${id}:${animeId}`, JSON.stringify({ collectionId: id, animeId })),
-      database.prepare("INSERT OR IGNORE INTO yume_xp_ledger(id,user_id,event_key,event_type,amount,metadata_json) SELECT ?,?,?,'collection_milestone',15,? WHERE (SELECT COUNT(*) FROM yume_collection_items WHERE collection_id=?)>=3")
+      database.prepare("INSERT OR IGNORE INTO yume_xp_ledger(id,user_id,event_key,event_type,amount,metadata_json) SELECT ?,?,?,'collection_milestone',15,? WHERE changes()=1 AND (SELECT COUNT(*) FROM yume_collection_items WHERE collection_id=?)=3")
         .bind(crypto.randomUUID(), userId, `collection-milestone:${id}`, JSON.stringify({ collectionId: id }), id),
     ]);
     return json({ ok: true });
