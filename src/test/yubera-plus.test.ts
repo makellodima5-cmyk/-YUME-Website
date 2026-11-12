@@ -9,7 +9,7 @@ it("sets the approved 100-Star price and includes renewal and permanent support-
 expect(migration).not.toContain("ALTER TABLE yume_profiles");expect(migration).not.toContain("ALTER TABLE yume_follows");expect(migration).not.toContain("ALTER TABLE yume_collections");expect(migration).toContain("CREATE TABLE IF NOT EXISTS yume_profiles");expect(migration).toContain("CREATE TABLE IF NOT EXISTS yume_follows");expect(migration).toContain("CREATE TABLE IF NOT EXISTS yume_collections");});
 
 
-it("does not offer checkout at an unconfigured price and exposes the admin setup state",async()=>{const [panel,admin]=await Promise.all([import("node:fs/promises").then(m=>m.readFile("src/components/yume/YuberaPlusPanel.tsx","utf8")),import("node:fs/promises").then(m=>m.readFile("src/components/yume/YuberaPlusAdminPanel.tsx","utf8"))]);expect(panel).toContain("status.price<1");expect(panel).toContain("Стоимость:");
+it("does not offer checkout at an unconfigured price and exposes the admin setup state",async()=>{const [panel,admin]=await Promise.all([import("node:fs/promises").then(m=>m.readFile("src/components/yume/YuberaPlusPanel.tsx","utf8")),import("node:fs/promises").then(m=>m.readFile("src/components/yume/YuberaPlusAdminPanel.tsx","utf8"))]);expect(panel).toContain("status.price<1");expect(panel).toContain("Цена подписки ещё не настроена.");
 expect(panel).toContain("status.price>0");expect(admin).toContain("Цена не задана");});
 
 
