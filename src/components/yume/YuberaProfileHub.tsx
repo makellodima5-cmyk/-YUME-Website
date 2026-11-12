@@ -17,6 +17,7 @@ type ProfileData = {
 };
 type Collection = { id: string; title: string; description: string; cover_key: string | null; is_public: number; is_pinned: number; title_count: number; like_count: number; liked: number };
 type CollectionFormSnapshot = { title: string; description: string; cover: string | null; isPublic: boolean; editingCollectionId: string | null };
+type ProfileFormSnapshot = { bio: string; visibility: "public" | "private"; frame: string | null };
 type Props = { animeList: Anime[]; onSelect: (anime: Anime) => void; onBack: () => void; isAdmin?: boolean; onSettings?: () => void; onLegal?: () => void; onAbout?: () => void; onAdmin?: () => void; onSupport?: () => void; onAccount?: () => void };
 
 const covers = [
@@ -70,6 +71,8 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
   const [visibility, setVisibility] = useState<"public" | "private">("private");
   const [frame, setFrame] = useState<string | null>(null);
   const [frameCategory, setFrameCategory] = useState<"support" | "plus">("support");
+  const [profileFormInitial, setProfileFormInitial] = useState<ProfileFormSnapshot>({ bio: "", visibility: "private", frame: null });
+  const [discardProfileOpen, setDiscardProfileOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [cover, setCover] = useState<string | null>(null);
@@ -103,6 +106,7 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
       setBio(data.profile.bio || "");
       setVisibility(data.profile.visibility || "private");
       setFrame(data.profile.avatarFrame || null);
+      setProfileFormInitial({ bio: data.profile.bio || "", visibility: data.profile.visibility || "private", frame: data.profile.avatarFrame || null });
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Ошибка загрузки"); }
   }, []);
   useEffect(() => { void load(); }, [load]);
@@ -227,12 +231,25 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
     setCollectionFormInitial({ title: "", description: "", cover: null, isPublic: true, editingCollectionId: null });
     changeScreen(collectionFormReturnScreen);
   };
+  const cancelProfileEdit = () => {
+    const dirty = bio !== profileFormInitial.bio || visibility !== profileFormInitial.visibility || frame !== profileFormInitial.frame;
+    if (dirty) setDiscardProfileOpen(true);
+    else changeScreen("home");
+  };
+  const confirmDiscardProfileEdit = () => {
+    setDiscardProfileOpen(false);
+    setBio(profileFormInitial.bio);
+    setVisibility(profileFormInitial.visibility);
+    setFrame(profileFormInitial.frame);
+    changeScreen("home");
+  };
 
   const goBack = () => {
     if (screen === "home") onBack();
     else if (screen === "public-collections") changeScreen("public-profile");
     else if (screen === "public-profile") changeScreen(publicProfileReturnScreen);
     else if (screen === "collection-detail" && !activeCollectionIsOwner) changeScreen(collectionReturnScreen);
+    else if (screen === "edit") cancelProfileEdit();
     else if (screen === "create" || screen === "edit-collection") cancelCollectionForm();
     else changeScreen("home");
   };
@@ -335,7 +352,7 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
       </div>
       <p className="mt-3 rounded-xl bg-white/[0.03] p-3 text-xs text-white/50"><Sparkles className="mr-1 inline h-4 w-4"/> {frameCategory==="support"?"Рамки открываются по мере накопления подтверждённой поддержки проекта. Открытые рамки остаются у вас навсегда.":"Рамки YUBERA Plus доступны только при активной подписке. После её окончания такая рамка перестаёт отображаться."}</p>
       <button disabled={busy} onClick={()=>void saveProfile()} className="mt-5 w-full rounded-xl bg-gradient-to-r from-[#ff5d42] to-[#ff8058] py-3 font-semibold disabled:opacity-50">Сохранить изменения</button>
-      <button disabled={busy} onClick={()=>{setBio(profile.bio);setVisibility(profile.visibility);setFrame(profile.avatarFrame);changeScreen("home");}} className="mt-2 w-full rounded-xl border border-white/15 bg-white/5 py-3 font-semibold">Отменить</button>
+      <button type="button" disabled={busy} onClick={cancelProfileEdit} className="mt-2 w-full rounded-xl border border-white/15 bg-white/5 py-3 font-semibold">Отменить</button>
     </Card></>}
     {screen === "collection-detail" && activeCollection && <><Header title={activeCollection.title} subtitle={activeCollection.description || "Подборка аниме"}/><Card><div className="mb-3 flex items-center justify-between"><b>{activeCollectionItems.length} / {profile.isPlus ? 300 : 50} тайтлов</b><span className="text-xs text-white/45">{activeCollection.is_public ? "Публичная" : "Приватная"}</span></div>{activeCollectionItems.length ? activeCollectionItems.map(id=>{const anime=animeList.find(item=>item.id===id);return <div key={id} className="flex items-center gap-3 border-b border-white/5 py-3 last:border-0">{anime?.posterUrl ? <img src={anime.posterUrl} alt="" className="h-16 w-12 rounded-lg object-cover"/> : <div className="h-16 w-12 rounded-lg bg-white/5"/>}<button onClick={()=>anime&&onSelect(anime)} className="min-w-0 flex-1 text-left"><b className="block truncate">{anime?.title || `Аниме #${id}`}</b><span className="text-xs text-white/45">{anime?.original || ""}</span></button>{activeCollectionIsOwner && <button disabled={busy} onClick={async()=>{const result=await request({action:"collection.item.remove",id:activeCollection.id,animeId:id});if(result){setActiveCollectionItems(items=>items.filter(value=>value!==id));await load();}}} className="rounded-lg bg-white/5 p-2 text-white/55" aria-label="Убрать из подборки"><Trash2 className="h-4 w-4"/></button>}</div>}) : <p className="py-5 text-center text-sm text-white/45">В этой подборке пока нет аниме</p>}</Card>{activeCollectionIsOwner && <Card className="mt-3"><h3 className="mb-3 font-semibold">Добавить аниме</h3><input value={animeSearch} onChange={e=>setAnimeSearch(e.target.value)} placeholder="Найти аниме в каталоге" className="mb-3 w-full rounded-xl border border-white/10 bg-black/20 p-3 text-sm"/><div className="max-h-80 space-y-1 overflow-y-auto">{animeList.filter(item=>!activeCollectionItems.includes(item.id)&&(!animeSearch.trim()||[item.title,item.englishTitle,item.original].filter(Boolean).some(value=>value!.toLocaleLowerCase().includes(animeSearch.toLocaleLowerCase())))).slice(0,30).map(anime=><div key={anime.id} className="flex items-center gap-3 rounded-lg p-2 hover:bg-white/5">{anime.posterUrl?<img src={anime.posterUrl} alt="" className="h-12 w-9 rounded object-cover"/>:<div className="h-12 w-9 rounded bg-white/5"/>}<span className="min-w-0 flex-1 truncate text-sm">{anime.title}</span><button disabled={busy||activeCollectionItems.length >= (profile.isPlus?300:50)} onClick={async()=>{const result=await request({action:"collection.item.add",id:activeCollection.id,animeId:anime.id});if(result){setActiveCollectionItems(items=>[...items,anime.id]);await load();}}} className="rounded-lg bg-[#ff7658]/15 px-3 py-2 text-xs font-semibold text-[#ff967e]">Добавить</button></div>)}</div></Card>}</>}{screen === "collections" && <><Header title="Мои подборки" subtitle="Ваши личные подборки аниме"/>{pinned.length>0 && <Card className="mb-3"><h3 className="mb-2 font-semibold"><Pin className="mr-2 inline h-4 w-4 text-[#ff7658]"/>Закреплённые подборки <span className="float-right rounded-full bg-white/10 px-2 text-xs">{pinned.length}</span></h3>{pinned.map(collectionRow)}</Card>}<Card className="mb-4"><h3 className="mb-2 font-semibold"><Layers3 className="mr-2 inline h-4 w-4 text-[#ff7658]"/>Остальные подборки <span className="float-right rounded-full bg-white/10 px-2 text-xs">{rest.length}</span></h3>{rest.length?rest.map(collectionRow):<p className="py-4 text-center text-sm text-white/45">Пока нет подборок</p>}</Card><button onClick={startCreateCollection} className="w-full rounded-2xl border border-dashed border-white/30 py-4 font-semibold"><Plus className="mr-2 inline h-5 w-5"/>Создать подборку</button></>}
     {(screen === "create" || screen === "edit-collection") && <>
@@ -447,6 +464,7 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
       <Header title="Публичные подборки" subtitle={"Подборки пользователя " + publicProfile.displayName} />
       <Card>{publicCollections.length ? publicCollections.map(publicCollectionRow) : <p className="py-4 text-center text-sm text-white/45">Публичных подборок пока нет</p>}</Card>
     </>}
+    {discardProfileOpen && <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4" role="dialog" aria-modal="true" aria-labelledby="discard-profile-title"><div className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#202127] p-5"><h3 id="discard-profile-title" className="text-lg font-bold">Отменить изменения профиля?</h3><p className="mt-2 text-sm text-white/60">Описание, видимость и выбранная рамка не будут сохранены.</p><div className="mt-5 flex gap-2"><button type="button" onClick={()=>setDiscardProfileOpen(false)} className="flex-1 rounded-xl bg-white/10 py-3">Продолжить</button><button type="button" onClick={confirmDiscardProfileEdit} className="flex-1 rounded-xl bg-[#ff7658] py-3 font-semibold text-black">Отменить</button></div></div></div>}
     {discardCollectionOpen && <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4" role="dialog" aria-modal="true" aria-labelledby="discard-collection-title"><div className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#202127] p-5"><h3 id="discard-collection-title" className="text-lg font-bold">Отменить изменения?</h3><p className="mt-2 text-sm text-white/60">Введённые данные и выбранные параметры не сохранятся.</p><div className="mt-5 flex gap-2"><button type="button" onClick={()=>setDiscardCollectionOpen(false)} className="flex-1 rounded-xl bg-white/10 py-3">Продолжить</button><button type="button" onClick={confirmDiscardCollectionForm} className="flex-1 rounded-xl bg-[#ff7658] py-3 font-semibold text-black">Отменить</button></div></div></div>}
     {deleteTarget && <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4"><div className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#202127] p-5"><h3 className="text-lg font-bold">Удалить подборку?</h3><p className="mt-2 text-sm text-white/60">«{deleteTarget.title}» будет удалена. Тайтлы каталога и другие подборки не изменятся.</p><div className="mt-5 flex gap-2"><button onClick={()=>setDeleteTarget(null)} className="flex-1 rounded-xl bg-white/10 py-3">Отмена</button><button onClick={()=>{const target=deleteTarget;setDeleteTarget(null);void collectionAction({action:"collection.delete",id:target.id});}} className="flex-1 rounded-xl bg-red-500/90 py-3 font-semibold">Удалить</button></div></div></div>}
     <TelegramStarsDonation open={donationOpen} onClose={()=>setDonationOpen(false)}/>
