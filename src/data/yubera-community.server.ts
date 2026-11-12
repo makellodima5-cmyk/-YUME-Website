@@ -1,6 +1,7 @@
 import { env as cloudflareEnv } from "cloudflare:workers";
 import { getAuthenticatedYumeUserId } from "@/data/telegram-auth.server";
 import { getR2Anime } from "@/data/catalog-r2.server";
+import { YUBERA_SUPPORT_LEVELS, YUBERA_XP_LEVELS, YUBERA_XP_REWARDS } from "@/data/yubera-config";
 
 type Statement = {
   bind(...values: unknown[]): Statement;
@@ -16,27 +17,6 @@ type UserRow = {
   telegram_username: string | null; telegram_photo_url: string | null;
 };
 type ProfileRow = { bio: string; visibility: "public" | "private"; avatar_frame: string | null };
-type XPLevel = { level: number; title: string; min: number; max: number | null };
-const XP_LEVELS: XPLevel[] = [
-  { level: 1, title: "Начинающий зритель", min: 0, max: 49 },
-  { level: 2, title: "Любитель аниме", min: 50, max: 149 },
-  { level: 3, title: "Искатель историй", min: 150, max: 299 },
-  { level: 4, title: "Исследователь миров", min: 300, max: 499 },
-  { level: 5, title: "Коллекционер", min: 500, max: 749 },
-  { level: 6, title: "Знаток аниме", min: 750, max: 999 },
-  { level: 7, title: "Хранитель историй", min: 1000, max: 1499 },
-  { level: 8, title: "Мастер YUBERA", min: 1500, max: 2199 },
-  { level: 9, title: "Архивариус YUBERA", min: 2200, max: 3199 },
-  { level: 10, title: "Легенда YUBERA", min: 3200, max: null },
-];
-const SUPPORT_LEVELS = [
-  { level: 0, title: "Без статуса", min: 0, asset: null },
-  { level: 1, title: "Союзник", min: 50, asset: "YUBERA_Support_Status_Level_01_Soyuznik.webp" },
-  { level: 2, title: "Сторонник", min: 1000, asset: "YUBERA_Support_Status_Level_02_Storonnik.webp" },
-  { level: 3, title: "Преданный участник", min: 2500, asset: "YUBERA_Support_Status_Level_03_Predanniy_Uchastnik.webp" },
-  { level: 4, title: "Почётный покровитель", min: 5000, asset: "YUBERA_Support_Status_Level_04_Pochetnyy_Pokrovitel.webp" },
-  { level: 5, title: "Легенда YUBERA", min: 10000, asset: "YUBERA_Support_Status_Level_05_Legenda_YUBERA.webp" },
-] as const;
 const FREE_COLLECTIONS = 5;
 const FREE_TITLES = 50;
 const PLUS_COLLECTIONS = 30;
@@ -352,10 +332,10 @@ export async function handleYuberaCommunity(request: Request): Promise<Response>
     await database.batch([
       database.prepare("INSERT OR IGNORE INTO yume_collection_items(collection_id,anime_id,position) VALUES(?,?,?)")
         .bind(id, animeId, Number(count?.count ?? 0)),
-      database.prepare("INSERT OR IGNORE INTO yume_xp_ledger(id,user_id,event_key,event_type,amount,metadata_json) SELECT ?,?,?,'collection_add',2,? WHERE changes()=1")
-        .bind(crypto.randomUUID(), userId, `collection-add:${id}:${animeId}`, JSON.stringify({ collectionId: id, animeId })),
-      database.prepare("INSERT OR IGNORE INTO yume_xp_ledger(id,user_id,event_key,event_type,amount,metadata_json) SELECT ?,?,?,'collection_milestone',15,? WHERE changes()=1 AND (SELECT COUNT(*) FROM yume_collection_items WHERE collection_id=?)=3")
-        .bind(crypto.randomUUID(), userId, `collection-milestone:${id}`, JSON.stringify({ collectionId: id }), id),
+      database.prepare("INSERT OR IGNORE INTO yume_xp_ledger(id,user_id,event_key,event_type,amount,metadata_json) SELECT ?,?,?,'collection_add',?,? WHERE changes()=1")
+        .bind(crypto.randomUUID(), userId, `collection-add:${id}:${animeId}`, YUBERA_XP_REWARDS.collectionTitleAdded, JSON.stringify({ collectionId: id, animeId })),
+      database.prepare("INSERT OR IGNORE INTO yume_xp_ledger(id,user_id,event_key,event_type,amount,metadata_json) SELECT ?,?,?,'collection_milestone',?,? WHERE changes()=1 AND (SELECT COUNT(*) FROM yume_collection_items WHERE collection_id=?)=3")
+        .bind(crypto.randomUUID(), userId, `collection-milestone:${id}`, YUBERA_XP_REWARDS.collectionThreeTitleMilestone, JSON.stringify({ collectionId: id }), id),
     ]);
     return json({ ok: true });
   }
