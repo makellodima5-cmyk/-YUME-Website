@@ -350,9 +350,9 @@ async function handleWrite(request: Request): Promise<Response> {
     const results = await db.batch([
       db.prepare(
         "INSERT OR IGNORE INTO yume_xp_ledger (id, user_id, event_key, event_type, amount, metadata_json) " +
-        "SELECT ?, ?, ?, 'anime_rating', 10, ? WHERE NOT EXISTS (" +
+        "SELECT ?, ?, ?, 'anime_rating', ?, ? WHERE NOT EXISTS (" +
         "SELECT 1 FROM yume_anime_ratings WHERE anime_id = ? AND user_id = ?)",
-      ).bind(crypto.randomUUID(), userId, "anime-rating:" + userId + ":" + animeId, JSON.stringify({ animeId }), animeId, userId),
+      ).bind(crypto.randomUUID(), userId, "anime-rating:" + userId + ":" + animeId, YUBERA_XP_REWARDS.firstAnimeRating, JSON.stringify({ animeId }), animeId, userId),
       db.prepare(
         "INSERT INTO yume_anime_ratings (anime_id, user_id, rating) VALUES (?, ?, ?) " +
         "ON CONFLICT (anime_id, user_id) DO UPDATE SET " +
