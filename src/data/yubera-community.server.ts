@@ -207,13 +207,17 @@ export async function handleYuberaCommunity(request: Request): Promise<Response>
       if (query) {
         const [rows, total] = await Promise.all([
           database.prepare(`SELECT u.id,u.telegram_first_name,u.telegram_last_name,u.telegram_username,u.telegram_photo_url,
-            p.bio,p.avatar_frame,
+            p.bio,
+            CASE WHEN p.avatar_frame LIKE 'YUBERA_Contribution_Avatar_Frame_%' THEN p.avatar_frame
+              WHEN p.avatar_frame LIKE 'YUBERA_Plus_Avatar_Frame_%' AND EXISTS(
+                SELECT 1 FROM yume_plus_subscriptions s WHERE s.user_id=u.id AND s.status='active' AND s.expires_at > ?
+              ) THEN p.avatar_frame ELSE NULL END AS avatar_frame,
             EXISTS(SELECT 1 FROM yume_follows f WHERE f.follower_id = ? AND f.followed_id = u.id) AS is_following
             FROM yume_users u JOIN yume_profiles p ON p.user_id = u.id
             WHERE p.visibility = 'public' AND u.id <> ?
             AND (lower(u.telegram_first_name || ' ' || COALESCE(u.telegram_last_name,'')) LIKE lower(?) OR lower(COALESCE(u.telegram_username,'')) LIKE lower(?))
             ORDER BY u.telegram_first_name,u.id LIMIT 30 OFFSET ?`)
-            .bind(userId, userId, `%${query}%`, `%${query.replace(/^@/, "")}%`, offset).all<UserRow>(),
+            .bind(Date.now(), userId, userId, `%${query}%`, `%${query.replace(/^@/, "")}%`, offset).all<UserRow>(),
           database.prepare(`SELECT COUNT(*) AS count FROM yume_users u JOIN yume_profiles p ON p.user_id=u.id
             WHERE p.visibility='public' AND u.id<>?
             AND (lower(u.telegram_first_name || ' ' || COALESCE(u.telegram_last_name,'')) LIKE lower(?) OR lower(COALESCE(u.telegram_username,'')) LIKE lower(?))`)
@@ -225,10 +229,15 @@ export async function handleYuberaCommunity(request: Request): Promise<Response>
       if (url.searchParams.get("direction") === "followers") {
         const [rows, total] = await Promise.all([
           database.prepare(`SELECT u.id,u.telegram_first_name,u.telegram_last_name,u.telegram_username,u.telegram_photo_url,
-            p.bio,p.avatar_frame,f.created_at,
+            p.bio,
+            CASE WHEN p.avatar_frame LIKE 'YUBERA_Contribution_Avatar_Frame_%' THEN p.avatar_frame
+              WHEN p.avatar_frame LIKE 'YUBERA_Plus_Avatar_Frame_%' AND EXISTS(
+                SELECT 1 FROM yume_plus_subscriptions s WHERE s.user_id=u.id AND s.status='active' AND s.expires_at > ?
+              ) THEN p.avatar_frame ELSE NULL END AS avatar_frame,
+            f.created_at,
             EXISTS(SELECT 1 FROM yume_follows mine WHERE mine.follower_id = ? AND mine.followed_id = u.id) AS is_following
             FROM yume_follows f JOIN yume_users u ON u.id = f.follower_id JOIN yume_profiles p ON p.user_id = u.id
-            WHERE p.visibility = 'public' AND f.followed_id = ? ORDER BY f.created_at DESC LIMIT 30 OFFSET ?`).bind(userId, userId, offset).all<UserRow>(),
+            WHERE p.visibility = 'public' AND f.followed_id = ? ORDER BY f.created_at DESC LIMIT 30 OFFSET ?`).bind(Date.now(), userId, userId, offset).all<UserRow>(),
           database.prepare("SELECT COUNT(*) AS count FROM yume_follows WHERE followed_id = ?").bind(userId).first<{count:number}>(),
         ]);
         const count = Number(total?.count ?? 0);
@@ -236,9 +245,14 @@ export async function handleYuberaCommunity(request: Request): Promise<Response>
       }
       const [rows, total] = await Promise.all([
         database.prepare(`SELECT u.id,u.telegram_first_name,u.telegram_last_name,u.telegram_username,u.telegram_photo_url,
-          p.bio,p.avatar_frame,f.created_at
+          p.bio,
+          CASE WHEN p.avatar_frame LIKE 'YUBERA_Contribution_Avatar_Frame_%' THEN p.avatar_frame
+            WHEN p.avatar_frame LIKE 'YUBERA_Plus_Avatar_Frame_%' AND EXISTS(
+              SELECT 1 FROM yume_plus_subscriptions s WHERE s.user_id=u.id AND s.status='active' AND s.expires_at > ?
+            ) THEN p.avatar_frame ELSE NULL END AS avatar_frame,
+          f.created_at
           FROM yume_follows f JOIN yume_users u ON u.id = f.followed_id JOIN yume_profiles p ON p.user_id = u.id
-          WHERE p.visibility = 'public' AND f.follower_id = ? ORDER BY f.created_at DESC LIMIT 30 OFFSET ?`).bind(userId, offset).all<UserRow>(),
+          WHERE p.visibility = 'public' AND f.follower_id = ? ORDER BY f.created_at DESC LIMIT 30 OFFSET ?`).bind(Date.now(), userId, offset).all<UserRow>(),
         database.prepare("SELECT COUNT(*) AS count FROM yume_follows WHERE follower_id = ?").bind(userId).first<{count:number}>(),
       ]);
       const count = Number(total?.count ?? 0);
@@ -248,11 +262,15 @@ export async function handleYuberaCommunity(request: Request): Promise<Response>
       if (!userId) return json({ error: "authentication_required" }, 401);
       const page = Math.max(0, Math.min(1000, Number.parseInt(url.searchParams.get("page") ?? "0", 10) || 0));
       const rows = await database.prepare(`SELECT u.id,u.telegram_first_name,u.telegram_last_name,u.telegram_username,u.telegram_photo_url,
-        p.bio,p.avatar_frame
+        p.bio,
+        CASE WHEN p.avatar_frame LIKE 'YUBERA_Contribution_Avatar_Frame_%' THEN p.avatar_frame
+          WHEN p.avatar_frame LIKE 'YUBERA_Plus_Avatar_Frame_%' AND EXISTS(
+            SELECT 1 FROM yume_plus_subscriptions s WHERE s.user_id=u.id AND s.status='active' AND s.expires_at > ?
+          ) THEN p.avatar_frame ELSE NULL END AS avatar_frame
         FROM yume_users u JOIN yume_profiles p ON p.user_id = u.id
         WHERE p.visibility = 'public' AND u.id <> ?
         AND NOT EXISTS(SELECT 1 FROM yume_follows f WHERE f.follower_id = ? AND f.followed_id = u.id)
-        ORDER BY u.telegram_first_name,u.id LIMIT 12 OFFSET ?`).bind(userId, userId, page * 12).all<UserRow>();
+        ORDER BY u.telegram_first_name,u.id LIMIT 12 OFFSET ?`).bind(Date.now(), userId, userId, page * 12).all<UserRow>();
       return json({ users: rows.results, hasMore: rows.results.length === 12 });
     }
     if (action === "collection") {
