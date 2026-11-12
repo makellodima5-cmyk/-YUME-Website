@@ -18,7 +18,7 @@ Only migrations 9 and 10 are pending:
 
 - First anime rating: +10 XP only for a first-time rating. Existing ratings are not granted retroactive XP when edited. Rating write and XP ledger entry use an atomic batch.
 - Collection rewards: +2 XP for a newly added unique title and +15 XP only when the third title is newly added. Item and XP writes are atomic; unique event keys prevent re-awards after removal/re-addition.
-- Episode viewing: server-side elapsed-time, position progression and merged watched segments; browser-supplied completion percentages are not trusted. Completion and +5 XP ledger entry require an atomic D1 batch.
+- Episode viewing: server-side elapsed-time, position progression and merged watched segments; browser-supplied completion percentages are not trusted. Completion and +5 XP ledger entry require an atomic D1 batch. Expired sessions are cleaned up at session start, episode numbers are checked against catalogue metadata, and each account is capped at five active sessions.
 - Support status: based on confirmed one-time Telegram Stars donations minus recorded refunds. Plus subscription payments are excluded. Exact totals are owner-only.
 - Telegram Stars support refunds: idempotent charge tracking and payer/amount/currency validation are covered by tests.
 - Plus payments: first payments and recurring renewals are persisted atomically; duplicate webhook deliveries cannot extend a subscription twice.
@@ -39,7 +39,7 @@ Tests cover rating XP idempotency and legacy ratings, collection XP/milestone gu
 
 ## Release gates still open
 
-1. The latest CI run for the current branch head must complete successfully. Earlier commits had a syntax error in the collection-preview JSX; that was corrected and a subsequent run passed on the corrected source snapshot. The newest commits are being revalidated.
+1. **CI passed on the current implementation head** (`615e6e3c24a54f2d10369793f0af50ad45bbf4dc`): 75 test files, 411 tests passed; TypeScript lint, Worker build, configuration/binding checks, clean SQLite migration validation/history, and all four Worker deploy-artifact validations passed. See https://github.com/makellodima5-cmyk/-YUME-Website/actions/runs/43258907644.
 2. Migrations 9 and 10 must be applied by the owner to the existing D1 database, in that order. Do not deploy code that depends on these schema additions before the migrations are applied.
 3. Live Telegram Stars end-to-end checks are still required: invoice creation, first recurring payment, renewal, cancellation, insufficient balance, and refund delivery.
 4. Browser/Telegram Mini App verification is still required for profile editing, frames, collections, donations, Plus purchase/cancellation, public/private profile access and navigation.
