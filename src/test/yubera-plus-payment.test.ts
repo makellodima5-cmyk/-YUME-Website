@@ -19,7 +19,7 @@ class FakeStatement {
     }
     return null;
   }
-  async run(): Promise<Result> { if (this.sql.includes("SET auto_renew") && this.db.subscription) { this.db.subscription?.auto_renew = Number(this.values[0]); this.db.subscription?.renewal_failed_at = Number(this.values[1]) === 1 ? "2026-11-12 12:00:00" : null; return { meta: { changes: 1 } }; } return { meta: { changes: 0 } }; }
+  async run(): Promise<Result> { if (this.sql.includes("SET auto_renew") && this.db.subscription) { this.db.subscription.auto_renew = Number(this.values[0]); this.db.subscription.renewal_failed_at = Number(this.values[1]) === 1 ? "2026-11-12 12:00:00" : null; return { meta: { changes: 1 } }; } return { meta: { changes: 0 } }; }
   valuesForBatch() { return this.values; }
 }
 
