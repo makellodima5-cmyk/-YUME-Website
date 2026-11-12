@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { Info, Pencil, Rocket, Send, Server, Star } from "lucide-react";
+import { BadgeCheck, Crown, Rocket, Send, Star } from "lucide-react";
+import { YuberaPlusPanel } from "./YuberaPlusPanel";
 import { getTelegramWebApp, telegramHapticImpact, telegramHapticNotification } from "@/lib/telegram-mini-app";
 
 type PaymentStatus = "pending" | "pre_checkout" | "paid" | "failed";
@@ -25,6 +26,7 @@ export function SupportPage() {
   const [error, setError] = useState("");
   const [status, setStatus] = useState<PaymentStatus | null>(null);
   const [message, setMessage] = useState("");
+  const [activeTab, setActiveTab] = useState<"support" | "plus">("support");
   const pollingRef = useRef(false);
   const submitLockRef = useRef(false);
 
@@ -148,11 +150,25 @@ export function SupportPage() {
           <div className="absolute inset-0 bg-gradient-to-r from-[#101116]/95 via-[#101116]/78 to-[#101116]/10" />
           <div className="relative z-10 max-w-[64%] px-4 py-5 sm:px-6 sm:py-6">
             <span className="inline-flex rounded-full bg-[#652d2b]/75 px-3 py-1 text-[11px] font-semibold text-white">Поддержка проекта</span>
-            <h1 className="mt-2 text-[25px] font-extrabold leading-tight text-white sm:text-[30px]">Поддержи YUBERA</h1>
-            <p className="mt-2 max-w-[340px] text-[13px] leading-[1.45] text-white/75 sm:text-sm">Помоги проекту развиваться, добавлять новые функции и сохранять стабильную работу.</p>
+            <h1 className="mt-2 text-[25px] font-extrabold leading-tight text-white sm:text-[30px]">Поддержка и YUBERA Plus</h1>
+            <p className="mt-2 max-w-[340px] text-[13px] leading-[1.45] text-white/75 sm:text-sm">Помоги проекту развиваться и открой дополнительные возможности.</p>
           </div>
         </section>
 
+        <div className="grid grid-cols-2 gap-1 rounded-full border border-[#393a43] bg-[#1c1d24] p-1">
+          <button type="button" aria-pressed={activeTab === "support"} onClick={() => setActiveTab("support")} className={"flex min-h-11 items-center justify-center gap-2 rounded-full border text-sm font-bold transition " + (activeTab === "support" ? "border-[#ff704b] bg-gradient-to-r from-[#ff593e] to-[#ff8053] text-white shadow-[0_0_14px_rgba(255,93,62,.4)]" : "border-transparent text-white/70")}>
+            <Star className="h-5 w-5" />Поддержка
+          </button>
+          <button type="button" aria-pressed={activeTab === "plus"} onClick={() => setActiveTab("plus")} className={"flex min-h-11 items-center justify-center gap-2 rounded-full border text-sm font-bold transition " + (activeTab === "plus" ? "border-[#ff704b] bg-gradient-to-r from-[#ff593e] to-[#ff8053] text-white shadow-[0_0_14px_rgba(255,93,62,.4)]" : "border-transparent text-white/70")}>
+            <Crown className="h-5 w-5" />YUBERA Plus
+          </button>
+        </div>
+
+        {activeTab === "support" ? <>
+        <section className="rounded-[20px] border border-[#383941] bg-[#191a21] p-3.5 sm:p-5">
+          <h2 className="flex items-center gap-2.5 text-[18px] font-bold text-white"><span className="h-7 w-1.5 rounded-full bg-[#ff6245]" />Поддержать проект</h2>
+          <p className="mt-1 text-sm text-white/60">Единовременный вклад в развитие YUBERA.</p>
+        </section>
         <section className="rounded-[20px] border border-[#383941] bg-[#191a21] p-3.5 sm:p-5">
           <h2 className="flex items-center gap-2.5 text-[18px] font-bold text-white"><span className="h-7 w-1.5 rounded-full bg-[#ff6245]" />Выбери сумму поддержки</h2>
           <div className="mt-4 grid grid-cols-3 gap-2.5">
@@ -174,19 +190,14 @@ export function SupportPage() {
         </section>
 
         <section className="rounded-[20px] border border-[#383941] bg-[#191a21] p-3.5 sm:p-5">
-          <h2 className="flex items-center gap-2.5 text-[18px] font-bold text-white"><span className="h-7 w-1.5 rounded-full bg-[#ff6245]" />На что идут пожертвования?</h2>
+          <h2 className="flex items-center gap-2.5 text-[18px] font-bold text-white"><span className="h-7 w-1.5 rounded-full bg-[#ff6245]" />Что даёт поддержка?</h2>
           <div className="mt-3 divide-y divide-white/10">
-            <div className="flex items-center gap-3 py-2.5"><span className="grid h-14 w-14 shrink-0 place-items-center rounded-[17px] bg-[#38221f] text-[#ff754f]"><Rocket className="h-7 w-7" /></span><span><strong className="block text-[15px] text-white">Развитие функционала</strong><span className="mt-0.5 block text-[13px] text-white/65">Новые возможности, разделы и улучшения</span></span></div>
-            <div className="flex items-center gap-3 py-2.5"><span className="grid h-14 w-14 shrink-0 place-items-center rounded-[17px] bg-[#38221f] text-[#ff754f]"><Server className="h-7 w-7" /></span><span><strong className="block text-[15px] text-white">Стабильная работа</strong><span className="mt-0.5 block text-[13px] text-white/65">Оплата серверов и инфраструктуры</span></span></div>
-            <div className="flex items-center gap-3 py-2.5"><span className="grid h-14 w-14 shrink-0 place-items-center rounded-[17px] bg-[#38221f] text-[#ff754f]"><Pencil className="h-7 w-7" /></span><span><strong className="block text-[15px] text-white">Улучшение контента</strong><span className="mt-0.5 block text-[13px] text-white/65">Качество, удобство и актуальные подборки</span></span></div>
+            <div className="flex items-center gap-3 py-3"><span className="grid h-12 w-12 shrink-0 place-items-center rounded-[15px] bg-[#38221f] text-[#ffb45f]"><Crown className="h-7 w-7" /></span><span><strong className="block text-[15px] text-white">Эксклюзивные рамки аватара</strong><span className="mt-0.5 block text-[13px] text-white/65">Уникальные рамки, доступные за вклад в развитие проекта</span></span></div>
+            <div className="flex items-center gap-3 py-3"><span className="grid h-12 w-12 shrink-0 place-items-center rounded-[15px] bg-[#38221f] text-[#ff754f]"><BadgeCheck className="h-7 w-7" /></span><span><strong className="block text-[15px] text-white">Статус поддержки</strong><span className="mt-0.5 block text-[13px] text-white/65">Особый статус в профиле, который отражает твой вклад</span></span></div>
+            <div className="flex items-center gap-3 py-3"><span className="grid h-12 w-12 shrink-0 place-items-center rounded-[15px] bg-[#38221f] text-[#ff754f]"><Rocket className="h-7 w-7" /></span><span><strong className="block text-[15px] text-white">Развитие YUBERA</strong><span className="mt-0.5 block text-[13px] text-white/65">Новые функции, улучшения и стабильная работа сервиса</span></span></div>
           </div>
         </section>
-
-        <section className="flex items-center gap-3 rounded-[18px] border border-[#383941] bg-[#191a21] px-3.5 py-3">
-          <Info className="h-6 w-6 shrink-0 text-white/65" />
-          <p className="min-w-0 flex-1 text-[12px] leading-relaxed text-white/65">Пожертвования проходят через Telegram Stars. Оплата осуществляется внутри Telegram. Ты поддерживаешь проект напрямую.</p>
-          <StarsMark compact />
-        </section>
+        </> : <YuberaPlusPanel />}
       </div>
 
       {customOpen && <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/70 px-4 py-6" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setCustomOpen(false); }}>

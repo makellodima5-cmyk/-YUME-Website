@@ -116,7 +116,7 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
       window.removeEventListener("storage", syncLocalHistory);
     };
   }, []);
-  useEffect(() => setPanel(initialPanel), [initialPanel]);
+  useEffect(() => setPanel(initialPanel === "yubera" ? "overview" : initialPanel), [initialPanel]);
   useEffect(() => {
     if (panel !== "support") return;
 
@@ -532,6 +532,47 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
           </section>
         ) : panel === "overview" ? (
           <>
+            <YuberaProfileHub
+              animeList={animeList}
+              onSelect={onSelect}
+              onBack={() => undefined}
+              isAdmin={isAdmin}
+              onSettings={() => setSettingsExpanded(current => !current)}
+              onLegal={() => navigatePanel("documents")}
+              onAbout={() => navigatePanel("about")}
+              onAdmin={onAdmin}
+              onSupport={() => navigatePanel("support")}
+              onAccount={() => document.getElementById("telegram-account")?.scrollIntoView({ behavior: "smooth", block: "center" })}
+            />
+            <section id="telegram-account" className="mt-6 rounded-2xl border border-border bg-card/50 p-4">
+              <h2 className="text-base font-semibold">{language === "ru" ? "Аккаунт Telegram" : "Telegram account"}</h2>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                {language === "ru" ? "Выход завершит текущий сеанс. Удаление аккаунта необратимо удалит избранное, список и историю просмотров." : "Signing out ends this session. Account deletion permanently removes favorites, your list, and viewing history."}
+              </p>
+              <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                <button type="button" disabled={accountBusy} onClick={() => void signOut()} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-border px-4 py-2 text-sm font-semibold hover:bg-accent disabled:opacity-50">
+                  {accountBusy ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />}
+                  {language === "ru" ? "Выйти" : "Sign out"}
+                </button>
+                <button type="button" disabled={accountBusy} onClick={() => setShowDeleteConfirm(true)} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-destructive/40 px-4 py-2 text-sm font-semibold text-destructive hover:bg-destructive/10 disabled:opacity-50">
+                  <Trash2 className="h-4 w-4" /> {language === "ru" ? "Удалить аккаунт" : "Delete account"}
+                </button>
+              </div>
+              {accountMessage && <p className="mt-3 text-xs leading-relaxed text-muted-foreground" role="status">{accountMessage}</p>}
+              {showDeleteConfirm && (
+                <div className="mt-4 rounded-xl border border-destructive/30 bg-destructive/5 p-4" role="alertdialog" aria-labelledby="delete-account-title" aria-describedby="delete-account-description">
+                  <h3 id="delete-account-title" className="font-semibold text-destructive">{language === "ru" ? "Удалить аккаунт без возможности восстановления?" : "Permanently delete your account?"}</h3>
+                  <p id="delete-account-description" className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                    {language === "ru" ? "Будут удалены аккаунт Yubera, все сеансы, избранное, «Смотреть позже», история просмотров и связанные данные. Telegram-аккаунт не удаляется. Восстановить данные нельзя." : "Your Yubera account, sessions, favorites, Watch Later, viewing history, and linked data will be deleted. Your Telegram account will not be deleted. This cannot be undone."}
+                  </p>
+                  <div className="mt-4 flex flex-wrap justify-end gap-2">
+                    <button type="button" disabled={accountBusy} onClick={() => setShowDeleteConfirm(false)} className="rounded-lg border border-border px-3 py-2 text-sm font-semibold hover:bg-accent">{language === "ru" ? "Отмена" : "Cancel"}</button>
+                    <button type="button" disabled={accountBusy} onClick={() => void deleteAccount()} className="rounded-lg bg-destructive px-3 py-2 text-sm font-semibold text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50">{accountBusy ? (language === "ru" ? "Удаляем…" : "Deleting…") : (language === "ru" ? "Удалить навсегда" : "Delete permanently")}</button>
+                  </div>
+                </div>
+              )}
+            </section>
+
             <div className="relative isolate overflow-hidden rounded-[20px] border border-border bg-card shadow-[0_10px_34px_rgba(0,0,0,0.24)]">
               <div className="yubera-profile-cover relative overflow-hidden">
                 <img
@@ -609,7 +650,7 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
                 <span className="min-w-0 flex-1"><span className="block text-sm font-semibold">{language === "ru" ? "Панель администратора" : "Admin panel"}</span><span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">{language === "ru" ? "Управление сайтом и каталогом" : "Manage the site and catalogue"}</span></span>
                 <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
               </button>}
-              {profileRow(LibraryBig, "YUBERA", "Профиль, уровень, подборки и друзья", "yubera")}
+
               {profileRow(LifeBuoy, t("profile.support"), t("profile.supportDescription"), "support")}
             </section>
             {settingsExpanded && (
@@ -648,34 +689,7 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
                 </div>
               </section>
               )}
-            <section id="telegram-account" className="mt-6 rounded-2xl border border-border bg-card/50 p-4">
-              <h2 className="text-base font-semibold">{language === "ru" ? "Аккаунт Telegram" : "Telegram account"}</h2>
-              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                {language === "ru" ? "Выход завершит текущий сеанс. Удаление аккаунта необратимо удалит избранное, список и историю просмотров." : "Signing out ends this session. Account deletion permanently removes favorites, your list, and viewing history."}
-              </p>
-              <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-                <button type="button" disabled={accountBusy} onClick={() => void signOut()} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-border px-4 py-2 text-sm font-semibold hover:bg-accent disabled:opacity-50">
-                  {accountBusy ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />}
-                  {language === "ru" ? "Выйти" : "Sign out"}
-                </button>
-                <button type="button" disabled={accountBusy} onClick={() => setShowDeleteConfirm(true)} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-destructive/40 px-4 py-2 text-sm font-semibold text-destructive hover:bg-destructive/10 disabled:opacity-50">
-                  <Trash2 className="h-4 w-4" /> {language === "ru" ? "Удалить аккаунт" : "Delete account"}
-                </button>
-              </div>
-              {accountMessage && <p className="mt-3 text-xs leading-relaxed text-muted-foreground" role="status">{accountMessage}</p>}
-              {showDeleteConfirm && (
-                <div className="mt-4 rounded-xl border border-destructive/30 bg-destructive/5 p-4" role="alertdialog" aria-labelledby="delete-account-title" aria-describedby="delete-account-description">
-                  <h3 id="delete-account-title" className="font-semibold text-destructive">{language === "ru" ? "Удалить аккаунт без возможности восстановления?" : "Permanently delete your account?"}</h3>
-                  <p id="delete-account-description" className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                    {language === "ru" ? "Будут удалены аккаунт Yubera, все сеансы, избранное, «Смотреть позже», история просмотров и связанные данные. Telegram-аккаунт не удаляется. Восстановить данные нельзя." : "Your Yubera account, sessions, favorites, Watch Later, viewing history, and linked data will be deleted. Your Telegram account will not be deleted. This cannot be undone."}
-                  </p>
-                  <div className="mt-4 flex flex-wrap justify-end gap-2">
-                    <button type="button" disabled={accountBusy} onClick={() => setShowDeleteConfirm(false)} className="rounded-lg border border-border px-3 py-2 text-sm font-semibold hover:bg-accent">{language === "ru" ? "Отмена" : "Cancel"}</button>
-                    <button type="button" disabled={accountBusy} onClick={() => void deleteAccount()} className="rounded-lg bg-destructive px-3 py-2 text-sm font-semibold text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50">{accountBusy ? (language === "ru" ? "Удаляем…" : "Deleting…") : (language === "ru" ? "Удалить навсегда" : "Delete permanently")}</button>
-                  </div>
-                </div>
-              )}
-            </section>
+            
           </>
         ) : (
           <>
@@ -1020,9 +1034,7 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
                 </div>
               </section>
             )}
-            {panel === "yubera" && (
-              <YuberaProfileHub animeList={animeList} onSelect={onSelect} onBack={() => navigatePanel("overview")} isAdmin={isAdmin} onSettings={() => { navigatePanel("overview"); setSettingsExpanded(true); }} onLegal={() => navigatePanel("documents")} onAbout={() => navigatePanel("about")} onAdmin={onAdmin} onSupport={() => navigatePanel("support")} onAccount={() => { navigatePanel("overview"); window.requestAnimationFrame(() => document.getElementById("telegram-account")?.scrollIntoView({behavior:"smooth",block:"center"})); }} />
-            )}
+
           </>
         )}
       </div>

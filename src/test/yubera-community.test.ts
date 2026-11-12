@@ -133,8 +133,13 @@ describe("YUBERA community foundation", () => {
     const component = await readFile(resolve(process.cwd(), "src/components/yume/YuberaProfileHub.tsx"), "utf8");
     const supportScreen = component.slice(component.indexOf('{screen === "support-status"'), component.indexOf('{screen === "plus"'));
     expect(supportScreen).not.toContain("setDonationOpen(true)");
-    expect(component).toContain('label="Поддержать проект"');
-    expect(component).toContain("onClick={()=>setDonationOpen(true)}");
+    expect(component).not.toContain("Аккаунт Telegram");
+    expect(component).not.toContain("onSignOut");
+    expect(component).not.toContain("onDeleteAccount");
+    const profile = await readFile(resolve(process.cwd(), "src/components/yume/Profile.tsx"), "utf8");
+    expect(profile).toContain('id="telegram-account"');
+    expect(profile).toContain("signOut()");
+    expect(profile).toContain("deleteAccount()");
   });
 
 
