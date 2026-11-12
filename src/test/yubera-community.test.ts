@@ -135,7 +135,7 @@ describe("YUBERA community foundation", () => {
     expect(supportScreen).not.toContain("setDonationOpen(true)");
     expect(component).toContain('<h3 className="text-sm font-semibold text-white">Аккаунт Telegram</h3>');
     expect(component).toContain('onSignOut');
-    expect(component).toContain("onClick={()=>setDonationOpen(true)}");
+    expect(component).toContain("onDeleteAccount");
   });
 
 
