@@ -24,7 +24,8 @@ describe("YUBERA community foundation", () => {
     expect(server).toContain("PLUS_TITLES : FREE_TITLES");
     expect(server).toContain("INSERT OR IGNORE INTO yume_xp_ledger");
     expect(server).toContain("LIMIT 30 OFFSET ?");
-    expect(server).toContain("LIMIT 12 OFFSET ?");
+    expect(server).toContain("LIMIT 13 OFFSET ?");
+    expect(server).toContain("rows.results.slice(0, 12)");
   });
 
   it("exposes collection detail, catalogue add/remove, public profiles and people discovery in the UI", async () => {
