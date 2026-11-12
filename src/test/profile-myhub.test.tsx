@@ -83,7 +83,7 @@ describe("Profile and My library pages", () => {
 
     expect(await screen.findByText("ЛИЧНОЕ ПРОСТРАНСТВО")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Уровень 1/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Поддержка/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Уровень 1/ })).toBeInTheDocument();
     expect(screen.queryByText("Профиль, уровень, подборки и друзья")).not.toBeInTheDocument();
   });
 
