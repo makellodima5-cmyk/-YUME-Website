@@ -2,6 +2,7 @@ import { env as cloudflareEnv } from "cloudflare:workers";
 import { completeTelegramBrowserAuth, confirmTelegramBrowserAuth } from "@/data/telegram-auth.server";
 import { TELEGRAM_CHANNEL_URL, TELEGRAM_CHANNEL_ID } from "@/data/telegram-channel";
 import { recordTelegramStarsRefund, recordYuberaPlusSuccessfulPayment, recordYuberaPlusSubscriptionUpdate } from "@/data/yubera-plus.server";
+import { YUBERA_SUPPORT_LEVELS } from "@/data/yubera-config";
 
 type TelegramEnvironment = Record<string, unknown> & {
   TELEGRAM_BOT_TOKEN?: string;
@@ -337,7 +338,7 @@ export async function handleTelegramWebhook(request: Request): Promise<Response>
         return json({ ok: true, ignored: true });
       }
       if (!db.batch) return json({ ok: false, error: "atomic_support_frame_unlock_unavailable" }, 503);
-      const unlockStatements = [50, 1000, 2500, 5000, 10000].map((threshold, index) =>
+      const unlockStatements = YUBERA_SUPPORT_LEVELS.filter((level) => level.level > 0).map((level) =>
         db.prepare(`INSERT OR IGNORE INTO yume_support_frame_unlocks(user_id,frame_level)
           SELECT u.id,? FROM yume_users u
           JOIN yume_stars_donations current_payment ON current_payment.telegram_user_id=u.telegram_user_id
@@ -346,7 +347,7 @@ export async function handleTelegramWebhook(request: Request): Promise<Response>
               LEFT JOIN yume_stars_refunds r ON r.telegram_payment_charge_id=d.telegram_payment_charge_id
               WHERE d.telegram_user_id=u.telegram_user_id AND d.status='paid'
                 AND r.telegram_payment_charge_id IS NULL)>=?)`
-        ).bind(index + 1, payload, threshold)
+        ).bind(level.level, payload, level.min)
       );
       const results = await db.batch([
         db.prepare("UPDATE yume_stars_donations SET status = 'paid', telegram_payment_charge_id = ?, provider_payment_charge_id = ?, paid_at = CURRENT_TIMESTAMP WHERE payload = ? AND status = 'pre_checkout' AND telegram_payment_charge_id IS NULL")
