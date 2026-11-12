@@ -71,11 +71,10 @@ type Props = {
   initialPanel?: ProfilePanel;
   isAdmin?: boolean;
   onAdmin?: () => void;
-  onYubera?: () => void;
   telegramMiniApp?: boolean;
 };
 
-export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overview", isAdmin = false, onAdmin, onYubera, telegramMiniApp = false }: Props) {
+export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overview", isAdmin = false, onAdmin, telegramMiniApp = false }: Props) {
   const { t, language, theme, setTheme, setLanguage } = useYumePreferences();
   const [panel, setPanel] = useState<ProfilePanel>(initialPanel);
   const [settingsExpanded, setSettingsExpanded] = useState(false);
@@ -593,17 +592,6 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
               </div>
             </div>
             {!isTelegramMiniApp && <p className="mt-3 text-xs leading-relaxed text-muted-foreground">{t("profile.localLibraryNotice")}</p>}
-
-            <section className="mt-5 grid gap-2 sm:grid-cols-2">
-              <button type="button" onClick={onYubera} className="flex min-h-[72px] items-center gap-3 rounded-2xl border border-primary/30 bg-primary/5 p-3 text-left transition hover:border-primary/60 hover:bg-primary/10">
-                <img src="/images/yubera/YUBERA_Plus_Crown_Simple.webp" alt="" className="h-12 w-12 object-contain"/>
-                <span className="min-w-0 flex-1"><span className="block text-sm font-bold">{language === "ru" ? "Мой профиль YUBERA" : "My YUBERA profile"}</span><span className="mt-1 block text-xs text-muted-foreground">{language === "ru" ? "Уровень, статус, рамка и публичный профиль" : "Level, status, avatar frame and public profile"}</span></span><ChevronRight className="h-4 w-4 shrink-0 text-primary"/>
-              </button>
-              <button type="button" onClick={onYubera} className="flex min-h-[72px] items-center gap-3 rounded-2xl border border-border bg-card p-3 text-left transition hover:border-primary/40">
-                <UsersRound className="h-7 w-7 shrink-0 text-primary"/>
-                <span className="min-w-0 flex-1"><span className="block text-sm font-bold">{language === "ru" ? "Друзья и подборки" : "Friends and collections"}</span><span className="mt-1 block text-xs text-muted-foreground">{language === "ru" ? "Подписки, поиск пользователей и собственные подборки" : "Following, user search and personal collections"}</span></span><ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground"/>
-              </button>
-            </section>
 
             <section className="mt-7 grid gap-2.5">
               <button type="button" onClick={() => setSettingsExpanded(current => !current)} aria-expanded={settingsExpanded} className="yubera-profile-row flex w-full items-center gap-4 rounded-2xl border border-border bg-card text-left text-card-foreground shadow-sm transition hover:border-primary/35 hover:bg-accent/70">

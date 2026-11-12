@@ -422,14 +422,8 @@ export async function handleYuberaCommunity(request: Request): Promise<Response>
             .bind(collection.owner_id).first<{ visibility: string }>();
           if (profile?.visibility !== "public" || collection.visibility !== "public") return json({ error: "collection_not_found" }, 404);
         }
-        const [items, likes, liked] = await Promise.all([
-          db.prepare("SELECT anime_id, added_at FROM yume_collection_items WHERE collection_id = ? ORDER BY added_at DESC")
-            .bind(collectionId).all<{ anime_id: string; added_at: string }>(),
-          db.prepare("SELECT COUNT(*) AS total FROM yume_collection_likes WHERE collection_id = ?")
-            .bind(collectionId).first<{total:number}>(),
-          user ? db.prepare("SELECT 1 AS found FROM yume_collection_likes WHERE collection_id = ? AND user_id = ?")
-            .bind(collectionId,user.user_id).first<{found:number}>() : Promise.resolve(null),
-        ]);
+        const items = await db.prepare("SELECT anime_id, added_at FROM yume_collection_items WHERE collection_id = ? ORDER BY added_at DESC")
+          .bind(collectionId).all<{ anime_id: string; added_at: string }>();
         const catalog = await Promise.all(items.results.map(async item => {
           try { return { anime: await getR2Anime(item.anime_id), addedAt: item.added_at }; } catch { return { anime: null, addedAt: item.added_at }; }
         }));
@@ -443,8 +437,6 @@ export async function handleYuberaCommunity(request: Request): Promise<Response>
           },
           owner,
           items: catalog.filter(item => item.anime).map(item => ({ ...item.anime, addedAt: item.addedAt })),
-          likeCount: Number(likes?.total ?? 0),
-          liked: Boolean(liked),
           own,
         });
       }
@@ -495,21 +487,6 @@ export async function handleYuberaCommunity(request: Request): Promise<Response>
       else await db.prepare("DELETE FROM yume_user_follows WHERE follower_id = ? AND followed_id = ?")
         .bind(user.user_id, targetId).run();
       return json({ following: op === "follow" });
-    }
-
-    if (op === "collection.like" || op === "collection.unlike") {
-      const collectionId = typeof body.collectionId === "string" ? body.collectionId : "";
-      const collection = await db.prepare("SELECT id, owner_id, visibility FROM yume_user_collections WHERE id = ?")
-        .bind(collectionId).first<{id:string;owner_id:string;visibility:string}>();
-      if (!collection) return json({error:"collection_not_found"},404);
-      if (collection.owner_id !== user.user_id) {
-        const owner = await db.prepare("SELECT visibility FROM yume_user_profiles WHERE user_id = ?").bind(collection.owner_id).first<{visibility:string}>();
-        if (collection.visibility !== "public" || owner?.visibility !== "public") return json({error:"collection_not_found"},404);
-      }
-      if (op === "collection.like") await db.prepare("INSERT OR IGNORE INTO yume_collection_likes(collection_id,user_id) VALUES(?,?)").bind(collectionId,user.user_id).run();
-      else await db.prepare("DELETE FROM yume_collection_likes WHERE collection_id = ? AND user_id = ?").bind(collectionId,user.user_id).run();
-      const row = await db.prepare("SELECT COUNT(*) AS total FROM yume_collection_likes WHERE collection_id = ?").bind(collectionId).first<{total:number}>();
-      return json({liked:op === "collection.like",likeCount:Number(row?.total ?? 0)});
     }
 
     if (op === "collection.create") {
@@ -661,6 +638,8 @@ export async function handleYuberaPlus(request: Request): Promise<Response> {
       if (typeof price !== "number" || !Number.isSafeInteger(price) || price < 1 || price > 10000) {
         return json({ error: "invalid_price", min: 1, max: 10000 }, 400);
       }
+      // The published price only governs invoices created after the change.
+      // Active subscriptions keep their paid price and agreed renewal terms.
       const oldPrice = await readPrice(db);
       await db.prepare("INSERT INTO yume_plus_settings (setting_key, setting_value, updated_by, updated_at) VALUES ('price_stars', ?, ?, CURRENT_TIMESTAMP) " +
         "ON CONFLICT(setting_key) DO UPDATE SET setting_value = excluded.setting_value, updated_by = excluded.updated_by, updated_at = CURRENT_TIMESTAMP")

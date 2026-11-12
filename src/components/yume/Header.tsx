@@ -6,7 +6,7 @@ export type View =
   | "home" | "admin" | "catalog" | "collections" | "my" | "news" | "profile"
   | "login" | "register" | "popular" | "new-releases" | "announcements" | "airing"
   | "favorites" | "watchlist" | "history" | "privacy" | "privacy-policy" | "rules"
-  | "rights" | "notifications" | "tracked-titles" | "support" | "yubera";
+  | "rights" | "notifications" | "tracked-titles" | "support";
 
 type Props = {
   setView: (view: View) => void;

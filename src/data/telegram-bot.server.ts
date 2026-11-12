@@ -20,9 +20,7 @@ type TelegramUpdate = {
     successful_payment?: {
       currency?: string; total_amount?: number; invoice_payload?: string;
       telegram_payment_charge_id?: string; provider_payment_charge_id?: string;
-      is_recurring?: boolean; is_first_recurring?: boolean; subscription_expiration_date?: number;
     };
-    refunded_payment?: { currency?: string; total_amount?: number; invoice_payload?: string; telegram_payment_charge_id?: string };
   };
   pre_checkout_query?: {
     id?: string; from?: TelegramUser; currency?: string; total_amount?: number; invoice_payload?: string;
@@ -211,35 +209,6 @@ export async function handleTelegramWebhook(request: Request): Promise<Response>
 
   const preCheckout = update.pre_checkout_query;
   if (preCheckout) {
-    if (typeof preCheckout.invoice_payload === "string" && preCheckout.invoice_payload.startsWith("yubera_plus:")) {
-      const db = subscriptionDb(env);
-      const shape = typeof preCheckout.id === "string" && typeof preCheckout.from?.id === "number" &&
-        Number.isSafeInteger(preCheckout.from.id) && preCheckout.currency === "XTR" &&
-        typeof preCheckout.total_amount === "number" && Number.isSafeInteger(preCheckout.total_amount);
-      const order = shape && db ? await db.prepare(
-        "SELECT telegram_user_id, amount, status FROM yume_plus_orders WHERE payload = ?",
-      ).bind(preCheckout.invoice_payload).first<{ telegram_user_id: string; amount: number; status: string }>() : null;
-      const approved = Boolean(order && order.telegram_user_id === String(preCheckout.from!.id) &&
-        order.amount === preCheckout.total_amount && ["pending", "pre_checkout", "paid"].includes(order.status));
-      let accepted = false;
-      try {
-        const answer = await telegramApi(token, "answerPreCheckoutQuery", {
-          pre_checkout_query_id: preCheckout.id,
-          ok: approved,
-          ...(!approved ? { error_message: "Не удалось подтвердить оплату YUBERA Plus. Создайте новый счёт." } : {}),
-        });
-        if (answer.ok) accepted = (await answer.json() as { ok?: unknown }).ok === true;
-      } catch (error) {
-        console.error("[YUBERA][PLUS] Could not answer pre-checkout.", error);
-      }
-      if (approved && accepted && order?.status === "pending" && db) {
-        const changed = await db.prepare("UPDATE yume_plus_orders SET status = 'pre_checkout' WHERE payload = ? AND status = 'pending'")
-          .bind(preCheckout.invoice_payload).run() as { meta?: { changes?: number } };
-        if (Number(changed.meta?.changes ?? 0) !== 1) return json({ ok: false, error: "plus_pre_checkout_conflict" }, 503);
-      }
-      if (approved && !accepted) return json({ ok: false, error: "plus_pre_checkout_not_confirmed" }, 503);
-      return json({ ok: true, action: approved ? "plus_pre_checkout_approved" : "plus_pre_checkout_rejected" });
-    }
     const db = subscriptionDb(env);
     const validShape = typeof preCheckout.id === "string" && typeof preCheckout.from?.id === "number" &&
       typeof preCheckout.invoice_payload === "string" && preCheckout.currency === "XTR" &&
@@ -297,65 +266,6 @@ export async function handleTelegramWebhook(request: Request): Promise<Response>
 
   const successfulPayment = update.message?.successful_payment;
   if (successfulPayment) {
-    const paymentPayload = successfulPayment.invoice_payload;
-    if (typeof paymentPayload === "string" && paymentPayload.startsWith("yubera_plus:")) {
-      const db = subscriptionDb(env);
-      const userId = update.message?.from?.id;
-      const chargeId = successfulPayment.telegram_payment_charge_id;
-      const amount = successfulPayment.total_amount;
-      if (!db || typeof userId !== "number" || !Number.isSafeInteger(userId) ||
-          successfulPayment.currency !== "XTR" || typeof chargeId !== "string" || !chargeId ||
-          typeof amount !== "number" || !Number.isSafeInteger(amount) || amount < 1 || amount > 10000 ||
-          !/^yubera_plus:[0-9a-f-]{36}$/i.test(paymentPayload)) {
-        console.error("[YUBERA][PLUS] Successful payment update is missing valid fields.");
-        return json({ ok: true, ignored: true });
-      }
-      try {
-        const order = await db.prepare("SELECT telegram_user_id, amount, auto_renew, status FROM yume_plus_orders WHERE payload = ?")
-          .bind(paymentPayload).first<{ telegram_user_id: string; amount: number; auto_renew: number; status: string }>();
-        if (!order || order.telegram_user_id !== String(userId) || order.amount !== amount ||
-            !["pre_checkout", "paid"].includes(order.status) ||
-            (order.status === "paid" && successfulPayment.is_recurring !== true)) {
-          console.error("[YUBERA][PLUS] Successful payment did not match its invoice.");
-          return json({ ok: true, ignored: true });
-        }
-        const duplicate = await db.prepare("SELECT 1 AS found FROM yume_plus_payments WHERE telegram_payment_charge_id = ?")
-          .bind(chargeId).first<{ found: number }>();
-        if (duplicate) return json({ ok: true, action: "plus_payment_already_recorded" });
-        const subscription = await db.prepare("SELECT id FROM yume_plus_subscriptions WHERE invoice_payload = ? LIMIT 1")
-          .bind(paymentPayload).first<{ id: string }>();
-        const subscriptionId = subscription?.id ?? crypto.randomUUID();
-        const now = Math.floor(Date.now() / 1000);
-        const periodEnd = typeof successfulPayment.subscription_expiration_date === "number" &&
-          Number.isSafeInteger(successfulPayment.subscription_expiration_date) &&
-          successfulPayment.subscription_expiration_date > now
-          ? successfulPayment.subscription_expiration_date : now + 2592000;
-        const recurring = order.auto_renew === 1 &&
-          (successfulPayment.is_recurring === true || successfulPayment.is_first_recurring === true);
-        if (!subscription) {
-          await db.prepare(
-            "INSERT INTO yume_plus_subscriptions (id, user_id, telegram_user_id, invoice_payload, first_charge_id, price_stars, period_start_epoch, period_end_epoch, auto_renew, status) " +
-            "SELECT ?, user_id, telegram_user_id, payload, ?, amount, ?, ?, ?, 'active' FROM yume_plus_orders WHERE payload = ?",
-          ).bind(subscriptionId, chargeId, now, periodEnd, recurring ? 1 : 0, paymentPayload).run();
-        } else {
-          await db.prepare("UPDATE yume_plus_subscriptions SET period_end_epoch = ?, auto_renew = ?, status = 'active', updated_at = CURRENT_TIMESTAMP WHERE id = ?")
-            .bind(periodEnd, recurring ? 1 : 0, subscriptionId).run();
-        }
-        const persisted = await db.prepare(
-          "INSERT OR IGNORE INTO yume_plus_payments (telegram_payment_charge_id, subscription_id, user_id, invoice_payload, amount, is_recurring, period_end_epoch) " +
-          "SELECT ?, ?, user_id, payload, amount, ?, ? FROM yume_plus_orders WHERE payload = ?",
-        ).bind(chargeId, subscriptionId, successfulPayment.is_recurring ? 1 : 0, periodEnd, paymentPayload).run() as { meta?: { changes?: number } };
-        if (persisted.meta && persisted.meta.changes !== 1) {
-          return json({ ok: false, error: "plus_payment_persistence_conflict" }, 503);
-        }
-        await db.prepare("UPDATE yume_plus_orders SET status = 'paid' WHERE payload = ?")
-          .bind(paymentPayload).run();
-        return json({ ok: true, action: "plus_payment_recorded" });
-      } catch (error) {
-        console.error("[YUBERA][PLUS] Could not persist successful payment.", error);
-        return json({ ok: false, error: "plus_payment_persistence_failed" }, 503);
-      }
-    }
     const db = subscriptionDb(env);
     const userId = update.message?.from?.id;
     const chargeId = successfulPayment.telegram_payment_charge_id;
@@ -400,40 +310,6 @@ export async function handleTelegramWebhook(request: Request): Promise<Response>
       return json({ ok: false, error: "payment_persistence_failed" }, 503);
     }
     return json({ ok: true, action: "stars_payment_recorded" });
-  }
-
-  const refundedPayment = update.message?.refunded_payment;
-  if (refundedPayment) {
-    const db = subscriptionDb(env);
-    const userId = update.message?.from?.id;
-    const chargeId = refundedPayment.telegram_payment_charge_id;
-    const amount = refundedPayment.total_amount;
-    if (db && typeof userId === "number" && Number.isSafeInteger(userId) &&
-        refundedPayment.currency === "XTR" && typeof chargeId === "string" &&
-        typeof amount === "number" && Number.isSafeInteger(amount) && amount > 0) {
-      try {
-        const donation = await db.prepare("SELECT telegram_user_id FROM yume_stars_donations WHERE telegram_payment_charge_id = ?")
-          .bind(chargeId).first<{ telegram_user_id: string }>();
-        if (donation?.telegram_user_id === String(userId)) {
-          const original = await db.prepare("SELECT amount FROM yume_stars_donations WHERE telegram_payment_charge_id = ?")
-            .bind(chargeId).first<{ amount: number }>();
-          await db.prepare("INSERT OR IGNORE INTO yume_stars_refunds (telegram_payment_charge_id, telegram_user_id, amount, currency) VALUES (?, ?, ?, 'XTR')")
-            .bind(chargeId, String(userId), Math.min(amount, Number(original?.amount ?? amount))).run();
-          return json({ ok: true, action: "support_refund_recorded" });
-        }
-        const plusPayment = await db.prepare("SELECT subscription_id, user_id FROM yume_plus_payments WHERE telegram_payment_charge_id = ?")
-          .bind(chargeId).first<{ subscription_id: string; user_id: string }>();
-        if (plusPayment) {
-          await db.prepare("UPDATE yume_plus_subscriptions SET status = 'cancelled', auto_renew = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND telegram_user_id = ?")
-            .bind(plusPayment.subscription_id, String(userId)).run();
-          return json({ ok: true, action: "plus_refund_recorded" });
-        }
-      } catch (error) {
-        console.error("[YUBERA][STARS] Refund persistence failed.", error);
-        return json({ ok: false, error: "refund_persistence_failed" }, 503);
-      }
-    }
-    return json({ ok: true, ignored: true });
   }
 
   const callback = update.callback_query;

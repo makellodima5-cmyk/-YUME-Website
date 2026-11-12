@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  ArrowLeft, Bookmark, Check, ChevronRight, Crown, Heart, Lock, Plus,
+  ArrowLeft, Bookmark, Check, ChevronRight, Heart, Plus,
   Search, Shield, Star, Users, UserRound, X,
 } from "lucide-react";
 import type { Anime } from "@/data/anime";
@@ -351,6 +351,32 @@ export function YuberaCommunityPage({ animeList, initialScreen = "overview", isA
     } catch (error) { setMessage(error instanceof Error ? error.message : "Не удалось изменить цену."); }
     finally { setPlusBusy(false); }
   };
+  const checkSupportPayment = async (payload: string, initData: string) => {
+    setPollingInvoice(true);
+    setSupportNotice("Проверяем подтверждение платежа Telegram…");
+    try {
+      for (let attempt = 0; attempt < 10; attempt += 1) {
+        const response = await fetch("/api/telegram/stars-status?payload=" + encodeURIComponent(payload), {
+          credentials: "same-origin", cache: "no-store",
+          headers: { "X-Telegram-Init-Data": initData },
+        });
+        if (!response.ok) throw new Error("Не удалось проверить статус платежа.");
+        const data = await response.json() as { status?: string };
+        if (data.status === "paid") {
+          setSupportNotice("Спасибо за поддержку YUBERA!");
+          telegramHapticNotification("success");
+          return;
+        }
+        if (data.status === "failed") throw new Error("Платёж не завершён. Попробуй ещё раз.");
+        await new Promise(resolve => window.setTimeout(resolve, 1200));
+      }
+      setSupportNotice("Подтверждение ещё не получено. Проверь статус позже.");
+    } catch (error) {
+      setSupportError(error instanceof Error ? error.message : "Не удалось проверить платёж.");
+    } finally {
+      setPollingInvoice(false);
+    }
+  };
   const createSupportInvoice = async () => {
     const amount = customStars ? Number(customStars) : supportAmount;
     if (!Number.isSafeInteger(amount) || amount < 1 || amount > 100000) {
@@ -374,8 +400,9 @@ export function YuberaCommunityPage({ animeList, initialScreen = "overview", isA
       const webApp = getTelegramWebApp();
       if (webApp?.openInvoice) {
         webApp.openInvoice(data.invoiceUrl, status => {
-          if (status === "paid") setSupportNotice("Спасибо за поддержку YUBERA!");
+          if (status === "paid" || status === "pending") void checkSupportPayment(data.payload!, initData);
           if (status === "failed") setSupportError("Платёж не прошёл. Попробуй ещё раз.");
+          if (status === "cancelled") setSupportNotice("Оплата отменена. Счёт не оплачен.");
         });
       } else {
         webApp?.openTelegramLink?.(data.invoiceUrl);

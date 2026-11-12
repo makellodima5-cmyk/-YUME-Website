@@ -320,7 +320,7 @@ function AnimeDetailPage() {
       // the completion indicator; the saved duration remains unknown.
       const estimatedTvEpisodeDuration = durationSeconds === null && anime.episodes > 1 ? 24 * 60 : null;
       const completionDuration = durationSeconds ?? estimatedTvEpisodeDuration;
-      const completed = completionDuration !== null && watchedSeconds / completionDuration >= 0.9;
+      const completed = completionDuration !== null && watchedSeconds / completionDuration >= 0.95;
       if (completed) {
         const alreadyCompleted = readPlaybackProgress().some((entry) =>
           entry.animeId === animeId && entry.episode === kodikEpisode && entry.completed,

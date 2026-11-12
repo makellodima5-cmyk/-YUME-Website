@@ -2082,7 +2082,7 @@ function Index() {
       ) : view === "news" ? (
         <News animeList={ANIME} onDetailChange={setNewsDetailOpen} telegramMiniApp={isTelegramMiniApp} />
       ) : view === "profile" ? (
-        <Profile animeList={ANIME} onSelect={select} onCatalog={() => setView("catalog")} isAdmin={isAdmin} onAdmin={() => setView("admin")} telegramMiniApp={isTelegramMiniApp} onYubera={() => setView("yubera")} />
+        <Profile animeList={ANIME} onSelect={select} onCatalog={() => setView("catalog")} isAdmin={isAdmin} onAdmin={() => setView("admin")} telegramMiniApp={isTelegramMiniApp} />
       ) : view === "favorites" ? (
         <Profile key="favorites" initialPanel="favorites" animeList={ANIME} onSelect={select} onCatalog={() => setView("catalog")} telegramMiniApp={isTelegramMiniApp} />
       ) : view === "watchlist" ? (
