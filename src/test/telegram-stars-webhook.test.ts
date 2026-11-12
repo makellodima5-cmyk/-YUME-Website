@@ -108,7 +108,7 @@ describe("Telegram Stars pre-checkout webhook", () => {
     expect(db.statements.filter(statement => statement.sql.includes("SET status = 'pre_checkout'"))).toHaveLength(0);
   });
 
-  it("does not advance the order when the Telegram API JSON reports ok=false", async () => {
+  it("keeps the reservation when Telegram does not confirm the API answer", async () => {
     const db = new FakeDatabase();
     configure(db);
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ ok: false, description: "not accepted" }), { status: 200 })));
