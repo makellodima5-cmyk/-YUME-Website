@@ -17,10 +17,24 @@ describe("YUBERA support page", () => {
     expect(screen.getByRole("button", { name: /отправить 250 звёзд/i })).toBeInTheDocument();
   });
 
-  it("renders the three donation purpose items", () => {
-    render(<SupportPage onBack={() => undefined} />);
-    expect(screen.getByText("Развитие функционала")).toBeInTheDocument();
-    expect(screen.getByText("Стабильная работа")).toBeInTheDocument();
-    expect(screen.getByText("Улучшение контента")).toBeInTheDocument();
+  it("renders the three benefits of supporting YUBERA", () => {
+    render(<SupportPage />);
+    expect(screen.getByText("Поддержка и YUBERA Plus")).toBeInTheDocument();
+    expect(screen.getByText("Поддержать проект")).toBeInTheDocument();
+    expect(screen.getByText("Эксклюзивные рамки аватара")).toBeInTheDocument();
+    expect(screen.getByText("Статус поддержки")).toBeInTheDocument();
+    expect(screen.getByText("Развитие YUBERA")).toBeInTheDocument();
+  });
+
+  it("switches to the Plus tab without leaving the combined screen", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ price: 100, periodDays: 30, isPlus: false, subscription: null }),
+    })));
+    render(<SupportPage />);
+    fireEvent.click(screen.getByRole("button", { name: "YUBERA Plus" }));
+    expect(await screen.findByText("Преимущества подписки")).toBeInTheDocument();
+    expect(screen.getByText("AI-помощник")).toBeInTheDocument();
+    expect(screen.getByText("Эксклюзивные рамки аватара")).toBeInTheDocument();
   });
 });
