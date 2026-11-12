@@ -112,4 +112,25 @@ describe("YUBERA community foundation", () => {
     expect(required.filter(file => !files.has(file))).toEqual([]);
   });
 
+
+  it("returns owner-only favorites, watchlist and history counts from existing library tables", async () => {
+    const server = await readFile(resolve(process.cwd(), "src/data/yubera-community.server.ts"), "utf8");
+    const component = await readFile(resolve(process.cwd(), "src/components/yume/YuberaProfileHub.tsx"), "utf8");
+    expect(server).toContain("FROM yume_saved_anime WHERE user_id=? AND list_type='favorite'");
+    expect(server).toContain("FROM yume_saved_anime WHERE user_id=? AND list_type='watchlist'");
+    expect(server).toContain("FROM yume_view_history WHERE user_id=?");
+    expect(server).toContain("stats: isOwner ?");
+    expect(component).toContain("profile.stats?.favorites");
+    expect(component).toContain("profile.stats?.watchlist");
+    expect(component).toContain("profile.stats?.history");
+  });
+
+  it("keeps donation checkout off the informational support-status screen", async () => {
+    const component = await readFile(resolve(process.cwd(), "src/components/yume/YuberaProfileHub.tsx"), "utf8");
+    const supportScreen = component.slice(component.indexOf('{screen === "support-status"'), component.indexOf('{screen === "plus"'));
+    expect(supportScreen).not.toContain("setDonationOpen(true)");
+    expect(component).toContain('label="Поддержать проект"');
+    expect(component).toContain("onClick={()=>setDonationOpen(true)}");
+  });
+
 });
