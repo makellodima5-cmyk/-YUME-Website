@@ -81,8 +81,8 @@ class RatingStatement {
     }
     if (this.sql.includes("INSERT OR IGNORE INTO yume_xp_ledger")) {
       const eventKey = this.values[2] as string;
-      const animeId = this.values[4] as string;
-      const userId = this.values[5] as string;
+      const animeId = this.values[5] as string;
+      const userId = this.values[6] as string;
       if (this.db.votes.has(animeId + ":" + userId) || this.db.xpKeys.has(eventKey)) {
         return { meta: { changes: 0, rows_read: 1, rows_written: 0 } };
       }
