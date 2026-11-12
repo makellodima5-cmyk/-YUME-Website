@@ -216,9 +216,10 @@ describe("YUBERA community foundation", () => {
     const form = component.slice(formStart, formEnd);
     expect(component).toContain('useState<string | null>(null)');
     expect(component).toContain('useState(true)');
-    expect(form).toContain("0 / 50");
+    expect(form).toContain("title.length} / 50");
     expect(form).toContain("maxLength={50}");
     expect(form).toContain("maxLength={250}");
+    expect(form).toContain("description.length} / 250");
     expect(form).toContain("aria-pressed={isPublic}");
     expect(form).toContain("Доступна всем пользователям");
     expect(form).toContain("Видна только вам");
