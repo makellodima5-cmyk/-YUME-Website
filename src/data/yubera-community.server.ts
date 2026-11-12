@@ -146,7 +146,7 @@ async function profileSummary(database: Database, userId: string, viewerId: stri
     displayName: [account.user.telegram_first_name, account.user.telegram_last_name].filter(Boolean).join(" ") || account.user.telegram_username || "Пользователь",
     username: account.user.telegram_username, photoUrl: account.user.telegram_photo_url,
     bio: account.profile.bio, avatarFrame: account.profile.avatar_frame,
-    visibility: account.profile.visibility, xp: isOwner ? xp : { level: xp.level, title: xp.title }, support: { level: support.level, title: support.title, asset: support.asset },
+    visibility: account.profile.visibility, xp: isOwner ? xp : { level: xp.level, title: xp.title }, support: isOwner ? support : { level: support.level, title: support.title, asset: support.asset },
     isPlus: plus, followers: Number(followers?.count ?? 0), following: Number(following?.count ?? 0),
     publicCollections: Number(collections?.count ?? 0), publicTitles: Number(collections?.titles ?? 0),
     collectionLikes: Number(collections?.likes ?? 0), isFollowing: Boolean(follow),
