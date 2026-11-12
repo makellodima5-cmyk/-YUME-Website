@@ -2,6 +2,7 @@ import { env as cloudflareEnv } from "cloudflare:workers";
 import { getR2Anime } from "@/data/catalog-r2.server";
 import type { Anime } from "@/data/anime";
 import { isSameOriginRequest } from "@/lib/request-security";
+import { YUBERA_XP_REWARDS } from "@/data/yubera-config";
 
 type Environment = Record<string, unknown> & {
   YUME_DB?: unknown;
