@@ -44,7 +44,7 @@ describe("YUBERA community foundation", () => {
     expect(server).toContain("WHERE changes()=1");
     expect(server).toContain("`collection-add:${id}:${animeId}`");
     expect(server).toContain("`collection-milestone:${id}`");
-    expect(server).toContain("WHERE (SELECT COUNT(*) FROM yume_collection_items WHERE collection_id=?)>=3");
+    expect(server).toContain("WHERE changes()=1 AND (SELECT COUNT(*) FROM yume_collection_items WHERE collection_id=?)=3");
   });
 
 
