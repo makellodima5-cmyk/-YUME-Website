@@ -6,3 +6,6 @@ describe("server episode playback accounting",()=>{it("merges overlapping timeli
 
 
 it("requires an atomic D1 batch before awarding episode completion XP",async()=>{const source=await readFile(resolve(process.cwd(),"src/data/yubera-episode-watch.server.ts"),"utf8");expect(source).toContain('if(!d.batch)return json({error:"atomic_watch_xp_batch_unavailable"},503)');expect(source).toContain("const results=await d.batch([update,award])");expect(source).not.toContain("else{await update.run();");});
+
+
+it("validates episode catalogue bounds and caps active server watch sessions",async()=>{const source=await readFile(resolve(process.cwd(),"src/data/yubera-episode-watch.server.ts"),"utf8");expect(source).toContain("episode_not_in_catalog");expect(source).toContain("DELETE FROM yume_episode_watch_sessions WHERE expires_at<=?");expect(source).toContain("too_many_active_watch_sessions");});
