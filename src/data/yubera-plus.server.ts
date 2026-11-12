@@ -19,7 +19,7 @@ function origin(r:Request){const o=r.headers.get("origin");if(!o)return false;tr
 function cookie(r:Request,n:string){for(const p of(r.headers.get("cookie")??"").split(";")){const i=p.indexOf("=");if(i>=0&&p.slice(0,i).trim()===n)return p.slice(i+1).trim();}return "";}
 async function sign(v:string,s:string){const k=await crypto.subtle.importKey("raw",new TextEncoder().encode(s),{name:"HMAC",hash:"SHA-256"},false,["sign"]);return Array.from(new Uint8Array(await crypto.subtle.sign("HMAC",k,new TextEncoder().encode(v))),b=>b.toString(16).padStart(2,"0")).join("");}
 async function tg(t:string,m:string,b:Record<string,unknown>){const r=await fetch("https://api.telegram.org/bot"+t+"/"+m,{method:"POST",headers:{"Content-Type":"application/json"},signal:AbortSignal.timeout(7000),body:JSON.stringify(b)});const x=await r.json().catch(()=>({})) as {ok?:boolean;result?:unknown;description?:string};return{ok:r.ok&&x.ok===true,result:x.result,description:x.description};}
-async function price(d:DB){const x=await d.prepare("SELECT setting_value FROM yume_plus_settings WHERE setting_key='price_xtr'").first<{setting_value:string}>();const n=Number(x?.setting_value??250);return isValidPlusPrice(n)?n:250;}
+async function price(d:DB){const x=await d.prepare("SELECT setting_value FROM yume_plus_settings WHERE setting_key='price_xtr'").first<{setting_value:string}>();const n=Number(x?.setting_value??0);return isValidPlusPrice(n)?n:0;}
 async function active(d:DB,u:string){return d.prepare("SELECT id,expires_at,auto_renew,is_recurring,telegram_payment_charge_id FROM yume_plus_subscriptions WHERE user_id=? AND status='active' AND expires_at>? ORDER BY expires_at DESC LIMIT 1").bind(u,Date.now()).first<{id:string;expires_at:number;auto_renew:number;is_recurring:number;telegram_payment_charge_id:string|null}>();}
 export async function handleYuberaPlus(r:Request):Promise<Response>{
  if(!["GET","POST"].includes(r.method))return json({error:"method_not_allowed"},405);if(r.method==="POST"&&!origin(r))return json({error:"cross_origin_request"},403);
@@ -30,6 +30,7 @@ export async function handleYuberaPlus(r:Request):Promise<Response>{
  let body:unknown;try{const raw=await r.text();if(raw.length>4096)return json({error:"request_too_large"},413);body=JSON.parse(raw);}catch{return json({error:"invalid_json"},400);}if(!body||typeof body!=="object"||Array.isArray(body))return json({error:"invalid_request"},400);
  const x=body as Record<string,unknown>;
  if(x.action==="create-invoice"){
+  if(!isValidPlusPrice(p))return json({error:"plus_price_not_configured"},503);
   if(sub)return json({error:"subscription_already_active",expiresAt:sub.expires_at},409);
   const consent=x.autoRenewConsent===true,e=env(),token=String(e.TELEGRAM_BOT_TOKEN??"").trim();if(!token)return json({error:"payments_not_configured"},503);
   const limiter=e.TELEGRAM_STARS_RATE_LIMITER as {limit?:(v:{key:string})=>Promise<{success:boolean}>}|undefined;if(!limiter||typeof limiter.limit!=="function")return json({error:"payment_rate_limit_unavailable"},503);
