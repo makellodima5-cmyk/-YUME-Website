@@ -44,12 +44,19 @@ export async function handleYuberaEpisodeWatch(r:Request):Promise<Response>{
  let segments:Interval[]=[];try{const parsed=JSON.parse(session.watched_segments_json) as unknown;if(Array.isArray(parsed))segments=parsed.filter((v):v is Interval=>Array.isArray(v)&&v.length===2&&finiteNumber(v[0])&&finiteNumber(v[1]));}catch{/* discard malformed stored ranges */}
  if(isCreditworthyPlaybackStep(session.last_position_seconds,position,elapsed))segments=mergeWatchedSegments(segments,session.last_position_seconds,position);
  const coverage=segments.reduce((sum,[a,b])=>sum+Math.max(0,b-a),0),completed=coverage>=session.duration_seconds*0.9;
- const update=d.prepare("UPDATE yume_episode_watch_sessions SET last_position_seconds=?,last_heartbeat_at=?,watched_segments_json=?,completed_at=CASE WHEN ?=1 THEN COALESCE(completed_at,?) ELSE completed_at END WHERE id=? AND user_id=? AND completed_at IS NULL")
-  .bind(position,now,JSON.stringify(segments),completed?1:0,now,id,userId);
- if(!completed){await update.run();return json({ok:true,completed:false,watchedSeconds:Math.floor(coverage),requiredSeconds:Math.ceil(session.duration_seconds*YUBERA_XP_RULES.episodeCompletionRatio),xpAwarded:0});}
- const award=d.prepare("INSERT OR IGNORE INTO yume_xp_ledger(id,user_id,event_key,event_type,amount,metadata_json) VALUES(?,?,?,'episode_complete',?,?)")
+ // Compare-and-swap the exact state read above. Concurrent stale heartbeats
+ // cannot overwrite a newer position or award completion XP from a stale snapshot.
+ const update=d.prepare("UPDATE yume_episode_watch_sessions SET last_position_seconds=?,last_heartbeat_at=?,watched_segments_json=?,completed_at=CASE WHEN ?=1 THEN COALESCE(completed_at,?) ELSE completed_at END WHERE id=? AND user_id=? AND completed_at IS NULL AND last_position_seconds=? AND last_heartbeat_at=? AND watched_segments_json=?")
+  .bind(position,now,JSON.stringify(segments),completed?1:0,now,id,userId,session.last_position_seconds,session.last_heartbeat_at,session.watched_segments_json);
+ if(!completed){
+  const result=await update.run();
+  if(Number(result.meta?.changes??0)!==1)return json({error:"heartbeat_state_conflict"},409);
+  return json({ok:true,completed:false,watchedSeconds:Math.floor(coverage),requiredSeconds:Math.ceil(session.duration_seconds*YUBERA_XP_RULES.episodeCompletionRatio),xpAwarded:0});
+ }
+ const award=d.prepare("INSERT OR IGNORE INTO yume_xp_ledger(id,user_id,event_key,event_type,amount,metadata_json) SELECT ?,?,?,'episode_complete',?,? WHERE changes()=1")
   .bind(crypto.randomUUID(),userId,"episode-complete:"+userId+":"+session.anime_id+":"+session.episode_number,YUBERA_XP_REWARDS.episodeNinetyPercent,JSON.stringify({animeId:session.anime_id,episodeNumber:session.episode_number,coverageSeconds:Math.floor(coverage),durationSeconds:session.duration_seconds,sessionId:id}));
  if(!d.batch)return json({error:"atomic_watch_xp_batch_unavailable"},503);
  const results=await d.batch([update,award]);
+ if(Number(results[0]?.meta?.changes??0)!==1)return json({error:"heartbeat_state_conflict"},409);
  return json({ok:true,completed:true,watchedSeconds:Math.floor(coverage),requiredSeconds:Math.ceil(session.duration_seconds*0.9),xpAwarded:Number(results[1]?.meta?.changes??0)===1?YUBERA_XP_REWARDS.episodeNinetyPercent:0});
 }
