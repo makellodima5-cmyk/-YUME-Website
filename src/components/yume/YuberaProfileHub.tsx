@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Bookmark, Check, ChevronRight, Crown, Heart, Layers3, LockKeyhole, Pencil, Pin, Plus, Search, ShieldCheck, Sparkles, Star, Trash2, Users, X } from "lucide-react";
+import { ArrowLeft, Bookmark, Check, ChevronRight, Crown, Heart, Info, Layers3, LifeBuoy, LockKeyhole, LogOut, Pencil, Pin, Plus, Search, Settings, Shield, ShieldCheck, Sparkles, Star, Trash2, Users, X } from "lucide-react";
 import { TelegramStarsDonation } from "./TelegramStarsDonation";
 import { YuberaPlusPanel } from "./YuberaPlusPanel";
 import type { Anime } from "@/data/anime";
