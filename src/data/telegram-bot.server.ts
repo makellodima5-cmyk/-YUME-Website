@@ -336,15 +336,30 @@ export async function handleTelegramWebhook(request: Request): Promise<Response>
         console.error("[YUBERA][STARS] Successful payment arrived for an order outside pre-checkout.", { payload, status: order.status });
         return json({ ok: true, ignored: true });
       }
-      const result = await db.prepare("UPDATE yume_stars_donations SET status = 'paid', telegram_payment_charge_id = ?, provider_payment_charge_id = ?, paid_at = CURRENT_TIMESTAMP WHERE payload = ? AND status = 'pre_checkout' AND telegram_payment_charge_id IS NULL")
-        .bind(chargeId, successfulPayment.provider_payment_charge_id ?? null, payload).run() as { meta?: { changes?: number } };
-      if (result.meta?.changes !== 1) {
+      if (!db.batch) return json({ ok: false, error: "atomic_support_frame_unlock_unavailable" }, 503);
+      const unlockStatements = [50, 1000, 2500, 5000, 10000].map((threshold, index) =>
+        db.prepare(`INSERT OR IGNORE INTO yume_support_frame_unlocks(user_id,frame_level)
+          SELECT u.id,? FROM yume_users u
+          JOIN yume_stars_donations current_payment ON current_payment.telegram_user_id=u.telegram_user_id
+          WHERE current_payment.payload=? AND current_payment.status='paid'
+            AND (SELECT COALESCE(SUM(d.amount),0) FROM yume_stars_donations d
+              LEFT JOIN yume_stars_refunds r ON r.telegram_payment_charge_id=d.telegram_payment_charge_id
+              WHERE d.telegram_user_id=u.telegram_user_id AND d.status='paid'
+                AND r.telegram_payment_charge_id IS NULL)>=?)`
+        ).bind(index + 1, payload, threshold)
+      );
+      const results = await db.batch([
+        db.prepare("UPDATE yume_stars_donations SET status = 'paid', telegram_payment_charge_id = ?, provider_payment_charge_id = ?, paid_at = CURRENT_TIMESTAMP WHERE payload = ? AND status = 'pre_checkout' AND telegram_payment_charge_id IS NULL")
+          .bind(chargeId, successfulPayment.provider_payment_charge_id ?? null, payload),
+        ...unlockStatements,
+      ]);
+      if (Number(results[0]?.meta?.changes ?? 0) !== 1) {
         const latest = await db.prepare("SELECT status, telegram_payment_charge_id FROM yume_stars_donations WHERE payload = ?")
           .bind(payload).first<{ status: string; telegram_payment_charge_id: string | null }>();
         if (latest?.status === "paid" && latest.telegram_payment_charge_id === chargeId) {
           return json({ ok: true, action: "stars_payment_already_recorded" });
         }
-        console.error("[YUBERA][STARS] Successful payment update did not change exactly one order.", { payload, changes: result.meta?.changes });
+        console.error("[YUBERA][STARS] Successful payment update did not change exactly one order.", { payload, changes: results[0]?.meta?.changes });
         return json({ ok: false, error: "payment_persistence_conflict" }, 503);
       }
     } catch (error) {
