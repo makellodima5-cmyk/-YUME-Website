@@ -858,3 +858,17 @@ export async function handleTelegramSession(request: Request): Promise<Response>
     return jsonResponse({ error: "telegram_auth_failed" }, 500);
   }
 }
+
+
+/** Returns the current account id after validating the signed, HttpOnly site session. */
+export async function getAuthenticatedYumeUserId(request: Request): Promise<string | null> {
+  const env = environment();
+  const db = database(env);
+  const secret = sessionSecret(env);
+  if (!db || !secret) return null;
+  try {
+    return await authenticatedTelegramUserId(request, db, secret);
+  } catch {
+    return null;
+  }
+}
