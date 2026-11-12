@@ -11,9 +11,9 @@ This work is limited to the website repository. The Android repository is out of
 
 ## Implemented in code (branch CI status is tracked separately)
 
-- First anime rating: +10 XP, with rating persistence and the one-time ledger entry written atomically.
-- Collection rewards: +2 XP for a newly added unique title and +15 XP for the first three-title milestone. The collection item and reward ledger writes now run in one D1 batch. Unique event keys prevent re-awards after removal/re-addition.
-- Episode viewing: the server uses elapsed server time, position progression and merged watched segments; it does not accept a browser-supplied completion percentage. Playback advancement tolerance was tightened to reduce seek/speed farming. Completion and the +5 XP ledger entry are written atomically.
+- First anime rating: +10 XP only when the account has no prior rating for that title. Legacy ratings do not receive retroactive XP; edits and repeated submissions do not re-award. The rating and XP ledger are written in one D1 batch.
+- Collection rewards: +2 XP for a newly inserted unique title and +15 XP only on the insertion that takes a collection from two to exactly three titles. The item and reward ledger writes run in one D1 batch. Unique event keys prevent re-awards after removal/re-addition.
+- Episode viewing: the server uses elapsed server time, position progression and merged watched segments; it does not accept a browser-supplied completion percentage. Playback advancement tolerance was tightened to reduce seek/speed farming. Completion and the +5 XP ledger entry require an atomic D1 batch; the handler fails closed if batching is unavailable.
 - Support status: totals are based on confirmed Stars donations minus recorded refunds. Plus payments are not included. Status and progress are recalculated from the resulting total; exact totals remain owner-only.
 - Telegram Stars refunds: support refund records are idempotent by Telegram charge ID; automated tests cover matching payer/amount/currency and duplicate delivery.
 - Plus payments: first payment and recurring renewals are processed with D1 batches. Renewal ledger insertion gates the subscription-expiry update, preventing duplicate webhook deliveries from extending a period twice.
@@ -21,7 +21,7 @@ This work is limited to the website repository. The Android repository is out of
 - Pre-checkout race: the pending order is reserved in D1 before answering Telegram's pre-checkout query, so an immediate successful-payment update cannot arrive while the order still appears pending.
 - Plus price administration: price changes and the audit-log insert are atomic and use an optimistic old-value check to prevent concurrent updates from producing an unlogged price change.
 - Plus access: Plus-only avatar frames are hidden when the paid period expires; active Plus status is shown on owner and public profile headers.
-- Avatar frames: all five contribution frames and five Plus frames now use the exact repository asset names. Support-frame entitlements are persisted permanently; Plus frames are visible only while Plus is active. Migration 9 creates and backfills the permanent unlock table.
+- Avatar frames and artwork: all five contribution frames, five Plus frames, five support-status emblems, ten XP-level illustrations and five collection covers are present in `public/images/yubera` and verified by an asset-inventory test. The profile editor exposes separate support and Plus categories, locked states and a no-frame option. Support-frame entitlements are persisted permanently; Plus frames are visible only while Plus is active. Migration 9 creates and backfills the permanent unlock table. The Plus panel now presents exactly the four approved benefits and uses the uploaded Plus crown asset.
 - Launch price: the owner-approved price is 100 Stars for 30 days. Migration 9 writes the price and records the initial price change in the admin audit log.
 - Migration consolidation: the renewal-failure column and permanent support-frame unlock schema are included in migration 9. Separate migrations 11 and 12 were removed. Migration 10 remains the episode-watch-session schema.
 
@@ -50,5 +50,5 @@ This work is limited to the website repository. The Android repository is out of
 - All changes are on the feature branch above.
 - `main` was not changed.
 - No production deployment or remote D1 migration was run.
-- The existing D1 database has migrations 1–8 applied according to the owner; migrations 9 and 10 are pending manual application.
+- The existing D1 database has migrations 1–8 applied according to the owner; consolidated migration 9 and episode-watch migration 10 are pending manual application. Migration 9 now includes the 100-Star price, recurring-payment event schema, renewal-failure state and permanent support-frame unlock table. Separate migrations 11 and 12 are not required.
 - Do not merge or deploy until migrations 9 and 10 have been applied and the remaining acceptance blockers above are resolved.
