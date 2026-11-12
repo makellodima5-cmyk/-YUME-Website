@@ -63,4 +63,12 @@ describe("YUBERA community foundation", () => {
     expect(server).toContain("expires_at > ?");
   });
 
+
+  it("shows active Plus status in both owner and public profile headers", async () => {
+    const component = await readFile(resolve(process.cwd(), "src/components/yume/YuberaProfileHub.tsx"), "utf8");
+    expect(component).toContain("profile.isPlus && <span");
+    expect(component).toContain("publicProfile.isPlus && <span");
+    expect(component).toContain(">YUBERA Plus</span>");
+  });
+
 });
