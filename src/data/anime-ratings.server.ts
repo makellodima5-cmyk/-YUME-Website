@@ -362,6 +362,13 @@ async function handleWrite(request: Request): Promise<Response> {
       });
     }
 
+    // The unique ledger key makes the first successful rating worth +10 XP;
+    // edits and later re-ratings remain idempotent even if a rating row is deleted.
+    await db.prepare(
+      "INSERT OR IGNORE INTO yume_xp_ledger (id, user_id, event_key, event_type, amount, metadata_json) " +
+      "VALUES (?, ?, ?, 'anime_rating', 10, ?)"
+    ).bind(crypto.randomUUID(), userId, "anime-rating:" + userId + ":" + animeId, JSON.stringify({ animeId })).run();
+
     if ((write.meta?.changes ?? 1) > 0) publicRatingCache.delete(animeId);
     const result = await getStats(db, animeId, userId);
     return json(result);
