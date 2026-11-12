@@ -344,6 +344,10 @@ async function handleWrite(request: Request): Promise<Response> {
     if (!anime) return json({ error: "anime_not_found" }, 404);
     if (anime.status === "Анонс") return json({ error: "ratings_unavailable_for_announced" }, 409);
 
+    const existingVote = await db.prepare("SELECT 1 AS found FROM yume_anime_ratings WHERE anime_id = ? AND user_id = ?")
+      .bind(animeId, userId).first<{ found: number }>();
+    // XP is a first-ever unique-title award. The immutable ledger key prevents
+    // re-awards if a rating is later removed and submitted again.
     // The composite primary key makes this an upsert, never a second vote.
     // Its SQLite triggers update the aggregate in the same atomic D1 statement.
     const write = await db.prepare(
@@ -352,6 +356,10 @@ async function handleWrite(request: Request): Promise<Response> {
       "rating = excluded.rating, updated_at = CURRENT_TIMESTAMP " +
       "WHERE yume_anime_ratings.rating <> excluded.rating",
     ).bind(animeId, userId, rating).run();
+    if (!existingVote) {
+      await db.prepare("INSERT OR IGNORE INTO yume_xp_ledger (id, user_id, event_key, event_type, amount, metadata_json) VALUES (?, ?, ?, 'first_rating', 10, ?)")
+        .bind(crypto.randomUUID(), userId, "first_rating:" + animeId, JSON.stringify({ animeId })).run();
+    }
 
     if (write.meta) {
       console.debug("[YUBERA][ANIME_RATINGS][D1]", {

@@ -1,5 +1,5 @@
 import { useMemo, type ReactNode } from "react";
-import { ChevronRight, Star, Megaphone, Radio, Layers, Send, Shuffle } from "lucide-react";
+import { ChevronRight, Star, Megaphone, Radio, Layers, Send, Shuffle, Crown } from "lucide-react";
 import type { Anime } from "@/data/anime";
 import { COLLECTIONS } from "@/data/anime";
 import { displayAnimeTitle, displayAnimeKind, useYumePreferences, type TranslationKey } from "@/data/preferences";
@@ -125,13 +125,12 @@ export function HomeExperience({
         {showSupport && (
         <button type="button" onClick={onSupport} className="yubera-support-entry group my-3 flex min-h-[68px] w-full items-center gap-3 rounded-[19px] border border-[#3a3b43] bg-[#1b1c23] px-3.5 py-2.5 text-left transition-colors hover:border-[#ff765c]/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ff6245] sm:my-4 sm:px-5">
           <span className="relative grid h-12 w-12 shrink-0 place-items-center">
-            <Star aria-hidden="true" className="h-10 w-10 fill-[#ffc044] text-[#ffe49a] drop-shadow-[0_0_8px_rgba(255,190,55,.45)]" strokeWidth={1.5} />
-            <span aria-hidden="true" className="absolute bottom-0 right-0 grid h-[19px] w-[19px] place-items-center rounded-full border-2 border-[#1b1c23] bg-[#229ED9] text-white"><Send className="h-2.5 w-2.5 fill-current" /></span>
+            <img src="/images/yubera/YUBERA_Plus_Crown_Simple.webp" alt="" className="h-12 w-12 object-contain" />
           </span>
           <span aria-hidden="true" className="h-12 w-px shrink-0 bg-white/20" />
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-[16px] font-bold text-white">{ru ? "Поддержать проект" : "Support the project"}</span>
-            <span className="mt-0.5 block truncate text-[13px] text-white/60">{ru ? "Развитие YUBERA и новые возможности" : "Help YUBERA grow and add new features"}</span>
+            <span className="block truncate text-[16px] font-bold text-white">{ru ? "Поддержка и YUBERA Plus" : "Support and YUBERA Plus"}</span>
+            <span className="mt-0.5 block truncate text-[13px] text-white/60">{ru ? "Статусы поддержки, рамки и подписка" : "Support statuses, avatar frames and subscription"}</span>
           </span>
           <ChevronRight aria-hidden="true" className="h-6 w-6 shrink-0 text-[#ff6245] transition-transform group-hover:translate-x-0.5" />
         </button>
