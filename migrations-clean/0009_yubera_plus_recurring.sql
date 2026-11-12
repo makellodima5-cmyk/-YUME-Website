@@ -8,6 +8,10 @@
 
 -- Remove indexes attached to the legacy tables so the clean indexes can be
 -- recreated on the replacement tables after the rename.
+DROP INDEX IF EXISTS idx_yume_follows_followed_created;
+DROP INDEX IF EXISTS idx_yume_follows_follower_created;
+DROP INDEX IF EXISTS idx_yume_collections_owner_updated;
+DROP INDEX IF EXISTS idx_yume_collections_public_owner;
 DROP INDEX IF EXISTS idx_yume_plus_user_expiry;
 DROP INDEX IF EXISTS idx_yume_plus_payments_user_created;
 DROP INDEX IF EXISTS idx_yume_xp_user_created;
@@ -15,6 +19,9 @@ DROP INDEX IF EXISTS idx_yume_collection_items_order;
 
 -- Archive old table definitions. Renaming the payment table first preserves
 -- its original FK relationship when the subscriptions table is renamed next.
+ALTER TABLE yume_profiles RENAME TO yume_profiles_legacy_0009;
+ALTER TABLE yume_follows RENAME TO yume_follows_legacy_0009;
+ALTER TABLE yume_collections RENAME TO yume_collections_legacy_0009;
 ALTER TABLE yume_plus_payments RENAME TO yume_plus_payments_legacy_0009;
 ALTER TABLE yume_plus_subscriptions RENAME TO yume_plus_subscriptions_legacy_0009;
 ALTER TABLE yume_xp_ledger RENAME TO yume_xp_ledger_legacy_0009;
