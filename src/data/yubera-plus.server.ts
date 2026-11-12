@@ -2,7 +2,7 @@ import { env as cloudflareEnv } from "cloudflare:workers";
 import { getAuthenticatedYumeUserId } from "@/data/telegram-auth.server";
 import { hasAdminPasswordSession, isAdminPasswordConfigured } from "@/lib/admin-password.server";
 type S={bind(...v:unknown[]):S;first<T=Record<string,unknown>>():Promise<T|null>;all<T=Record<string,unknown>>():Promise<{results:T[]}>;run():Promise<{meta?:{changes?:number}}>} ;
-type DB={prepare(sql:string):S};
+type DB={prepare(sql:string):S;batch?:(statements:S[])=>Promise<Array<{meta?:{changes?:number}}>>};
 type E=Record<string,unknown>&{YUME_DB?:unknown;TELEGRAM_BOT_TOKEN?:string;TELEGRAM_ADMIN_ID?:string;YUME_AUTH_SESSION_SECRET?:string;YUME_ADMIN_PASSWORD?:string;TELEGRAM_STARS_RATE_LIMITER?:unknown};
 type G=typeof globalThis&{__YUME_RUNTIME_ENV__?:unknown};
 type Pay={currency?:string;total_amount?:number;invoice_payload?:string;telegram_payment_charge_id?:string;is_recurring?:boolean;is_first_recurring?:boolean;subscription_expiration_date?:number};
@@ -66,15 +66,28 @@ export async function recordYuberaPlusSuccessfulPayment(d:DB,telegramId:string,p
  const owner=await d.prepare("SELECT telegram_user_id FROM yume_users WHERE id=?").bind(order.user_id).first<{telegram_user_id:string}>();if(owner?.telegram_user_id!==telegramId)return true;
  const recurring=p.is_recurring===true,first=p.is_first_recurring===true,now=Date.now();
  if(order.status==="pre_checkout"&&!order.telegram_payment_charge_id){
-  if((order.auto_renew_consent===1)!==recurring||(recurring&&!first))return true;const subId=order.id,expiry=resolveInitialPlusExpiry(p.subscription_expiration_date,now);
-  await d.prepare("INSERT OR IGNORE INTO yume_plus_subscriptions(id,user_id,status,starts_at,expires_at,auto_renew,telegram_payment_charge_id,is_recurring,created_at,updated_at) VALUES(?,?,'active',?,?,?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)").bind(subId,order.user_id,now,expiry,recurring?1:0,charge,recurring?1:0).run();
-  const saved=await d.prepare("UPDATE yume_plus_payments SET status='paid',subscription_id=?,telegram_payment_charge_id=?,paid_at=CURRENT_TIMESTAMP WHERE invoice_payload=? AND status='pre_checkout' AND telegram_payment_charge_id IS NULL").bind(subId,charge,payload).run();if(Number(saved.meta?.changes??0)!==1){const latest=await d.prepare("SELECT status,telegram_payment_charge_id FROM yume_plus_payments WHERE invoice_payload=?").bind(payload).first<{status:string;telegram_payment_charge_id:string|null}>();if(latest?.status!=="paid"||latest.telegram_payment_charge_id!==charge)return true;}
-  await d.prepare("INSERT OR IGNORE INTO yume_plus_payment_events(telegram_payment_charge_id,user_id,invoice_payload,amount,currency,is_recurring,is_first_recurring,subscription_expiration_date,status,created_at) VALUES(?,?,?,?,'XTR',?,?,?,?,CURRENT_TIMESTAMP)").bind(charge,order.user_id,payload,amount,recurring?1:0,first?1:0,p.subscription_expiration_date??null,"paid").run();return true;
+  if((order.auto_renew_consent===1)!==recurring||(recurring&&!first))return true;
+  if(!d.batch)throw new Error("atomic_payment_batch_unavailable");
+  const subId=order.id,expiry=resolveInitialPlusExpiry(p.subscription_expiration_date,now);
+  const results=await d.batch([
+   d.prepare("INSERT OR IGNORE INTO yume_plus_subscriptions(id,user_id,status,starts_at,expires_at,auto_renew,telegram_payment_charge_id,is_recurring,created_at,updated_at) VALUES(?,?,'active',?,?,?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)").bind(subId,order.user_id,now,expiry,recurring?1:0,charge,recurring?1:0),
+   d.prepare("UPDATE yume_plus_payments SET status='paid',subscription_id=?,telegram_payment_charge_id=?,paid_at=CURRENT_TIMESTAMP WHERE invoice_payload=? AND status='pre_checkout' AND telegram_payment_charge_id IS NULL").bind(subId,charge,payload),
+   d.prepare("INSERT OR IGNORE INTO yume_plus_payment_events(telegram_payment_charge_id,user_id,invoice_payload,amount,currency,is_recurring,is_first_recurring,subscription_expiration_date,status,created_at) SELECT ?,?,?,?,'XTR',?,?,?,?,CURRENT_TIMESTAMP WHERE changes()=1").bind(charge,order.user_id,payload,amount,recurring?1:0,first?1:0,p.subscription_expiration_date??null,"paid")
+  ]);
+  if(Number(results[1]?.meta?.changes??0)!==1){
+   const latest=await d.prepare("SELECT status,telegram_payment_charge_id FROM yume_plus_payments WHERE invoice_payload=?").bind(payload).first<{status:string;telegram_payment_charge_id:string|null}>();
+   if(latest?.status!=="paid"||latest.telegram_payment_charge_id!==charge)throw new Error("plus_initial_payment_state_conflict");
+  }
+  return true;
  }
  if(order.status==="paid"&&order.subscription_id&&order.auto_renew_consent===1&&recurring&&!first){
+  if(!d.batch)throw new Error("atomic_payment_batch_unavailable");
   const sec=p.subscription_expiration_date,expiry=typeof sec==="number"&&Number.isSafeInteger(sec)?sec*1000:0;
-  await d.prepare("UPDATE yume_plus_subscriptions SET expires_at=CASE WHEN ?>0 THEN ? ELSE MAX(expires_at,?)+? END,status='active',auto_renew=1,updated_at=CURRENT_TIMESTAMP WHERE id=? AND user_id=? AND NOT EXISTS(SELECT 1 FROM yume_plus_payment_events WHERE telegram_payment_charge_id=?)").bind(expiry,expiry,now,PERIOD,order.subscription_id,order.user_id,charge).run();
-  await d.prepare("INSERT OR IGNORE INTO yume_plus_payment_events(telegram_payment_charge_id,user_id,invoice_payload,amount,currency,is_recurring,is_first_recurring,subscription_expiration_date,status,created_at) VALUES(?,?,?,?,'XTR',1,0,?,'paid',CURRENT_TIMESTAMP)").bind(charge,order.user_id,payload,amount,sec??null).run();return true;
+  await d.batch([
+   d.prepare("INSERT OR IGNORE INTO yume_plus_payment_events(telegram_payment_charge_id,user_id,invoice_payload,amount,currency,is_recurring,is_first_recurring,subscription_expiration_date,status,created_at) SELECT ?,?,?,?,'XTR',1,0,?,'paid',CURRENT_TIMESTAMP WHERE EXISTS(SELECT 1 FROM yume_plus_subscriptions WHERE id=? AND user_id=?)").bind(charge,order.user_id,payload,amount,sec??null,order.subscription_id,order.user_id),
+   d.prepare("UPDATE yume_plus_subscriptions SET expires_at=CASE WHEN ?>0 THEN ? ELSE MAX(expires_at,?)+? END,status='active',auto_renew=1,updated_at=CURRENT_TIMESTAMP WHERE id=? AND user_id=? AND changes()=1").bind(expiry,expiry,now,PERIOD,order.subscription_id,order.user_id)
+  ]);
+  return true;
  }
  return true;
 }
