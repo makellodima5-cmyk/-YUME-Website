@@ -12,3 +12,6 @@ it("does not offer checkout at an unconfigured price and exposes the admin setup
 
 
 it("persists failed recurring payments and gives the user recovery guidance",async()=>{const [server,panel,migration]=await Promise.all([import("node:fs/promises").then(m=>m.readFile("src/data/yubera-plus.server.ts","utf8")),import("node:fs/promises").then(m=>m.readFile("src/components/yume/YuberaPlusPanel.tsx","utf8")),import("node:fs/promises").then(m=>m.readFile("migrations-clean/0009_yubera_plus_recurring.sql","utf8"))]);expect(server).toContain("renewal_failed_at=CASE WHEN ?=1 THEN CURRENT_TIMESTAMP ELSE NULL END");expect(server).toContain("renewalFailedAt:latest?.renewal_failed_at??null");expect(panel).toContain("Telegram не смог выполнить автопродление.");expect(migration).toContain("ADD COLUMN renewal_failed_at TEXT");});
+
+
+it("renders the four approved Plus benefits without promising an active AI feature",async()=>{const panel=await import("node:fs/promises").then(m=>m.readFile("src/components/yume/YuberaPlusPanel.tsx","utf8"));for(const phrase of ["AI-помощник","Скоро","Рекомендации, создание подборок и помощь в поиске аниме","Расширенные подборки","Больше лимитов и гибкие настройки","Эксклюзивные рамки аватара","Специальные рамки только для подписчиков Plus","Эксклюзивный статус","Особый статус YUBERA Plus в профиле"])expect(panel).toContain(phrase);});
