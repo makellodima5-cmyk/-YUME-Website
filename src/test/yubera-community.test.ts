@@ -270,4 +270,15 @@ describe("YUBERA community foundation", () => {
     expect(edit).toContain("maxLength={250}");
   });
 
+  it("keeps recommendation pagination shuffled but stable within one screen session", async () => {
+    const server = await readFile(resolve(process.cwd(), "src/data/yubera-community.server.ts"), "utf8");
+    const panel = await readFile(resolve(process.cwd(), "src/components/yume/YuberaFriendsPanel.tsx"), "utf8");
+    expect(server).toContain("url.searchParams.get(\"seed\")");
+    expect(server).toContain("ORDER BY abs((CAST(substr(u.id, -8) AS INTEGER) * 1103515245 + ?) % 2147483647)");
+    expect(server).toContain("LIMIT 13 OFFSET ?");
+    expect(server).toContain("hasMore: rows.results.length > 12");
+    expect(panel).toContain("recommendationSeed");
+    expect(panel).toContain("&seed=${recommendationSeed}");
+  });
+
 });
