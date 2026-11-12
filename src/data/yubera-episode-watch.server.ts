@@ -42,7 +42,7 @@ export async function handleYuberaEpisodeWatch(r:Request):Promise<Response>{
  if(!completed){await update.run();return json({ok:true,completed:false,watchedSeconds:Math.floor(coverage),requiredSeconds:Math.ceil(session.duration_seconds*0.9),xpAwarded:0});}
  const award=d.prepare("INSERT OR IGNORE INTO yume_xp_ledger(id,user_id,event_key,event_type,amount,metadata_json) VALUES(?,?,?,'episode_complete',5,?)")
   .bind(crypto.randomUUID(),userId,"episode-complete:"+userId+":"+session.anime_id+":"+session.episode_number,JSON.stringify({animeId:session.anime_id,episodeNumber:session.episode_number,coverageSeconds:Math.floor(coverage),durationSeconds:session.duration_seconds,sessionId:id}));
- let results:Array<{meta?:{changes?:number}}>;
- if(d.batch)results=await d.batch([update,award]);else{await update.run();results=[{meta:{changes:0}},await award.run()];}
+ if(!d.batch)return json({error:"atomic_watch_xp_batch_unavailable"},503);
+ const results=await d.batch([update,award]);
  return json({ok:true,completed:true,watchedSeconds:Math.floor(coverage),requiredSeconds:Math.ceil(session.duration_seconds*0.9),xpAwarded:Number(results[1]?.meta?.changes??0)===1?5:0});
 }
