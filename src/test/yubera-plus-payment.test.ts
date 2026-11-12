@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { recordYuberaPlusSuccessfulPayment } from "@/data/yubera-plus.server";
+import { recordYuberaPlusSuccessfulPayment, recordYuberaPlusSubscriptionUpdate } from "@/data/yubera-plus.server";
 
 type Order = {
   id: string; user_id: string; amount: number; currency: string; status: string;
@@ -19,7 +19,7 @@ class FakeStatement {
     }
     return null;
   }
-  async run(): Promise<Result> { return { meta: { changes: 0 } }; }
+  async run(): Promise<Result> { if (this.sql.includes("SET auto_renew") && this.db.subscription) { this.db.subscription.auto_renew = Number(this.values[0]); this.db.subscription.renewal_failed_at = Number(this.values[1]) === 1 ? "2026-11-12 12:00:00" : null; return { meta: { changes: 1 } }; } return { meta: { changes: 0 } }; }
   valuesForBatch() { return this.values; }
 }
 
@@ -29,7 +29,7 @@ class FakePlusDatabase {
     status: "pre_checkout", auto_renew_consent: 1, subscription_id: null,
     telegram_payment_charge_id: null,
   };
-  subscription: { id: string; expires_at: number; status: string; auto_renew: number } | null = null;
+  subscription: { id: string; expires_at: number; status: string; auto_renew: number; renewal_failed_at: string | null } | null = null;
   events = new Set<string>();
   prepare(sql: string) { return new FakeStatement(this, sql); }
   async batch(statements: FakeStatement[]): Promise<Result[]> {
@@ -39,7 +39,7 @@ class FakePlusDatabase {
       const values = statement.valuesForBatch();
       if (statement.sql.includes("INSERT OR IGNORE INTO yume_plus_subscriptions")) {
         if (!this.subscription) {
-          this.subscription = { id: String(values[0]), expires_at: Number(values[3]), status: "active", auto_renew: Number(values[4]) };
+          this.subscription = { id: String(values[0]), expires_at: Number(values[3]), status: "active", auto_renew: Number(values[4]), renewal_failed_at: null };
           changes = 1;
         } else changes = 0;
       } else if (statement.sql.includes("UPDATE yume_plus_payments SET status='paid'")) {
@@ -98,4 +98,18 @@ describe("YUBERA Plus Telegram payment ledger", () => {
     expect(db.subscription?.expires_at).toBe(afterFirstDelivery);
     expect(db.events).toEqual(new Set(["charge-first", "charge-renewal"]));
   });
+
+  it("surfaces failed recurring payment and clears the warning after recovery", async () => {
+    const db = new FakePlusDatabase();
+    db.subscription = { id: "payment-1", expires_at: Date.now() + 86_400_000, status: "active", auto_renew: 1, renewal_failed_at: null };
+
+    await recordYuberaPlusSubscriptionUpdate(db as never, { user: { id: 12345 }, invoice_payload: "yubera_plus:payment-1", state: "failed" });
+    expect(db.subscription.auto_renew).toBe(0);
+    expect(db.subscription.renewal_failed_at).not.toBeNull();
+
+    await recordYuberaPlusSubscriptionUpdate(db as never, { user: { id: 12345 }, invoice_payload: "yubera_plus:payment-1", state: "active" });
+    expect(db.subscription.auto_renew).toBe(1);
+    expect(db.subscription.renewal_failed_at).toBeNull();
+  });
+
 });
