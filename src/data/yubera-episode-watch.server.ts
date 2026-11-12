@@ -1,7 +1,7 @@
 import { env as cloudflareEnv } from "cloudflare:workers";
 import { getAuthenticatedYumeUserId } from "@/data/telegram-auth.server";
 import { getR2Anime } from "@/data/catalog-r2.server";
-import { YUBERA_XP_REWARDS } from "@/data/yubera-config";
+import { YUBERA_XP_REWARDS, YUBERA_XP_RULES } from "@/data/yubera-config";
 type S={bind(...v:unknown[]):S;first<T=Record<string,unknown>>():Promise<T|null>;run():Promise<{meta?:{changes?:number}}>} ;
 type DB={prepare(sql:string):S;batch?:(statements:S[])=>Promise<Array<{meta?:{changes?:number}}>>};
 type E={YUME_DB?:unknown};
@@ -46,10 +46,10 @@ export async function handleYuberaEpisodeWatch(r:Request):Promise<Response>{
  const coverage=segments.reduce((sum,[a,b])=>sum+Math.max(0,b-a),0),completed=coverage>=session.duration_seconds*0.9;
  const update=d.prepare("UPDATE yume_episode_watch_sessions SET last_position_seconds=?,last_heartbeat_at=?,watched_segments_json=?,completed_at=CASE WHEN ?=1 THEN COALESCE(completed_at,?) ELSE completed_at END WHERE id=? AND user_id=? AND completed_at IS NULL")
   .bind(position,now,JSON.stringify(segments),completed?1:0,now,id,userId);
- if(!completed){await update.run();return json({ok:true,completed:false,watchedSeconds:Math.floor(coverage),requiredSeconds:Math.ceil(session.duration_seconds*0.9),xpAwarded:0});}
+ if(!completed){await update.run();return json({ok:true,completed:false,watchedSeconds:Math.floor(coverage),requiredSeconds:Math.ceil(session.duration_seconds*YUBERA_XP_RULES.episodeCompletionRatio),xpAwarded:0});}
  const award=d.prepare("INSERT OR IGNORE INTO yume_xp_ledger(id,user_id,event_key,event_type,amount,metadata_json) VALUES(?,?,?,'episode_complete',?,?)")
   .bind(crypto.randomUUID(),userId,"episode-complete:"+userId+":"+session.anime_id+":"+session.episode_number,YUBERA_XP_REWARDS.episodeNinetyPercent,JSON.stringify({animeId:session.anime_id,episodeNumber:session.episode_number,coverageSeconds:Math.floor(coverage),durationSeconds:session.duration_seconds,sessionId:id}));
  if(!d.batch)return json({error:"atomic_watch_xp_batch_unavailable"},503);
  const results=await d.batch([update,award]);
- return json({ok:true,completed:true,watchedSeconds:Math.floor(coverage),requiredSeconds:Math.ceil(session.duration_seconds*0.9),xpAwarded:Number(results[1]?.meta?.changes??0)===1?5:0});
+ return json({ok:true,completed:true,watchedSeconds:Math.floor(coverage),requiredSeconds:Math.ceil(session.duration_seconds*0.9),xpAwarded:Number(results[1]?.meta?.changes??0)===1?YUBERA_XP_REWARDS.episodeNinetyPercent:0});
 }
