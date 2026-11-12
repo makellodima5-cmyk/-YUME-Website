@@ -9,7 +9,7 @@ Base branch: `main` (not modified)
 
 This work is limited to the website repository. The Android repository is out of scope.
 
-## Implemented and verified in code
+## Implemented in code (branch CI status is tracked separately)
 
 - First anime rating: +10 XP, with rating persistence and the one-time ledger entry written atomically.
 - Collection rewards: +2 XP for a newly added unique title and +15 XP for the first three-title milestone. The collection item and reward ledger writes now run in one D1 batch. Unique event keys prevent re-awards after removal/re-addition.
@@ -21,7 +21,9 @@ This work is limited to the website repository. The Android repository is out of
 - Pre-checkout race: the pending order is reserved in D1 before answering Telegram's pre-checkout query, so an immediate successful-payment update cannot arrive while the order still appears pending.
 - Plus price administration: price changes and the audit-log insert are atomic and use an optimistic old-value check to prevent concurrent updates from producing an unlogged price change.
 - Plus access: Plus-only avatar frames are hidden when the paid period expires; active Plus status is shown on owner and public profile headers.
-- Unapproved price: the former seed value of 250 Stars was not present in the approved specification. Migration `0011_yubera_plus_price_requires_admin_approval.sql` clears that unapproved seed only when it was never explicitly set by an administrator. Checkout is disabled until an administrator saves an approved price from 1 to 10,000 Stars.
+- Avatar frames: all five contribution frames and five Plus frames now use the exact repository asset names. Support-frame entitlements are persisted permanently; Plus frames are visible only while Plus is active. Migration 9 creates and backfills the permanent unlock table.
+- Launch price: the owner-approved price is 100 Stars for 30 days. Migration 9 writes the price and records the initial price change in the admin audit log.
+- Migration consolidation: the renewal-failure column and permanent support-frame unlock schema are included in migration 9. Separate migrations 11 and 12 were removed. Migration 10 remains the episode-watch-session schema.
 
 ## Automated coverage added or updated
 
@@ -37,14 +39,16 @@ This work is limited to the website repository. The Android repository is out of
 
 ## Remaining acceptance blockers
 
-1. **Initial Plus price requires an owner/admin decision.** No starting price is specified in the supplied Plus specification. The system intentionally refuses new purchases until an administrator sets the value. Do not restore the unapproved 250-Star seed.
-2. **Kodik playback is not cryptographically attestable from the current integration.** The iframe sends playback position/duration events; the page checks the iframe source/origin and the server checks elapsed time and plausible position progression. Kodik does not provide a signed server-verifiable watch receipt in the current integration. A user with browser-devtools access can still forge client messages. Therefore this is anti-abuse hardening, not proof that a human watched the video. A provider-side signed event or a trusted server-side playback source is needed for that guarantee.
-3. **Real Telegram Stars end-to-end tests remain necessary.** CI tests the server logic, but it cannot prove live Telegram invoice creation, first recurring payment, renewal, cancellation, insufficient-balance behavior and refund delivery without the configured bot/test environment.
-4. **Manual browser verification remains outstanding.** Automated CI does not replace checking the purchase, cancellation, refund and profile flows in the actual Telegram Mini App/browser.
+1. **The approved 100-Star launch price is now configured by migration 9.** Do not deploy the updated Worker until migrations 9 and 10 have been manually applied to the existing D1 database.
+2. **The profile screens are not yet a complete visual implementation of the supplied references.** The current profile hub still lacks several required owner-profile blocks (the three statistics, public-collection preview, settings/legal/about/admin/support/account sections and the specified ordering). The support-status screen also combines donation entry with status information even though the dedicated status-screen specification excludes the donation action. Collection menus and some screen layouts still need visual refinement against the archive screenshots. Do not mark the UI portion complete.
+3. **Kodik playback is not cryptographically attestable from the current integration.** The iframe sends playback position/duration events; the page checks the iframe source/origin and the server checks elapsed time and plausible position progression. Kodik does not provide a signed server-verifiable watch receipt in the current integration. A user with browser-devtools access can still forge client messages. This is anti-abuse hardening, not proof that a human watched the video.
+4. **Real Telegram Stars end-to-end tests remain necessary.** CI tests server logic, but it cannot prove live invoice creation, first recurring payment, renewal, cancellation, insufficient-balance behavior and refund delivery without the configured bot/test environment.
+5. **Manual browser verification remains outstanding.** Purchase, cancellation, refund, profile/frame selection and collection flows still need checking in the actual Telegram Mini App/browser.
 
 ## Release/branch safety
 
 - All changes are on the feature branch above.
 - `main` was not changed.
 - No production deployment or remote D1 migration was run.
-- Do not merge or mark Stage 2 complete until the acceptance blockers above are resolved and the final branch CI is green.
+- The existing D1 database has migrations 1–8 applied according to the owner; migrations 9 and 10 are pending manual application.
+- Do not merge or deploy until migrations 9 and 10 have been applied and the remaining acceptance blockers above are resolved.
