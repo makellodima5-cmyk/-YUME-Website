@@ -8,7 +8,7 @@ type Statement = {
   all<T = Record<string, unknown>>(): Promise<{ results: T[] }>;
   run(): Promise<{ meta?: { changes?: number } }>;
 };
-type Database = { prepare(sql: string): Statement };
+type Database = { prepare(sql: string): Statement; batch?: (statements: Statement[]) => Promise<Array<{ meta?: { changes?: number } }>> };
 type Environment = { YUME_DB?: unknown };
 type RuntimeGlobal = typeof globalThis & { __YUME_RUNTIME_ENV__?: unknown };
 type UserRow = {
@@ -336,13 +336,15 @@ export async function handleYuberaCommunity(request: Request): Promise<Response>
     const count = await database.prepare("SELECT COUNT(*) AS count FROM yume_collection_items WHERE collection_id = ?").bind(id).first<{ count: number }>();
     const exists = await database.prepare("SELECT 1 AS found FROM yume_collection_items WHERE collection_id = ? AND anime_id = ?").bind(id, animeId).first();
     if (!exists && Number(count?.count ?? 0) >= (plus ? PLUS_TITLES : FREE_TITLES)) return json({ error: "collection_title_limit_reached" }, 409);
-    const inserted = await database.prepare("INSERT OR IGNORE INTO yume_collection_items(collection_id,anime_id,position) VALUES(?,?,?)")
-      .bind(id, animeId, Number(count?.count ?? 0)).run();
-    if (Number(inserted.meta?.changes ?? 0) === 1) {
-      await awardXP(database, userId, "collection_add", `collection-add:${id}:${animeId}`, { collectionId: id, animeId });
-      const milestone = await database.prepare("SELECT COUNT(*) AS count FROM yume_collection_items WHERE collection_id = ?").bind(id).first<{ count: number }>();
-      if (Number(milestone?.count ?? 0) === 3) await awardXP(database, userId, "collection_milestone", `collection-milestone:${id}`, { collectionId: id });
-    }
+    if (!database.batch) return json({ error: "atomic_xp_batch_unavailable" }, 503);
+    await database.batch([
+      database.prepare("INSERT OR IGNORE INTO yume_collection_items(collection_id,anime_id,position) VALUES(?,?,?)")
+        .bind(id, animeId, Number(count?.count ?? 0)),
+      database.prepare("INSERT OR IGNORE INTO yume_xp_ledger(id,user_id,event_key,event_type,amount,metadata_json) SELECT ?,?,?,'collection_add',2,? WHERE changes()=1")
+        .bind(crypto.randomUUID(), userId, `collection-add:${id}:${animeId}`, JSON.stringify({ collectionId: id, animeId })),
+      database.prepare("INSERT OR IGNORE INTO yume_xp_ledger(id,user_id,event_key,event_type,amount,metadata_json) SELECT ?,?,?,'collection_milestone',15,? WHERE (SELECT COUNT(*) FROM yume_collection_items WHERE collection_id=?)>=3")
+        .bind(crypto.randomUUID(), userId, `collection-milestone:${id}`, JSON.stringify({ collectionId: id }), id),
+    ]);
     return json({ ok: true });
   }
   if (action === "collection.like") {
