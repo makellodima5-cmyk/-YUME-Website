@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import { resolve } from "node:path";
 
 describe("YUBERA community foundation", () => {
@@ -92,6 +92,24 @@ describe("YUBERA community foundation", () => {
     expect(server).toContain("bio.length > 250");
     expect(component).toContain("maxLength={250}");
     expect(component).toContain("levelAssets[profile.xp.level - 1]");
+  });
+
+
+  it("keeps all supplied YUBERA level, support, Plus-frame and collection-cover assets in the website bundle", async () => {
+    const files = new Set(await readdir(resolve(process.cwd(), "public/images/yubera")));
+    const required = [
+      "YUBERA_Level_01_Option_A.webp","YUBERA_Level_02.webp","YUBERA_Level_03.webp","YUBERA_Level_04.webp","YUBERA_Level_05_Transparent.webp",
+      "YUBERA_Level_06.webp","YUBERA_Level_07_Transparent.webp","YUBERA_Level_08_Transparent.webp","YUBERA_Level_09_Transparent.webp","YUBERA_Level_10_New_Design.webp",
+      "YUBERA_Support_Status_Level_01_Soyuznik.webp","YUBERA_Support_Status_Level_02_Storonnik.webp","YUBERA_Support_Status_Level_03_Predanniy_Uchastnik.webp",
+      "YUBERA_Support_Status_Level_04_Pochetnyy_Pokrovitel.webp","YUBERA_Support_Status_Level_05_Legenda_YUBERA.webp",
+      "YUBERA_Contribution_Avatar_Frame_01_Soyuznik.webp.webp","YUBERA_Contribution_Avatar_Frame_02_Storonnik.webp.webp","YUBERA_Contribution_Avatar_Frame_03_Predanniy_Uchastnik.webp.webp",
+      "YUBERA_Contribution_Avatar_Frame_04_Pochetnyy_Pokrovitel.webp","YUBERA_Contribution_Avatar_Frame_05_Legenda_YUBERA.webp",
+      "YUBERA_Plus_Avatar_Frame_01_Sakura_Gold.webp","YUBERA_Plus_Avatar_Frame_02_Mystic_Kitsune.webp","YUBERA_Plus_Avatar_Frame_03_Samurai_Steel.webp",
+      "YUBERA_Plus_Avatar_Frame_04_Celestial_Archive.webp","YUBERA_Plus_Avatar_Frame_05_Cyberpunk_Neon.webp",
+      "YUBERA_Collection_Cover_Action.webp","YUBERA_Collection_Cover_Adventure_Fantasy.webp","YUBERA_Collection_Cover_Romance.webp",
+      "YUBERA_Collection_Cover_Slice_of_Life.webp","YUBERA_Collection_Cover_Thriller_Mystery.webp",
+    ];
+    expect(required.filter(file => !files.has(file))).toEqual([]);
   });
 
 });
