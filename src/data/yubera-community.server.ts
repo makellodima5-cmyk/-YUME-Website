@@ -68,15 +68,28 @@ function sameOrigin(request: Request): boolean {
 function validId(value: unknown): value is string {
   return typeof value === "string" && /^[0-9]{1,12}$/.test(value);
 }
+const SUPPORT_FRAME_ASSETS = [
+  "YUBERA_Contribution_Avatar_Frame_01_Soyuznik.webp.webp",
+  "YUBERA_Contribution_Avatar_Frame_02_Storonnik.webp.webp",
+  "YUBERA_Contribution_Avatar_Frame_03_Predanniy_Uchastnik.webp.webp",
+  "YUBERA_Contribution_Avatar_Frame_04_Pochetnyy_Pokrovitel.webp",
+  "YUBERA_Contribution_Avatar_Frame_05_Legenda_YUBERA.webp",
+] as const;
+const PLUS_FRAME_ASSETS = [
+  "YUBERA_Plus_Avatar_Frame_01_Sakura_Gold.webp",
+  "YUBERA_Plus_Avatar_Frame_02_Mystic_Kitsune.webp",
+  "YUBERA_Plus_Avatar_Frame_03_Samurai_Steel.webp",
+  "YUBERA_Plus_Avatar_Frame_04_Celestial_Archive.webp",
+  "YUBERA_Plus_Avatar_Frame_05_Cyberpunk_Neon.webp",
+] as const;
 function profileAssetFrame(value: unknown): string | null {
-  const frames = new Set([
-    "YUBERA_Plus_Avatar_Frame_01_Sakura_Gold.webp",
-    "YUBERA_Plus_Avatar_Frame_02_Mystic_Kitsune.webp",
-    "YUBERA_Plus_Avatar_Frame_03_Samurai_Steel.webp",
-    "YUBERA_Plus_Avatar_Frame_04_Celestial_Archive.webp",
-    "YUBERA_Plus_Avatar_Frame_05_Cyberpunk_Neon.webp",
-  ]);
-  return typeof value === "string" && frames.has(value) ? value : null;
+  return typeof value === "string" && [...SUPPORT_FRAME_ASSETS, ...PLUS_FRAME_ASSETS].includes(value) ? value : null;
+}
+function supportFrameLevel(value: string): number {
+  return SUPPORT_FRAME_ASSETS.indexOf(value as typeof SUPPORT_FRAME_ASSETS[number]) + 1;
+}
+function isSupportFrame(value: string | null): boolean {
+  return Boolean(value && supportFrameLevel(value) > 0);
 }
 async function userAndProfile(database: Database, userId: string) {
   const user = await database.prepare("SELECT id, telegram_user_id, telegram_first_name, telegram_last_name, telegram_username, telegram_photo_url FROM yume_users WHERE id = ?")
@@ -127,13 +140,14 @@ async function profileSummary(database: Database, userId: string, viewerId: stri
   if (!account) return null;
   const isOwner = viewerId === userId;
   if (!isOwner && account.profile.visibility !== "public") return { private: true };
-  const [xp, support, plus, followers, following, collections] = await Promise.all([
+  const [xp, support, plus, followers, following, collections, unlockedSupportFrames] = await Promise.all([
     xpTotal(database, userId).then(xpState),
     supportState(database, account.user.telegram_user_id),
     plusActive(database, userId),
     database.prepare("SELECT COUNT(*) AS count FROM yume_follows WHERE followed_id = ?").bind(userId).first<{ count: number }>(),
     database.prepare("SELECT COUNT(*) AS count FROM yume_follows WHERE follower_id = ?").bind(userId).first<{ count: number }>(),
     database.prepare("SELECT COUNT(*) AS count, COALESCE(SUM((SELECT COUNT(*) FROM yume_collection_items i WHERE i.collection_id = c.id)),0) AS titles, COALESCE(SUM((SELECT COUNT(*) FROM yume_collection_likes l WHERE l.collection_id = c.id)),0) AS likes FROM yume_collections c WHERE c.user_id = ? AND c.is_public = 1").bind(userId).first<{ count: number; titles: number; likes: number }>(),
+    isOwner ? database.prepare("SELECT frame_level FROM yume_support_frame_unlocks WHERE user_id = ? ORDER BY frame_level").bind(userId).all<{ frame_level: number }>() : Promise.resolve({ results: [] as Array<{ frame_level: number }> }),
   ]);
   const follow = viewerId && viewerId !== userId
     ? await database.prepare("SELECT 1 AS followed FROM yume_follows WHERE follower_id = ? AND followed_id = ?").bind(viewerId, userId).first()
@@ -142,8 +156,9 @@ async function profileSummary(database: Database, userId: string, viewerId: stri
     private: false, id: userId,
     displayName: [account.user.telegram_first_name, account.user.telegram_last_name].filter(Boolean).join(" ") || account.user.telegram_username || "Пользователь",
     username: account.user.telegram_username, photoUrl: account.user.telegram_photo_url,
-    bio: account.profile.bio, avatarFrame: plus ? account.profile.avatar_frame : null,
+    bio: account.profile.bio, avatarFrame: isSupportFrame(account.profile.avatar_frame) ? account.profile.avatar_frame : plus ? account.profile.avatar_frame : null,
     visibility: account.profile.visibility, xp: isOwner ? xp : { level: xp.level, title: xp.title }, support: isOwner ? support : { level: support.level, title: support.title, asset: support.asset },
+    availableSupportFrames: isOwner ? unlockedSupportFrames.results.map((row) => SUPPORT_FRAME_ASSETS[row.frame_level - 1]).filter(Boolean) : [],
     isPlus: plus, followers: Number(followers?.count ?? 0), following: Number(following?.count ?? 0),
     publicCollections: Number(collections?.count ?? 0), publicTitles: Number(collections?.titles ?? 0),
     collectionLikes: Number(collections?.likes ?? 0), isFollowing: Boolean(follow),
@@ -262,11 +277,15 @@ export async function handleYuberaCommunity(request: Request): Promise<Response>
   if (action === "profile.update") {
     const bio = typeof input.bio === "string" ? input.bio.trim() : "";
     const visibility = input.visibility === "public" ? "public" : input.visibility === "private" ? "private" : null;
-    if (bio.length > 500 || !visibility) return json({ error: "invalid_profile" }, 400);
+    if (bio.length > 250 || !visibility) return json({ error: "invalid_profile" }, 400);
     const plus = await plusActive(database, userId);
     const frame = input.avatarFrame === null ? null : profileAssetFrame(input.avatarFrame);
     if (input.avatarFrame !== null && !frame) return json({ error: "invalid_avatar_frame" }, 400);
-    if (frame && !plus) return json({ error: "plus_required" }, 403);
+    if (frame && isSupportFrame(frame)) {
+      const unlocked = await database.prepare("SELECT 1 AS unlocked FROM yume_support_frame_unlocks WHERE user_id = ? AND frame_level = ?")
+        .bind(userId, supportFrameLevel(frame)).first();
+      if (!unlocked) return json({ error: "support_frame_locked" }, 403);
+    } else if (frame && !plus) return json({ error: "plus_required" }, 403);
     await database.prepare("INSERT INTO yume_profiles(user_id,bio,visibility,avatar_frame) VALUES(?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET bio=excluded.bio,visibility=excluded.visibility,avatar_frame=excluded.avatar_frame,updated_at=CURRENT_TIMESTAMP")
       .bind(userId, bio, visibility, frame).run();
     return json({ ok: true });
