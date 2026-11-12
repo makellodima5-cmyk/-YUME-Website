@@ -7,7 +7,7 @@ type E={YUME_DB?:unknown};
 type G=typeof globalThis&{__YUME_RUNTIME_ENV__?:unknown};
 type Interval=[number,number];
 export function mergeWatchedSegments(input:Interval[],start:number,end:number):Interval[]{const all=[...input,[Math.max(0,start),Math.max(start,end)] as Interval].filter(([a,b])=>Number.isFinite(a)&&Number.isFinite(b)&&b>a).sort((a,b)=>a[0]-b[0]);const out:Interval[]=[];for(const current of all){const last=out[out.length-1];if(last&&current[0]<=last[1]+0.25)last[1]=Math.max(last[1],current[1]);else out.push([current[0],current[1]]);}return out;}
-export function isCreditworthyPlaybackStep(previous:number,current:number,elapsedSeconds:number):boolean{const advance=current-previous;return elapsedSeconds>=5&&elapsedSeconds<=45&&advance>0&&advance<=elapsedSeconds*2.5+3;}
+export function isCreditworthyPlaybackStep(previous:number,current:number,elapsedSeconds:number):boolean{const advance=current-previous;return Number.isFinite(previous)&&Number.isFinite(current)&&Number.isFinite(elapsedSeconds)&&elapsedSeconds>=5&&elapsedSeconds<=45&&advance>0&&advance<=elapsedSeconds*1.25+1;}
 function env():E{try{return cloudflareEnv as unknown as E;}catch{const x=(globalThis as G).__YUME_RUNTIME_ENV__;return x&&typeof x==="object"?x as E:{};}}
 function db():DB|null{const x=env().YUME_DB;return x&&typeof x==="object"?x as DB:null;}
 function json(x:unknown,s=200){return new Response(JSON.stringify(x),{status:s,headers:{"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store, private","X-Content-Type-Options":"nosniff","Vary":"Cookie"}});}
