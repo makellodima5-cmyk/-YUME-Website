@@ -91,8 +91,8 @@ async function xpTotal(database: Database, userId: string): Promise<number> {
   return Math.max(0, Number(row?.total ?? 0));
 }
 function xpState(total: number) {
-  const current = [...XP_LEVELS].reverse().find((level) => total >= level.min) ?? XP_LEVELS[0];
-  const next = XP_LEVELS.find((level) => level.level === current.level + 1) ?? null;
+  const current = [...YUBERA_XP_LEVELS].reverse().find((level) => total >= level.min) ?? YUBERA_XP_LEVELS[0];
+  const next = YUBERA_XP_LEVELS.find((level) => level.level === current.level + 1) ?? null;
   return {
     total, level: current.level, title: current.title,
     nextLevel: next?.level ?? null, nextTitle: next?.title ?? null,
@@ -108,8 +108,8 @@ async function supportState(database: Database, telegramUserId: string) {
     WHERE d.telegram_user_id = ? AND d.status = 'paid' AND r.telegram_payment_charge_id IS NULL`)
     .bind(telegramUserId).first<{ total: number }>();
   const total = Math.max(0, Number(row?.total ?? 0));
-  const current = [...SUPPORT_LEVELS].reverse().find((level) => total >= level.min) ?? SUPPORT_LEVELS[0];
-  const next = SUPPORT_LEVELS.find((level) => level.level === current.level + 1) ?? null;
+  const current = [...YUBERA_SUPPORT_LEVELS].reverse().find((level) => total >= level.min) ?? YUBERA_SUPPORT_LEVELS[0];
+  const next = YUBERA_SUPPORT_LEVELS.find((level) => level.level === current.level + 1) ?? null;
   return { total, level: current.level, title: current.title, asset: current.asset,
     nextLevel: next?.level ?? null, nextTitle: next?.title ?? null, nextThreshold: next?.min ?? null,
     progress: next ? Math.max(0, Math.min(100, ((total - current.min) / (next.min - current.min)) * 100)) : 100,
