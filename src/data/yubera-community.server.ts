@@ -261,6 +261,7 @@ export async function handleYuberaCommunity(request: Request): Promise<Response>
     if (action === "recommendations") {
       if (!userId) return json({ error: "authentication_required" }, 401);
       const page = Math.max(0, Math.min(1000, Number.parseInt(url.searchParams.get("page") ?? "0", 10) || 0));
+      const seed = Math.max(1, Math.min(2147483646, Number.parseInt(url.searchParams.get("seed") ?? "0", 10) || 0));
       const rows = await database.prepare(`SELECT u.id,u.telegram_first_name,u.telegram_last_name,u.telegram_username,u.telegram_photo_url,
         p.bio,
         CASE WHEN p.avatar_frame LIKE 'YUBERA_Contribution_Avatar_Frame_%' THEN p.avatar_frame
@@ -270,8 +271,9 @@ export async function handleYuberaCommunity(request: Request): Promise<Response>
         FROM yume_users u JOIN yume_profiles p ON p.user_id = u.id
         WHERE p.visibility = 'public' AND u.id <> ?
         AND NOT EXISTS(SELECT 1 FROM yume_follows f WHERE f.follower_id = ? AND f.followed_id = u.id)
-        ORDER BY u.telegram_first_name,u.id LIMIT 12 OFFSET ?`).bind(Date.now(), userId, userId, page * 12).all<UserRow>();
-      return json({ users: rows.results, hasMore: rows.results.length === 12 });
+        ORDER BY abs((CAST(substr(u.id, -8) AS INTEGER) * 1103515245 + ?) % 2147483647), u.id
+        LIMIT 13 OFFSET ?`).bind(Date.now(), userId, userId, seed, page * 12).all<UserRow>();
+      return json({ users: rows.results.slice(0, 12), hasMore: rows.results.length > 12 });
     }
     if (action === "collection") {
       const collectionId = url.searchParams.get("id") ?? "";
