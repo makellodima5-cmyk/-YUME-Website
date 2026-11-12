@@ -2,6 +2,7 @@ import { env as cloudflareEnv } from "cloudflare:workers";
 import { getR2Anime } from "@/data/catalog-r2.server";
 import type { Anime } from "@/data/anime";
 import { isSameOriginRequest } from "@/lib/request-security";
+import { YUBERA_XP_REWARDS } from "@/data/yubera-config";
 
 type Environment = Record<string, unknown> & {
   YUME_DB?: unknown;
@@ -18,7 +19,7 @@ type Statement = {
   all<T = Record<string, unknown>>(): Promise<{ results: T[]; meta?: D1Meta }>;
   run(): Promise<{ meta?: D1Meta }>;
 };
-type Database = { prepare(sql: string): Statement };
+type Database = { prepare(sql: string): Statement; batch?: (statements: Statement[]) => Promise<Array<{ meta?: D1Meta }>> };
 type SessionRow = { user_id: string; expires_at: number };
 type RatingStatsRow = {
   rating_sum: number;
@@ -346,12 +347,21 @@ async function handleWrite(request: Request): Promise<Response> {
 
     // The composite primary key makes this an upsert, never a second vote.
     // Its SQLite triggers update the aggregate in the same atomic D1 statement.
-    const write = await db.prepare(
-      "INSERT INTO yume_anime_ratings (anime_id, user_id, rating) VALUES (?, ?, ?) " +
-      "ON CONFLICT (anime_id, user_id) DO UPDATE SET " +
-      "rating = excluded.rating, updated_at = CURRENT_TIMESTAMP " +
-      "WHERE yume_anime_ratings.rating <> excluded.rating",
-    ).bind(animeId, userId, rating).run();
+    if (!db.batch) throw new Error("atomic_rating_batch_unavailable");
+    const results = await db.batch([
+      db.prepare(
+        "INSERT OR IGNORE INTO yume_xp_ledger (id, user_id, event_key, event_type, amount, metadata_json) " +
+        "SELECT ?, ?, ?, 'anime_rating', ?, ? WHERE NOT EXISTS (" +
+        "SELECT 1 FROM yume_anime_ratings WHERE anime_id = ? AND user_id = ?)",
+      ).bind(crypto.randomUUID(), userId, "anime-rating:" + userId + ":" + animeId, YUBERA_XP_REWARDS.firstAnimeRating, JSON.stringify({ animeId }), animeId, userId),
+      db.prepare(
+        "INSERT INTO yume_anime_ratings (anime_id, user_id, rating) VALUES (?, ?, ?) " +
+        "ON CONFLICT (anime_id, user_id) DO UPDATE SET " +
+        "rating = excluded.rating, updated_at = CURRENT_TIMESTAMP " +
+        "WHERE yume_anime_ratings.rating <> excluded.rating",
+      ).bind(animeId, userId, rating),
+    ]);
+    const write = results[1] ?? {};
 
     if (write.meta) {
       console.debug("[YUBERA][ANIME_RATINGS][D1]", {

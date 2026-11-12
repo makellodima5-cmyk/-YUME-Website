@@ -69,7 +69,7 @@ afterEach(() => {
 });
 
 describe("Telegram Stars pre-checkout webhook", () => {
-  it("does not advance an order when Telegram rejects the API request", async () => {
+  it("reserves the order before Telegram approval and retries after an API failure", async () => {
     const db = new FakeDatabase();
     configure(db);
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ ok: false, description: "temporary failure" }), { status: 502 })));
@@ -77,14 +77,17 @@ describe("Telegram Stars pre-checkout webhook", () => {
     const response = await handleTelegramWebhook(makeRequest());
 
     expect(response.status).toBe(503);
-    expect(db.order.status).toBe("pending");
-    expect(db.statements.some(statement => statement.sql.includes("SET status = 'pre_checkout'"))).toBe(false);
+    expect(db.order.status).toBe("pre_checkout");
+    expect(db.statements.some(statement => statement.sql.includes("SET status = 'pre_checkout'"))).toBe(true);
   });
 
   it("advances a pending order only after Telegram confirms the pre-checkout answer", async () => {
     const db = new FakeDatabase();
     configure(db);
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ ok: true, result: true }), { status: 200 })));
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(async () => {
+      expect(db.order.status).toBe("pre_checkout");
+      return new Response(JSON.stringify({ ok: true, result: true }), { status: 200 });
+    }));
 
     const response = await handleTelegramWebhook(makeRequest());
 
@@ -105,7 +108,7 @@ describe("Telegram Stars pre-checkout webhook", () => {
     expect(db.statements.filter(statement => statement.sql.includes("SET status = 'pre_checkout'"))).toHaveLength(0);
   });
 
-  it("does not advance the order when the Telegram API JSON reports ok=false", async () => {
+  it("keeps the reservation when Telegram does not confirm the API answer", async () => {
     const db = new FakeDatabase();
     configure(db);
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ ok: false, description: "not accepted" }), { status: 200 })));
@@ -113,6 +116,6 @@ describe("Telegram Stars pre-checkout webhook", () => {
     const response = await handleTelegramWebhook(makeRequest());
 
     expect(response.status).toBe(503);
-    expect(db.order.status).toBe("pending");
+    expect(db.order.status).toBe("pre_checkout");
   });
 });
