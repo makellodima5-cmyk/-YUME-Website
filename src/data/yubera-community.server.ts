@@ -212,19 +212,21 @@ export async function handleYuberaCommunity(request: Request): Promise<Response>
     if (action === "friends") {
       if (!userId) return json({ error: "authentication_required" }, 401);
       const query = (url.searchParams.get("q") ?? "").trim().slice(0, 60);
+      const page = Math.max(0, Math.min(1000, Number.parseInt(url.searchParams.get("page") ?? "0", 10) || 0));
+      const offset = page * 30;
       if (query) {
         const rows = await database.prepare(`SELECT u.id,u.telegram_first_name,u.telegram_last_name,u.telegram_username,u.telegram_photo_url
           FROM yume_users u JOIN yume_profiles p ON p.user_id = u.id
           WHERE p.visibility = 'public' AND u.id <> ?
           AND (lower(u.telegram_first_name || ' ' || COALESCE(u.telegram_last_name,'')) LIKE lower(?) OR lower(COALESCE(u.telegram_username,'')) LIKE lower(?))
-          ORDER BY u.telegram_first_name LIMIT 30`)
-          .bind(userId, userId, `%${query}%`, `%${query.replace(/^@/, "")}%`).all<UserRow & { is_following: number }>();
-        return json({ users: rows.results });
+          ORDER BY u.telegram_first_name LIMIT 30 OFFSET ?`)
+          .bind(userId, userId, `%${query}%`, `%${query.replace(/^@/, "")}%`, offset).all<UserRow & { is_following: number }>();
+        return json({ users: rows.results, hasMore: rows.results.length === 30 });
       }
       const rows = await database.prepare(`SELECT u.id,u.telegram_first_name,u.telegram_last_name,u.telegram_username,u.telegram_photo_url,f.created_at
         FROM yume_follows f JOIN yume_users u ON u.id = f.followed_id
-        WHERE f.follower_id = ? ORDER BY f.created_at DESC LIMIT 100`).bind(userId).all<UserRow & { created_at: string }>();
-      return json({ users: rows.results });
+        WHERE f.follower_id = ? ORDER BY f.created_at DESC LIMIT 30 OFFSET ?`).bind(userId, offset).all<UserRow & { created_at: string }>();
+      return json({ users: rows.results, hasMore: rows.results.length === 30 });
     }
     if (action === "recommendations") {
       if (!userId) return json({ error: "authentication_required" }, 401);
@@ -232,8 +234,8 @@ export async function handleYuberaCommunity(request: Request): Promise<Response>
         FROM yume_users u JOIN yume_profiles p ON p.user_id = u.id
         WHERE p.visibility = 'public' AND u.id <> ?
         AND NOT EXISTS(SELECT 1 FROM yume_follows f WHERE f.follower_id = ? AND f.followed_id = u.id)
-        ORDER BY RANDOM() LIMIT 12`).bind(userId, userId).all<UserRow>();
-      return json({ users: rows.results });
+        ORDER BY RANDOM() LIMIT 12 OFFSET ?`).bind(userId, userId, page * 12).all<UserRow>();
+      return json({ users: rows.results, hasMore: rows.results.length === 12 });
     }
     if (action === "collection") {
       const collectionId = url.searchParams.get("id") ?? "";
