@@ -239,6 +239,7 @@ export async function handleYuberaCommunity(request: Request): Promise<Response>
     }
     if (action === "recommendations") {
       if (!userId) return json({ error: "authentication_required" }, 401);
+      const page = Math.max(0, Math.min(1000, Number.parseInt(url.searchParams.get("page") ?? "0", 10) || 0));
       const rows = await database.prepare(`SELECT u.id,u.telegram_first_name,u.telegram_last_name,u.telegram_username,u.telegram_photo_url
         FROM yume_users u JOIN yume_profiles p ON p.user_id = u.id
         WHERE p.visibility = 'public' AND u.id <> ?
