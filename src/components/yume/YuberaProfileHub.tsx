@@ -21,7 +21,8 @@ const covers = [
   "YUBERA_Collection_Cover_Slice_of_Life.webp",
   "YUBERA_Collection_Cover_Thriller_Mystery.webp",
 ];
-const levelAssets = ["YUBERA_Level_01_Option_A.webp","YUBERA_Level_02.webp","YUBERA_Level_03.webp","YUBERA_Level_04.webp","YUBERA_Level_05_Transparent.webp","YUBERA_Level_06.webp","YUBERA_Level_07_Transparent.webp","YUBERA_Level_08_Transparent.webp","YUBERA_Level_09_Transparent.webp","YUBERA_Level_10_New_Design.webp"];\nconst levels = [
+const levelAssets = ["YUBERA_Level_01_Option_A.webp","YUBERA_Level_02.webp","YUBERA_Level_03.webp","YUBERA_Level_04.webp","YUBERA_Level_05_Transparent.webp","YUBERA_Level_06.webp","YUBERA_Level_07_Transparent.webp","YUBERA_Level_08_Transparent.webp","YUBERA_Level_09_Transparent.webp","YUBERA_Level_10_New_Design.webp"];
+const levels = [
   ["Начинающий зритель", "0–49 XP"], ["Любитель аниме", "50–149 XP"], ["Искатель историй", "150–299 XP"],
   ["Исследователь миров", "300–499 XP"], ["Коллекционер", "500–749 XP"], ["Знаток аниме", "750–999 XP"],
   ["Хранитель историй", "1 000–1 499 XP"], ["Мастер YUBERA", "1 500–2 199 XP"],
@@ -49,7 +50,8 @@ export function YuberaProfileHub({ animeList, onSelect, onBack }: Props) {
   const [cover, setCover] = useState<string | null>(covers[0]);
   const [isPublic, setIsPublic] = useState(false);
   const [menuId, setMenuId] = useState<string | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<Collection | null>(null);\n  const [editingCollectionId, setEditingCollectionId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Collection | null>(null);
+  const [editingCollectionId, setEditingCollectionId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [people, setPeople] = useState<Array<{id:string;telegram_first_name:string;telegram_last_name?:string|null;telegram_username?:string|null;telegram_photo_url?:string|null}>>([]);
   const [publicProfile, setPublicProfile] = useState<ProfileData | null>(null);
