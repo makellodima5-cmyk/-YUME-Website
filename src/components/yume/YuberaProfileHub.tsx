@@ -14,7 +14,7 @@ type ProfileData = {
   stats?: { favorites: number; watchlist: number; history: number } | null;
 };
 type Collection = { id: string; title: string; description: string; cover_key: string | null; is_public: number; is_pinned: number; title_count: number; like_count: number; liked: number };
-type Props = { animeList: Anime[]; onSelect: (anime: Anime) => void; onBack: () => void };
+type Props = { animeList: Anime[]; onSelect: (anime: Anime) => void; onBack: () => void; isAdmin?: boolean; onSettings?: () => void; onLegal?: () => void; onAbout?: () => void; onAdmin?: () => void; onSupport?: () => void; onAccount?: () => void };
 
 const covers = [
   "YUBERA_Collection_Cover_Action.webp",
@@ -52,7 +52,7 @@ const supportLevels = [
   ["Легенда YUBERA", "10 000 ⭐", "YUBERA_Support_Status_Level_05_Legenda_YUBERA.webp"],
 ];
 
-export function YuberaProfileHub({ animeList, onSelect, onBack }: Props) {
+export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false, onSettings, onLegal, onAbout, onAdmin, onSupport, onAccount }: Props) {
   const [screen, setScreen] = useState<Screen>("home");
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [collections, setCollections] = useState<Collection[]>([]);
@@ -211,7 +211,7 @@ export function YuberaProfileHub({ animeList, onSelect, onBack }: Props) {
       </div>
       <Card className="mt-3"><div className="grid grid-cols-3 divide-x divide-white/10 text-center">{[["В избранном",profile.stats?.favorites],["В моём списке",profile.stats?.watchlist],["В истории",profile.stats?.history]].map(([label,value])=><div key={String(label)} className="px-1 py-2"><b className="block text-xl">{typeof value==="number"?value:"—"}</b><span className="mt-1 block text-[10px] leading-tight text-white/50">{label}</span></div>)}</div></Card>
       <Card className="mt-3"><div className="mb-3 flex items-center justify-between"><h3 className="font-semibold"><Layers3 className="mr-2 inline h-4 w-4 text-[#ff7658]"/>Мои подборки</h3><button onClick={()=>changeScreen("collections")} className="text-xs text-[#ff987f]">Все подборки <ChevronRight className="inline h-3 w-3"/></button></div><div className="flex gap-3 overflow-x-auto pb-1"><button onClick={()=>{setEditingCollectionId(null);setTitle("");setDescription("");setCover(covers[0]);changeScreen("create");}} className="grid h-28 w-28 shrink-0 place-items-center rounded-xl border border-dashed border-white/25 text-center text-xs text-white/65"><Plus className="h-6 w-6"/><span>Создать подборку</span></button>{orderedCollections.slice(0,5).map(item=><button key={item.id} onClick={()=>void openCollection(item)} className="relative h-28 w-36 shrink-0 overflow-hidden rounded-xl border border-white/10 text-left">{item.cover_key?<img src={\`/images/yubera/\${item.cover_key}\`} alt="" className="absolute inset-0 h-full w-full object-cover"/>:<div className="absolute inset-0 bg-white/5"/>}<div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/15 to-transparent"/><span className="absolute bottom-2 left-2 right-2"><b className="block truncate text-xs">{item.title}</b><span className="text-[10px] text-white/65">{item.title_count} тайтлов</span></span></button>)}</div></Card>
-      <Card className="mt-3"><Action icon={<Users/>} label="Друзья" detail="Пользователи, на которых вы подписаны" onClick={()=>changeScreen("friends")}/><Action icon={<Heart/>} label="Поддержать проект" detail="Разовый вклад в развитие YUBERA" onClick={()=>setDonationOpen(true)}/><Action icon={<Crown/>} label="YUBERA Plus" detail={profile.isPlus ? "Подписка активна" : "Дополнительные возможности"} onClick={()=>changeScreen("plus")}/></Card>
+      <Card className="mt-3"><Action icon={<Users/>} label="Друзья" detail="Пользователи, на которых вы подписаны" onClick={()=>changeScreen("friends")}/></Card><Card className="mt-3"><Action icon={<Settings/>} label="Настройки приложения" detail="Тема, язык и другие параметры" onClick={()=>onSettings?.()}/><Action icon={<ShieldCheck/>} label="Правовая информация" detail="Политика конфиденциальности и правила сайта" onClick={()=>onLegal?.()}/><Action icon={<Info/>} label="О Yubera" detail="О проекте и версии сайта" onClick={()=>onAbout?.()}/>{isAdmin&&<Action icon={<Shield/>} label="Панель администратора" detail="Управление сайтом и каталогом" onClick={()=>onAdmin?.()}/>}<Action icon={<LifeBuoy/>} label="Поддержка" detail="Помощь и сообщения о проблемах" onClick={()=>onSupport?.()}/><Action icon={<Heart/>} label="Поддержать проект" detail="Разовый вклад в развитие YUBERA" onClick={()=>setDonationOpen(true)}/><Action icon={<Crown/>} label="YUBERA Plus" detail={profile.isPlus ? "Подписка активна" : "Дополнительные возможности"} onClick={()=>changeScreen("plus")}/><Action icon={<LogOut/>} label="Аккаунт Telegram" detail="Выход или удаление аккаунта" onClick={()=>onAccount?.()}/></Card>
     </>}
     {screen === "edit" && <><Header title="Редактирование профиля" subtitle="Настройте описание, видимость и оформление профиля"/><Card>
       <div className="mb-4 flex items-center gap-3">{avatar(profile)}<div><b>{profile.displayName}</b><p className="text-sm text-white/50">@{profile.username || "username"}</p></div></div>
