@@ -59,8 +59,10 @@ WHERE (SELECT COALESCE(SUM(d.amount),0) FROM yume_stars_donations d
 
 -- Owner-approved launch price: 100 Telegram Stars for 30 days.
 INSERT INTO yume_plus_audit_log(actor_user_id,action,details_json)
-SELECT NULL,'migration_initial_price', '{"oldPrice":250,"newPrice":100,"source":"owner-approved migration"}'
-WHERE EXISTS (SELECT 1 FROM yume_plus_settings WHERE setting_key='price_xtr' AND setting_value<>'100');
+SELECT NULL,'migration_initial_price',
+  json_object('oldPrice',CAST(setting_value AS INTEGER),'newPrice',100,'source','owner-approved migration')
+FROM yume_plus_settings
+WHERE setting_key='price_xtr' AND setting_value<>'100';
 UPDATE yume_plus_settings
 SET setting_value='100',updated_at=CURRENT_TIMESTAMP
 WHERE setting_key='price_xtr';
