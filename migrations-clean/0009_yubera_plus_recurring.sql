@@ -64,5 +64,5 @@ SELECT NULL,'migration_initial_price',
 FROM yume_plus_settings
 WHERE setting_key='price_xtr' AND setting_value<>'100' AND updated_by IS NULL;
 UPDATE yume_plus_settings
-SET setting_value='100',updated_at=CURRENT_TIMESTAMP
+SET setting_value = '100', updated_at = CURRENT_TIMESTAMP
 WHERE setting_key='price_xtr' AND updated_by IS NULL;
