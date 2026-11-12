@@ -9,3 +9,6 @@ it("does not seed an unapproved subscription price",async()=>{const migration=aw
 
 
 it("does not offer checkout at an unconfigured price and exposes the admin setup state",async()=>{const [panel,admin]=await Promise.all([import("node:fs/promises").then(m=>m.readFile("src/components/yume/YuberaPlusPanel.tsx","utf8")),import("node:fs/promises").then(m=>m.readFile("src/components/yume/YuberaPlusAdminPanel.tsx","utf8"))]);expect(panel).toContain("status.price<1");expect(panel).toContain("Цена подписки ещё не настроена.");expect(admin).toContain("Цена не задана");});
+
+
+it("persists failed recurring payments and gives the user recovery guidance",async()=>{const [server,panel,migration]=await Promise.all([import("node:fs/promises").then(m=>m.readFile("src/data/yubera-plus.server.ts","utf8")),import("node:fs/promises").then(m=>m.readFile("src/components/yume/YuberaPlusPanel.tsx","utf8")),import("node:fs/promises").then(m=>m.readFile("migrations-clean/0012_yubera_plus_renewal_failure_state.sql","utf8"))]);expect(server).toContain("renewal_failed_at=CASE WHEN ?=1 THEN CURRENT_TIMESTAMP ELSE NULL END");expect(server).toContain("renewalFailedAt:latest?.renewal_failed_at??null");expect(panel).toContain("Telegram не смог выполнить автопродление.");expect(migration).toContain("ADD COLUMN renewal_failed_at TEXT");});
