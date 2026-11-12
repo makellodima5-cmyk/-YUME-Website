@@ -140,7 +140,7 @@ async function profileSummary(database: Database, userId: string, viewerId: stri
   if (!account) return null;
   const isOwner = viewerId === userId;
   if (!isOwner && account.profile.visibility !== "public") return { private: true };
-  const [xp, support, plus, followers, following, collections, unlockedSupportFrames] = await Promise.all([
+  const [xp, support, plus, followers, following, collections, unlockedSupportFrames, favoriteCount, watchlistCount, historyCount] = await Promise.all([
     xpTotal(database, userId).then(xpState),
     supportState(database, account.user.telegram_user_id),
     plusActive(database, userId),
@@ -148,6 +148,9 @@ async function profileSummary(database: Database, userId: string, viewerId: stri
     database.prepare("SELECT COUNT(*) AS count FROM yume_follows WHERE follower_id = ?").bind(userId).first<{ count: number }>(),
     database.prepare("SELECT COUNT(*) AS count, COALESCE(SUM((SELECT COUNT(*) FROM yume_collection_items i WHERE i.collection_id = c.id)),0) AS titles, COALESCE(SUM((SELECT COUNT(*) FROM yume_collection_likes l WHERE l.collection_id = c.id)),0) AS likes FROM yume_collections c WHERE c.user_id = ? AND c.is_public = 1").bind(userId).first<{ count: number; titles: number; likes: number }>(),
     isOwner ? database.prepare("SELECT frame_level FROM yume_support_frame_unlocks WHERE user_id = ? ORDER BY frame_level").bind(userId).all<{ frame_level: number }>() : Promise.resolve({ results: [] as Array<{ frame_level: number }> }),
+    isOwner ? database.prepare("SELECT COUNT(*) AS count FROM yume_saved_anime WHERE user_id=? AND list_type='favorite'").bind(userId).first<{count:number}>() : Promise.resolve(null),
+    isOwner ? database.prepare("SELECT COUNT(*) AS count FROM yume_saved_anime WHERE user_id=? AND list_type='watchlist'").bind(userId).first<{count:number}>() : Promise.resolve(null),
+    isOwner ? database.prepare("SELECT COUNT(*) AS count FROM yume_view_history WHERE user_id=?").bind(userId).first<{count:number}>() : Promise.resolve(null),
   ]);
   const follow = viewerId && viewerId !== userId
     ? await database.prepare("SELECT 1 AS followed FROM yume_follows WHERE follower_id = ? AND followed_id = ?").bind(viewerId, userId).first()
@@ -162,6 +165,7 @@ async function profileSummary(database: Database, userId: string, viewerId: stri
     isPlus: plus, followers: Number(followers?.count ?? 0), following: Number(following?.count ?? 0),
     publicCollections: Number(collections?.count ?? 0), publicTitles: Number(collections?.titles ?? 0),
     collectionLikes: Number(collections?.likes ?? 0), isFollowing: Boolean(follow),
+    stats: isOwner ? { favorites: Number(favoriteCount?.count ?? 0), watchlist: Number(watchlistCount?.count ?? 0), history: Number(historyCount?.count ?? 0) } : null,
   };
 }
 async function ownedCollection(database: Database, userId: string, collectionId: string) {
