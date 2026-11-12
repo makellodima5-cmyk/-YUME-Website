@@ -302,14 +302,14 @@ export async function handleTelegramWebhook(request: Request): Promise<Response>
 
   const successfulPayment = update.message?.successful_payment;
   if(successfulPayment?.invoice_payload?.startsWith("yubera_plus:")){
-    const db=subscriptionDb(env),userId=update.message?.from?.id;
+    const db=subscriptionDb(env),userId=update.message?.from?.id??update.message?.chat?.id;
     if(!db||typeof userId!=="number"||!Number.isSafeInteger(userId))return json({ok:true,ignored:true});
     try{await recordYuberaPlusSuccessfulPayment(db as never,String(userId),successfulPayment);return json({ok:true,action:"yubera_plus_payment_processed"});}
     catch(error){console.error("[YUBERA][PLUS] Successful payment processing failed.",error);return json({ok:false,error:"plus_payment_processing_failed"},503);}
   }
   if (successfulPayment) {
     const db = subscriptionDb(env);
-    const userId = update.message?.from?.id;
+    const userId = update.message?.from?.id ?? update.message?.chat?.id;
     const chargeId = successfulPayment.telegram_payment_charge_id;
     const payload = successfulPayment.invoice_payload;
     const amount = successfulPayment.total_amount;
@@ -361,7 +361,7 @@ export async function handleTelegramWebhook(request: Request): Promise<Response>
   }
   const refund=update.message?.refunded_payment;
   if(refund){
-    const db=subscriptionDb(env),userId=update.message?.from?.id;
+    const db=subscriptionDb(env),userId=update.message?.chat?.id??update.message?.from?.id;
     if(db&&typeof userId==="number"&&Number.isSafeInteger(userId)){
       try{await recordTelegramStarsRefund(db as never,String(userId),refund,token);}
       catch(error){console.error("[YUBERA][STARS] Refund processing failed.",error);return json({ok:false,error:"stars_refund_processing_failed"},503);}
