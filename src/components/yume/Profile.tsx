@@ -648,7 +648,7 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
                 </div>
               </section>
               )}
-            <section className="mt-6 rounded-2xl border border-border bg-card/50 p-4">
+            <section id="telegram-account" className="mt-6 rounded-2xl border border-border bg-card/50 p-4">
               <h2 className="text-base font-semibold">{language === "ru" ? "Аккаунт Telegram" : "Telegram account"}</h2>
               <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                 {language === "ru" ? "Выход завершит текущий сеанс. Удаление аккаунта необратимо удалит избранное, список и историю просмотров." : "Signing out ends this session. Account deletion permanently removes favorites, your list, and viewing history."}
