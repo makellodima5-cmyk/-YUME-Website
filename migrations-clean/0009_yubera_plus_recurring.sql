@@ -17,11 +17,13 @@ DROP INDEX IF EXISTS idx_yume_plus_payments_user_created;
 DROP INDEX IF EXISTS idx_yume_xp_user_created;
 DROP INDEX IF EXISTS idx_yume_collection_items_order;
 
--- Archive old table definitions. Renaming the payment table first preserves
--- its original FK relationship when the subscriptions table is renamed next.
-ALTER TABLE yume_profiles RENAME TO yume_profiles_legacy_0009;
-ALTER TABLE yume_follows RENAME TO yume_follows_legacy_0009;
-ALTER TABLE yume_collections RENAME TO yume_collections_legacy_0009;
+-- Archive only tables whose names are present in both supported schema generations.
+-- The production database may use yume_user_profiles/yume_user_follows/
+-- yume_user_collections instead of the clean names below. Those differently
+-- named legacy tables are deliberately left untouched. Community target tables
+-- are created with IF NOT EXISTS below, so no absent-table ALTER is attempted.
+-- Rename payments first so their original FK remains attached to the archived
+-- subscriptions table after the next rename.
 ALTER TABLE yume_plus_payments RENAME TO yume_plus_payments_legacy_0009;
 ALTER TABLE yume_plus_subscriptions RENAME TO yume_plus_subscriptions_legacy_0009;
 ALTER TABLE yume_xp_ledger RENAME TO yume_xp_ledger_legacy_0009;
