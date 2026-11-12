@@ -33,6 +33,7 @@ import type { Anime } from "@/data/anime";
 import { getShikimoriAnimes } from "@/data/shikimori";
 import { displayAnimeTitle, useYumePreferences } from "@/data/preferences";
 import { PrivacyPolicy } from "./PrivacyPolicy";
+import { YuberaProfileHub } from "./YuberaProfileHub";
 import { getTelegramWebApp, telegramHapticImpact } from "@/lib/telegram-mini-app";
 import { Grid } from "./Sections";
 import { PLAYBACK_PROGRESS_UPDATED_EVENT, readPlaybackProgress } from "@/data/playback-progress";
@@ -55,7 +56,8 @@ type ProfilePanel =
   | "rules"
   | "rights"
   | "about"
-  | "support";
+  | "support"
+  | "yubera";
 
 type TelegramProfileUser = {
   first_name?: string;
@@ -339,6 +341,7 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
     rights: t("profile.rights"),
     about: t("profile.about"),
     support: t("profile.support"),
+    yubera: "YUBERA",
   };
   const backPanel: ProfilePanel = panel === "privacy" || panel === "rules" || panel === "rights"
     ? "documents"
@@ -606,6 +609,7 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
                 <span className="min-w-0 flex-1"><span className="block text-sm font-semibold">{language === "ru" ? "Панель администратора" : "Admin panel"}</span><span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">{language === "ru" ? "Управление сайтом и каталогом" : "Manage the site and catalogue"}</span></span>
                 <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
               </button>}
+              {profileRow(LibraryBig, "YUBERA", "Профиль, уровень, подборки и друзья", "yubera")}
               {profileRow(LifeBuoy, t("profile.support"), t("profile.supportDescription"), "support")}
             </section>
             {settingsExpanded && (
@@ -1015,6 +1019,9 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
                   </aside>
                 </div>
               </section>
+            )}
+            {panel === "yubera" && (
+              <YuberaProfileHub animeList={animeList} onSelect={onSelect} onBack={() => navigatePanel("overview")} />
             )}
           </>
         )}
