@@ -9,3 +9,12 @@ it("requires an atomic D1 batch before awarding episode completion XP",async()=>
 
 
 it("validates episode catalogue bounds and caps active server watch sessions",async()=>{const source=await readFile(resolve(process.cwd(),"src/data/yubera-episode-watch.server.ts"),"utf8");expect(source).toContain("episode_not_in_catalog");expect(source).toContain("DELETE FROM yume_episode_watch_sessions WHERE expires_at<=?");expect(source).toContain("too_many_active_watch_sessions");});
+
+
+it("rejects stale concurrent heartbeats before they can award completion XP", async () => {
+  const source = await readFile(resolve(process.cwd(), "src/data/yubera-episode-watch.server.ts"), "utf8");
+  expect(source).toContain("AND last_position_seconds=? AND last_heartbeat_at=? AND watched_segments_json=?");
+  expect(source).toContain("if(Number(result.meta?.changes??0)!==1)return json({error:\"heartbeat_state_conflict\"},409)");
+  expect(source).toContain("SELECT ?,?,?,'episode_complete',?,? WHERE changes()=1");
+  expect(source).toContain("if(Number(results[0]?.meta?.changes??0)!==1)return json({error:\"heartbeat_state_conflict\"},409)");
+});
