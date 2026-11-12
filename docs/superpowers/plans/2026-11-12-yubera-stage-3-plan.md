@@ -40,8 +40,8 @@ The repository has a Stage 3 runbook for the separate R2 catalogue launch. The Y
 
 ## Implementation order
 
-- [ ] Task 1 — Friends screen: API fields/counts, race-safe debounced search, recommendation pagination/deduplication, responsive user cards and state coverage.
-- [ ] Task 2 — Public profile: complete reference layout and public-only data presentation.
+- [x] Task 1 — Friends screen: API fields/counts, race-safe debounced search, recommendation pagination/deduplication, responsive user cards and state coverage. CI passed on `b96195a1ab1ff75eb7414d6aaa8592d603de4b4d` (75 test files / 416 tests).
+- [ ] Task 2 — Public profile: complete reference layout and public-only data presentation (implementation in progress: banner, expandable bio, public counters, read-only level/support cards, first-four/all collections, likes and visitor-safe collection detail).
 - [ ] Task 3 — Collections index/detail: public/private separation, ordering, pagination where needed, likes and ownership controls.
 - [ ] Task 4 — Create/edit collection and profile edit form states.
 - [ ] Task 5 — Full tests, lint, Worker build, migration-history validation and diff review.
@@ -50,4 +50,6 @@ The repository has a Stage 3 runbook for the separate R2 catalogue launch. The Y
 ## Current progress
 
 - Stage 3 branch created from the Stage 2 implementation head.
-- Task 1 is in progress. No production resources have been changed.
+- Task 1 is implemented and passed CI.
+- Task 2 is in progress; visitor access to another user's collection detail now hides owner-only add/remove controls.
+- No production resources have been changed.
