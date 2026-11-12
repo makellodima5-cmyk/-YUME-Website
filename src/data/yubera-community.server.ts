@@ -221,7 +221,7 @@ export async function handleYuberaCommunity(request: Request): Promise<Response>
           FROM yume_users u JOIN yume_profiles p ON p.user_id = u.id
           WHERE p.visibility = 'public' AND u.id <> ?
           AND (lower(u.telegram_first_name || ' ' || COALESCE(u.telegram_last_name,'')) LIKE lower(?) OR lower(COALESCE(u.telegram_username,'')) LIKE lower(?))
-          ORDER BY u.telegram_first_name LIMIT 30 OFFSET ?`)
+          ORDER BY u.telegram_first_name,u.id LIMIT 30 OFFSET ?`)
           .bind(userId, userId, `%${query}%`, `%${query.replace(/^@/, "")}%`, offset).all<UserRow & { is_following: number }>();
         return json({ users: rows.results, hasMore: rows.results.length === 30 });
       }
@@ -244,7 +244,7 @@ export async function handleYuberaCommunity(request: Request): Promise<Response>
         FROM yume_users u JOIN yume_profiles p ON p.user_id = u.id
         WHERE p.visibility = 'public' AND u.id <> ?
         AND NOT EXISTS(SELECT 1 FROM yume_follows f WHERE f.follower_id = ? AND f.followed_id = u.id)
-        ORDER BY RANDOM() LIMIT 12 OFFSET ?`).bind(userId, userId, page * 12).all<UserRow>();
+        ORDER BY u.telegram_first_name,u.id LIMIT 12 OFFSET ?`).bind(userId, userId, page * 12).all<UserRow>();
       return json({ users: rows.results, hasMore: rows.results.length === 12 });
     }
     if (action === "collection") {
