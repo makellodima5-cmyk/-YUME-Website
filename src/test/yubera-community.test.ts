@@ -184,4 +184,27 @@ describe("YUBERA community foundation", () => {
     expect(component).toContain("onFollowChange={load}");
   });
 
+  it("renders public profiles with public-only counters and read-only collection details", async () => {
+    const component = await readFile(resolve(process.cwd(), "src/components/yume/YuberaProfileHub.tsx"), "utf8");
+    const server = await readFile(resolve(process.cwd(), "src/data/yubera-community.server.ts"), "utf8");
+    const publicView = component.slice(component.indexOf('screen === "public-profile"'), component.indexOf('screen === "public-collections"'));
+    expect(publicView).toContain("yubera_banner.webp");
+    expect(publicView).toContain("publicProfile.publicCollections");
+    expect(publicView).toContain("publicProfile.publicTitles");
+    expect(publicView).toContain("publicProfile.collectionLikes");
+    expect(publicView).toContain("Показать полностью");
+    expect(publicView).toContain("publicCollections.slice(0, 4)");
+    expect(publicView).not.toContain("publicProfile.xp.total");
+    expect(component).toContain("activeCollectionIsOwner &&");
+    expect(server).toContain("row.owner_id !== userId && (row.visibility !== \"public\" || Number(row.is_public) !== 1)");
+  });
+
+  it("returns to the originating screen after viewing a public profile", async () => {
+    const component = await readFile(resolve(process.cwd(), "src/components/yume/YuberaProfileHub.tsx"), "utf8");
+    expect(component).toContain("setPublicProfileReturnScreen(screen)");
+    expect(component).toContain("changeScreen(publicProfileReturnScreen)");
+    expect(component).toContain("setCollectionReturnScreen(screen)");
+    expect(component).toContain("changeScreen(collectionReturnScreen)");
+  });
+
 });
