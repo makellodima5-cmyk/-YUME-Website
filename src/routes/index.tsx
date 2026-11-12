@@ -7,6 +7,7 @@ import { getExactReleaseDate, isNewRelease, isUpcomingAnnouncement } from "@/dat
 import { Header, type View } from "@/components/yume/Header";
 import { HomeExperience } from "@/components/yume/HomeExperience";
 import { SupportPage } from "@/components/yume/SupportPage";
+import { YuberaPlusAdminPanel } from "@/components/yume/YuberaPlusAdminPanel";
 import { AuthPage } from "@/components/yume/AuthPage";
 import { CollectionsGrid, Grid, SectionBanner } from "@/components/yume/Sections";
 import { CatalogFilters, EMPTY_CATALOG_FILTERS, type CatalogFiltersValue } from "@/components/yume/CatalogFilters";
@@ -2426,6 +2427,8 @@ function Index() {
                   {adminAuditLog.length===0 ? <p className="text-sm text-muted-foreground">{language==="ru"?"Событий пока нет.":"No events yet."}</p> : <div className="max-h-64 space-y-2 overflow-y-auto">{adminAuditLog.map(entry=><div key={entry.id} className="flex flex-wrap items-start justify-between gap-2 rounded-lg border border-border bg-background/50 p-2.5 text-xs"><div className="min-w-0 flex-1"><strong className="break-words">{entry.action}</strong><p className="mt-1 break-words text-muted-foreground">{JSON.stringify(entry.details)}</p></div><div className="shrink-0 text-right"><span className={entry.status==="success"?"text-emerald-500":"text-amber-500"}>{entry.status}</span><p className="mt-1 text-muted-foreground">{new Date(entry.created_at.replace(" ","T")+"Z").toLocaleString(language==="ru"?"ru-RU":"en-US")}</p></div></div>)}</div>}
                 </div>
               </details>
+
+              <YuberaPlusAdminPanel language={language} />
 
               </>
             ) : (
