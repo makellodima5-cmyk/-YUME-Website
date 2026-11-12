@@ -268,6 +268,37 @@ function AnimeDetailPage() {
     let lastServerSavedPosition = -1;
     let lastKnownDuration: number | null = null;
     let serverCompletionSaved = false;
+    let serverWatchSessionId: string | null = null;
+    let serverWatchStarting = false;
+    let lastServerWatchHeartbeat = 0;
+    const syncServerWatch = async (position: number, duration: number | null) => {
+      if (duration === null || !Number.isFinite(duration) || duration < 60 || duration > 10800 || !Number.isFinite(position)) return;
+      if (!serverWatchSessionId) {
+        if (serverWatchStarting) return;
+        serverWatchStarting = true;
+        try {
+          const response = await fetch("/api/yubera/episode-watch", {
+            method: "POST", credentials: "same-origin", cache: "no-store",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "start", animeId, episodeNumber: kodikEpisode, durationSeconds: duration, currentTime: position }),
+          });
+          const payload = await response.json().catch(() => ({})) as { sessionId?: string };
+          if (response.ok && typeof payload.sessionId === "string") {
+            serverWatchSessionId = payload.sessionId;
+            lastServerWatchHeartbeat = Date.now();
+          }
+        } catch { /* XP tracking must not interrupt playback */ }
+        finally { serverWatchStarting = false; }
+        return;
+      }
+      if (Date.now() - lastServerWatchHeartbeat < 10000) return;
+      lastServerWatchHeartbeat = Date.now();
+      void fetch("/api/yubera/episode-watch", {
+        method: "POST", credentials: "same-origin", cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "heartbeat", sessionId: serverWatchSessionId, currentTime: position, durationSeconds: duration }),
+      }).catch(() => undefined);
+    };
     const trustedHosts = ["kodik.info", "kodik.biz", "kodik.cc", "kodik.online", "kodikplayer.com", "kodikres.com"];
     const onKodikMessage = (event: MessageEvent) => {
       if (!event.origin) return;
@@ -289,6 +320,7 @@ function AnimeDetailPage() {
         episode: kodikEpisode,
       };
       if (playbackEvent.type === "ended") {
+        if (lastKnownDuration !== null) void syncServerWatch(lastSavedPosition, lastKnownDuration);
         markPlaybackEpisodeCompleted({
           ...progressEntry,
           positionSeconds: Math.max(0, lastSavedPosition),
@@ -316,6 +348,7 @@ function AnimeDetailPage() {
       const watchedSeconds = playbackEvent.currentTime;
       const durationSeconds = playbackEvent.durationSeconds;
       if (durationSeconds !== null) lastKnownDuration = durationSeconds;
+      void syncServerWatch(watchedSeconds, durationSeconds);
       // Kodik may omit duration. Use a conservative TV-episode estimate only for
       // the completion indicator; the saved duration remains unknown.
       const estimatedTvEpisodeDuration = durationSeconds === null && anime.episodes > 1 ? 24 * 60 : null;
