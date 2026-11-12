@@ -1,5 +1,6 @@
 import { env as cloudflareEnv } from "cloudflare:workers";
 import { getAuthenticatedYumeUserId } from "@/data/telegram-auth.server";
+import { getR2Anime } from "@/data/catalog-r2.server";
 
 type Statement = {
   bind(...values: unknown[]): Statement;
@@ -326,6 +327,10 @@ export async function handleYuberaCommunity(request: Request): Promise<Response>
       await database.prepare("DELETE FROM yume_collection_items WHERE collection_id = ? AND anime_id = ?").bind(id, animeId).run();
       return json({ ok: true });
     }
+    let catalogueAnime: Awaited<ReturnType<typeof getR2Anime>>;
+    try { catalogueAnime = await getR2Anime(animeId); }
+    catch { return json({ error: "catalog_unavailable" }, 503); }
+    if (!catalogueAnime) return json({ error: "anime_not_found" }, 404);
     const plus = await plusActive(database, userId);
     const count = await database.prepare("SELECT COUNT(*) AS count FROM yume_collection_items WHERE collection_id = ?").bind(id).first<{ count: number }>();
     const exists = await database.prepare("SELECT 1 AS found FROM yume_collection_items WHERE collection_id = ? AND anime_id = ?").bind(id, animeId).first();
