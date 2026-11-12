@@ -37,4 +37,14 @@ describe("YUBERA community foundation", () => {
     expect(component).toContain("Загрузить ещё");
     expect(component).toContain("Найти людей");
   });
+
+  it("awards collection XP atomically with unique-add and milestone guards", async () => {
+    const server = await readFile(resolve(process.cwd(), "src/data/yubera-community.server.ts"), "utf8");
+    expect(server).toContain("if (!database.batch) return json({ error: \"atomic_xp_batch_unavailable\" }, 503)");
+    expect(server).toContain("WHERE changes()=1");
+    expect(server).toContain("`collection-add:${id}:${animeId}`");
+    expect(server).toContain("`collection-milestone:${id}`");
+    expect(server).toContain("WHERE (SELECT COUNT(*) FROM yume_collection_items WHERE collection_id=?)>=3");
+  });
+
 });
