@@ -147,4 +147,39 @@ describe("YUBERA community foundation", () => {
     expect(webhook).toContain("YUBERA_SUPPORT_LEVELS.filter");
   });
 
+  it("returns public profile card data and total counts for paginated people lists", async () => {
+    const server = await readFile(resolve(process.cwd(), "src/data/yubera-community.server.ts"), "utf8");
+    const panel = await readFile(resolve(process.cwd(), "src/components/yume/YuberaFriendsPanel.tsx"), "utf8");
+    expect(server).toContain("p.bio");
+    expect(server).toContain("AS avatar_frame");
+    expect(server).toContain("return json({ users: rows.results, total: count, hasMore: offset + rows.results.length < count })");
+    expect(server).toContain("p.visibility = 'public'");
+    expect(panel).toContain("По дате подписки");
+    expect(panel).toContain("followingTotal");
+    expect(panel).toContain("Поиск по нику или @username");
+    expect(panel).toContain("Показать ещё");
+  });
+
+  it("debounces user search and discards stale responses", async () => {
+    const panel = await readFile(resolve(process.cwd(), "src/components/yume/YuberaFriendsPanel.tsx"), "utf8");
+    expect(panel).toContain("window.setTimeout");
+    expect(panel).toContain("}, 280)");
+    expect(panel).toContain("searchRequestId.current");
+    expect(panel).toContain("setSearchResults([])");
+  });
+
+  it("does not expose expired Plus avatar frames in people discovery", async () => {
+    const server = await readFile(resolve(process.cwd(), "src/data/yubera-community.server.ts"), "utf8");
+    expect(server).toContain("p.avatar_frame LIKE 'YUBERA_Plus_Avatar_Frame_%'");
+    expect(server).toContain("s.status='active' AND s.expires_at > ?");
+    expect(server).toContain("ELSE NULL END AS avatar_frame");
+  });
+
+  it("keeps the stage 3 friends panel wired to the existing community API", async () => {
+    const component = await readFile(resolve(process.cwd(), "src/components/yume/YuberaProfileHub.tsx"), "utf8");
+    expect(component).toContain('import { YuberaFriendsPanel } from "./YuberaFriendsPanel"');
+    expect(component).toContain("onOpenProfile={(id) => void viewPublicProfile(id)}");
+    expect(component).toContain("onFollowChange={load}");
+  });
+
 });
