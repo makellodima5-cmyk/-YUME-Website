@@ -18,7 +18,7 @@ type Statement = {
   all<T = Record<string, unknown>>(): Promise<{ results: T[]; meta?: D1Meta }>;
   run(): Promise<{ meta?: D1Meta }>;
 };
-type Database = { prepare(sql: string): Statement };
+type Database = { prepare(sql: string): Statement; batch?: (statements: Statement[]) => Promise<Array<{ meta?: D1Meta }>> };
 type SessionRow = { user_id: string; expires_at: number };
 type RatingStatsRow = {
   rating_sum: number;
@@ -346,12 +346,20 @@ async function handleWrite(request: Request): Promise<Response> {
 
     // The composite primary key makes this an upsert, never a second vote.
     // Its SQLite triggers update the aggregate in the same atomic D1 statement.
-    const write = await db.prepare(
-      "INSERT INTO yume_anime_ratings (anime_id, user_id, rating) VALUES (?, ?, ?) " +
-      "ON CONFLICT (anime_id, user_id) DO UPDATE SET " +
-      "rating = excluded.rating, updated_at = CURRENT_TIMESTAMP " +
-      "WHERE yume_anime_ratings.rating <> excluded.rating",
-    ).bind(animeId, userId, rating).run();
+    if (!db.batch) throw new Error("atomic_rating_batch_unavailable");
+    const results = await db.batch([
+      db.prepare(
+        "INSERT INTO yume_anime_ratings (anime_id, user_id, rating) VALUES (?, ?, ?) " +
+        "ON CONFLICT (anime_id, user_id) DO UPDATE SET " +
+        "rating = excluded.rating, updated_at = CURRENT_TIMESTAMP " +
+        "WHERE yume_anime_ratings.rating <> excluded.rating",
+      ).bind(animeId, userId, rating),
+      db.prepare(
+        "INSERT OR IGNORE INTO yume_xp_ledger (id, user_id, event_key, event_type, amount, metadata_json) " +
+        "VALUES (?, ?, ?, 'anime_rating', 10, ?)",
+      ).bind(crypto.randomUUID(), userId, "anime-rating:" + userId + ":" + animeId, JSON.stringify({ animeId })),
+    ]);
+    const write = results[0] ?? {};
 
     if (write.meta) {
       console.debug("[YUBERA][ANIME_RATINGS][D1]", {
@@ -361,13 +369,6 @@ async function handleWrite(request: Request): Promise<Response> {
         changes: write.meta.changes ?? null,
       });
     }
-
-    // The unique ledger key makes the first successful rating worth +10 XP;
-    // edits and later re-ratings remain idempotent even if a rating row is deleted.
-    await db.prepare(
-      "INSERT OR IGNORE INTO yume_xp_ledger (id, user_id, event_key, event_type, amount, metadata_json) " +
-      "VALUES (?, ?, ?, 'anime_rating', 10, ?)"
-    ).bind(crypto.randomUUID(), userId, "anime-rating:" + userId + ":" + animeId, JSON.stringify({ animeId })).run();
 
     if ((write.meta?.changes ?? 1) > 0) publicRatingCache.delete(animeId);
     const result = await getStats(db, animeId, userId);
