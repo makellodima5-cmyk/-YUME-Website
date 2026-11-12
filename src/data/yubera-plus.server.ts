@@ -102,6 +102,24 @@ export async function recordYuberaPlusSuccessfulPayment(d:DB,telegramId:string,p
 }
 export async function recordYuberaPlusSubscriptionUpdate(d:DB,u:SubUpdate){const id=u.user?.id,payload=u.invoice_payload??"";if(!Number.isSafeInteger(id)||!payload.startsWith("yubera_plus:"))return;const failed=u.state==="failed",value=u.state==="active"?1:u.state==="canceled"||failed?0:null;if(value===null)return;await d.prepare("UPDATE yume_plus_subscriptions SET auto_renew=?,renewal_failed_at=CASE WHEN ?=1 THEN CURRENT_TIMESTAMP ELSE NULL END,updated_at=CURRENT_TIMESTAMP WHERE id=(SELECT p.subscription_id FROM yume_plus_payments p JOIN yume_users u ON u.id=p.user_id WHERE p.invoice_payload=? AND u.telegram_user_id=?) AND status='active'").bind(value,failed?1:0,payload,String(id)).run();}
 export async function recordTelegramStarsRefund(d:DB,telegramId:string,p:Refund,token?:string){
+ const charge=p.telegram_payment_charge_id??"",amount=p.total_amount;
+ if(!charge||!Number.isSafeInteger(amount)||amount!<1||p.currency!=="XTR")return;
+ await d.prepare("INSERT OR IGNORE INTO yume_stars_refunds(telegram_payment_charge_id,telegram_user_id,amount,currency,refunded_at) SELECT telegram_payment_charge_id,telegram_user_id,amount,currency,CURRENT_TIMESTAMP FROM yume_stars_donations WHERE telegram_payment_charge_id=? AND telegram_user_id=? AND amount=? AND currency='XTR' AND status='paid'").bind(charge,telegramId,amount).run();
+ const x=await d.prepare("SELECT e.invoice_payload,p.user_id,p.subscription_id,p.telegram_payment_charge_id AS initial_charge,s.is_recurring,u.telegram_user_id FROM yume_plus_payment_events e JOIN yume_plus_payments p ON p.invoice_payload=e.invoice_payload JOIN yume_plus_subscriptions s ON s.id=p.subscription_id JOIN yume_users u ON u.id=p.user_id WHERE e.telegram_payment_charge_id=? AND e.amount=? AND e.currency='XTR' AND e.status='paid'").bind(charge,amount).first<{invoice_payload:string;user_id:string;subscription_id:string|null;initial_charge:string|null;is_recurring:number;telegram_user_id:string}>();
+ if(!x||x.telegram_user_id!==telegramId||!x.subscription_id)return;
+ if(!d.batch)throw new Error("atomic_refund_batch_unavailable");
+ if(x.is_recurring===1&&x.initial_charge){
+  if(!token)throw new Error("telegram_bot_token_missing_for_refund_cancellation");
+  const result=await tg(token,"editUserStarSubscription",{user_id:Number(telegramId),telegram_payment_charge_id:x.initial_charge,is_canceled:true});
+  if(!result.ok&&!/not found|already canceled|already cancelled/i.test(result.description??""))throw new Error("telegram_subscription_cancel_failed");
+ }
+ const statements=[
+  d.prepare("UPDATE yume_plus_payment_events SET status='refunded',refunded_at=CURRENT_TIMESTAMP WHERE telegram_payment_charge_id=? AND status='paid'").bind(charge),
+  ...(x.initial_charge===charge?[d.prepare("UPDATE yume_plus_payments SET status='refunded' WHERE invoice_payload=? AND telegram_payment_charge_id=?").bind(x.invoice_payload,charge)]:[]),
+  d.prepare("UPDATE yume_plus_subscriptions SET status='cancelled',auto_renew=0,expires_at=MIN(expires_at,?),updated_at=CURRENT_TIMESTAMP WHERE id=? AND user_id=?").bind(Date.now(),x.subscription_id,x.user_id),
+ ];
+ await d.batch(statements);
+}
  const charge=p.telegram_payment_charge_id??"",amount=p.total_amount;if(!charge||!Number.isSafeInteger(amount)||amount!<1||p.currency!=="XTR")return;
  await d.prepare("INSERT OR IGNORE INTO yume_stars_refunds(telegram_payment_charge_id,telegram_user_id,amount,currency,refunded_at) SELECT telegram_payment_charge_id,telegram_user_id,amount,currency,CURRENT_TIMESTAMP FROM yume_stars_donations WHERE telegram_payment_charge_id=? AND telegram_user_id=? AND amount=? AND currency='XTR' AND status='paid'").bind(charge,telegramId,amount).run();
  const x=await d.prepare("SELECT e.invoice_payload,p.user_id,p.subscription_id,p.telegram_payment_charge_id AS initial_charge,u.telegram_user_id FROM yume_plus_payment_events e JOIN yume_plus_payments p ON p.invoice_payload=e.invoice_payload JOIN yume_users u ON u.id=p.user_id WHERE e.telegram_payment_charge_id=? AND e.amount=? AND e.currency='XTR' AND e.status='paid'").bind(charge,amount).first<{invoice_payload:string;user_id:string;subscription_id:string|null;initial_charge:string|null;telegram_user_id:string}>();if(!x||x.telegram_user_id!==telegramId||!x.subscription_id)return;
