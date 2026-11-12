@@ -93,6 +93,12 @@ class RatingsDatabase {
   prepare(sql: string) {
     return new RatingStatement(this, sql);
   }
+
+  async batch(statements: Statement[]) {
+    const results = [];
+    for (const statement of statements) results.push(await statement.run());
+    return results;
+  }
 }
 
 function configureDatabase(db: RatingsDatabase) {
