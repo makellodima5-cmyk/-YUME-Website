@@ -20,6 +20,7 @@ export function YuberaPlusPanel(){
  <span className="block text-sm font-semibold">1 месяц</span>
  <b className="mt-1 block text-2xl">{status?.price ? status.price.toLocaleString("ru-RU") : "—"} ⭐</b>
  <span className="text-xs text-white/55">{status?.periodDays || 30} дней</span>
+ {status && status.price < 1 && <p className="mt-2 text-xs text-white/55">Цена подписки ещё не настроена.</p>}
  </div>
  </section>
  {status?.renewalFailedAt&&<p role="alert" className="mt-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-100">{status.subscription?`Telegram не смог выполнить автопродление. Пополни баланс Stars и включи продление снова. Доступ сохранится до ${formatDate(status.subscription.expiresAt)}.`:"Telegram не смог продлить YUBERA Plus. Пополни баланс Stars и оформи подписку снова."}</p>}
