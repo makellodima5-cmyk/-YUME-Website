@@ -6,3 +6,6 @@ it("guards payment ledger and subscription updates in one atomic batch",async()=
 
 
 it("does not seed an unapproved subscription price",async()=>{const migration=await import("node:fs/promises").then(m=>m.readFile("migrations-clean/0011_yubera_plus_price_requires_admin_approval.sql","utf8"));expect(migration).toContain("setting_value = '0'");expect(migration).toContain("updated_by IS NULL");});
+
+
+it("does not offer checkout at an unconfigured price and exposes the admin setup state",async()=>{const [panel,admin]=await Promise.all([import("node:fs/promises").then(m=>m.readFile("src/components/yume/YuberaPlusPanel.tsx","utf8")),import("node:fs/promises").then(m=>m.readFile("src/components/yume/YuberaPlusAdminPanel.tsx","utf8"))]);expect(panel).toContain("status.price<1");expect(panel).toContain("Цена подписки ещё не настроена.");expect(admin).toContain("Цена не задана");});
