@@ -40,11 +40,11 @@ The repository has a Stage 3 runbook for the separate R2 catalogue launch. The Y
 
 ## Implementation order
 
-- [x] Task 1 — Friends screen: API fields/counts, race-safe debounced search, recommendation pagination/deduplication, responsive user cards and state coverage. CI passed on `b96195a1ab1ff75eb7414d6aaa8592d603de4b4d` (75 test files / 416 tests).
+- [x] Task 1 — Friends screen: API fields/counts, race-safe debounced search, stable seeded recommendation shuffle/pagination/deduplication, responsive user cards and state coverage.
 - [x] Task 2 — Public profile: banner, expandable bio, public-only counters, non-interactive level/support cards, first-four/all public collections, likes, correct return navigation and visitor-safe read-only collection detail.
 - [x] Task 3 — Collections index/detail: pinned/unpinned ordering, fixed overlay menu with outside-click dismissal, delete confirmation, correct Russian title-count forms, public/private server enforcement and owner-only item controls.
-- [ ] Task 4 — Create/edit collection and profile edit form states (collection form updated to public-by-default, no preselected cover, horizontal approved-cover gallery, title/description counters, public/private cards, human-readable errors and unsaved-change confirmation; profile-edit discard confirmation remains).
-- [ ] Task 5 — Full tests, lint, Worker build, migration-history validation and diff review (latest run `43263659209` has tests, lint, build, bindings and clean local migration checks green; Worker artifact checks still running).
+- [x] Task 4 — Create/edit collection and profile edit form states: public-by-default collection creation, no preselected cover, horizontal approved-cover gallery, title/description counters, public/private cards, human-readable errors, unsaved-change confirmation for collection and profile edits, and a profile visibility editor matching the supplied v2 specification.
+- [ ] Task 5 — Full tests, lint, Worker build, migration-history validation and diff review (latest run `43264480413` is validating the seeded recommendation query and the full branch diff).
 - [ ] Task 6 — Record final status and remaining live acceptance gates. Do not merge or deploy without a separate owner instruction.
 
 ## Current progress
@@ -52,6 +52,7 @@ The repository has a Stage 3 runbook for the separate R2 catalogue launch. The Y
 - Stage 3 branch created from the Stage 2 implementation head.
 - Task 1 is implemented and passed CI.
 - Tasks 2 and 3 are implemented; public visitors cannot access owner-only collection controls.
-- Task 4 is in progress. Collection create/edit behavior now follows the supplied specification; profile-edit unsaved-change handling remains.
-- Latest CI run: `43263659209`; all tests, lint, Worker build, generated binding checks and clean local migration validation passed; deploy-artifact validation is finishing.
+- Tasks 1–4 are implemented from the supplied Friends, Public Profile, My Collections, Create Collection and Profile Edit specifications.
+- The latest successful full CI before the recommendation shuffle change is run `43264063597`: 75 test files / 423 tests, lint, Worker build, generated binding checks, clean local migration validation and all Worker artifact checks passed.
+- Current CI run `43264480413` is validating the stable seeded recommendation pagination and updated tests.
 - No production resources have been changed.
