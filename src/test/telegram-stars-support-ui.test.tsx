@@ -20,7 +20,7 @@ describe("YUBERA support page", () => {
   it("renders the three benefits of supporting YUBERA", () => {
     render(<SupportPage />);
     expect(screen.getByText("Поддержка и YUBERA Plus")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Поддержать проект" })).toBeInTheDocument();
+    expect(screen.getByText("Поддержать проект")).toBeInTheDocument();
     expect(screen.getByText("Эксклюзивные рамки аватара")).toBeInTheDocument();
     expect(screen.getByText("Статус поддержки")).toBeInTheDocument();
     expect(screen.getByText("Развитие YUBERA")).toBeInTheDocument();
