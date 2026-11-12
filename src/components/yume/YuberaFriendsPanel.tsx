@@ -59,7 +59,7 @@ export function YuberaFriendsPanel({ onOpenProfile, onFollowChange }: Props) {
 
   const loadFollowing = useCallback(async (page = 0, append = false) => {
     setFollowingLoading(true);
-    setLoadError("");
+    setFollowingError("");
     try {
       const response = await fetch(`/api/yubera/community?action=friends&page=${page}`, { credentials: "same-origin", cache: "no-store" });
       const data = await response.json() as PeopleResponse;
@@ -82,7 +82,7 @@ export function YuberaFriendsPanel({ onOpenProfile, onFollowChange }: Props) {
   const loadRecommendations = useCallback(async (page: number, append: boolean) => {
     const requestId = ++recommendationRequestId.current;
     setRecommendationsLoading(true);
-    setLoadError("");
+    setRecommendationError("");
     try {
       const response = await fetch(`/api/yubera/community?action=recommendations&page=${page}&seed=${recommendationSeed}`, { credentials: "same-origin", cache: "no-store" });
       const data = await response.json() as PeopleResponse;
