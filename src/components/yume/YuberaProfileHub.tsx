@@ -326,8 +326,23 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
     </>}
     {screen === "edit" && <><Header title="Редактирование профиля" subtitle="Настройте описание, видимость и оформление профиля"/><Card>
       <div className="mb-4 flex items-center gap-3">{avatar(profile)}<div><b>{profile.displayName}</b><p className="text-sm text-white/50">@{profile.username || "username"}</p></div></div>
-      <label className="mb-2 block text-sm font-semibold">Видимость профиля</label>
-      <div className="grid grid-cols-2 gap-2"><button onClick={()=>setVisibility("public")} className={`rounded-xl border p-3 text-sm ${visibility==="public"?"border-[#ff7658] bg-[#ff7658]/10":"border-white/10 bg-white/5"}`}>Публичный</button><button onClick={()=>setVisibility("private")} className={`rounded-xl border p-3 text-sm ${visibility==="private"?"border-[#ff7658] bg-[#ff7658]/10":"border-white/10 bg-white/5"}`}>Приватный</button></div>
+      <div className="mb-4 flex items-start gap-2 rounded-xl bg-white/[0.04] p-3 text-xs leading-relaxed text-white/55"><Info className="mt-0.5 h-4 w-4 shrink-0 text-white/45"/><span>Аватар и никнейм берутся из Telegram и не могут быть изменены на сайте</span></div>
+      <section className="mb-4 rounded-2xl border border-white/10 bg-black/10 p-3">
+        <div className="mb-1 flex items-center gap-2"><Eye className="h-4 w-4 text-[#ff7658]"/><h3 className="text-sm font-semibold">Видимость профиля</h3></div>
+        <p className="mb-3 text-xs text-white/45">Определите, кто может находить и просматривать ваш профиль</p>
+        <div className="grid grid-cols-2 gap-2">
+          <button type="button" aria-pressed={visibility==="public"} onClick={()=>setVisibility("public")} className={"rounded-xl border p-3 text-left transition " + (visibility==="public"?"border-[#ff7658] bg-[#ff7658]/10":"border-white/10 bg-white/[0.02]")}>
+            <Globe2 className={"mb-2 h-5 w-5 " + (visibility==="public"?"text-[#ff8a69]":"text-white/45")}/>
+            <b className="block text-sm">Публичный</b><span className="mt-1 block text-[11px] leading-snug text-white/45">Доступен в поиске и открыт для всех</span>
+            <span className="mt-2 flex items-center gap-1 text-[10px] text-[#ff987f]">{visibility==="public"&&<Check className="h-3.5 w-3.5"/>}{visibility==="public"?"Выбран":" "}</span>
+          </button>
+          <button type="button" aria-pressed={visibility==="private"} onClick={()=>setVisibility("private")} className={"rounded-xl border p-3 text-left transition " + (visibility==="private"?"border-[#ff7658] bg-[#ff7658]/10":"border-white/10 bg-white/[0.02]")}>
+            <LockKeyhole className={"mb-2 h-5 w-5 " + (visibility==="private"?"text-[#ff8a69]":"text-white/45")}/>
+            <b className="block text-sm">Закрытый</b><span className="mt-1 block text-[11px] leading-snug text-white/45">Не отображается в поиске и недоступен для общего доступа</span>
+            <span className="mt-2 flex items-center gap-1 text-[10px] text-[#ff987f]">{visibility==="private"&&<Check className="h-3.5 w-3.5"/>}{visibility==="private"?"Выбран":" "}</span>
+          </button>
+        </div>
+      </section>
       <label className="mb-2 mt-4 block text-sm font-semibold">Описание профиля</label>
       <textarea value={bio} onChange={e=>setBio(e.target.value)} maxLength={250} rows={4} className="w-full rounded-xl border border-white/10 bg-black/20 p-3 text-sm outline-none focus:border-[#ff7658]" placeholder="Расскажите о себе"/>
       <div className="mt-1 text-right text-xs text-white/40">{bio.length}/250</div>
