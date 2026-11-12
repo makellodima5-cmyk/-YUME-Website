@@ -59,7 +59,7 @@ describe("YUBERA community foundation", () => {
 
   it("hides Plus-only avatar frames when the paid period is no longer active", async () => {
     const server = await readFile(resolve(process.cwd(), "src/data/yubera-community.server.ts"), "utf8");
-    expect(server).toContain("avatarFrame: plus ? account.profile.avatar_frame : null");
+    expect(server).toContain("avatarFrame: isSupportFrame(account.profile.avatar_frame) ? account.profile.avatar_frame : plus ? account.profile.avatar_frame : null");
     expect(server).toContain("expires_at > ?");
   });
 
@@ -69,6 +69,29 @@ describe("YUBERA community foundation", () => {
     expect(component).toContain("profile.isPlus && <span");
     expect(component).toContain("publicProfile.isPlus && <span");
     expect(component).toContain(">YUBERA Plus</span>");
+  });
+
+
+  it("keeps support frames permanently unlocked and restricts Plus frames to active subscribers", async () => {
+    const server = await readFile(resolve(process.cwd(), "src/data/yubera-community.server.ts"), "utf8");
+    const webhook = await readFile(resolve(process.cwd(), "src/data/telegram-bot.server.ts"), "utf8");
+    const component = await readFile(resolve(process.cwd(), "src/components/yume/YuberaProfileHub.tsx"), "utf8");
+    expect(server).toContain("yume_support_frame_unlocks WHERE user_id = ?");
+    expect(server).toContain("if (frame && isSupportFrame(frame))");
+    expect(server).toContain("else if (frame && !plus)");
+    expect(server).toContain("availableSupportFrames:");
+    expect(webhook).toContain("INSERT OR IGNORE INTO yume_support_frame_unlocks");
+    expect(component).toContain("supportFrameOptions");
+    expect(component).toContain("plusFrameOptions");
+    expect(component).toContain("profile.availableSupportFrames");
+  });
+
+  it("uses the approved 250-character profile bio limit and exact level image mapping", async () => {
+    const server = await readFile(resolve(process.cwd(), "src/data/yubera-community.server.ts"), "utf8");
+    const component = await readFile(resolve(process.cwd(), "src/components/yume/YuberaProfileHub.tsx"), "utf8");
+    expect(server).toContain("bio.length > 250");
+    expect(component).toContain("maxLength={250}");
+    expect(component).toContain("levelAssets[profile.xp.level - 1]");
   });
 
 });
