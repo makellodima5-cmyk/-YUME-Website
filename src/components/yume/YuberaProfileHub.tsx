@@ -18,7 +18,7 @@ type ProfileData = {
 type Collection = { id: string; title: string; description: string; cover_key: string | null; is_public: number; is_pinned: number; title_count: number; like_count: number; liked: number };
 type CollectionFormSnapshot = { title: string; description: string; cover: string | null; isPublic: boolean; editingCollectionId: string | null };
 type ProfileFormSnapshot = { bio: string; visibility: "public" | "private"; frame: string | null };
-type Props = { animeList: Anime[]; onSelect: (anime: Anime) => void; onBack: () => void; isAdmin?: boolean; onSettings?: () => void; onLegal?: () => void; onAbout?: () => void; onAdmin?: () => void; onSupport?: () => void; onAccount?: () => void; onSignOut?: () => void; onDeleteAccount?: () => void; accountBusy?: boolean; accountMessage?: string; showDeleteConfirm?: boolean; onConfirmDelete?: () => void; onCancelDelete?: () => void };
+type Props = { animeList: Anime[]; onSelect: (anime: Anime) => void; onBack: () => void; isAdmin?: boolean; onSettings?: () => void; onLegal?: () => void; onAbout?: () => void; onAdmin?: () => void; onSupport?: () => void; onAccount?: () => void };
 
 const covers = [
   "YUBERA_Collection_Cover_Action.webp",
@@ -61,7 +61,7 @@ function formatCollectionTitleCount(value: number): string {
   return `${value} ${word}`;
 }
 
-export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false, onSettings, onLegal, onAbout, onAdmin, onSupport, onAccount, onSignOut, onDeleteAccount, accountBusy = false, accountMessage = "", showDeleteConfirm = false, onConfirmDelete, onCancelDelete }: Props) {
+export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false, onSettings, onLegal, onAbout, onAdmin, onSupport, onAccount }: Props) {
   const [screen, setScreen] = useState<Screen>("home");
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [collections, setCollections] = useState<Collection[]>([]);
