@@ -103,7 +103,15 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
     try {
       const response = await fetch("/api/yubera/community", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Не удалось выполнить действие");
+      const messages: Record<string, string> = {
+        invalid_collection: "Проверьте название и описание подборки.",
+        collection_limit_reached: "Достигнут лимит подборок для вашего тарифа.",
+        collection_title_limit_reached: "Достигнут лимит тайтлов в этой подборке.",
+        not_found: "Подборка не найдена или у вас нет доступа.",
+        catalog_unavailable: "Каталог временно недоступен. Попробуйте позже.",
+        anime_not_found: "Не удалось найти выбранное аниме в каталоге.",
+      };
+      if (!response.ok) throw new Error(messages[String(data.error)] || "Не удалось выполнить действие. Попробуйте ещё раз.");
       return data;
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Ошибка запроса"); return null; }
     finally { setBusy(false); }
@@ -425,6 +433,7 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
       <Header title="Публичные подборки" subtitle={"Подборки пользователя " + publicProfile.displayName} />
       <Card>{publicCollections.length ? publicCollections.map(publicCollectionRow) : <p className="py-4 text-center text-sm text-white/45">Публичных подборок пока нет</p>}</Card>
     </>}
+    {discardCollectionOpen && <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4" role="dialog" aria-modal="true" aria-labelledby="discard-collection-title"><div className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#202127] p-5"><h3 id="discard-collection-title" className="text-lg font-bold">Отменить изменения?</h3><p className="mt-2 text-sm text-white/60">Введённые данные и выбранные параметры не сохранятся.</p><div className="mt-5 flex gap-2"><button type="button" onClick={()=>setDiscardCollectionOpen(false)} className="flex-1 rounded-xl bg-white/10 py-3">Продолжить</button><button type="button" onClick={confirmDiscardCollectionForm} className="flex-1 rounded-xl bg-[#ff7658] py-3 font-semibold text-black">Отменить</button></div></div></div>}
     {deleteTarget && <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4"><div className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#202127] p-5"><h3 className="text-lg font-bold">Удалить подборку?</h3><p className="mt-2 text-sm text-white/60">«{deleteTarget.title}» будет удалена. Тайтлы каталога и другие подборки не изменятся.</p><div className="mt-5 flex gap-2"><button onClick={()=>setDeleteTarget(null)} className="flex-1 rounded-xl bg-white/10 py-3">Отмена</button><button onClick={()=>{const target=deleteTarget;setDeleteTarget(null);void collectionAction({action:"collection.delete",id:target.id});}} className="flex-1 rounded-xl bg-red-500/90 py-3 font-semibold">Удалить</button></div></div></div>}
     <TelegramStarsDonation open={donationOpen} onClose={()=>setDonationOpen(false)}/>
   </div>;
