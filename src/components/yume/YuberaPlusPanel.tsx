@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { BadgeCheck, Crown, Headphones, Image, Layers3, LoaderCircle, Shield, Sparkles, Star } from "lucide-react";
+import { BadgeCheck, Crown, Headphones, Image, Layers3, LoaderCircle, Sparkles, Star } from "lucide-react";
 import { getTelegramWebApp } from "@/lib/telegram-mini-app";
 
 type Sub = { active: boolean; expiresAt: number; autoRenew: boolean; isRecurring: boolean; renewalFailedAt?: string | null };
