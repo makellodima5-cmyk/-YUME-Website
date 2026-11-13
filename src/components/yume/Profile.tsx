@@ -535,7 +535,7 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
             <YuberaProfileHub
               animeList={animeList}
               onSelect={onSelect}
-              onBack={() => undefined}
+              onBack={() => { if (window.history.length > 1) window.history.back(); }}
               isAdmin={isAdmin}
               onSettings={() => setSettingsExpanded(current => !current)}
               settingsExpanded={settingsExpanded}
