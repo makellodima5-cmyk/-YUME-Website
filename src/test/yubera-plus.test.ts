@@ -61,14 +61,9 @@ it("calculates the one-month and discounted three-month Plus plans from the conf
  expect(calculateYuberaPlusPlanPrice(100,3)).toBe(249);
  expect(calculateYuberaPlusPlanPrice(5000,3)).toBe(0);
 });
-it("persists the selected 30- or 90-day plan and extends non-recurring access by its purchased term",async()=>{
- const [server,migration]=await Promise.all([
-  import("node:fs/promises").then(m=>m.readFile("src/data/yubera-plus.server.ts","utf8")),
-  import("node:fs/promises").then(m=>m.readFile("migrations-clean/0011_yubera_plus_duration.sql","utf8"))
- ]);
- expect(server).toContain("period_days");
- expect(server).toContain("now+order.period_days*86400000");
+it("stores the selected 30- or 90-day term in the server-created invoice payload without changing the D1 schema",async()=>{
+ const server=await import("node:fs/promises").then(m=>m.readFile("src/data/yubera-plus.server.ts","utf8"));
+ expect(server).toContain('payload="yubera_plus:"+periodDays+":"+id');
+ expect(server).toContain('payload.startsWith("yubera_plus:90:")?90:30');
  expect(server).toContain("monthlyPrice*3*0.83");
- expect(migration).toContain("DEFAULT 30");
- expect(migration).toContain("IN (30, 90)");
 });
