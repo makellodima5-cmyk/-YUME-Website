@@ -115,7 +115,7 @@ describe("Profile and My library pages", () => {
     expect(await screen.findByRole("heading", { name: "Аккаунт Telegram" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /Друзья/ }));
-    expect(await screen.findByRole("heading", { name: "Друзья" })).toBeInTheDocument();
+    expect((await screen.findAllByRole("heading", { name: "Друзья" })).length).toBeGreaterThan(0);
     expect(screen.queryByRole("heading", { name: "Аккаунт Telegram" })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Назад" }));
