@@ -83,7 +83,7 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
 
   useEffect(() => {
     if (settingsExpanded) {
-      document.getElementById("app-settings")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      document.getElementById("app-settings")?.scrollIntoView?.({ behavior: "smooth", block: "nearest" });
     }
   }, [settingsExpanded]);
   const [supportLinks, setSupportLinks] = useState<{ group: string | null; personal: string | null }>({ group: null, personal: null });
@@ -535,9 +535,10 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
             <YuberaProfileHub
               animeList={animeList}
               onSelect={onSelect}
-              onBack={() => undefined}
+              onBack={() => { if (window.history.length > 1) window.history.back(); }}
               isAdmin={isAdmin}
               onSettings={() => setSettingsExpanded(current => !current)}
+              settingsExpanded={settingsExpanded}
               onLegal={() => navigatePanel("documents")}
               onAbout={() => navigatePanel("about")}
               onAdmin={onAdmin}
@@ -573,86 +574,6 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
               )}
             </section>
 
-            <div className="relative isolate overflow-hidden rounded-[20px] border border-border bg-card shadow-[0_10px_34px_rgba(0,0,0,0.24)]">
-              <div className="yubera-profile-cover relative overflow-hidden">
-                <img
-                  src="/images/yubera/yubera_banner.webp"
-                  alt=""
-                  aria-hidden="true"
-                  width={2172}
-                  height={724}
-                  fetchPriority="high"
-                  decoding="async"
-                  className="absolute inset-0 h-full w-full object-cover object-[center_38%]"
-                />
-                <div className="absolute inset-0 bg-gradient-to-b from-black/5 via-[#101116]/5 to-[#101116]/70" />
-                <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-[#101116]/80 to-transparent" />
-              </div>
-
-              <div className="relative -mt-6 rounded-[20px] bg-gradient-to-b from-[#1A1B22]/42 via-[#1A1B22]/52 to-[#101116]/72 px-3 pb-3 pt-0 sm:px-5 sm:pb-5">
-                <div className="flex min-w-0 items-end gap-3 sm:gap-4">
-                  <div className="yubera-profile-avatar relative shrink-0 overflow-hidden rounded-full border-[2.5px] border-primary bg-secondary shadow-[0_0_18px_rgba(255,90,61,0.16)] sm:-mt-11 sm:h-28 sm:w-28">
-                    {telegramUser?.photo_url ? (
-                      <img
-                        src={telegramUser.photo_url}
-                        alt={telegramDisplayName}
-                        referrerPolicy="no-referrer"
-                        decoding="async"
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[#FF5A3D] to-[#101116]">
-                        <UserRound className="h-11 w-11 text-white sm:h-14 sm:w-14" aria-hidden="true" />
-                      </div>
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1 pb-1 pt-3 sm:pb-2">
-                    <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-primary sm:text-xs">
-                      {t("profile.space")}
-                    </p>
-                    <h1 className="mt-1 break-words text-lg font-bold leading-tight text-white sm:text-2xl">
-                      {telegramDisplayName}
-                    </h1>
-                    {telegramUser?.username && <p className="mt-1 text-xs font-medium text-white/60">@{telegramUser.username}</p>}
-                    <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-white/65 sm:text-sm">
-                      {t("profile.subtitle")}
-                    </p>
-                  </div>
-                </div>
-                <div className="mt-4 grid grid-cols-3 overflow-hidden rounded-[18px] border border-border bg-black/20 sm:mt-5">
-                  <div className="px-2.5 py-2.5 text-center">
-                    <span className="block text-lg font-bold tabular-nums text-white">{favorites.length}</span>
-                    <span className="text-[10px] text-white/65">{t("profile.favoritesCount")}</span>
-                  </div>
-                  <div className="border-l border-border px-2.5 py-2.5 text-center">
-                    <span className="block text-lg font-bold tabular-nums text-white">{watchlist.length}</span>
-                    <span className="text-[10px] text-white/65">{t("profile.watchlistCount")}</span>
-                  </div>
-                  <div className="border-l border-border px-2.5 py-2.5 text-center">
-                    <span className="block text-lg font-bold tabular-nums text-white">{historyCount}</span>
-                    <span className="text-[10px] text-white/65">{language === "ru" ? "В истории" : "In history"}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-            {!isTelegramMiniApp && <p className="mt-3 text-xs leading-relaxed text-muted-foreground">{t("profile.localLibraryNotice")}</p>}
-
-            <section className="mt-7 grid gap-2.5">
-              <button type="button" onClick={() => setSettingsExpanded(current => !current)} aria-expanded={settingsExpanded} className="yubera-profile-row flex w-full items-center gap-4 rounded-2xl border border-border bg-card text-left text-card-foreground shadow-sm transition hover:border-primary/35 hover:bg-accent/70">
-                <span className="yubera-profile-row-icon flex shrink-0 items-center justify-center rounded-full bg-[#22232B] text-primary"><Settings className="h-6 w-6" /></span>
-                <span className="min-w-0 flex-1"><span className="block text-sm font-semibold">{language === "ru" ? "Настройки приложения" : "App settings"}</span><span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">{language === "ru" ? "Тема, язык и другие параметры" : "Theme, language and preferences"}</span></span>
-                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-              </button>
-              {profileRow(ShieldCheck, t("profile.legal"), t("profile.legalDescription"), "documents")}
-              {profileRow(Info, t("profile.about"), t("profile.aboutDescription"), "about")}
-              {isAdmin && <button type="button" onClick={onAdmin} className="yubera-profile-row flex w-full items-center gap-4 rounded-2xl border border-primary/30 bg-primary/5 text-left text-card-foreground shadow-sm transition hover:border-primary/55 hover:bg-primary/10">
-                <span className="yubera-profile-row-icon flex shrink-0 items-center justify-center rounded-full bg-[#22232B] text-primary"><Shield className="h-6 w-6" /></span>
-                <span className="min-w-0 flex-1"><span className="block text-sm font-semibold">{language === "ru" ? "Панель администратора" : "Admin panel"}</span><span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">{language === "ru" ? "Управление сайтом и каталогом" : "Manage the site and catalogue"}</span></span>
-                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-              </button>}
-
-              {profileRow(LifeBuoy, t("profile.support"), t("profile.supportDescription"), "support")}
-            </section>
             {settingsExpanded && (
               <section id="app-settings" className="mt-6 rounded-2xl border border-border bg-card p-4 sm:p-5">
                 <h2 className="text-base font-bold">{language === "ru" ? "Настройки приложения" : "App settings"}</h2>

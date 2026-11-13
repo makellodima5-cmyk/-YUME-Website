@@ -83,8 +83,12 @@ describe("Profile and My library pages", () => {
 
     expect(await screen.findByText("ЛИЧНОЕ ПРОСТРАНСТВО")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Уровень 1/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Уровень 1/ })).toBeInTheDocument();
+    expect(screen.getAllByText("ЛИЧНОЕ ПРОСТРАНСТВО")).toHaveLength(1);
+    expect(screen.getAllByText("Dima")).toHaveLength(1);
     expect(screen.queryByText("Профиль, уровень, подборки и друзья")).not.toBeInTheDocument();
+    const settingsButton = screen.getByRole("button", { name: /Настройки приложения/ });
+    expect(settingsButton).toHaveAttribute("aria-expanded", "false");
+
   });
 
   it("uses Telegram BackButton to return from profile subpages and hides the in-page back link", async () => {
