@@ -1630,7 +1630,7 @@ html[data-theme="light"] .yubera-home-filter-button {
 .yubera-home-discovery-button svg { width:19px; height:19px; flex:0 0 19px; }
 @media(max-width:640px) {
   .yubera-home-discovery { aspect-ratio:1.7 / 1; }
-  .yubera-home-discovery-button { bottom:6%; }
+  .yubera-home-discovery-button { bottom:2.5%; }
 }
 @media(max-width:420px) {
   .yubera-home-discovery { border-radius:19px; }

@@ -88,6 +88,7 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
   const [activeCollection, setActiveCollection] = useState<Collection | null>(null);
   const [activeCollectionIsOwner, setActiveCollectionIsOwner] = useState(true);
   const [activeCollectionItems, setActiveCollectionItems] = useState<string[]>([]);
+  const [activeCollectionTitleLimit, setActiveCollectionTitleLimit] = useState(50);
   const [collectionReturnScreen, setCollectionReturnScreen] = useState<Screen>("home");
   const [publicProfileReturnScreen, setPublicProfileReturnScreen] = useState<Screen>("home");
   const [publicBioExpanded, setPublicBioExpanded] = useState(false);
@@ -95,6 +96,7 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
 
   const [publicProfile, setPublicProfile] = useState<ProfileData | null>(null);
   const [publicCollections, setPublicCollections] = useState<Collection[]>([]);
+  const [likeBusyCollectionId, setLikeBusyCollectionId] = useState<string | null>(null);
   const [donationOpen, setDonationOpen] = useState(false);
 
   useEffect(() => {
@@ -166,16 +168,31 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
     }
   };
   const togglePublicCollectionLike = async (item: Collection) => {
-    const result = await request({ action: "collection.like", id: item.id, liked: !item.liked });
-    if (!result || !publicProfile) return;
+    if (!publicProfile || likeBusyCollectionId) return;
+    const nextLiked = !item.liked;
+    const countDelta = nextLiked ? 1 : -1;
+    setLikeBusyCollectionId(item.id);
+    setPublicCollections((current) => current.map((collection) => collection.id === item.id
+      ? { ...collection, liked: nextLiked ? 1 : 0, like_count: Math.max(0, collection.like_count + countDelta) }
+      : collection));
+    setPublicProfile((current) => current ? { ...current, collectionLikes: Math.max(0, current.collectionLikes + countDelta) } : current);
     try {
-      const response = await fetch("/api/yubera/community?action=profile&userId=" + encodeURIComponent(publicProfile.id), { credentials: "same-origin", cache: "no-store" });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Не удалось обновить профиль");
-      setPublicProfile(data.profile);
-      setPublicCollections(Array.isArray(data.collections) ? data.collections : []);
+      const response = await fetch("/api/yubera/community", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "collection.like", id: item.id, liked: nextLiked }),
+      });
+      const data = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(data.error || "Не удалось обновить отметку «Нравится»");
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Не удалось обновить профиль");
+      setPublicCollections((current) => current.map((collection) => collection.id === item.id
+        ? { ...collection, liked: item.liked, like_count: item.like_count }
+        : collection));
+      setPublicProfile((current) => current ? { ...current, collectionLikes: Math.max(0, current.collectionLikes - countDelta) } : current);
+      setError(cause instanceof Error ? cause.message : "Не удалось обновить отметку «Нравится»");
+    } finally {
+      setLikeBusyCollectionId(null);
     }
   };
   const publicCollectionRow = (item: Collection) => (
@@ -190,7 +207,7 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
         </span>
         <ChevronRight className="h-4 w-4 shrink-0 text-white/35" />
       </button>
-      <button type="button" disabled={busy} onClick={() => void togglePublicCollectionLike(item)} className="inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-2 text-xs text-[#FF5738] disabled:opacity-50" aria-label={item.liked ? "Убрать лайк" : "Поставить лайк"}>
+      <button type="button" disabled={likeBusyCollectionId === item.id} onClick={() => void togglePublicCollectionLike(item)} className="inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-2 text-xs text-[#FF5738] disabled:opacity-50" aria-label={item.liked ? "Убрать лайк" : "Поставить лайк"}>
         <Heart className="h-4 w-4" fill={item.liked ? "currentColor" : "none"} />
         <span>{item.like_count}</span>
       </button>
@@ -310,6 +327,7 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Не удалось открыть подборку");
       setActiveCollection(item);
+      setActiveCollectionTitleLimit(data.titleLimit === 300 ? 300 : 50);
       setActiveCollectionIsOwner(isOwner);
       setActiveCollectionItems(Array.isArray(data.items) ? data.items.map((entry: { anime_id: string }) => entry.anime_id) : []);
       setAnimeSearch("");
@@ -459,7 +477,7 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
       <button disabled={busy} onClick={()=>void saveProfile()} className="mt-5 w-full rounded-xl bg-gradient-to-r from-[#FF5738] to-[#FF6245] py-3 font-semibold disabled:opacity-50">Сохранить изменения</button>
       <button type="button" disabled={busy} onClick={cancelProfileEdit} className="mt-2 w-full rounded-xl border border-white/15 bg-white/5 py-3 font-semibold">Отменить</button>
     </Card></>}
-    {screen === "collection-detail" && activeCollection && <><Header title={activeCollection.title} subtitle={activeCollection.description || "Подборка аниме"}/><Card><div className="mb-3 flex items-center justify-between"><b>{activeCollectionItems.length} / {profile.isPlus ? 300 : 50} тайтлов</b><span className="text-xs text-white/45">{activeCollection.is_public ? "Публичная" : "Приватная"}</span></div>{activeCollectionItems.length ? activeCollectionItems.map(id=>{const anime=animeList.find(item=>item.id===id);return <div key={id} className="flex items-center gap-3 border-b border-white/5 py-3 last:border-0">{anime?.posterUrl ? <img src={anime.posterUrl} alt="" className="h-16 w-12 rounded-lg object-cover"/> : <div className="h-16 w-12 rounded-lg bg-white/5"/>}<button onClick={()=>anime&&onSelect(anime)} className="min-w-0 flex-1 text-left"><b className="block truncate">{anime?.title || `Аниме #${id}`}</b><span className="text-xs text-white/45">{anime?.original || ""}</span></button>{activeCollectionIsOwner && <button disabled={busy} onClick={async()=>{const result=await request({action:"collection.item.remove",id:activeCollection.id,animeId:id});if(result){setActiveCollectionItems(items=>items.filter(value=>value!==id));await load();}}} className="rounded-lg bg-white/5 p-2 text-white/55" aria-label="Убрать из подборки"><Trash2 className="h-4 w-4"/></button>}</div>}) : <p className="py-5 text-center text-sm text-white/45">В этой подборке пока нет аниме</p>}</Card>{activeCollectionIsOwner && <Card className="mt-3"><h3 className="mb-3 font-semibold">Добавить аниме</h3><input value={animeSearch} onChange={e=>setAnimeSearch(e.target.value)} placeholder="Найти аниме в каталоге" className="mb-3 w-full rounded-xl border border-white/10 bg-black/20 p-3 text-sm"/><div className="max-h-80 space-y-1 overflow-y-auto">{animeList.filter(item=>!activeCollectionItems.includes(item.id)&&(!animeSearch.trim()||[item.title,item.englishTitle,item.original].filter(Boolean).some(value=>value!.toLocaleLowerCase().includes(animeSearch.toLocaleLowerCase())))).slice(0,30).map(anime=><div key={anime.id} className="flex items-center gap-3 rounded-lg p-2 hover:bg-white/5">{anime.posterUrl?<img src={anime.posterUrl} alt="" className="h-12 w-9 rounded object-cover"/>:<div className="h-12 w-9 rounded bg-white/5"/>}<span className="min-w-0 flex-1 truncate text-sm">{anime.title}</span><button disabled={busy||activeCollectionItems.length >= (profile.isPlus?300:50)} onClick={async()=>{const result=await request({action:"collection.item.add",id:activeCollection.id,animeId:anime.id});if(result){setActiveCollectionItems(items=>[...items,anime.id]);await load();}}} className="rounded-lg bg-[#FF5738]/15 px-3 py-2 text-xs font-semibold text-[#FF5738]">Добавить</button></div>)}</div></Card>}</>}{screen === "collections" && <><Header title="Мои подборки" subtitle="Ваши личные подборки аниме"/>{pinned.length>0 && <Card className="mb-3"><h3 className="mb-2 font-semibold"><Pin className="mr-2 inline h-4 w-4 text-[#FF5738]"/>Закреплённые подборки <span className="float-right rounded-full bg-white/10 px-2 text-xs">{pinned.length}</span></h3>{pinned.map(collectionRow)}</Card>}<Card className="mb-4"><h3 className="mb-2 font-semibold"><Layers3 className="mr-2 inline h-4 w-4 text-[#FF5738]"/>Остальные подборки <span className="float-right rounded-full bg-white/10 px-2 text-xs">{rest.length}</span></h3>{rest.length?rest.map(collectionRow):<p className="py-4 text-center text-sm text-white/45">Пока нет подборок</p>}</Card><button onClick={startCreateCollection} className="w-full rounded-2xl border border-dashed border-white/30 py-4 font-semibold"><Plus className="mr-2 inline h-5 w-5"/>Создать подборку</button></>}
+    {screen === "collection-detail" && activeCollection && <><Header title={activeCollection.title} subtitle={activeCollection.description || "Подборка аниме"}/><Card><div className="mb-3 flex items-center justify-between"><b>{activeCollectionItems.length} / {activeCollectionTitleLimit} тайтлов</b><span className="text-xs text-white/45">{activeCollection.is_public ? "Публичная" : "Приватная"}</span></div>{activeCollectionItems.length ? activeCollectionItems.map(id=>{const anime=animeList.find(item=>item.id===id);return <div key={id} className="flex items-center gap-3 border-b border-white/5 py-3 last:border-0">{anime?.posterUrl ? <img src={anime.posterUrl} alt="" className="h-16 w-12 rounded-lg object-cover"/> : <div className="h-16 w-12 rounded-lg bg-white/5"/>}<button onClick={()=>anime&&onSelect(anime)} className="min-w-0 flex-1 text-left"><b className="block truncate">{anime?.title || `Аниме #${id}`}</b><span className="text-xs text-white/45">{anime?.original || ""}</span></button>{activeCollectionIsOwner && <button disabled={busy} onClick={async()=>{const result=await request({action:"collection.item.remove",id:activeCollection.id,animeId:id});if(result){setActiveCollectionItems(items=>items.filter(value=>value!==id));await load();}}} className="rounded-lg bg-white/5 p-2 text-white/55" aria-label="Убрать из подборки"><Trash2 className="h-4 w-4"/></button>}</div>}) : <p className="py-5 text-center text-sm text-white/45">В этой подборке пока нет аниме</p>}</Card>{activeCollectionIsOwner && <Card className="mt-3"><h3 className="mb-3 font-semibold">Добавить аниме</h3><input value={animeSearch} onChange={e=>setAnimeSearch(e.target.value)} placeholder="Найти аниме в каталоге" className="mb-3 w-full rounded-xl border border-white/10 bg-black/20 p-3 text-sm"/><div className="max-h-80 space-y-1 overflow-y-auto">{animeList.filter(item=>!activeCollectionItems.includes(item.id)&&(!animeSearch.trim()||[item.title,item.englishTitle,item.original].filter(Boolean).some(value=>value!.toLocaleLowerCase().includes(animeSearch.toLocaleLowerCase())))).slice(0,30).map(anime=><div key={anime.id} className="flex items-center gap-3 rounded-lg p-2 hover:bg-white/5">{anime.posterUrl?<img src={anime.posterUrl} alt="" className="h-12 w-9 rounded object-cover"/>:<div className="h-12 w-9 rounded bg-white/5"/>}<span className="min-w-0 flex-1 truncate text-sm">{anime.title}</span><button disabled={busy||activeCollectionItems.length >= activeCollectionTitleLimit} onClick={async()=>{const result=await request({action:"collection.item.add",id:activeCollection.id,animeId:anime.id});if(result){setActiveCollectionItems(items=>[...items,anime.id]);await load();}}} className="rounded-lg bg-[#FF5738]/15 px-3 py-2 text-xs font-semibold text-[#FF5738]">Добавить</button></div>)}</div></Card>}</>}{screen === "collections" && <><Header title="Мои подборки" subtitle="Ваши личные подборки аниме"/>{pinned.length>0 && <Card className="mb-3"><h3 className="mb-2 font-semibold"><Pin className="mr-2 inline h-4 w-4 text-[#FF5738]"/>Закреплённые подборки <span className="float-right rounded-full bg-white/10 px-2 text-xs">{pinned.length}</span></h3>{pinned.map(collectionRow)}</Card>}<Card className="mb-4"><h3 className="mb-2 font-semibold"><Layers3 className="mr-2 inline h-4 w-4 text-[#FF5738]"/>Остальные подборки <span className="float-right rounded-full bg-white/10 px-2 text-xs">{rest.length}</span></h3>{rest.length?rest.map(collectionRow):<p className="py-4 text-center text-sm text-white/45">Пока нет подборок</p>}</Card><button onClick={startCreateCollection} className="w-full rounded-2xl border border-dashed border-white/30 py-4 font-semibold"><Plus className="mr-2 inline h-5 w-5"/>Создать подборку</button></>}
     {(screen === "create" || screen === "edit-collection") && <>
       <Header title={screen === "edit-collection" ? "Редактировать подборку" : "Создать подборку"} subtitle="Соберите аниме в одном месте" />
       <div className="space-y-3">
@@ -525,8 +543,8 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
           <div className="absolute inset-x-3 bottom-3 flex items-end gap-2.5">
             {avatar(publicProfile, "h-[72px] w-[72px]")}
             <div className="min-w-0 flex-1">
-              <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-                <h3 className="min-w-0 break-words text-[clamp(18px,4.5vw,22px)] font-bold leading-tight text-white">{publicProfile.displayName}</h3>
+              <div className="flex min-w-0 flex-nowrap items-center gap-x-2">
+                <h3 className="min-w-0 break-words text-[clamp(16px,4.2vw,22px)] font-bold leading-tight text-white">{publicProfile.displayName}</h3>
                 {publicProfile.isPlus && <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-[#ffc66d]/55 bg-[#ffc66d]/10 px-2.5 py-1 text-[11px] font-bold leading-none text-[#ffc66d]"><img src="/images/yubera/YUBERA_Plus_Crown_Simple.webp" alt="" className="h-3.5 w-3.5 object-contain" />Plus</span>}
               </div>
               {publicProfile.username && <p className="mt-1 break-words text-[13px] leading-tight text-white/75">@{publicProfile.username}</p>}
@@ -535,7 +553,7 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
                 {publicProfile.bio.length > 110 && <button type="button" onClick={() => setPublicBioExpanded(value => !value)} className="mt-1 text-[10px] font-semibold text-[#ff8768]">{publicBioExpanded ? "Свернуть" : "Показать полностью"}</button>}
               </div>}
             </div>
-            <button type="button" disabled={busy} onClick={() => void follow(publicProfile.id, !publicProfile.isFollowing)} className="inline-flex min-h-8 shrink-0 items-center justify-center gap-1 rounded-full border border-[#FF5738]/65 bg-gradient-to-r from-[#7c2d26]/90 to-[#4a2026]/90 px-2.5 py-1.5 text-[10px] font-bold text-[#ff987d] shadow-[0_0_12px_rgba(255,87,56,.16)] disabled:opacity-50">
+            <button type="button" disabled={busy} onClick={() => void follow(publicProfile.id, !publicProfile.isFollowing)} className="inline-flex min-h-8 shrink-0 items-center justify-center gap-1 rounded-full border border-[#ff7658]/70 bg-gradient-to-r from-[#ff795b] to-[#ff5738] px-2.5 py-1.5 text-[10px] font-bold text-white shadow-[0_4px_16px_rgba(255,91,61,.2)] transition-colors hover:brightness-110 disabled:opacity-50">
               <Users className="h-3.5 w-3.5" />
               {publicProfile.isFollowing ? "Вы подписаны" : "Подписаться"}
             </button>
