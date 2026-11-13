@@ -551,7 +551,118 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
       </div>
     </>}
     {screen === "friends" && <><Header title="Друзья" subtitle="Подписки и поиск пользователей YUBERA"/><YuberaFriendsPanel onOpenProfile={(id) => void viewPublicProfile(id)} onFollowChange={load}/></>}
-    {screen === "level" && <><Header title="Уровень пользователя" subtitle="Ваш прогресс и система опыта"/><YuberaCard className="text-center"><img src={`/images/yubera/${levelAssets[profile.xp.level - 1]}`} alt="" className="mx-auto h-36 w-36 object-contain"/><p className="text-sm text-white/50">Уровень {profile.xp.level}</p><h3 className="text-2xl font-bold">{profile.xp.title}</h3><p className="mt-2 text-lg font-semibold">{profile.xp.total??0} XP</p>{profile.xp.nextThreshold && <><div className="mt-4 h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-gradient-to-r from-[#FF5738] to-[#FF6245]" style={{width:`${profile.xp.progress??0}%`}}/></div><p className="mt-2 text-xs text-white/50">До уровня {profile.xp.nextLevel}: осталось {profile.xp.remaining} XP</p></>}</YuberaCard><YuberaCard className="mt-3"><h3 className="mb-3 font-semibold">Как получить опыт?</h3>{[["Первая оценка аниме",`+${YUBERA_XP_REWARDS.firstAnimeRating} XP`],["Добавление тайтла в подборку",`+${YUBERA_XP_REWARDS.collectionTitleAdded} XP`],[`Подборка из ${YUBERA_XP_RULES.collectionMilestoneTitleCount} тайтлов`,`+${YUBERA_XP_REWARDS.collectionThreeTitleMilestone} XP`],[`Просмотр ${Math.round(YUBERA_XP_RULES.episodeCompletionRatio*100)}% серии`,`+${YUBERA_XP_REWARDS.episodeNinetyPercent} XP`]].map(([label,xp])=><div key={label} className="flex justify-between border-b border-white/5 py-3 text-sm last:border-0"><span>{label}</span><b className="text-[#FF5738]">{xp}</b></div>)}</YuberaCard><YuberaCard className="mt-3"><h3 className="mb-3 font-semibold">Система уровней YUBERA</h3>{levels.map(([name,range],i)=><div key={name} className={`flex items-center justify-between border-b border-white/5 py-3 text-sm last:border-0 ${profile.xp.level===i+1?"text-[#FF5738]": "text-white/65"}`}><span>{i+1}. {name}</span><span>{range}</span></div>)}</YuberaCard></>}
+    {screen === "level" && <>
+      <div className="relative mb-3 flex min-h-[112px] items-center overflow-hidden rounded-[20px] border border-white/10 bg-[#17181e] px-4 py-4 sm:min-h-[132px] sm:px-6">
+        <img src="/images/yubera/yubera_banner.webp" alt="" className="absolute inset-0 h-full w-full object-cover object-[center_38%]" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#101116]/95 via-[#101116]/75 to-[#101116]/35" />
+        <div className="relative z-10 flex min-w-0 items-center gap-3 sm:gap-4">
+          <span className="grid h-11 w-11 shrink-0 place-items-center text-[#FF5738] sm:h-14 sm:w-14"><Layers3 className="h-9 w-9 sm:h-11 sm:w-11" strokeWidth={1.7}/></span>
+          <span className="min-w-0">
+            <h2 className="text-xl font-bold leading-tight text-white sm:text-2xl">Уровень пользователя</h2>
+            <p className="mt-1 text-sm text-white/70 sm:text-base">Ваш прогресс и система уровней</p>
+          </span>
+        </div>
+      </div>
+
+      {(() => {
+        const totalXp = xpTotal;
+        const currentThreshold = currentXpLevel?.min ?? 0;
+        const nextThreshold = nextXpThreshold;
+        const remainingXp = typeof profile.xp.remaining === "number"
+          ? profile.xp.remaining
+          : nextThreshold !== null ? Math.max(0, nextThreshold - totalXp) : 0;
+        const progressPercent = nextThreshold !== null
+          ? Math.max(0, Math.min(100, xpProgress ?? (nextThreshold > currentThreshold ? ((totalXp-currentThreshold)/(nextThreshold-currentThreshold))*100 : 100)))
+          : 100;
+        const rewards = [
+          { label: "Оценка аниме", detail: "Ставьте оценки просмотренным тайтлам", value: `+${YUBERA_XP_REWARDS.firstAnimeRating} XP`, icon: Star },
+          { label: "Добавление тайтлов в подборку", detail: "Добавляйте аниме в свои подборки", value: `+${YUBERA_XP_REWARDS.collectionTitleAdded} XP`, icon: Bookmark },
+          { label: "Создание подборки", detail: `Создавайте подборки минимум из ${YUBERA_XP_RULES.collectionMilestoneTitleCount} тайтлов`, value: `+${YUBERA_XP_REWARDS.collectionThreeTitleMilestone} XP`, icon: Layers3 },
+          { label: "Просмотр серии", detail: `Смотрите серии не менее чем на ${Math.round(YUBERA_XP_RULES.episodeCompletionRatio*100)}%`, value: `+${YUBERA_XP_REWARDS.episodeNinetyPercent} XP`, icon: Eye },
+        ];
+        return <>
+          <YuberaCard className="p-3 sm:p-5">
+            <div className="grid grid-cols-[76px_minmax(0,1fr)] items-center gap-3 sm:grid-cols-[112px_minmax(0,1fr)] sm:gap-5">
+              <div className="flex items-center justify-center">
+                <img src={`/images/yubera/${levelAssets[profile.xp.level - 1] || levelAssets[0]}`} alt={`Эмблема уровня ${profile.xp.level}`} className="h-[72px] w-[72px] object-contain sm:h-[104px] sm:w-[104px]" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[11px] font-bold uppercase tracking-wide text-[#FF704F] sm:text-xs">Текущий уровень</p>
+                <h3 className="mt-0.5 break-words text-lg font-bold leading-tight text-white sm:text-2xl">{levelTitle}</h3>
+                <div className="mt-3 flex items-center justify-between gap-2 text-sm font-semibold sm:text-xl">
+                  <span className="min-w-0 tabular-nums">{totalXp.toLocaleString("ru-RU")} / {nextThreshold !== null ? nextThreshold.toLocaleString("ru-RU") : "—"} XP</span>
+                  <span className="shrink-0 tabular-nums text-white/75">{Math.round(progressPercent)}%</span>
+                </div>
+                <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-white/10">
+                  <div className="h-full rounded-full bg-gradient-to-r from-[#FFB84D] via-[#FF704F] to-[#FF3B3B] transition-[width]" style={{width:`${progressPercent}%`}}/>
+                </div>
+              </div>
+            </div>
+            <div className="mt-4 flex items-center justify-between gap-3 border-t border-white/15 pt-3 sm:mt-5 sm:pt-4">
+              <span className="flex min-w-0 items-center gap-3 text-sm font-semibold text-white sm:text-base">
+                <Layers3 className="h-7 w-7 shrink-0 text-[#FF5738]" strokeWidth={1.8}/>
+                <span>До следующего уровня</span>
+              </span>
+              <b className="shrink-0 text-lg font-bold text-[#FF704F] sm:text-2xl">{nextThreshold !== null ? `${remainingXp.toLocaleString("ru-RU")} XP` : "Максимальный уровень"}</b>
+            </div>
+          </YuberaCard>
+
+          <YuberaCard className="mt-3 p-3 sm:p-5">
+            <div className="flex items-center gap-3">
+              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-[#FF5738]/10 text-[#FF704F]"><Sparkles className="h-8 w-8" strokeWidth={1.8}/></span>
+              <span className="min-w-0">
+                <h3 className="text-lg font-bold sm:text-xl">Как получить опыт?</h3>
+                <p className="text-xs leading-snug text-white/55 sm:text-sm">Выполняйте действия в YUBERA и повышайте свой уровень.</p>
+              </span>
+            </div>
+            <div className="mt-3 space-y-1">
+              {rewards.map(({label,detail,value,icon:RewardIcon}) => <div key={label} className="flex min-w-0 items-center gap-3 rounded-2xl border border-white/[0.08] bg-black/10 px-3 py-2.5 sm:px-4">
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#FF5738]/[0.08] text-[#FF704F]"><RewardIcon className="h-7 w-7" strokeWidth={1.9}/></span>
+                <span className="min-w-0 flex-1">
+                  <b className="block text-sm leading-tight text-white sm:text-base">{label}</b>
+                  <span className="mt-0.5 block text-[11px] leading-snug text-white/55 sm:text-sm">{detail}</span>
+                </span>
+                <b className="shrink-0 whitespace-nowrap text-sm font-bold text-[#FF704F] sm:text-lg">{value}</b>
+              </div>)}
+            </div>
+          </YuberaCard>
+
+          <YuberaCard className="mt-3 p-3 sm:p-5">
+            <div className="mb-3 flex items-start gap-3">
+              <Layers3 className="mt-0.5 h-9 w-9 shrink-0 text-[#FF5738]" strokeWidth={1.8}/>
+              <span className="min-w-0">
+                <h3 className="text-lg font-bold sm:text-xl">Система уровней YUBERA</h3>
+                <p className="text-xs text-white/55 sm:text-sm">Список уровней, их названия и требуемое количество опыта.</p>
+              </span>
+            </div>
+            <div className="space-y-1">
+              {YUBERA_XP_LEVELS.map(({level,name,title,min,max}) => {
+                const current = profile.xp.level === level;
+                const unlocked = profile.xp.level >= level;
+                const range = max === null ? `${min.toLocaleString("ru-RU")}+ XP` : `${min.toLocaleString("ru-RU")} – ${(max+1).toLocaleString("ru-RU")} XP`;
+                return <div key={level} className={`flex min-w-0 items-center gap-2 rounded-2xl border px-2.5 py-2 sm:gap-3 sm:px-4 sm:py-2.5 ${current ? "border-[#FF704F]/80 bg-[#FF5738]/[0.12] shadow-[0_0_18px_rgba(255,87,56,0.10)]" : "border-white/[0.08] bg-black/[0.08]"}`}>
+                  <span className="grid h-11 w-11 shrink-0 place-items-center sm:h-14 sm:w-14">
+                    <img src={`/images/yubera/${levelAssets[level-1] || levelAssets[0]}`} alt="" className={`h-full w-full object-contain ${unlocked ? "" : "grayscale opacity-65"}`}/>
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <b className={`block break-words text-sm font-semibold leading-tight sm:text-base ${current ? "text-white" : "text-white/85"}`}>{title}</b>
+                    <span className="mt-1 block text-xs tabular-nums text-white/60 sm:text-sm">{range}</span>
+                  </span>
+                  <span className="ml-auto flex shrink-0 items-center justify-end">
+                    {current
+                      ? <span className="whitespace-nowrap rounded-full border border-[#FF704F]/80 px-3 py-1 text-[10px] font-semibold text-[#FF704F] sm:text-xs">Текущий уровень</span>
+                      : unlocked
+                        ? <Check className="h-5 w-5 text-emerald-400" aria-label="Уровень открыт"/>
+                        : <LockKeyhole className="h-5 w-5 text-white/65" aria-label="Уровень закрыт"/>}
+                  </span>
+                </div>;
+              })}
+            </div>
+          </YuberaCard>
+        </>;
+      })()}
+    </>}
+
     {screen === "support-status" && <><Header title="Статус поддержки" subtitle="Ваш вклад в развитие YUBERA"/><YuberaCard className="text-center">{profile.support.asset ? <img src={`/images/yubera/${profile.support.asset}`} alt="" className="mx-auto h-36 w-36 object-contain"/> : <div className="mx-auto grid h-36 w-36 place-items-center rounded-3xl bg-white/5 text-white/40"><Star className="h-16 w-16"/></div>}<h3 className="text-2xl font-bold">{profile.support.title}</h3><p className="mt-2 text-sm text-white/55">Статус присваивается за подтверждённую поддержку проекта в Telegram Stars.</p>{typeof profile.support.total === "number" && profile.support.nextThreshold && <><div className="mt-4 h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-gradient-to-r from-[#FF5738] to-[#FF6245]" style={{width:`${profile.support.progress ?? 0}%`}}/></div><p className="mt-2 text-xs text-white/50">До следующего статуса: {profile.support.remaining} ⭐</p></>}</YuberaCard><YuberaCard className="mt-3">{supportLevels.map(([name,threshold,asset],i)=><div key={name} className="flex items-center gap-3 border-b border-white/5 py-3 last:border-0"><img src={`/images/yubera/${asset}`} alt="" className="h-14 w-14 object-contain"/><div className="flex-1"><b>{i+1}. {name}</b><p className="text-xs text-white/50">От {threshold}</p></div>{profile.support.level>=i+1&&<Check className="h-5 w-5 text-emerald-400"/>}</div>)}</YuberaCard></>}
     {screen === "plus" && <><Header title="YUBERA Plus" subtitle="Расширенные возможности личного пространства"/><YuberaPlusPanel /></>}
     {screen === "public-profile" && publicProfile && <>
