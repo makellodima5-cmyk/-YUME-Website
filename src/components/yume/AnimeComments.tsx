@@ -50,6 +50,11 @@ type ReplyPageResponse = {
   nextCursor: string | null;
   hasMore: boolean;
 };
+type LiveUpdatesResponse = {
+  updates?: Array<{ root: Comment; replies: Comment[] }>;
+  totalCount?: number;
+  checkedAt?: string;
+};
 type MutationResponse = {
   error?: string;
   comment?: Comment;
@@ -235,11 +240,13 @@ export function AnimeComments({ animeId, language }: Props) {
   const requestLock = useRef(false);
   const pageLock = useRef(false);
   const pollLock = useRef(false);
+  const lastUpdateAt = useRef(new Date().toISOString());
   const busyLikeIds = useRef(new Set<string>());
 
   const loadInitial = useCallback(async () => {
     setLoading(true);
     setLoadError(false);
+    lastUpdateAt.current = new Date().toISOString();
     try {
       const response = await fetch("/api/anime-comments?animeId=" + encodeURIComponent(animeId), {
         credentials: "same-origin",
@@ -272,33 +279,42 @@ export function AnimeComments({ animeId, language }: Props) {
     const poll = async () => {
       if (!active || pollLock.current || document.visibilityState === "hidden") return;
       pollLock.current = true;
+      const since = lastUpdateAt.current;
       try {
-        const response = await fetch("/api/anime-comments?animeId=" + encodeURIComponent(animeId), {
+        const url = "/api/anime-comments?animeId=" + encodeURIComponent(animeId) + "&since=" + encodeURIComponent(since);
+        const response = await fetch(url, {
           credentials: "same-origin",
           cache: "no-store",
           headers: { Accept: "application/json" },
         });
-        const payload = await response.json().catch(() => ({})) as Partial<PageResponse>;
-        if (!active || !response.ok || !Array.isArray(payload.comments)) return;
+        const payload = await response.json().catch(() => ({})) as LiveUpdatesResponse;
+        if (!active || !response.ok || !Array.isArray(payload.updates)) return;
         setComments(current => {
-          const existing = new Map(current.map(root => [root.id, root]));
-          const incomingIds = new Set(payload.comments!.map(root => root.id));
-          const refreshed = payload.comments!.map(incoming => {
-            const previous = existing.get(incoming.id);
-            if (!previous) return incoming;
+          let next = [...current];
+          for (const update of payload.updates!) {
+            const index = next.findIndex(root => root.id === update.root.id);
+            if (index < 0) {
+              if (update.root.createdAt > since) {
+                next.unshift({ ...update.root, replies: update.replies, replyCount: update.replies.length, hasMoreReplies: false, replyCursor: null });
+              }
+              continue;
+            }
+            const previous = next[index];
+            const known = new Set(previous.replies.map(reply => reply.id));
+            const freshReplies = update.replies.filter(reply => !known.has(reply.id));
             const replies = new Map(previous.replies.map(reply => [reply.id, reply]));
-            for (const reply of incoming.replies) replies.set(reply.id, reply);
-            return {
+            for (const reply of update.replies) replies.set(reply.id, reply);
+            next[index] = {
               ...previous,
-              ...incoming,
+              ...update.root,
               replies: Array.from(replies.values()).sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
-              replyCount: Math.max(incoming.replyCount, previous.replyCount),
+              replyCount: previous.replyCount + freshReplies.length,
             };
-          });
-          return [...refreshed, ...current.filter(root => !incomingIds.has(root.id))]
-            .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+          }
+          return next.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
         });
         setCount(Math.max(0, Number(payload.totalCount) || 0));
+        if (payload.checkedAt) lastUpdateAt.current = payload.checkedAt;
       } catch {
         // Keep the last rendered comments; the next polling cycle retries.
       } finally {
