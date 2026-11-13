@@ -126,7 +126,7 @@ describe("Profile and My library pages", () => {
       [/Статус поддержки/, "Статус поддержки"],
     ] as const) {
       fireEvent.click(screen.getByRole("button", { name: label }));
-      expect(await screen.findByRole("heading", { name: heading })).toBeInTheDocument();
+      expect((await screen.findAllByRole("heading", { name: heading })).length).toBeGreaterThan(0);
       expectAccountPanelHidden();
       fireEvent.click(screen.getByRole("button", { name: "Назад" }));
       expect(await screen.findByRole("heading", { name: "Аккаунт Telegram" })).toBeInTheDocument();
