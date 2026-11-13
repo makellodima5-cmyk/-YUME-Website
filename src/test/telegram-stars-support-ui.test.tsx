@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { SupportPage } from "@/components/yume/SupportPage";
+import { YuberaPlusPanel } from "@/components/yume/YuberaPlusPanel";
 
 describe("YUBERA support page", () => {
   it("shows the required preset amounts and defaults to 100 Stars", () => {
@@ -36,5 +37,33 @@ describe("YUBERA support page", () => {
     expect(await screen.findByText("Преимущества подписки")).toBeInTheDocument();
     expect(screen.getByText("AI-помощник")).toBeInTheDocument();
     expect(screen.getByText("Эксклюзивные рамки аватара")).toBeInTheDocument();
+  });
+});
+
+describe("YUBERA Plus plan selection", () => {
+  it("offers clickable one- and three-month plans and shows the fixed 17% discount", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        price: 199,
+        threeMonthPrice: 496,
+        threeMonthDiscountPercent: 17,
+        periodDays: 30,
+        isPlus: false,
+        subscription: null,
+      }),
+    })));
+    render(<YuberaPlusPanel />);
+    const oneMonth = await screen.findByRole("button", { name: /1 месяц/i });
+    const threeMonths = screen.getByRole("button", { name: /3 месяца/i });
+    expect(oneMonth).toHaveAttribute("aria-pressed", "true");
+    expect(threeMonths).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByText("199")).toBeInTheDocument();
+    expect(screen.getByText("496")).toBeInTheDocument();
+    expect(screen.getByText("-17%")).toBeInTheDocument();
+    fireEvent.click(threeMonths);
+    expect(threeMonths).toHaveAttribute("aria-pressed", "true");
+    expect(oneMonth).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByText(/Разовая оплата за 90 дней/i)).toBeInTheDocument();
   });
 });
