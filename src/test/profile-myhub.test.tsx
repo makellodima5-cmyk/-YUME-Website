@@ -120,10 +120,10 @@ describe("Profile and My library pages", () => {
 
     // Every nested YUBERA view must hide the account controls, not just Friends.
     for (const [label, heading] of [
-      [/Мои подборки/, "Мои подборки"],
+      [/Все подборки/, "Мои подборки"],
       [/Друзья/, "Друзья"],
       [/Уровень 1/, "Уровень пользователя"],
-      [/Подде/, "Статус поддержки"],
+      [/Статус поддержки/, "Статус поддержки"],
     ] as const) {
       fireEvent.click(screen.getByRole("button", { name: label }));
       expect(await screen.findByRole("heading", { name: heading })).toBeInTheDocument();
