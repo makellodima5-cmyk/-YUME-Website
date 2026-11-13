@@ -328,7 +328,7 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
         <div className="relative -mt-8 px-3 pb-3">
           <div className="flex items-end gap-3">
             <div className="shrink-0">{avatar(profile)}</div>
-            <div className="min-w-0 flex-1 pb-1"><p className="text-[10px] font-bold tracking-[.14em] text-[#FF5738]">ЛИЧНОЕ ПРОСТРАНСТВО</p><h2 className="mt-1 truncate text-lg font-bold">{profile.displayName}</h2><p className="truncate text-xs text-white/65">@{profile.username || "YUBERA"}</p><p className="mt-1 line-clamp-1 text-[11px] text-white/65">{profile.bio || "Твоя коллекция и настройки Yubera"}</p></div>
+            <div className="min-w-0 flex-1 pb-1"><p className="text-[10px] font-bold tracking-[.14em] text-[#FF5738]">ЛИЧНОЕ ПРОСТРАНСТВО</p><h2 className="mt-1 truncate text-lg font-bold">{profile.displayName}</h2>{profile.isPlus && <span className="mt-1 inline-flex items-center gap-1 rounded-full border border-[#ffc66d]/40 bg-[#ffc66d]/10 px-2 py-0.5 text-[10px] font-bold tracking-wide text-[#ffc66d]"><img src="/images/yubera/YUBERA_Plus_Crown_Simple.webp" alt="" className="h-3.5 w-3.5 object-contain"/>YUBERA Plus</span>}<p className="truncate text-xs text-white/65">@{profile.username || "YUBERA"}</p><p className="mt-1 line-clamp-1 text-[11px] text-white/65">{profile.bio || "Твоя коллекция и настройки Yubera"}</p></div>
             <button onClick={()=>changeScreen("edit")} className="mb-1 inline-flex shrink-0 items-center gap-1.5 rounded-full bg-white/10 px-3 py-2 text-[11px] font-semibold text-white" aria-label="Редактировать профиль"><Pencil className="h-3.5 w-3.5"/>Редактировать</button>
           </div>
           <div className="mt-3 grid grid-cols-[1.2fr_1fr] gap-2">
