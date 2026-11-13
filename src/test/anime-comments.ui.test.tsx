@@ -47,6 +47,7 @@ describe("AnimeComments", () => {
         authorId: "user-1",
         authorName: "Akira",
         avatarUrl: "https://t.me/i/userpic/320/akira.jpg",
+        avatarFrame: "YUBERA_Plus_Avatar_Frame_02_Mystic_Kitsune.webp",
         liked: false,
         replies: [],
         replyCount: 0,
@@ -67,6 +68,7 @@ describe("AnimeComments", () => {
     expect(screen.getByText("12")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Like" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Reply" })).toBeTruthy();
+    expect(document.querySelector('img[src="/images/yubera/YUBERA_Plus_Avatar_Frame_02_Mystic_Kitsune.webp"]')).toBeTruthy();
   });
 
   it("uses the verified Telegram profile avatar in the Mini App composer for a guest", async () => {
