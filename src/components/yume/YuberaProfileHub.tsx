@@ -387,6 +387,7 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
           {[[ "В избранном", profile.stats?.favorites ], [ "В моём списке", profile.stats?.watchlist ], [ "В истории", profile.stats?.history ]].map(([label, value]) => <div key={String(label)} className="min-w-0 px-1 py-2"><b className="block text-[22px] font-bold leading-none">{typeof value === "number" ? value : "—"}</b><span className="mt-1.5 block whitespace-nowrap text-[clamp(10px,2.7vw,12px)] leading-tight text-white/65">{label}</span></div>)}
         </div>
       </section>
+    </>}
     {screen === "edit" && <><Header title="Редактирование профиля" subtitle="Настройте описание, видимость и оформление профиля"/><Card>
       <div className="mb-4 flex items-center gap-3">{avatar(profile)}<div><b>{profile.displayName}</b><p className="text-sm text-white/50">@{profile.username || "username"}</p></div></div>
       <div className="mb-4 flex items-start gap-2 rounded-xl bg-white/[0.04] p-3 text-xs leading-relaxed text-white/55"><Info className="mt-0.5 h-4 w-4 shrink-0 text-white/45"/><span>Аватар и никнейм берутся из Telegram и не могут быть изменены на сайте</span></div>
