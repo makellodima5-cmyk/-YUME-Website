@@ -89,7 +89,7 @@ describe("Profile and My library pages", () => {
     const settingsButton = screen.getByRole("button", { name: /Настройки приложения/ });
     expect(settingsButton).toHaveAttribute("aria-expanded", "false");
     fireEvent.click(settingsButton);
-    expect(settingsButton).toHaveAttribute("aria-expanded", "true");
+    await waitFor(() => expect(settingsButton).toHaveAttribute("aria-expanded", "true"));
     expect(document.getElementById("app-settings")).toBeInTheDocument();
   });
 
