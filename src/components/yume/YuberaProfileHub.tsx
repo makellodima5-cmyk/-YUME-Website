@@ -52,6 +52,10 @@ const supportLevels = YUBERA_SUPPORT_LEVELS.filter((item) => item.level > 0).map
   `${min.toLocaleString("ru-RU")} ⭐`,
   asset ?? "",
 ] as const);
+function YuberaCard({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return <section className={`rounded-[18px] border border-white/10 bg-[#17181e] p-3 ${className}`}>{children}</section>;
+}
+
 function formatCollectionTitleCount(value: number): string {
   const remainder100 = value % 100;
   const remainder10 = value % 10;
@@ -299,7 +303,6 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
       <div className="min-w-0"><h2 className="text-xl font-bold text-white">{heading}</h2>{subtitle && <p className="text-sm text-white/55">{subtitle}</p>}</div>
     </div>
   );
-  const Card = ({ children, className = "" }: { children: React.ReactNode; className?: string }) => <section className={`rounded-[18px] border border-white/10 bg-[#17181e] p-3 ${className}`}>{children}</section>;
   const Action = ({ icon, label, onClick, detail, expanded, controls }: { icon: React.ReactNode; label: string; onClick: () => void; detail?: string; expanded?: boolean; controls?: string }) => (
     <button type="button" onClick={onClick} aria-expanded={expanded} aria-controls={controls} className={`flex min-h-[68px] w-full items-center gap-3 rounded-[14px] border px-3 py-2.5 text-left transition hover:border-white/20 ${label === "Панель администратора" ? "border-[#FF5738]/45 bg-[#FF5738]/[0.09]" : "border-white/10 bg-[#17181e]"}`}>
       <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-full ${label === "Панель администратора" ? "bg-[#FF5738]/25 text-[#FF704F]" : "bg-[#FF5738]/15 text-[#FF6847]"}`}>{icon}</span>
@@ -416,13 +419,13 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
           {[[ "В избранном", profile.stats?.favorites ], [ "В моём списке", profile.stats?.watchlist ], [ "В истории", profile.stats?.history ]].map(([label, value]) => <div key={String(label)} className="min-w-0 px-1 py-2"><b className="block text-[22px] font-bold leading-none">{typeof value === "number" ? value : "—"}</b><span className="mt-1.5 block whitespace-nowrap text-[clamp(10px,2.7vw,12px)] leading-tight text-white/65">{label}</span></div>)}
         </div>
       </section>
-      <Card className="mt-2 p-3">
+      <YuberaCard className="mt-2 p-3">
         <div className="mb-2 flex items-center justify-between gap-2"><h3 className="flex items-center gap-2 text-sm font-semibold"><Layers3 className="h-4 w-4 text-[#FF5738]" />Мои подборки</h3><button type="button" onClick={() => changeScreen("collections")} className="shrink-0 text-xs text-[#FF5738]">Все подборки <ChevronRight className="inline h-3 w-3" /></button></div>
         <div className="flex gap-2 overflow-x-auto pb-1">
           <button type="button" onClick={startCreateCollection} className="grid h-[92px] w-[92px] shrink-0 place-items-center rounded-xl border border-dashed border-white/30 text-center text-xs text-white/75"><Plus className="h-6 w-6 text-[#FF5738]" /><span>Создать подборку</span></button>
           {orderedCollections.slice(0, 5).map(item => <button type="button" key={item.id} onClick={() => void openCollection(item)} className="relative h-[92px] w-32 shrink-0 overflow-hidden rounded-xl border border-white/10 text-left">{item.cover_key ? <img src={`/images/yubera/${item.cover_key}`} alt="" className="absolute inset-0 h-full w-full object-cover" /> : <div className="absolute inset-0 bg-white/5" />}<div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/15 to-transparent" /><span className="absolute bottom-2 left-2 right-2"><b className="block truncate text-xs">{item.title}</b><span className="text-[10px] text-white/75">{item.title_count} тайтлов</span></span></button>)}
         </div>
-      </Card>
+      </YuberaCard>
       <div className="mt-2 space-y-2">
         <Action icon={<Users />} label="Друзья" detail="Пользователи, на которых вы подписаны" onClick={() => changeScreen("friends")} />
         <Action icon={<Settings />} label="Настройки приложения" detail="Тема, язык и другие параметры" onClick={() => onSettings?.()} expanded={settingsExpanded} controls="app-settings" />
@@ -432,7 +435,7 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
         <Action icon={<LifeBuoy />} label="Поддержка" detail="Помощь и сообщения о проблемах" onClick={() => onSupport?.()} />
       </div>
     </>}
-    {screen === "edit" && <><Header title="Редактирование профиля" subtitle="Настройте описание, видимость и оформление профиля"/><Card>
+    {screen === "edit" && <><Header title="Редактирование профиля" subtitle="Настройте описание, видимость и оформление профиля"/><YuberaCard>
       <div className="mb-4 flex items-center gap-3">{avatar(profile)}<div><b>{profile.displayName}</b><p className="text-sm text-white/50">@{profile.username || "username"}</p></div></div>
       <div className="mb-4 flex items-start gap-2 rounded-xl bg-white/[0.04] p-3 text-xs leading-relaxed text-white/55"><Info className="mt-0.5 h-4 w-4 shrink-0 text-white/45"/><span>Аватар и никнейм берутся из Telegram и не могут быть изменены на сайте</span></div>
       <section className="mb-4 rounded-2xl border border-white/10 bg-black/10 p-3">
@@ -476,20 +479,20 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
       <p className="mt-3 rounded-xl bg-white/[0.03] p-3 text-xs text-white/50"><Sparkles className="mr-1 inline h-4 w-4"/> {frameCategory==="support"?"Рамки открываются по мере накопления подтверждённой поддержки проекта. Открытые рамки остаются у вас навсегда.":"Рамки YUBERA Plus доступны только при активной подписке. После её окончания такая рамка перестаёт отображаться."}</p>
       <button disabled={busy} onClick={()=>void saveProfile()} className="mt-5 w-full rounded-xl bg-gradient-to-r from-[#FF5738] to-[#FF6245] py-3 font-semibold disabled:opacity-50">Сохранить изменения</button>
       <button type="button" disabled={busy} onClick={cancelProfileEdit} className="mt-2 w-full rounded-xl border border-white/15 bg-white/5 py-3 font-semibold">Отменить</button>
-    </Card></>}
-    {screen === "collection-detail" && activeCollection && <><Header title={activeCollection.title} subtitle={activeCollection.description || "Подборка аниме"}/><Card><div className="mb-3 flex items-center justify-between"><b>{activeCollectionItems.length} / {activeCollectionTitleLimit} тайтлов</b><span className="text-xs text-white/45">{activeCollection.is_public ? "Публичная" : "Приватная"}</span></div>{activeCollectionItems.length ? activeCollectionItems.map(id=>{const anime=animeList.find(item=>item.id===id);return <div key={id} className="flex items-center gap-3 border-b border-white/5 py-3 last:border-0">{anime?.posterUrl ? <img src={anime.posterUrl} alt="" className="h-16 w-12 rounded-lg object-cover"/> : <div className="h-16 w-12 rounded-lg bg-white/5"/>}<button onClick={()=>anime&&onSelect(anime)} className="min-w-0 flex-1 text-left"><b className="block truncate">{anime?.title || `Аниме #${id}`}</b><span className="text-xs text-white/45">{anime?.original || ""}</span></button>{activeCollectionIsOwner && <button disabled={busy} onClick={async()=>{const result=await request({action:"collection.item.remove",id:activeCollection.id,animeId:id});if(result){setActiveCollectionItems(items=>items.filter(value=>value!==id));await load();}}} className="rounded-lg bg-white/5 p-2 text-white/55" aria-label="Убрать из подборки"><Trash2 className="h-4 w-4"/></button>}</div>}) : <p className="py-5 text-center text-sm text-white/45">В этой подборке пока нет аниме</p>}</Card>{activeCollectionIsOwner && <Card className="mt-3"><h3 className="mb-3 font-semibold">Добавить аниме</h3><input value={animeSearch} onChange={e=>setAnimeSearch(e.target.value)} placeholder="Найти аниме в каталоге" className="mb-3 w-full rounded-xl border border-white/10 bg-black/20 p-3 text-sm"/><div className="max-h-80 space-y-1 overflow-y-auto">{animeList.filter(item=>!activeCollectionItems.includes(item.id)&&(!animeSearch.trim()||[item.title,item.englishTitle,item.original].filter(Boolean).some(value=>value!.toLocaleLowerCase().includes(animeSearch.toLocaleLowerCase())))).slice(0,30).map(anime=><div key={anime.id} className="flex items-center gap-3 rounded-lg p-2 hover:bg-white/5">{anime.posterUrl?<img src={anime.posterUrl} alt="" className="h-12 w-9 rounded object-cover"/>:<div className="h-12 w-9 rounded bg-white/5"/>}<span className="min-w-0 flex-1 truncate text-sm">{anime.title}</span><button disabled={busy||activeCollectionItems.length >= activeCollectionTitleLimit} onClick={async()=>{const result=await request({action:"collection.item.add",id:activeCollection.id,animeId:anime.id});if(result){setActiveCollectionItems(items=>[...items,anime.id]);await load();}}} className="rounded-lg bg-[#FF5738]/15 px-3 py-2 text-xs font-semibold text-[#FF5738]">Добавить</button></div>)}</div></Card>}</>}{screen === "collections" && <><Header title="Мои подборки" subtitle="Ваши личные подборки аниме"/>{pinned.length>0 && <Card className="mb-3"><h3 className="mb-2 font-semibold"><Pin className="mr-2 inline h-4 w-4 text-[#FF5738]"/>Закреплённые подборки <span className="float-right rounded-full bg-white/10 px-2 text-xs">{pinned.length}</span></h3>{pinned.map(collectionRow)}</Card>}<Card className="mb-4"><h3 className="mb-2 font-semibold"><Layers3 className="mr-2 inline h-4 w-4 text-[#FF5738]"/>Остальные подборки <span className="float-right rounded-full bg-white/10 px-2 text-xs">{rest.length}</span></h3>{rest.length?rest.map(collectionRow):<p className="py-4 text-center text-sm text-white/45">Пока нет подборок</p>}</Card><button onClick={startCreateCollection} className="w-full rounded-2xl border border-dashed border-white/30 py-4 font-semibold"><Plus className="mr-2 inline h-5 w-5"/>Создать подборку</button></>}
+    </YuberaCard></>}
+    {screen === "collection-detail" && activeCollection && <><Header title={activeCollection.title} subtitle={activeCollection.description || "Подборка аниме"}/><YuberaCard><div className="mb-3 flex items-center justify-between"><b>{activeCollectionItems.length} / {activeCollectionTitleLimit} тайтлов</b><span className="text-xs text-white/45">{activeCollection.is_public ? "Публичная" : "Приватная"}</span></div>{activeCollectionItems.length ? activeCollectionItems.map(id=>{const anime=animeList.find(item=>item.id===id);return <div key={id} className="flex items-center gap-3 border-b border-white/5 py-3 last:border-0">{anime?.posterUrl ? <img src={anime.posterUrl} alt="" className="h-16 w-12 rounded-lg object-cover"/> : <div className="h-16 w-12 rounded-lg bg-white/5"/>}<button onClick={()=>anime&&onSelect(anime)} className="min-w-0 flex-1 text-left"><b className="block truncate">{anime?.title || `Аниме #${id}`}</b><span className="text-xs text-white/45">{anime?.original || ""}</span></button>{activeCollectionIsOwner && <button disabled={busy} onClick={async()=>{const result=await request({action:"collection.item.remove",id:activeCollection.id,animeId:id});if(result){setActiveCollectionItems(items=>items.filter(value=>value!==id));await load();}}} className="rounded-lg bg-white/5 p-2 text-white/55" aria-label="Убрать из подборки"><Trash2 className="h-4 w-4"/></button>}</div>}) : <p className="py-5 text-center text-sm text-white/45">В этой подборке пока нет аниме</p>}</YuberaCard>{activeCollectionIsOwner && <YuberaCard className="mt-3"><h3 className="mb-3 font-semibold">Добавить аниме</h3><input value={animeSearch} onChange={e=>setAnimeSearch(e.target.value)} placeholder="Найти аниме в каталоге" className="mb-3 w-full rounded-xl border border-white/10 bg-black/20 p-3 text-sm"/><div className="max-h-80 space-y-1 overflow-y-auto">{animeList.filter(item=>!activeCollectionItems.includes(item.id)&&(!animeSearch.trim()||[item.title,item.englishTitle,item.original].filter(Boolean).some(value=>value!.toLocaleLowerCase().includes(animeSearch.toLocaleLowerCase())))).slice(0,30).map(anime=><div key={anime.id} className="flex items-center gap-3 rounded-lg p-2 hover:bg-white/5">{anime.posterUrl?<img src={anime.posterUrl} alt="" className="h-12 w-9 rounded object-cover"/>:<div className="h-12 w-9 rounded bg-white/5"/>}<span className="min-w-0 flex-1 truncate text-sm">{anime.title}</span><button disabled={busy||activeCollectionItems.length >= activeCollectionTitleLimit} onClick={async()=>{const result=await request({action:"collection.item.add",id:activeCollection.id,animeId:anime.id});if(result){setActiveCollectionItems(items=>[...items,anime.id]);await load();}}} className="rounded-lg bg-[#FF5738]/15 px-3 py-2 text-xs font-semibold text-[#FF5738]">Добавить</button></div>)}</div></YuberaCard>}</>}{screen === "collections" && <><Header title="Мои подборки" subtitle="Ваши личные подборки аниме"/>{pinned.length>0 && <YuberaCard className="mb-3"><h3 className="mb-2 font-semibold"><Pin className="mr-2 inline h-4 w-4 text-[#FF5738]"/>Закреплённые подборки <span className="float-right rounded-full bg-white/10 px-2 text-xs">{pinned.length}</span></h3>{pinned.map(collectionRow)}</YuberaCard>}<YuberaCard className="mb-4"><h3 className="mb-2 font-semibold"><Layers3 className="mr-2 inline h-4 w-4 text-[#FF5738]"/>Остальные подборки <span className="float-right rounded-full bg-white/10 px-2 text-xs">{rest.length}</span></h3>{rest.length?rest.map(collectionRow):<p className="py-4 text-center text-sm text-white/45">Пока нет подборок</p>}</YuberaCard><button onClick={startCreateCollection} className="w-full rounded-2xl border border-dashed border-white/30 py-4 font-semibold"><Plus className="mr-2 inline h-5 w-5"/>Создать подборку</button></>}
     {(screen === "create" || screen === "edit-collection") && <>
       <Header title={screen === "edit-collection" ? "Редактировать подборку" : "Создать подборку"} subtitle="Соберите аниме в одном месте" />
       <div className="space-y-3">
-        <Card>
+        <YuberaCard>
           <div className="mb-3 flex items-center justify-between gap-3">
             <label htmlFor="yubera-collection-title" className="flex items-center gap-2 text-sm font-semibold"><Type className="h-4 w-4 text-[#FF5738]" />Название подборки</label>
             <span className="text-xs tabular-nums text-white/40">{title.length} / 50</span>
           </div>
           <input id="yubera-collection-title" value={title} onChange={e=>setTitle(e.target.value)} maxLength={50} className="w-full rounded-xl border border-white/10 bg-black/20 p-3 text-sm outline-none focus:border-[#FF5738]" placeholder="Введите название" aria-required="true" aria-invalid={!title.trim() && Boolean(error)} />
           {!title.trim() && error && <p className="mt-2 text-xs text-red-300">{error}</p>}
-        </Card>
-        <Card>
+        </YuberaCard>
+        <YuberaCard>
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <FileText className="h-4 w-4 text-[#FF5738]" />
             <label htmlFor="yubera-collection-description" className="text-sm font-semibold">Описание</label>
@@ -497,8 +500,8 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
             <span className="ml-auto text-xs tabular-nums text-white/40">{description.length} / 250</span>
           </div>
           <textarea id="yubera-collection-description" value={description} onChange={e=>setDescription(e.target.value)} maxLength={250} rows={4} className="w-full resize-y rounded-xl border border-white/10 bg-black/20 p-3 text-sm outline-none focus:border-[#FF5738]" placeholder="Расскажите о подборке" />
-        </Card>
-        <Card>
+        </YuberaCard>
+        <YuberaCard>
           <div className="mb-1 flex items-center gap-2"><ImageIcon className="h-4 w-4 text-[#FF5738]" /><h3 className="text-sm font-semibold">Обложка подборки</h3></div>
           <p className="mb-3 text-xs text-white/45">Выберите изображение для подборки</p>
           <div className="flex gap-3 overflow-x-auto pb-2">
@@ -508,8 +511,8 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
             </button>)}
           </div>
           <p className="mt-1 text-[11px] text-white/35">Обложку можно не выбирать</p>
-        </Card>
-        <Card>
+        </YuberaCard>
+        <YuberaCard>
           <div className="mb-3 flex items-center gap-2"><Eye className="h-4 w-4 text-[#FF5738]" /><h3 className="text-sm font-semibold">Видимость</h3></div>
           <div className="grid grid-cols-2 gap-2">
             <button type="button" onClick={()=>setIsPublic(true)} aria-pressed={isPublic} className={"rounded-xl border p-3 text-left transition " + (isPublic?"border-[#FF5738] bg-[#FF5738]/10":"border-white/10 bg-white/[0.02]")}>
@@ -521,7 +524,7 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
               <b className="block text-sm text-white">Приватная</b><span className="mt-1 block text-[11px] leading-snug text-white/45">Видна только вам</span>
             </button>
           </div>
-        </Card>
+        </YuberaCard>
         {error && title.trim() && <p role="alert" className="rounded-xl border border-red-500/20 bg-red-500/5 p-3 text-sm text-red-200">{error}</p>}
         <button disabled={busy} onClick={()=>void createCollection()} className="flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#FF5738] to-[#FF6245] py-3 font-semibold text-white disabled:opacity-50">
           {busy ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" /> : <Plus className="h-5 w-5" />}
@@ -531,29 +534,29 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
       </div>
     </>}
     {screen === "friends" && <><Header title="Друзья" subtitle="Подписки и поиск пользователей YUBERA"/><YuberaFriendsPanel onOpenProfile={(id) => void viewPublicProfile(id)} onFollowChange={load}/></>}
-    {screen === "level" && <><Header title="Уровень пользователя" subtitle="Ваш прогресс и система опыта"/><Card className="text-center"><img src={`/images/yubera/${levelAssets[profile.xp.level - 1]}`} alt="" className="mx-auto h-36 w-36 object-contain"/><p className="text-sm text-white/50">Уровень {profile.xp.level}</p><h3 className="text-2xl font-bold">{profile.xp.title}</h3><p className="mt-2 text-lg font-semibold">{profile.xp.total??0} XP</p>{profile.xp.nextThreshold && <><div className="mt-4 h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-gradient-to-r from-[#FF5738] to-[#FF6245]" style={{width:`${profile.xp.progress??0}%`}}/></div><p className="mt-2 text-xs text-white/50">До уровня {profile.xp.nextLevel}: осталось {profile.xp.remaining} XP</p></>}</Card><Card className="mt-3"><h3 className="mb-3 font-semibold">Как получить опыт?</h3>{[["Первая оценка аниме",`+${YUBERA_XP_REWARDS.firstAnimeRating} XP`],["Добавление тайтла в подборку",`+${YUBERA_XP_REWARDS.collectionTitleAdded} XP`],[`Подборка из ${YUBERA_XP_RULES.collectionMilestoneTitleCount} тайтлов`,`+${YUBERA_XP_REWARDS.collectionThreeTitleMilestone} XP`],[`Просмотр ${Math.round(YUBERA_XP_RULES.episodeCompletionRatio*100)}% серии`,`+${YUBERA_XP_REWARDS.episodeNinetyPercent} XP`]].map(([label,xp])=><div key={label} className="flex justify-between border-b border-white/5 py-3 text-sm last:border-0"><span>{label}</span><b className="text-[#FF5738]">{xp}</b></div>)}</Card><Card className="mt-3"><h3 className="mb-3 font-semibold">Система уровней YUBERA</h3>{levels.map(([name,range],i)=><div key={name} className={`flex items-center justify-between border-b border-white/5 py-3 text-sm last:border-0 ${profile.xp.level===i+1?"text-[#FF5738]": "text-white/65"}`}><span>{i+1}. {name}</span><span>{range}</span></div>)}</Card></>}
-    {screen === "support-status" && <><Header title="Статус поддержки" subtitle="Ваш вклад в развитие YUBERA"/><Card className="text-center">{profile.support.asset ? <img src={`/images/yubera/${profile.support.asset}`} alt="" className="mx-auto h-36 w-36 object-contain"/> : <div className="mx-auto grid h-36 w-36 place-items-center rounded-3xl bg-white/5 text-white/40"><Star className="h-16 w-16"/></div>}<h3 className="text-2xl font-bold">{profile.support.title}</h3><p className="mt-2 text-sm text-white/55">Статус присваивается за подтверждённую поддержку проекта в Telegram Stars.</p>{typeof profile.support.total === "number" && profile.support.nextThreshold && <><div className="mt-4 h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-gradient-to-r from-[#FF5738] to-[#FF6245]" style={{width:`${profile.support.progress ?? 0}%`}}/></div><p className="mt-2 text-xs text-white/50">До следующего статуса: {profile.support.remaining} ⭐</p></>}</Card><Card className="mt-3">{supportLevels.map(([name,threshold,asset],i)=><div key={name} className="flex items-center gap-3 border-b border-white/5 py-3 last:border-0"><img src={`/images/yubera/${asset}`} alt="" className="h-14 w-14 object-contain"/><div className="flex-1"><b>{i+1}. {name}</b><p className="text-xs text-white/50">От {threshold}</p></div>{profile.support.level>=i+1&&<Check className="h-5 w-5 text-emerald-400"/>}</div>)}</Card></>}
+    {screen === "level" && <><Header title="Уровень пользователя" subtitle="Ваш прогресс и система опыта"/><YuberaCard className="text-center"><img src={`/images/yubera/${levelAssets[profile.xp.level - 1]}`} alt="" className="mx-auto h-36 w-36 object-contain"/><p className="text-sm text-white/50">Уровень {profile.xp.level}</p><h3 className="text-2xl font-bold">{profile.xp.title}</h3><p className="mt-2 text-lg font-semibold">{profile.xp.total??0} XP</p>{profile.xp.nextThreshold && <><div className="mt-4 h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-gradient-to-r from-[#FF5738] to-[#FF6245]" style={{width:`${profile.xp.progress??0}%`}}/></div><p className="mt-2 text-xs text-white/50">До уровня {profile.xp.nextLevel}: осталось {profile.xp.remaining} XP</p></>}</YuberaCard><YuberaCard className="mt-3"><h3 className="mb-3 font-semibold">Как получить опыт?</h3>{[["Первая оценка аниме",`+${YUBERA_XP_REWARDS.firstAnimeRating} XP`],["Добавление тайтла в подборку",`+${YUBERA_XP_REWARDS.collectionTitleAdded} XP`],[`Подборка из ${YUBERA_XP_RULES.collectionMilestoneTitleCount} тайтлов`,`+${YUBERA_XP_REWARDS.collectionThreeTitleMilestone} XP`],[`Просмотр ${Math.round(YUBERA_XP_RULES.episodeCompletionRatio*100)}% серии`,`+${YUBERA_XP_REWARDS.episodeNinetyPercent} XP`]].map(([label,xp])=><div key={label} className="flex justify-between border-b border-white/5 py-3 text-sm last:border-0"><span>{label}</span><b className="text-[#FF5738]">{xp}</b></div>)}</YuberaCard><YuberaCard className="mt-3"><h3 className="mb-3 font-semibold">Система уровней YUBERA</h3>{levels.map(([name,range],i)=><div key={name} className={`flex items-center justify-between border-b border-white/5 py-3 text-sm last:border-0 ${profile.xp.level===i+1?"text-[#FF5738]": "text-white/65"}`}><span>{i+1}. {name}</span><span>{range}</span></div>)}</YuberaCard></>}
+    {screen === "support-status" && <><Header title="Статус поддержки" subtitle="Ваш вклад в развитие YUBERA"/><YuberaCard className="text-center">{profile.support.asset ? <img src={`/images/yubera/${profile.support.asset}`} alt="" className="mx-auto h-36 w-36 object-contain"/> : <div className="mx-auto grid h-36 w-36 place-items-center rounded-3xl bg-white/5 text-white/40"><Star className="h-16 w-16"/></div>}<h3 className="text-2xl font-bold">{profile.support.title}</h3><p className="mt-2 text-sm text-white/55">Статус присваивается за подтверждённую поддержку проекта в Telegram Stars.</p>{typeof profile.support.total === "number" && profile.support.nextThreshold && <><div className="mt-4 h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-gradient-to-r from-[#FF5738] to-[#FF6245]" style={{width:`${profile.support.progress ?? 0}%`}}/></div><p className="mt-2 text-xs text-white/50">До следующего статуса: {profile.support.remaining} ⭐</p></>}</YuberaCard><YuberaCard className="mt-3">{supportLevels.map(([name,threshold,asset],i)=><div key={name} className="flex items-center gap-3 border-b border-white/5 py-3 last:border-0"><img src={`/images/yubera/${asset}`} alt="" className="h-14 w-14 object-contain"/><div className="flex-1"><b>{i+1}. {name}</b><p className="text-xs text-white/50">От {threshold}</p></div>{profile.support.level>=i+1&&<Check className="h-5 w-5 text-emerald-400"/>}</div>)}</YuberaCard></>}
     {screen === "plus" && <><Header title="YUBERA Plus" subtitle="Расширенные возможности личного пространства"/><YuberaPlusPanel /></>}
     {screen === "public-profile" && publicProfile && <>
       <Header title="Профиль пользователя" />
-      <Card className="overflow-hidden p-0">
+      <YuberaCard className="overflow-hidden p-0">
         <div className="relative h-[clamp(170px,46vw,190px)] overflow-hidden">
           <img src="/images/yubera/yubera_banner.webp" alt="" className="h-full w-full object-cover object-[center_38%]" />
           <div className="absolute inset-0 bg-gradient-to-t from-[#17181e] via-[#17181e]/20 to-transparent" />
-          <div className="absolute inset-x-3 bottom-3 flex items-end gap-2.5">
-            {avatar(publicProfile, "h-[72px] w-[72px]")}
-            <div className="min-w-0 flex-1">
-              <div className="flex min-w-0 flex-nowrap items-center gap-x-2">
-                <h3 className="min-w-0 break-words text-[clamp(16px,4.2vw,22px)] font-bold leading-tight text-white">{publicProfile.displayName}</h3>
+          <div className="absolute inset-x-3 bottom-3 grid grid-cols-[72px_minmax(0,1fr)] items-end gap-x-3 gap-y-2">
+            <div className="row-span-2 self-end">{avatar(publicProfile, "h-[72px] w-[72px]")}</div>
+            <div className="min-w-0">
+              <div className="flex min-w-0 items-center gap-x-2">
+                <h3 className="min-w-0 whitespace-nowrap text-[clamp(16px,4.2vw,22px)] font-bold leading-tight text-white">{publicProfile.displayName}</h3>
                 {publicProfile.isPlus && <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-[#ffc66d]/55 bg-[#ffc66d]/10 px-2.5 py-1 text-[11px] font-bold leading-none text-[#ffc66d]"><img src="/images/yubera/YUBERA_Plus_Crown_Simple.webp" alt="" className="h-3.5 w-3.5 object-contain" />Plus</span>}
               </div>
-              {publicProfile.username && <p className="mt-1 break-words text-[13px] leading-tight text-white/75">@{publicProfile.username}</p>}
+              {publicProfile.username && <p className="mt-1 whitespace-nowrap text-[13px] leading-tight text-white/75">@{publicProfile.username}</p>}
               {publicProfile.bio && <div className="mt-1">
                 <p className={publicBioExpanded ? "whitespace-pre-wrap break-words text-[11px] leading-snug text-white/80" : "line-clamp-1 whitespace-pre-wrap break-words text-[11px] leading-snug text-white/80"}>{publicProfile.bio}</p>
                 {publicProfile.bio.length > 110 && <button type="button" onClick={() => setPublicBioExpanded(value => !value)} className="mt-1 text-[10px] font-semibold text-[#ff8768]">{publicBioExpanded ? "Свернуть" : "Показать полностью"}</button>}
               </div>}
             </div>
-            <button type="button" disabled={busy} onClick={() => void follow(publicProfile.id, !publicProfile.isFollowing)} className="inline-flex min-h-8 shrink-0 items-center justify-center gap-1 rounded-full border border-[#ff7658]/70 bg-gradient-to-r from-[#ff795b] to-[#ff5738] px-2.5 py-1.5 text-[10px] font-bold text-white shadow-[0_4px_16px_rgba(255,91,61,.2)] transition-colors hover:brightness-110 disabled:opacity-50">
+            <button type="button" disabled={busy} onClick={() => void follow(publicProfile.id, !publicProfile.isFollowing)} className="inline-flex min-h-8 shrink-0 items-center justify-center gap-1 justify-self-end rounded-full border border-[#ff7658]/70 bg-gradient-to-r from-[#ff795b] to-[#ff5738] px-2.5 py-1.5 text-[10px] font-bold text-white shadow-[0_4px_16px_rgba(255,91,61,.2)] transition-colors hover:brightness-110 disabled:opacity-50">
               <Users className="h-3.5 w-3.5" />
               {publicProfile.isFollowing ? "Вы подписаны" : "Подписаться"}
             </button>
@@ -584,18 +587,18 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
             <div className="min-w-0 px-1 py-2"><b className="block text-xl leading-none text-white">{publicProfile.collectionLikes}</b><span className="mt-1 block text-[10px] leading-tight text-white/60">Лайков</span></div>
           </div>
         </div>
-      </Card>
-      <Card className="mt-3">
+      </YuberaCard>
+      <YuberaCard className="mt-3">
         <div className="mb-2 flex items-center justify-between gap-2">
           <div><h4 className="font-semibold">Публичные подборки</h4><p className="text-xs text-white/45">Подборки, доступные всем пользователям</p></div>
           {publicCollections.length > 4 && <button type="button" onClick={() => changeScreen("public-collections")} className="shrink-0 text-xs text-[#FF5738]">Все подборки <ChevronRight className="inline h-3 w-3" /></button>}
         </div>
         {publicCollections.length ? publicCollections.slice(0, 4).map(publicCollectionRow) : <p className="py-4 text-center text-sm text-white/45">Публичных подборок пока нет</p>}
-      </Card>
+      </YuberaCard>
     </>}
     {screen === "public-collections" && publicProfile && <>
       <Header title="Публичные подборки" subtitle={"Подборки пользователя " + publicProfile.displayName} />
-      <Card>{publicCollections.length ? publicCollections.map(publicCollectionRow) : <p className="py-4 text-center text-sm text-white/45">Публичных подборок пока нет</p>}</Card>
+      <YuberaCard>{publicCollections.length ? publicCollections.map(publicCollectionRow) : <p className="py-4 text-center text-sm text-white/45">Публичных подборок пока нет</p>}</YuberaCard>
     </>}
     {discardProfileOpen && <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4" role="dialog" aria-modal="true" aria-labelledby="discard-profile-title"><div className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#202127] p-5"><h3 id="discard-profile-title" className="text-lg font-bold">Отменить изменения профиля?</h3><p className="mt-2 text-sm text-white/60">Описание, видимость и выбранная рамка не будут сохранены.</p><div className="mt-5 flex gap-2"><button type="button" onClick={()=>setDiscardProfileOpen(false)} className="flex-1 rounded-xl bg-white/10 py-3">Продолжить</button><button type="button" onClick={confirmDiscardProfileEdit} className="flex-1 rounded-xl bg-[#FF5738] py-3 font-semibold text-black">Отменить</button></div></div></div>}
     {discardCollectionOpen && <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4" role="dialog" aria-modal="true" aria-labelledby="discard-collection-title"><div className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#202127] p-5"><h3 id="discard-collection-title" className="text-lg font-bold">Отменить изменения?</h3><p className="mt-2 text-sm text-white/60">Введённые данные и выбранные параметры не сохранятся.</p><div className="mt-5 flex gap-2"><button type="button" onClick={()=>setDiscardCollectionOpen(false)} className="flex-1 rounded-xl bg-white/10 py-3">Продолжить</button><button type="button" onClick={confirmDiscardCollectionForm} className="flex-1 rounded-xl bg-[#FF5738] py-3 font-semibold text-black">Отменить</button></div></div></div>}
