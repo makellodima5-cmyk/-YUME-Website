@@ -72,7 +72,7 @@ describe("YUBERA community foundation", () => {
     const component = await readFile(resolve(process.cwd(), "src/components/yume/YuberaProfileHub.tsx"), "utf8");
     expect(component).toContain("profile.isPlus && <span");
     expect(component).toContain("publicProfile.isPlus && <span");
-    expect(component).toContain(">YUBERA Plus</span>");
+    expect(component).toContain(">Plus</span>");
   });
 
 
