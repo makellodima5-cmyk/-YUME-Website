@@ -40,6 +40,9 @@ describe("YUBERA community foundation", () => {
     expect(component).toContain("YuberaFriendsPanel");
     expect(friendsPanel).toContain("Показать ещё");
     expect(friendsPanel).toContain("Найти друзей");
+    expect(friendsPanel).toContain("line-clamp-1");
+    expect(friendsPanel).not.toContain("По дате подписки");
+    expect(friendsPanel).toContain("bg-neon text-white shadow-neon");
   });
 
   it("awards collection XP atomically with unique-add and milestone guards", async () => {
