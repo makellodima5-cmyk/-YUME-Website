@@ -1,5 +1,5 @@
 import {describe,expect,it} from "vitest";
-import {isValidPlusPrice,resolveInitialPlusExpiry,YUBERA_PLUS_PERIOD_SECONDS} from "@/data/yubera-plus.server";
+import {isValidPlusPrice,isValidPlusGrantDays,normalizePlusGrantUsername,resolveInitialPlusExpiry,YUBERA_PLUS_PERIOD_SECONDS} from "@/data/yubera-plus.server";
 describe("YUBERA Plus",()=>{it("validates Stars price bounds",()=>{expect(isValidPlusPrice(1)).toBe(true);expect(isValidPlusPrice(10000)).toBe(true);expect(isValidPlusPrice(0)).toBe(false);expect(isValidPlusPrice(-1)).toBe(false);expect(isValidPlusPrice(1.5)).toBe(false);expect(isValidPlusPrice(10001)).toBe(false);expect(isValidPlusPrice("250")).toBe(false);});it("uses Telegram's fixed period",()=>expect(YUBERA_PLUS_PERIOD_SECONDS).toBe(2592000));it("uses Telegram expiration or 30 days",()=>{const now=1800000000000;expect(resolveInitialPlusExpiry(now/1000+2592000,now)).toBe(now+2592000000);expect(resolveInitialPlusExpiry(undefined,now)).toBe(now+2592000000);});});
 
 it("guards payment ledger and subscription updates in one atomic batch",async()=>{const source=await import("node:fs/promises").then(m=>m.readFile("src/data/yubera-plus.server.ts","utf8"));expect(source).toContain("if(!d.batch)throw new Error(\"atomic_payment_batch_unavailable\")");expect(source).toContain("WHERE changes()=1");expect(source).toContain("d.batch([");expect(source).toContain("WHERE changes()=1");expect(source).toContain("price_changed_concurrently");expect(source).toContain("plus_price_not_configured");expect(source).toContain("const n=Number(x?.setting_value??0);return isValidPlusPrice(n)?n:0;");});
@@ -17,3 +17,40 @@ it("persists failed recurring payments and gives the user recovery guidance",asy
 
 
 it("renders the four approved Plus benefits without promising an active AI feature",async()=>{const panel=await import("node:fs/promises").then(m=>m.readFile("src/components/yume/YuberaPlusPanel.tsx","utf8"));for(const phrase of ["AI-помощник","Скоро","Рекомендации, создание подборок и помощь в поиске аниме","Расширенные подборки","Больше лимитов и гибкие настройки","Эксклюзивные рамки аватара","Специальные рамки только для подписчиков Plus","Эксклюзивный статус","Особый статус YUBERA Plus в профиле"])expect(panel).toContain(phrase);});
+
+
+describe("YUBERA Plus admin grants",()=>{
+ it("normalizes Telegram usernames without accepting malformed values",()=>{
+  expect(normalizePlusGrantUsername("@Example_user")).toBe("Example_user");
+  expect(normalizePlusGrantUsername("  Example_user  ")).toBe("Example_user");
+  expect(normalizePlusGrantUsername("abc")).toBeNull();
+  expect(normalizePlusGrantUsername("@bad-name")).toBeNull();
+  expect(normalizePlusGrantUsername("@")).toBeNull();
+  expect(normalizePlusGrantUsername(null)).toBeNull();
+ });
+ it("limits manual grant durations to whole days from 1 to 3650",()=>{
+  expect(isValidPlusGrantDays(1)).toBe(true);
+  expect(isValidPlusGrantDays(3650)).toBe(true);
+  expect(isValidPlusGrantDays(0)).toBe(false);
+  expect(isValidPlusGrantDays(3651)).toBe(false);
+  expect(isValidPlusGrantDays(30.5)).toBe(false);
+  expect(isValidPlusGrantDays("30")).toBe(false);
+ });
+ it("keeps manual grants behind both Telegram admin identity and admin password checks",async()=>{
+  const source=await import("node:fs/promises").then(m=>m.readFile("src/data/yubera-plus.server.ts","utf8"));
+  expect(source).toContain('if(!admin)return json({isAdmin:false,error:"admin_required"},403)');
+  expect(source).toContain('if(!await hasAdminPasswordSession(r,e))return json({isAdmin:false,error:"admin_password_required"},428)');
+  expect(source).toContain('if(input.action==="grant-by-username")');
+  expect(source).toContain("lower(telegram_username)=lower(?)");
+  expect(source).toContain("plus_granted_by_admin");
+  expect(source).toContain("d.batch([");
+ });
+ it("shows the username grant form and reports successful grants in the admin panel",async()=>{
+  const panel=await import("node:fs/promises").then(m=>m.readFile("src/components/yume/YuberaPlusAdminPanel.tsx","utf8"));
+  expect(panel).toContain("grant-by-username");
+  expect(panel).toContain("Telegram username");
+  expect(panel).toContain("Выдать Plus");
+  expect(panel).toContain("Plus granted");
+  expect(panel).toContain("История операций Plus");
+ });
+});

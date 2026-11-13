@@ -11,6 +11,8 @@ type SubUpdate={user?:{id?:number};invoice_payload?:string;state?:string};
 export const YUBERA_PLUS_PERIOD_SECONDS=2592000;
 const PERIOD=2592000000,COOKIE="__Host-yume-session";
 export function isValidPlusPrice(v:unknown):v is number{return typeof v==="number"&&Number.isSafeInteger(v)&&v>=1&&v<=10000;}
+export function normalizePlusGrantUsername(value:unknown):string|null{if(typeof value!=="string")return null;const username=value.trim().replace(/^@/,"");return /^[A-Za-z0-9_]{5,32}$/.test(username)?username:null;}
+export function isValidPlusGrantDays(value:unknown):value is number{return typeof value==="number"&&Number.isSafeInteger(value)&&value>=1&&value<=3650;}
 export function resolveInitialPlusExpiry(exp:number|undefined,now=Date.now()){return typeof exp==="number"&&Number.isSafeInteger(exp)&&exp*1000>now&&exp*1000<=now+PERIOD+300000?exp*1000:now+PERIOD;}
 function env():E{try{return cloudflareEnv as unknown as E;}catch{const x=(globalThis as G).__YUME_RUNTIME_ENV__;return x&&typeof x==="object"?x as E:{ };}}
 function db():DB|null{const x=env().YUME_DB;return x&&typeof x==="object"?x as DB:null;}
@@ -56,8 +58,26 @@ async function isAdmin(r:Request,d:DB,e:E){const id=String(e.TELEGRAM_ADMIN_ID??
 export async function handleAdminYuberaPlus(r:Request):Promise<Response>{
  if(!["GET","POST"].includes(r.method))return json({error:"method_not_allowed"},405);if(r.method==="POST"&&!origin(r))return json({error:"cross_origin_request"},403);
  const d=db();if(!d)return json({error:"database_unavailable"},503);const e=env(),admin=await isAdmin(r,d,e);if(!admin)return json({isAdmin:false,error:"admin_required"},403);if(!isAdminPasswordConfigured(e))return json({isAdmin:false,error:"admin_password_not_configured"},503);if(!await hasAdminPasswordSession(r,e))return json({isAdmin:false,error:"admin_password_required"},428);
- if(r.method==="GET"){const [p,a]=await Promise.all([price(d),d.prepare("SELECT id,action,details_json,created_at FROM yume_plus_audit_log ORDER BY id DESC LIMIT 10").all<{id:number;action:string;details_json:string;created_at:string}>()]);return json({isAdmin:true,price:p,periodDays:30,periodSeconds:YUBERA_PLUS_PERIOD_SECONDS,audit:a.results});}
- let body:unknown;try{const raw=await r.text();if(raw.length>2048)return json({error:"request_too_large"},413);body=JSON.parse(raw);}catch{return json({error:"invalid_json"},400);}const value=body&&typeof body==="object"&&!Array.isArray(body)?(body as Record<string,unknown>).price:undefined;if(!isValidPlusPrice(value))return json({error:"invalid_price",min:1,max:10000},400);
+ if(r.method==="GET"){const [p,a]=await Promise.all([price(d),d.prepare("SELECT id,action,details_json,created_at FROM yume_plus_audit_log ORDER BY id DESC LIMIT 20").all<{id:number;action:string;details_json:string;created_at:string}>()]);return json({isAdmin:true,price:p,periodDays:30,periodSeconds:YUBERA_PLUS_PERIOD_SECONDS,audit:a.results});}
+ let body:unknown;try{const raw=await r.text();if(raw.length>2048)return json({error:"request_too_large"},413);body=JSON.parse(raw);}catch{return json({error:"invalid_json"},400);}if(!body||typeof body!=="object"||Array.isArray(body))return json({error:"invalid_request"},400);const input=body as Record<string,unknown>;
+ if(input.action==="grant-by-username"){
+  const username=normalizePlusGrantUsername(input.username),days=input.days===undefined?30:input.days;
+  if(!username)return json({error:"invalid_username"},400);
+  if(!isValidPlusGrantDays(days))return json({error:"invalid_duration",min:1,max:3650},400);
+  const target=await d.prepare("SELECT id,telegram_username FROM yume_users WHERE provider='telegram' AND lower(telegram_username)=lower(?) LIMIT 1").bind(username).first<{id:string;telegram_username:string|null}>();
+  if(!target)return json({error:"telegram_user_not_found"},404);
+  const now=Date.now(),previous=await d.prepare("SELECT MAX(expires_at) AS expires_at FROM yume_plus_subscriptions WHERE user_id=? AND status='active' AND expires_at>?").bind(target.id,now).first<{expires_at:number|null}>();
+  const startsAt=now,expiresAt=Math.max(now,Number(previous?.expires_at??now))+days*86400000,id=crypto.randomUUID();
+  try{
+   if(!d.batch)return json({error:"atomic_admin_batch_unavailable"},503);
+   await d.batch([
+    d.prepare("INSERT INTO yume_plus_subscriptions(id,user_id,status,starts_at,expires_at,auto_renew,telegram_payment_charge_id,created_at,updated_at,is_recurring,renewal_failed_at) VALUES(?,?,'active',?,?,0,NULL,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0,NULL)").bind(id,target.id,startsAt,expiresAt),
+    d.prepare("INSERT INTO yume_plus_audit_log(actor_user_id,action,details_json,created_at) VALUES(?,'plus_granted_by_admin',?,CURRENT_TIMESTAMP)").bind(admin,JSON.stringify({username:target.telegram_username??username,userId:target.id,days,startsAt,expiresAt,previousExpiresAt:previous?.expires_at??null}))
+   ]);
+   return json({isAdmin:true,granted:true,username:target.telegram_username??username,days,startsAt,expiresAt,extended:Boolean(previous?.expires_at)});
+  }catch(error){console.error("[YUBERA][PLUS] Admin grant failed.",error);return json({error:"plus_grant_failed"},503);}
+ }
+ const value=input.price;if(!isValidPlusPrice(value))return json({error:"invalid_price",min:1,max:10000},400);
  const old=await price(d);if(old===value)return json({isAdmin:true,price:value,unchanged:true});
  try{
   if(!d.batch)return json({error:"atomic_admin_batch_unavailable"},503);
