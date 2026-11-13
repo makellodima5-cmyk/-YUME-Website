@@ -107,15 +107,17 @@ export async function handleAdminYuberaPlus(r:Request):Promise<Response>{
   if(!isValidPlusGrantDays(days))return json({error:"invalid_duration",min:1,max:3650},400);
   const target=await d.prepare("SELECT id,telegram_username FROM yume_users WHERE provider='telegram' AND lower(telegram_username)=lower(?) LIMIT 1").bind(username).first<{id:string;telegram_username:string|null}>();
   if(!target)return json({error:"telegram_user_not_found"},404);
-  const now=Date.now(),previous=await d.prepare("SELECT MAX(expires_at) AS expires_at FROM yume_plus_subscriptions WHERE user_id=? AND status='active' AND expires_at>?").bind(target.id,now).first<{expires_at:number|null}>();
-  const startsAt=now,expiresAt=Math.max(now,Number(previous?.expires_at??now))+days*86400000,id=crypto.randomUUID();
+  const now=Date.now(),startsAt=now,id=crypto.randomUUID();
   try{
    if(!d.batch)return json({error:"atomic_admin_batch_unavailable"},503);
    await d.batch([
-    d.prepare("INSERT INTO yume_plus_subscriptions(id,user_id,status,starts_at,expires_at,auto_renew,telegram_payment_charge_id,created_at,updated_at,is_recurring,renewal_failed_at) VALUES(?,?,'active',?,?,0,NULL,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0,NULL)").bind(id,target.id,startsAt,expiresAt),
-    d.prepare("INSERT INTO yume_plus_audit_log(actor_user_id,action,details_json,created_at) VALUES(?,'plus_granted_by_admin',?,CURRENT_TIMESTAMP)").bind(admin,JSON.stringify({username:target.telegram_username??username,userId:target.id,days,startsAt,expiresAt,previousExpiresAt:previous?.expires_at??null}))
+    d.prepare("INSERT INTO yume_plus_subscriptions(id,user_id,status,starts_at,expires_at,auto_renew,telegram_payment_charge_id,created_at,updated_at,is_recurring,renewal_failed_at) SELECT ?,?,'active',?,MAX(?,COALESCE(MAX(expires_at),?))+?,0,NULL,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0,NULL FROM yume_plus_subscriptions WHERE user_id=? AND status='active' AND expires_at>?").bind(id,target.id,startsAt,now,now,days*86400000,target.id,now),
+    d.prepare("INSERT INTO yume_plus_audit_log(actor_user_id,action,details_json,created_at) SELECT ?,'plus_granted_by_admin',json_object('username',?,'userId',?,'days',?,'startsAt',?,'expiresAt',(SELECT expires_at FROM yume_plus_subscriptions WHERE id=?)),CURRENT_TIMESTAMP").bind(admin,target.telegram_username??username,target.id,days,startsAt,id)
    ]);
-   return json({isAdmin:true,granted:true,username:target.telegram_username??username,days,startsAt,expiresAt,extended:Boolean(previous?.expires_at)});
+   const granted=await d.prepare("SELECT expires_at FROM yume_plus_subscriptions WHERE id=? AND user_id=?").bind(id,target.id).first<{expires_at:number}>();
+   if(!granted)return json({error:"plus_grant_not_persisted"},503);
+   const previous=await d.prepare("SELECT COUNT(*) AS count FROM yume_plus_subscriptions WHERE user_id=? AND status='active' AND expires_at>? AND id<>?").bind(target.id,now,id).first<{count:number}>();
+   return json({isAdmin:true,granted:true,username:target.telegram_username??username,days,startsAt,expiresAt:granted.expires_at,extended:Number(previous?.count??0)>0});
   }catch(error){console.error("[YUBERA][PLUS] Admin grant failed.",error);return json({error:"plus_grant_failed"},503);}
  }
  const value=input.price;if(!isValidPlusPrice(value))return json({error:"invalid_price",min:1,max:10000},400);

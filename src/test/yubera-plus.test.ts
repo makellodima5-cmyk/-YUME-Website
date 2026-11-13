@@ -67,3 +67,11 @@ it("stores the selected 30- or 90-day term in the server-created invoice payload
  expect(server).toContain('payload.startsWith("yubera_plus:90:")?90:30');
  expect(server).toContain("monthlyPrice*3*0.83");
 });
+
+it("calculates admin Plus grant expiry inside the atomic insert to avoid lost concurrent extensions",async()=>{
+ const server=await import("node:fs/promises").then(m=>m.readFile("src/data/yubera-plus.server.ts","utf8"));
+ expect(server).toContain("SELECT ?,?,'active',?,MAX(?,COALESCE(MAX(expires_at),?))+?");
+ expect(server).toContain("WHERE user_id=? AND status='active' AND expires_at>?");
+ expect(server).toContain("json_object('username',?,'userId',?,'days',?,'startsAt',?,'expiresAt',(SELECT expires_at FROM yume_plus_subscriptions WHERE id=?))");
+ expect(server).not.toContain("const now=Date.now(),previous=await d.prepare(\"SELECT MAX(expires_at)");
+});

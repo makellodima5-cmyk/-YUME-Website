@@ -20,8 +20,12 @@ describe("YUBERA community foundation", () => {
     expect(server).toContain("profile.visibility !== \"public\"");
     expect(server).toContain("p.visibility = 'public'");
     expect(server).toContain("ownedCollection(database, userId, id)");
+    expect(server).toContain("YUBERA_Collection_Cover_[A-Za-z_]+\\.webp");
     expect(server).toContain("PLUS_COLLECTIONS : FREE_COLLECTIONS");
+    expect(server).toContain("SELECT ?,?,?,?,?,? WHERE (SELECT COUNT(*) FROM yume_collections WHERE user_id=?) < ?");
+    expect(server).toContain("inserted.meta?.changes");
     expect(server).toContain("PLUS_TITLES : FREE_TITLES");
+    expect(server).toContain("SELECT ?,?,COALESCE(MAX(position),-1)+1 FROM yume_collection_items WHERE collection_id=? HAVING COUNT(*) < ?");
     expect(server).toContain("titleLimit: ownerPlus ? PLUS_TITLES : FREE_TITLES");
     expect(server).toContain("INSERT OR IGNORE INTO yume_xp_ledger");
     expect(server).toContain("LIMIT 30 OFFSET ?");
@@ -301,7 +305,7 @@ describe("YUBERA community foundation", () => {
     const server = await readFile(resolve(process.cwd(), "src/data/yubera-community.server.ts"), "utf8");
     const panel = await readFile(resolve(process.cwd(), "src/components/yume/YuberaFriendsPanel.tsx"), "utf8");
     expect(server).toContain("url.searchParams.get(\"seed\")");
-    expect(server).toContain("ORDER BY abs((CAST(substr(u.id, -8) AS INTEGER) * 1103515245 + ?) % 2147483647)");
+    expect(server).toContain("ORDER BY abs((unicode(substr(u.id,-1))*1103515245 + unicode(substr(u.id,-2,1))*12345");
     expect(server).toContain("LIMIT 13 OFFSET ?");
     expect(server).toContain("hasMore: rows.results.length > 12");
     expect(panel).toContain("recommendationSeed");

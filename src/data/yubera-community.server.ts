@@ -168,12 +168,16 @@ async function createCollection(database: Database, userId: string, input: Recor
   const description = typeof input.description === "string" ? input.description.trim() : "";
   if (!title || title.length > 50 || description.length > 250) return json({ error: "invalid_collection" }, 400);
   const plus = await plusActive(database, userId);
-  const count = await database.prepare("SELECT COUNT(*) AS count FROM yume_collections WHERE user_id = ?").bind(userId).first<{ count: number }>();
-  if (Number(count?.count ?? 0) >= (plus ? PLUS_COLLECTIONS : FREE_COLLECTIONS)) return json({ error: "collection_limit_reached" }, 409);
+  const collectionLimit = plus ? PLUS_COLLECTIONS : FREE_COLLECTIONS;
   const id = crypto.randomUUID();
   const cover = typeof input.coverKey === "string" && /^YUBERA_Collection_Cover_[A-Za-z_]+\.webp$/.test(input.coverKey) ? input.coverKey : null;
-  await database.prepare("INSERT INTO yume_collections(id,user_id,title,description,cover_key,is_public) VALUES(?,?,?,?,?,?)")
-    .bind(id, userId, title, description, cover, input.isPublic === true ? 1 : 0).run();
+  // Enforce the cap in the INSERT itself. A separate COUNT followed by INSERT
+  // lets concurrent requests exceed the Free/Plus limit.
+  const inserted = await database.prepare(
+    "INSERT INTO yume_collections(id,user_id,title,description,cover_key,is_public) " +
+    "SELECT ?,?,?,?,?,? WHERE (SELECT COUNT(*) FROM yume_collections WHERE user_id=?) < ?",
+  ).bind(id, userId, title, description, cover, input.isPublic === true ? 1 : 0, userId, collectionLimit).run();
+  if (Number(inserted.meta?.changes ?? 0) !== 1) return json({ error: "collection_limit_reached" }, 409);
   return json({ ok: true, id });
 }
 async function collectionsFor(database: Database, ownerId: string, viewerId: string, includePrivate: boolean) {
@@ -281,7 +285,7 @@ export async function handleYuberaCommunity(request: Request): Promise<Response>
         FROM yume_users u JOIN yume_profiles p ON p.user_id = u.id
         WHERE p.visibility = 'public' AND u.id <> ?
         AND NOT EXISTS(SELECT 1 FROM yume_follows f WHERE f.follower_id = ? AND f.followed_id = u.id)
-        ORDER BY abs((CAST(substr(u.id, -8) AS INTEGER) * 1103515245 + ?) % 2147483647), u.id
+        ORDER BY abs((unicode(substr(u.id,-1))*1103515245 + unicode(substr(u.id,-2,1))*12345 + unicode(substr(u.id,-3,1))*2654435761 + unicode(substr(u.id,-4,1))*97 + unicode(substr(u.id,-5,1))*193 + unicode(substr(u.id,-6,1))*389 + unicode(substr(u.id,-7,1))*769 + unicode(substr(u.id,-8,1))*1543 + ?) % 2147483647), u.id
         LIMIT 13 OFFSET ?`).bind(Date.now(), userId, userId, seed, page * 12).all<UserRow>();
       return json({ users: rows.results.slice(0, 12), hasMore: rows.results.length > 12 });
     }
@@ -381,8 +385,10 @@ export async function handleYuberaCommunity(request: Request): Promise<Response>
     if (!exists && Number(count?.count ?? 0) >= (plus ? PLUS_TITLES : FREE_TITLES)) return json({ error: "collection_title_limit_reached" }, 409);
     if (!database.batch) return json({ error: "atomic_xp_batch_unavailable" }, 503);
     await database.batch([
-      database.prepare("INSERT OR IGNORE INTO yume_collection_items(collection_id,anime_id,position) VALUES(?,?,?)")
-        .bind(id, animeId, Number(count?.count ?? 0)),
+      database.prepare(
+        "INSERT OR IGNORE INTO yume_collection_items(collection_id,anime_id,position) " +
+        "SELECT ?,?,COALESCE(MAX(position),-1)+1 FROM yume_collection_items WHERE collection_id=? HAVING COUNT(*) < ?",
+      ).bind(id, animeId, id, plus ? PLUS_TITLES : FREE_TITLES),
       database.prepare("INSERT OR IGNORE INTO yume_xp_ledger(id,user_id,event_key,event_type,amount,metadata_json) SELECT ?,?,?,'collection_add',?,? WHERE changes()=1")
         .bind(crypto.randomUUID(), userId, `collection-add:${id}:${animeId}`, YUBERA_XP_REWARDS.collectionTitleAdded, JSON.stringify({ collectionId: id, animeId })),
       database.prepare("INSERT OR IGNORE INTO yume_xp_ledger(id,user_id,event_key,event_type,amount,metadata_json) SELECT ?,?,?,'collection_milestone',?,? WHERE changes()=1 AND (SELECT COUNT(*) FROM yume_collection_items WHERE collection_id=?)=?")
