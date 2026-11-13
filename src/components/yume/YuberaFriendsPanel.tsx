@@ -25,12 +25,13 @@ function displayName(person: CommunityPerson): string {
 }
 
 function PersonAvatar({ person }: { person: CommunityPerson }) {
+  const hasFrame = Boolean(person.avatar_frame);
   return (
-    <span className="relative block h-14 w-14 shrink-0 rounded-full border border-white/15 bg-[#252630] p-1">
+    <span className={"relative block h-14 w-14 shrink-0 rounded-full " + (hasFrame ? "bg-transparent" : "border border-white/20 bg-[#252630] p-1")}>
       {person.telegram_photo_url
-        ? <img src={person.telegram_photo_url} alt="" className="h-full w-full rounded-full object-cover" />
-        : <span className="grid h-full w-full place-items-center rounded-full bg-white/5 text-lg font-semibold text-white/55">{displayName(person).slice(0, 1).toUpperCase()}</span>}
-      {person.avatar_frame && <img src={`/images/yubera/${person.avatar_frame}`} alt="" className="pointer-events-none absolute -inset-1.5 h-[68px] w-[68px] max-w-none object-contain" />}
+        ? <img src={person.telegram_photo_url} alt="" className={hasFrame ? "absolute inset-[13%] h-[74%] w-[74%] rounded-full object-cover" : "h-full w-full rounded-full object-cover"} />
+        : <span className={hasFrame ? "absolute inset-[13%] grid h-[74%] w-[74%] place-items-center rounded-full bg-white/5 text-lg font-semibold text-white/55" : "grid h-full w-full place-items-center rounded-full bg-white/5 text-lg font-semibold text-white/55"}>{displayName(person).slice(0, 1).toUpperCase()}</span>}
+      {person.avatar_frame && <img src={`/images/yubera/${person.avatar_frame}`} alt="" className="pointer-events-none absolute inset-0 h-full w-full object-contain" />}
     </span>
   );
 }
@@ -186,9 +187,10 @@ export function YuberaFriendsPanel({ onOpenProfile, onFollowChange }: Props) {
 
   return (
     <div className="space-y-4">
-      <div className="relative isolate overflow-hidden rounded-2xl border border-white/10 bg-[#17181e] px-4 py-5">
-        <img src="/images/yubera/yubera_banner.webp" alt="" className="pointer-events-none absolute inset-0 -z-10 h-full w-full object-cover object-center opacity-20" />
-        <div className="absolute inset-0 -z-10 bg-gradient-to-r from-[#17181e] via-[#17181e]/90 to-[#17181e]/45" />
+      <div className="relative isolate overflow-hidden rounded-2xl border border-[#8a3d35]/60 bg-gradient-to-br from-[#351b25] via-[#241923] to-[#17181e] px-4 py-5 shadow-[0_0_22px_rgba(255,91,61,.13)]">
+        <img src="/images/yubera/yubera_banner.webp" alt="" className="pointer-events-none absolute inset-0 -z-10 h-full w-full object-cover object-center opacity-40" />
+        <div className="absolute inset-0 -z-10 bg-[linear-gradient(105deg,rgba(39,17,25,.92)_0%,rgba(83,28,36,.72)_48%,rgba(29,20,31,.58)_100%)]" />
+        <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_12%_100%,rgba(255,92,60,.28),transparent_42%),radial-gradient(circle_at_88%_0%,rgba(255,116,80,.2),transparent_38%)]" />
         <div className="flex items-center gap-3">
           <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[#ff7658]/10 text-[#ff815f]"><Users className="h-6 w-6" /></span>
           <span><h2 className="text-xl font-bold text-white">Друзья</h2><p className="text-sm text-white/55">Пользователи, на которых вы подписаны</p></span>

@@ -74,9 +74,10 @@ type Props = {
   isAdmin?: boolean;
   onAdmin?: () => void;
   telegramMiniApp?: boolean;
+  onBack?: () => void;
 };
 
-export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overview", isAdmin = false, onAdmin, telegramMiniApp = false }: Props) {
+export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overview", isAdmin = false, onAdmin, telegramMiniApp = false, onBack }: Props) {
   const { t, language, theme, setTheme, setLanguage } = useYumePreferences();
   const [panel, setPanel] = useState<ProfilePanel>(initialPanel);
   const [settingsExpanded, setSettingsExpanded] = useState(false);
@@ -358,11 +359,25 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
 
     const handleTelegramBack = (event: Event) => {
       event.preventDefault();
+      if ((initialPanel === "favorites" || initialPanel === "watchlist") && panel === initialPanel && onBack) {
+        onBack();
+        return;
+      }
       navigatePanel(backPanel);
     };
     window.addEventListener("yume-telegram-back", handleTelegramBack);
     return () => window.removeEventListener("yume-telegram-back", handleTelegramBack);
-  }, [telegramMiniApp, panel, backPanel]);
+  }, [telegramMiniApp, panel, backPanel, initialPanel, onBack]);
+
+  useEffect(() => {
+    const resetToProfileRoot = () => {
+      setPanel("overview");
+      setSettingsExpanded(false);
+      window.scrollTo({ top: 0, behavior: "auto" });
+    };
+    window.addEventListener("yume-reset-current-tab", resetToProfileRoot);
+    return () => window.removeEventListener("yume-reset-current-tab", resetToProfileRoot);
+  }, []);
 
   const requestAuth = (mode: "login" | "register") => {
     window.dispatchEvent(new CustomEvent("yume-open-auth", { detail: { mode } }));
@@ -475,11 +490,14 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
   const backButton = (target: ProfilePanel = backPanel) => !telegramMiniApp && (
     <button
       type="button"
-      onClick={() => navigatePanel(target)}
+      onClick={() => {
+        if ((initialPanel === "favorites" || initialPanel === "watchlist") && panel === initialPanel && onBack) onBack();
+        else navigatePanel(target);
+      }}
       className="mb-5 inline-flex items-center gap-1.5 text-sm text-muted-foreground transition hover:text-foreground"
     >
       <ArrowLeft className="h-4 w-4" />
-      {target === "documents" ? t("profile.backLegal") : t("profile.back")}
+      {initialPanel === "favorites" || initialPanel === "watchlist" ? (language === "ru" ? "Назад в раздел «Моё»" : "Back to My") : target === "documents" ? t("profile.backLegal") : t("profile.back")}
     </button>
   );
 

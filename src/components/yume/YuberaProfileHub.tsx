@@ -97,6 +97,17 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
   const [publicCollections, setPublicCollections] = useState<Collection[]>([]);
   const [donationOpen, setDonationOpen] = useState(false);
 
+  useEffect(() => {
+    const resetToProfileHome = () => {
+      setMenuId(null);
+      setScreen("home");
+      onScreenChange?.("home");
+      window.scrollTo({ top: 0, behavior: "auto" });
+    };
+    window.addEventListener("yume-reset-current-tab", resetToProfileHome);
+    return () => window.removeEventListener("yume-reset-current-tab", resetToProfileHome);
+  }, [onScreenChange]);
+
   const load = useCallback(async () => {
     setError("");
     try {
@@ -508,44 +519,54 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
     {screen === "public-profile" && publicProfile && <>
       <Header title="Профиль пользователя" />
       <Card className="overflow-hidden p-0">
-        <div className="relative h-36 overflow-hidden">
-          <img src="/images/yubera/yubera_banner.webp" alt="" className="h-full w-full object-cover opacity-75" />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#17181e] via-[#17181e]/15 to-transparent" />
-        </div>
-        <div className="flex flex-wrap items-start gap-4 px-4 pb-4">
-          {avatar(publicProfile)}
-          <div className="min-w-0 flex-1 pt-1">
-            <h3 className="truncate text-xl font-bold text-white">{publicProfile.displayName}</h3>
-            {publicProfile.isPlus && <span className="mt-1 inline-flex items-center gap-1 rounded-full border border-[#ffc66d]/40 bg-[#ffc66d]/10 px-2 py-0.5 text-[10px] font-bold tracking-wide text-[#ffc66d]"><img src="/images/yubera/YUBERA_Plus_Crown_Simple.webp" alt="" className="h-3.5 w-3.5 object-contain" />YUBERA Plus</span>}
-            <p className="text-sm text-white/50">@{publicProfile.username || ""}</p>
-            {publicProfile.bio && <div className="mt-2">
-              <p className={publicBioExpanded ? "whitespace-pre-wrap text-sm leading-relaxed text-white/65" : "line-clamp-3 whitespace-pre-wrap text-sm leading-relaxed text-white/65"}>{publicProfile.bio}</p>
-              {publicProfile.bio.length > 110 && <button type="button" onClick={() => setPublicBioExpanded((value) => !value)} className="mt-1 text-xs font-semibold text-[#FF5738]">{publicBioExpanded ? "Свернуть" : "Показать полностью"}</button>}
-            </div>}
+        <div className="relative h-[clamp(170px,46vw,190px)] overflow-hidden">
+          <img src="/images/yubera/yubera_banner.webp" alt="" className="h-full w-full object-cover object-[center_38%]" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#17181e] via-[#17181e]/20 to-transparent" />
+          <div className="absolute inset-x-3 bottom-3 flex items-end gap-2.5">
+            {avatar(publicProfile, "h-[72px] w-[72px]")}
+            <div className="min-w-0 flex-1">
+              <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                <h3 className="min-w-0 break-words text-[clamp(18px,4.5vw,22px)] font-bold leading-tight text-white">{publicProfile.displayName}</h3>
+                {publicProfile.isPlus && <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-[#ffc66d]/55 bg-[#ffc66d]/10 px-2.5 py-1 text-[11px] font-bold leading-none text-[#ffc66d]"><img src="/images/yubera/YUBERA_Plus_Crown_Simple.webp" alt="" className="h-3.5 w-3.5 object-contain" />Plus</span>}
+              </div>
+              {publicProfile.username && <p className="mt-1 break-words text-[13px] leading-tight text-white/75">@{publicProfile.username}</p>}
+              {publicProfile.bio && <div className="mt-1">
+                <p className={publicBioExpanded ? "whitespace-pre-wrap break-words text-[11px] leading-snug text-white/80" : "line-clamp-1 whitespace-pre-wrap break-words text-[11px] leading-snug text-white/80"}>{publicProfile.bio}</p>
+                {publicProfile.bio.length > 110 && <button type="button" onClick={() => setPublicBioExpanded(value => !value)} className="mt-1 text-[10px] font-semibold text-[#ff8768]">{publicBioExpanded ? "Свернуть" : "Показать полностью"}</button>}
+              </div>}
+            </div>
+            <button type="button" disabled={busy} onClick={() => void follow(publicProfile.id, !publicProfile.isFollowing)} className="inline-flex min-h-8 shrink-0 items-center justify-center gap-1 rounded-full border border-[#FF5738]/65 bg-gradient-to-r from-[#7c2d26]/90 to-[#4a2026]/90 px-2.5 py-1.5 text-[10px] font-bold text-[#ff987d] shadow-[0_0_12px_rgba(255,87,56,.16)] disabled:opacity-50">
+              <Users className="h-3.5 w-3.5" />
+              {publicProfile.isFollowing ? "Вы подписаны" : "Подписаться"}
+            </button>
           </div>
-          <button type="button" disabled={busy} onClick={() => void follow(publicProfile.id, !publicProfile.isFollowing)} className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full border border-[#FF5738]/50 bg-[#FF5738]/10 px-3 text-xs font-semibold text-[#FF5738] disabled:opacity-50">
-            <Users className="h-4 w-4" />
-            {publicProfile.isFollowing ? "Вы подписаны" : "Подписаться"}
-          </button>
+        </div>
+        <div className="space-y-2.5 px-3 pb-3 pt-2">
+          <div className="grid grid-cols-2 gap-2">
+            <div className="flex min-w-0 items-center gap-2 rounded-2xl border border-white/10 bg-[#202127] px-2.5 py-2.5">
+              <img src={"/images/yubera/" + levelAssets[publicProfile.xp.level - 1]} alt="" className="h-10 w-10 shrink-0 object-contain" />
+              <span className="min-w-0">
+                <b className="block break-words text-[12px] font-bold leading-tight text-white">{publicProfile.xp.title}</b>
+                <span className="mt-1 block text-[10px] leading-tight text-white/60">Уровень {publicProfile.xp.level}</span>
+              </span>
+            </div>
+            <div className="flex min-w-0 items-center gap-2 rounded-2xl border border-white/10 bg-[#202127] px-2.5 py-2.5">
+              {publicProfile.support.asset
+                ? <img src={"/images/yubera/" + publicProfile.support.asset} alt="" className="h-10 w-10 shrink-0 object-contain" />
+                : <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#FF5738]/15 text-[#FF704F]"><Star className="h-5 w-5" /></span>}
+              <span className="min-w-0">
+                <b className="block break-words text-[12px] font-bold leading-tight text-white">{publicProfile.support.title}</b>
+                <span className="mt-1 block text-[10px] leading-tight text-white/60">Статус поддержки</span>
+              </span>
+            </div>
+          </div>
+          <div className="grid grid-cols-3 divide-x divide-white/10 rounded-[18px] border border-white/10 bg-black/20 text-center">
+            <div className="min-w-0 px-1 py-2"><b className="block text-xl leading-none text-white">{publicProfile.publicCollections}</b><span className="mt-1 block text-[10px] leading-tight text-white/60">Подборок</span></div>
+            <div className="min-w-0 px-1 py-2"><b className="block text-xl leading-none text-white">{publicProfile.publicTitles}</b><span className="mt-1 block text-[10px] leading-tight text-white/60">Аниме в подборках</span></div>
+            <div className="min-w-0 px-1 py-2"><b className="block text-xl leading-none text-white">{publicProfile.collectionLikes}</b><span className="mt-1 block text-[10px] leading-tight text-white/60">Лайков</span></div>
+          </div>
         </div>
       </Card>
-      <Card className="mt-3">
-        <div className="grid grid-cols-3 divide-x divide-white/10 text-center">
-          <div className="px-1 py-2"><b className="block text-xl">{publicProfile.publicCollections}</b><span className="text-[10px] text-white/50">Подборок</span></div>
-          <div className="px-1 py-2"><b className="block text-xl">{publicProfile.publicTitles}</b><span className="text-[10px] text-white/50">Аниме в подборках</span></div>
-          <div className="px-1 py-2"><b className="block text-xl">{publicProfile.collectionLikes}</b><span className="text-[10px] text-white/50">Лайков</span></div>
-        </div>
-      </Card>
-      <div className="mt-3 grid grid-cols-2 gap-3">
-        <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-[#17181e] p-3">
-          <img src={"/images/yubera/" + levelAssets[publicProfile.xp.level - 1]} alt="" className="h-14 w-14 object-contain" />
-          <div className="min-w-0"><b className="block text-sm">Уровень {publicProfile.xp.level}</b><span className="text-xs text-white/50">{publicProfile.xp.title}</span></div>
-        </div>
-        <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-[#17181e] p-3">
-          {publicProfile.support.asset ? <img src={"/images/yubera/" + publicProfile.support.asset} alt="" className="h-14 w-14 object-contain" /> : <span className="grid h-14 w-14 place-items-center rounded-xl bg-white/5 text-white/40"><Star className="h-6 w-6" /></span>}
-          <div className="min-w-0"><b className="block truncate text-sm">{publicProfile.support.title}</b><span className="text-xs text-white/50">Статус поддержки</span></div>
-        </div>
-      </div>
       <Card className="mt-3">
         <div className="mb-2 flex items-center justify-between gap-2">
           <div><h4 className="font-semibold">Публичные подборки</h4><p className="text-xs text-white/45">Подборки, доступные всем пользователям</p></div>

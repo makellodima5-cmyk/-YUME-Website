@@ -1614,7 +1614,7 @@ html[data-theme="light"] .yubera-home-filter-button {
 }
 .yubera-home-discovery-button {
   position:absolute; left:4.2%; bottom:7.2%; z-index:1;
-  display:inline-flex; min-height:48px; align-items:center; justify-content:center; gap:9px;
+  display:inline-flex; min-height:44px; align-items:center; justify-content:center; gap:9px;
   border:0; border-radius:999px; background:#FF5738; padding:0 clamp(14px,2vw,20px);
   color:#FFF; font-size:clamp(13px,1.35vw,16px); font-weight:800;
   box-shadow:0 8px 22px rgba(255,87,56,.34);
@@ -1630,11 +1630,11 @@ html[data-theme="light"] .yubera-home-filter-button {
 .yubera-home-discovery-button svg { width:19px; height:19px; flex:0 0 19px; }
 @media(max-width:640px) {
   .yubera-home-discovery { aspect-ratio:1.7 / 1; }
-  .yubera-home-discovery-button { bottom:5%; }
+  .yubera-home-discovery-button { bottom:6%; }
 }
 @media(max-width:420px) {
   .yubera-home-discovery { border-radius:19px; }
-  .yubera-home-discovery-button { min-height:44px; gap:8px; padding:0 14px; font-size:13px; }
+  .yubera-home-discovery-button { min-height:40px; gap:8px; padding:0 14px; font-size:13px; }
 }
 @media(prefers-reduced-motion:reduce) {
   .yubera-home-discovery-button { transition:none; }
