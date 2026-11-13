@@ -24,6 +24,7 @@ describe("YUBERA community foundation", () => {
     expect(server).toContain("SELECT ?,?,?,?,?,? WHERE (SELECT COUNT(*) FROM yume_collections WHERE user_id=?) < ?");
     expect(server).toContain("inserted.meta?.changes");
     expect(server).toContain("PLUS_TITLES : FREE_TITLES");
+    expect(server).toContain("SELECT ?,?,COALESCE(MAX(position),-1)+1 FROM yume_collection_items WHERE collection_id=? HAVING COUNT(*) < ?");
     expect(server).toContain("titleLimit: ownerPlus ? PLUS_TITLES : FREE_TITLES");
     expect(server).toContain("INSERT OR IGNORE INTO yume_xp_ledger");
     expect(server).toContain("LIMIT 30 OFFSET ?");
