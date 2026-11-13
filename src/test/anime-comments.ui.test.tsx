@@ -154,8 +154,17 @@ describe("AnimeComments", () => {
     });
     expect(screen.getByText("No comments yet")).toBeTruthy();
 
+    Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" });
+    act(() => { document.dispatchEvent(new Event("visibilitychange")); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(5000);
+      document.dispatchEvent(new Event("visibilitychange"));
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
     });
 
     expect(screen.getByText("Live comment arrived")).toBeTruthy();
