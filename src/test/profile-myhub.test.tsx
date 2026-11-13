@@ -113,6 +113,7 @@ describe("Profile and My library pages", () => {
 
     render(withPreferences(<Profile animeList={[]} onSelect={vi.fn()} onCatalog={vi.fn()} />));
     expect(await screen.findByRole("heading", { name: "Аккаунт Telegram" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Редактировать профиль" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /Друзья/ }));
     expect((await screen.findAllByRole("heading", { name: "Друзья" })).length).toBeGreaterThan(0);
