@@ -1,5 +1,6 @@
 import { env as cloudflareEnv } from "cloudflare:workers";
 import { getAuthenticatedYumeUserId } from "@/data/telegram-auth.server";
+import { YUBERA_SUPPORT_LEVELS, YUBERA_XP_LEVELS } from "@/data/yubera-config";
 import { hasAdminPasswordSession, isAdminPasswordConfigured } from "@/lib/admin-password.server";
 type S={bind(...v:unknown[]):S;first<T=Record<string,unknown>>():Promise<T|null>;all<T=Record<string,unknown>>():Promise<{results:T[]}>;run():Promise<{meta?:{changes?:number}}>} ;
 type DB={prepare(sql:string):S;batch?:(statements:S[])=>Promise<Array<{meta?:{changes?:number}}>>};
@@ -61,8 +62,45 @@ async function isAdmin(r:Request,d:DB,e:E){const id=String(e.TELEGRAM_ADMIN_ID??
 export async function handleAdminYuberaPlus(r:Request):Promise<Response>{
  if(!["GET","POST"].includes(r.method))return json({error:"method_not_allowed"},405);if(r.method==="POST"&&!origin(r))return json({error:"cross_origin_request"},403);
  const d=db();if(!d)return json({error:"database_unavailable"},503);const e=env(),admin=await isAdmin(r,d,e);if(!admin)return json({isAdmin:false,error:"admin_required"},403);if(!isAdminPasswordConfigured(e))return json({isAdmin:false,error:"admin_password_not_configured"},503);if(!await hasAdminPasswordSession(r,e))return json({isAdmin:false,error:"admin_password_required"},428);
- if(r.method==="GET"){const [p,a]=await Promise.all([price(d),d.prepare("SELECT id,action,details_json,created_at FROM yume_plus_audit_log ORDER BY id DESC LIMIT 20").all<{id:number;action:string;details_json:string;created_at:string}>()]);return json({isAdmin:true,price:p,periodDays:30,periodSeconds:YUBERA_PLUS_PERIOD_SECONDS,audit:a.results});}
+ if(r.method==="GET"){
+  const usernameParam=new URL(r.url).searchParams.get("username");
+  if(usernameParam!==null){
+   const username=normalizePlusGrantUsername(usernameParam);if(!username)return json({error:"invalid_username"},400);
+   const target=await d.prepare("SELECT id,telegram_username,telegram_first_name,telegram_last_name FROM yume_users WHERE provider='telegram' AND lower(telegram_username)=lower(?) LIMIT 1").bind(username).first<{id:string;telegram_username:string|null;telegram_first_name:string;telegram_last_name:string|null}>();
+   if(!target)return json({error:"telegram_user_not_found"},404);
+   const [xpRow,supportRow,override]=await Promise.all([
+    d.prepare("SELECT COALESCE(SUM(amount),0) AS total FROM yume_xp_ledger WHERE user_id=?").bind(target.id).first<{total:number}>(),
+    d.prepare("SELECT COALESCE(SUM(d.amount),0) AS total FROM yume_stars_donations d LEFT JOIN yume_stars_refunds r ON r.telegram_payment_charge_id=d.telegram_payment_charge_id WHERE d.telegram_user_id=(SELECT telegram_user_id FROM yume_users WHERE id=?) AND d.status='paid' AND r.telegram_payment_charge_id IS NULL").bind(target.id).first<{total:number}>(),
+    d.prepare("SELECT xp_level,support_level FROM yume_user_level_overrides WHERE user_id=?").bind(target.id).first<{xp_level:number|null;support_level:number|null}>()
+   ]);
+   const xpTotalValue=Math.max(0,Number(xpRow?.total??0)),supportTotal=Math.max(0,Number(supportRow?.total??0));
+   const automaticXp=[...YUBERA_XP_LEVELS].reverse().find(x=>xpTotalValue>=x.min)??YUBERA_XP_LEVELS[0];
+   const automaticSupport=[...YUBERA_SUPPORT_LEVELS].reverse().find(x=>supportTotal>=x.min)??YUBERA_SUPPORT_LEVELS[0];
+   return json({isAdmin:true,target:{id:target.id,username:target.telegram_username??username,displayName:[target.telegram_first_name,target.telegram_last_name].filter(Boolean).join(" "),xpTotal:xpTotalValue,supportTotal,xpLevel:override?.xp_level??automaticXp.level,xpTitle:(YUBERA_XP_LEVELS.find(x=>x.level===(override?.xp_level??automaticXp.level))??automaticXp).title,supportLevel:override?.support_level??automaticSupport.level,supportTitle:(YUBERA_SUPPORT_LEVELS.find(x=>x.level===(override?.support_level??automaticSupport.level))??automaticSupport).title,xpOverride:override?.xp_level??null,supportOverride:override?.support_level??null,automaticXpLevel:automaticXp.level,automaticSupportLevel:automaticSupport.level}});
+  }
+  const [p,a]=await Promise.all([price(d),d.prepare("SELECT id,action,details_json,created_at FROM yume_plus_audit_log ORDER BY id DESC LIMIT 20").all<{id:number;action:string;details_json:string;created_at:string}>()]);
+  return json({isAdmin:true,price:p,periodDays:30,periodSeconds:YUBERA_PLUS_PERIOD_SECONDS,audit:a.results});
+ }
  let body:unknown;try{const raw=await r.text();if(raw.length>2048)return json({error:"request_too_large"},413);body=JSON.parse(raw);}catch{return json({error:"invalid_json"},400);}if(!body||typeof body!=="object"||Array.isArray(body))return json({error:"invalid_request"},400);const input=body as Record<string,unknown>;
+ if(input.action==="set-user-level-overrides"){
+  const username=normalizePlusGrantUsername(input.username);
+  if(!username)return json({error:"invalid_username"},400);
+  const xpLevel=input.xpLevel===null?null:input.xpLevel;
+  const supportLevel=input.supportLevel===null?null:input.supportLevel;
+  if(!(xpLevel===null||(typeof xpLevel==="number"&&Number.isSafeInteger(xpLevel)&&xpLevel>=1&&xpLevel<=10)))return json({error:"invalid_xp_level",min:1,max:10},400);
+  if(!(supportLevel===null||(typeof supportLevel==="number"&&Number.isSafeInteger(supportLevel)&&supportLevel>=0&&supportLevel<=5)))return json({error:"invalid_support_level",min:0,max:5},400);
+  const target=await d.prepare("SELECT id,telegram_username FROM yume_users WHERE provider='telegram' AND lower(telegram_username)=lower(?) LIMIT 1").bind(username).first<{id:string;telegram_username:string|null}>();
+  if(!target)return json({error:"telegram_user_not_found"},404);
+  const old=await d.prepare("SELECT xp_level,support_level FROM yume_user_level_overrides WHERE user_id=?").bind(target.id).first<{xp_level:number|null;support_level:number|null}>();
+  try{
+   if(!d.batch)return json({error:"atomic_admin_batch_unavailable"},503);
+   await d.batch([
+    d.prepare("INSERT INTO yume_user_level_overrides(user_id,xp_level,support_level,updated_by,updated_at) VALUES(?,?,?,?,CURRENT_TIMESTAMP) ON CONFLICT(user_id) DO UPDATE SET xp_level=excluded.xp_level,support_level=excluded.support_level,updated_by=excluded.updated_by,updated_at=CURRENT_TIMESTAMP").bind(target.id,xpLevel,supportLevel,admin),
+    d.prepare("INSERT INTO yume_user_level_override_audit(actor_user_id,target_user_id,old_xp_level,new_xp_level,old_support_level,new_support_level,created_at) VALUES(?,?,?,?,?,?,CURRENT_TIMESTAMP)").bind(admin,target.id,old?.xp_level??null,xpLevel,old?.support_level??null,supportLevel)
+   ]);
+   return json({isAdmin:true,saved:true,username:target.telegram_username??username,xpLevel,supportLevel});
+  }catch(error){console.error("[YUBERA][ADMIN] Level override failed.",error);return json({error:"level_override_save_failed"},503);}
+ }
  if(input.action==="grant-by-username"){
   const username=normalizePlusGrantUsername(input.username),days=input.days===undefined?30:input.days;
   if(!username)return json({error:"invalid_username"},400);
