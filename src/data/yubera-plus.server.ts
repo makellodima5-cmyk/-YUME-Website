@@ -11,6 +11,7 @@ type SubUpdate={user?:{id?:number};invoice_payload?:string;state?:string};
 export const YUBERA_PLUS_PERIOD_SECONDS=2592000;
 const PERIOD=2592000000,COOKIE="__Host-yume-session";
 export function isValidPlusPrice(v:unknown):v is number{return typeof v==="number"&&Number.isSafeInteger(v)&&v>=1&&v<=10000;}
+export function calculateYuberaPlusPlanPrice(monthlyPrice:number,months:1|3):number{if(!isValidPlusPrice(monthlyPrice))return 0;const amount=months===1?monthlyPrice:Math.round(monthlyPrice*3*0.83);return isValidPlusPrice(amount)?amount:0;}
 export function normalizePlusGrantUsername(value:unknown):string|null{if(typeof value!=="string")return null;const username=value.trim().replace(/^@/,"");return /^[A-Za-z0-9_]{5,32}$/.test(username)?username:null;}
 export function isValidPlusGrantDays(value:unknown):value is number{return typeof value==="number"&&Number.isSafeInteger(value)&&value>=1&&value<=3650;}
 export function resolveInitialPlusExpiry(exp:number|undefined,now=Date.now()){return typeof exp==="number"&&Number.isSafeInteger(exp)&&exp*1000>now&&exp*1000<=now+PERIOD+300000?exp*1000:now+PERIOD;}
@@ -28,20 +29,22 @@ export async function handleYuberaPlus(r:Request):Promise<Response>{
  const d=db();if(!d)return json({error:"database_unavailable"},503);const uid=await getAuthenticatedYumeUserId(r);if(!uid)return json({error:"authentication_required"},401);
  const user=await d.prepare("SELECT id,telegram_user_id FROM yume_users WHERE id=?").bind(uid).first<{id:string;telegram_user_id:string}>();if(!user)return json({error:"user_not_found"},404);
  const p=await price(d),sub=await active(d,uid);
- if(r.method==="GET"){const latest=await d.prepare("SELECT renewal_failed_at FROM yume_plus_subscriptions WHERE user_id=? ORDER BY starts_at DESC,created_at DESC LIMIT 1").bind(uid).first<{renewal_failed_at:string|null}>();return json({price:p,periodDays:30,periodSeconds:YUBERA_PLUS_PERIOD_SECONDS,isPlus:Boolean(sub),renewalFailedAt:latest?.renewal_failed_at??null,subscription:sub?{active:true,expiresAt:sub.expires_at,autoRenew:sub.auto_renew===1,isRecurring:sub.is_recurring===1,renewalFailedAt:sub.renewal_failed_at}:null});}
+ if(r.method==="GET"){const latest=await d.prepare("SELECT renewal_failed_at FROM yume_plus_subscriptions WHERE user_id=? ORDER BY starts_at DESC,created_at DESC LIMIT 1").bind(uid).first<{renewal_failed_at:string|null}>();return json({price:p,threeMonthPrice:calculateYuberaPlusPlanPrice(p,3),threeMonthDiscountPercent:17,periodDays:30,periodSeconds:YUBERA_PLUS_PERIOD_SECONDS,isPlus:Boolean(sub),renewalFailedAt:latest?.renewal_failed_at??null,subscription:sub?{active:true,expiresAt:sub.expires_at,autoRenew:sub.auto_renew===1,isRecurring:sub.is_recurring===1,renewalFailedAt:sub.renewal_failed_at}:null});}
  let body:unknown;try{const raw=await r.text();if(raw.length>4096)return json({error:"request_too_large"},413);body=JSON.parse(raw);}catch{return json({error:"invalid_json"},400);}if(!body||typeof body!=="object"||Array.isArray(body))return json({error:"invalid_request"},400);
  const x=body as Record<string,unknown>;
  if(x.action==="create-invoice"){
   if(!isValidPlusPrice(p))return json({error:"plus_price_not_configured"},503);
   if(sub)return json({error:"subscription_already_active",expiresAt:sub.expires_at},409);
-  const consent=x.autoRenewConsent===true,e=env(),token=String(e.TELEGRAM_BOT_TOKEN??"").trim();if(!token)return json({error:"payments_not_configured"},503);
+  const months=x.months===undefined?1:x.months;if(months!==1&&months!==3)return json({error:"invalid_plus_period",allowed:[1,3]},400);
+  const amount=calculateYuberaPlusPlanPrice(p,months);if(!isValidPlusPrice(amount))return json({error:"plus_plan_price_out_of_range"},400);
+  const periodDays=months*30,consent=months===1&&x.autoRenewConsent===true,e=env(),token=String(e.TELEGRAM_BOT_TOKEN??"").trim();if(!token)return json({error:"payments_not_configured"},503);
   const limiter=e.TELEGRAM_STARS_RATE_LIMITER as {limit?:(v:{key:string})=>Promise<{success:boolean}>}|undefined;if(!limiter||typeof limiter.limit!=="function")return json({error:"payment_rate_limit_unavailable"},503);
   try{if(!(await limiter.limit({key:"yubera-plus-invoice:"+user.telegram_user_id})).success)return json({error:"rate_limited"},429);}catch{return json({error:"payment_rate_limit_unavailable"},503);}
   const id=crypto.randomUUID(),payload="yubera_plus:"+id;
-  try{await d.prepare("INSERT INTO yume_plus_payments(id,user_id,invoice_payload,amount,currency,status,auto_renew_consent,created_at) VALUES(?,?,?,?,'XTR','pending',?,CURRENT_TIMESTAMP)").bind(id,uid,payload,p,consent?1:0).run();
-   const invoice=await tg(token,"createInvoiceLink",{title:"YUBERA Plus",description:"Доступ к YUBERA Plus на 30 дней",payload,provider_token:"",currency:"XTR",prices:[{label:"YUBERA Plus — 30 дней",amount:p}],...(consent?{subscription_period:YUBERA_PLUS_PERIOD_SECONDS}:{})});
+  try{await d.prepare("INSERT INTO yume_plus_payments(id,user_id,invoice_payload,amount,currency,status,auto_renew_consent,period_days,created_at) VALUES(?,?,?,?,'XTR','pending',?,?,CURRENT_TIMESTAMP)").bind(id,uid,payload,amount,consent?1:0,periodDays).run();
+   const invoice=await tg(token,"createInvoiceLink",{title:"YUBERA Plus",description:`Доступ к YUBERA Plus на ${periodDays} дней`,payload,provider_token:"",currency:"XTR",prices:[{label:`YUBERA Plus — ${periodDays} дней`,amount}],...(consent?{subscription_period:YUBERA_PLUS_PERIOD_SECONDS}:{})});
    if(!invoice.ok||typeof invoice.result!=="string"||!invoice.result.startsWith("https://t.me/")){await d.prepare("UPDATE yume_plus_payments SET status='failed' WHERE id=? AND status='pending'").bind(id).run();return json({error:"invoice_creation_failed"},502);}
-   await d.prepare("UPDATE yume_plus_payments SET invoice_link=? WHERE id=? AND status='pending'").bind(invoice.result,id).run();return json({invoiceUrl:invoice.result,amount:p,periodDays:30,autoRenew:consent});
+   await d.prepare("UPDATE yume_plus_payments SET invoice_link=? WHERE id=? AND status='pending'").bind(invoice.result,id).run();return json({invoiceUrl:invoice.result,amount,periodDays,months,autoRenew:consent,discountPercent:months===3?17:0});
   }catch(error){console.error("[YUBERA][PLUS] Invoice creation failed.",error);return json({error:"payments_unavailable"},503);}
  }
  if(x.action==="cancel-auto-renew"||x.action==="enable-auto-renew"){
@@ -91,13 +94,13 @@ export async function handleAdminYuberaPlus(r:Request):Promise<Response>{
 }
 export async function recordYuberaPlusSuccessfulPayment(d:DB,telegramId:string,p:Pay):Promise<boolean>{
  const payload=p.invoice_payload??"";if(!payload.startsWith("yubera_plus:"))return false;const charge=p.telegram_payment_charge_id??"",amount=p.total_amount;if(!charge||!Number.isSafeInteger(amount)||amount!<1||p.currency!=="XTR")return true;
- const order=await d.prepare("SELECT id,user_id,amount,currency,status,auto_renew_consent,subscription_id,telegram_payment_charge_id FROM yume_plus_payments WHERE invoice_payload=?").bind(payload).first<{id:string;user_id:string;amount:number;currency:string;status:string;auto_renew_consent:number;subscription_id:string|null;telegram_payment_charge_id:string|null}>();if(!order||order.amount!==amount||order.currency!=="XTR")return true;
+ const order=await d.prepare("SELECT id,user_id,amount,currency,status,auto_renew_consent,period_days,subscription_id,telegram_payment_charge_id FROM yume_plus_payments WHERE invoice_payload=?").bind(payload).first<{id:string;user_id:string;amount:number;currency:string;status:string;auto_renew_consent:number;period_days:number;subscription_id:string|null;telegram_payment_charge_id:string|null}>();if(!order||order.amount!==amount||order.currency!=="XTR")return true;
  const owner=await d.prepare("SELECT telegram_user_id FROM yume_users WHERE id=?").bind(order.user_id).first<{telegram_user_id:string}>();if(owner?.telegram_user_id!==telegramId)return true;
  const recurring=p.is_recurring===true,first=p.is_first_recurring===true,now=Date.now();
  if(order.status==="pre_checkout"&&!order.telegram_payment_charge_id){
   if((order.auto_renew_consent===1)!==recurring||(recurring&&!first))return true;
   if(!d.batch)throw new Error("atomic_payment_batch_unavailable");
-  const subId=order.id,expiry=resolveInitialPlusExpiry(p.subscription_expiration_date,now);
+  const subId=order.id,expiry=recurring?resolveInitialPlusExpiry(p.subscription_expiration_date,now):now+order.period_days*86400000;
   const results=await d.batch([
    d.prepare("INSERT OR IGNORE INTO yume_plus_subscriptions(id,user_id,status,starts_at,expires_at,auto_renew,telegram_payment_charge_id,is_recurring,created_at,updated_at) VALUES(?,?,'active',?,?,?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)").bind(subId,order.user_id,now,expiry,recurring?1:0,charge,recurring?1:0),
    d.prepare("UPDATE yume_plus_payments SET status='paid',subscription_id=?,telegram_payment_charge_id=?,paid_at=CURRENT_TIMESTAMP WHERE invoice_payload=? AND status='pre_checkout' AND telegram_payment_charge_id IS NULL").bind(subId,charge,payload),
