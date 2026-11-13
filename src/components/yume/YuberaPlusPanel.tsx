@@ -132,13 +132,13 @@ export function YuberaPlusPanel() {
         </div>
 
         <h3 className="mb-2 flex items-center gap-2 text-[17px] font-extrabold text-white">
-          <span className="h-6 w-1.5 rounded-full bg-[#ff6046]" />
+          <span className="h-6 w-1.5 rounded-full bg-[#FF5738]" />
           Преимущества подписки
         </h3>
         <div className="space-y-1">
           {benefits.map(({ title, description, icon: Icon, soon }) => (
             <div key={title} className="flex items-center gap-3 rounded-[15px] border border-white/[0.08] bg-gradient-to-r from-[#211b24] to-[#17171e] px-3 py-2">
-              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-[13px] border border-[#8b453d]/25 bg-gradient-to-br from-[#542c2b] to-[#29202a] text-[#ff956d]">
+              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-[13px] border border-[#8b453d]/25 bg-gradient-to-br from-[#542c2b] to-[#29202a] text-[#FF704F]">
                 <Icon className="h-6 w-6" strokeWidth={1.9} />
               </span>
               <span className="min-w-0 flex-1">
@@ -153,7 +153,7 @@ export function YuberaPlusPanel() {
         </div>
 
         <h3 className="mb-3 mt-4 flex items-center gap-2 text-[17px] font-extrabold text-white">
-          <span className="h-6 w-1.5 rounded-full bg-[#ff6046]" />
+          <span className="h-6 w-1.5 rounded-full bg-[#FF5738]" />
           Выбери подписку
         </h3>
         <div className="grid grid-cols-2 gap-2.5">

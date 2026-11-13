@@ -651,7 +651,7 @@ html[data-theme="light"] .yubera-wordmark {
   --card-foreground: #F6F4F5;
   --popover: #22232B;
   --popover-foreground: #F6F4F5;
-  --primary: #FF5A3D;
+  --primary: #FF5738;
   --primary-foreground: #FFFFFF;
   --secondary: #22232B;
   --secondary-foreground: #F6F4F5;
@@ -659,17 +659,17 @@ html[data-theme="light"] .yubera-wordmark {
   --muted-foreground: #A4A1AA;
   --accent: #34231F;
   --accent-foreground: #FFFFFF;
-  --magenta: #FF764F;
+  --magenta: #FF704F;
   --gold: #F4B942;
   --destructive: #E05252;
   --border: rgba(255,255,255,.12);
   --input: rgba(255,255,255,.16);
-  --ring: #FF5A3D;
-  --gradient-neon: linear-gradient(120deg,#FF5A3D,#FF764F);
+  --ring: #FF5738;
+  --gradient-neon: linear-gradient(120deg,#FF5738,#FF704F);
   --gradient-fade: linear-gradient(to top,#101116 0%,rgba(16,17,22,.72) 40%,transparent 100%);
-  --shadow-neon: 0 10px 34px -12px rgba(255,90,61,.32);
+  --shadow-neon: 0 10px 34px -12px rgba(255,87,56,.32);
   --body-gradient:
-    radial-gradient(ellipse 70% 26% at 50% 0%,rgba(255,90,61,.10),transparent 76%),
+    radial-gradient(ellipse 70% 26% at 50% 0%,rgba(255,87,56,.10),transparent 76%),
     linear-gradient(180deg,#101116 0%,#101116 100%);
 }
 html[data-theme="light"] {
@@ -680,7 +680,7 @@ html[data-theme="light"] {
   --card-foreground: #1B1920;
   --popover: #FFFFFF;
   --popover-foreground: #1B1920;
-  --primary: #D9472D;
+  --primary: #FF5738;
   --primary-foreground: #FFFFFF;
   --secondary: #ECE9EC;
   --secondary-foreground: #29262D;
@@ -688,14 +688,14 @@ html[data-theme="light"] {
   --muted-foreground: #6C6872;
   --accent: #F4E5E1;
   --accent-foreground: #2A211F;
-  --magenta: #B94C38;
+  --magenta: #FF704F;
   --border: rgba(35,27,31,.14);
   --input: rgba(35,27,31,.18);
-  --ring: #D9472D;
-  --gradient-neon: linear-gradient(120deg,#D9472D,#B94C38);
-  --shadow-neon: 0 10px 32px -12px rgba(217,71,45,.20);
+  --ring: #FF5738;
+  --gradient-neon: linear-gradient(120deg,#FF5738,#FF704F);
+  --shadow-neon: 0 10px 32px -12px rgba(255,87,56,.20);
   --body-gradient:
-    radial-gradient(ellipse 70% 24% at 50% 0%,rgba(217,71,45,.07),transparent 76%),
+    radial-gradient(ellipse 70% 24% at 50% 0%,rgba(255,87,56,.07),transparent 76%),
     linear-gradient(180deg,#F7F5F6 0%,#F7F5F6 100%);
 }
 html[data-theme="light"] body {
@@ -1903,13 +1903,27 @@ html[data-theme="light"] {
 }
 
 
-/* Saturated YUBERA orange is the shared accent inside Telegram Mini Apps. */
+/* One saturated YUBERA orange across web and Telegram Mini App. */
+:root,
+html[data-theme="light"],
 html.telegram-mini-app {
-  --primary: oklch(0.69 0.20 35);
-  --primary-foreground: oklch(0.13 0.02 285);
-  --ring: oklch(0.69 0.20 35);
-  --accent: oklch(0.27 0.07 35);
-  --gradient-neon: linear-gradient(120deg, #FF5738, #FF704F);
+  --primary: #FF5738;
+  --primary-foreground: #FFFFFF;
+  --ring: #FF5738;
+  --magenta: #FF704F;
+  --gradient-neon: linear-gradient(120deg, #FF5738 0%, #FF704F 100%);
+  --shadow-neon: 0 8px 26px -10px rgba(255, 87, 56, .38);
+}
+html.telegram-mini-app {
+  --accent: #34231F;
 }
 html.telegram-mini-app .yubera-with-bottom-nav { padding-left: 8px !important; padding-right: 8px !important; }
 html.telegram-mini-app #telegram-account { margin-top: 8px !important; }
+
+
+/* Keep all CTA labels legible on saturated orange: never inherit dark text. */
+.bg-neon,
+.yubera-primary-button,
+.yubera-bottom-nav button[aria-current="page"] {
+  color: #FFFFFF;
+}
