@@ -73,7 +73,7 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [bio, setBio] = useState("");
-  const [bioExpanded, setBioExpanded] = useState(false);
+  const [bioSheet, setBioSheet] = useState<{ title: string; bio: string } | null>(null);
   const [visibility, setVisibility] = useState<"public" | "private">("private");
   const [frame, setFrame] = useState<string | null>(null);
   const [frameCategory, setFrameCategory] = useState<"support" | "plus">("support");
@@ -95,13 +95,27 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
   const [activeCollectionTitleLimit, setActiveCollectionTitleLimit] = useState(50);
   const [collectionReturnScreen, setCollectionReturnScreen] = useState<Screen>("home");
   const [publicProfileReturnScreen, setPublicProfileReturnScreen] = useState<Screen>("home");
-  const [publicBioExpanded, setPublicBioExpanded] = useState(false);
+
   const [animeSearch, setAnimeSearch] = useState("");
 
   const [publicProfile, setPublicProfile] = useState<ProfileData | null>(null);
   const [publicCollections, setPublicCollections] = useState<Collection[]>([]);
   const [likeBusyCollectionId, setLikeBusyCollectionId] = useState<string | null>(null);
   const [donationOpen, setDonationOpen] = useState(false);
+
+  useEffect(() => {
+    if (!bioSheet) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setBioSheet(null);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [bioSheet]);
 
   useEffect(() => {
     const resetToProfileHome = () => {
@@ -160,7 +174,7 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
       if (!response.ok) throw new Error(data.error || "Профиль недоступен");
       if (id === profile?.id) { changeScreen("home"); return; }
       setPublicProfileReturnScreen(screen);
-      setPublicBioExpanded(false);
+      setBioSheet(null);
       setPublicProfile(data.profile); setPublicCollections(Array.isArray(data.collections) ? data.collections : []); changeScreen("public-profile");
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Профиль недоступен"); }
   };
@@ -382,11 +396,14 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
             <div className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto] grid-rows-[auto_auto] items-center gap-x-2">
               <div className="col-span-2 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
                 <h2 className="min-w-0 whitespace-normal break-words text-[clamp(18px,4.6vw,22px)] font-bold leading-tight">{profile.displayName}</h2>
-                {profile.isPlus && <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-[#ffc66d]/55 bg-[#ffc66d]/10 px-2.5 py-1 text-[11px] font-bold leading-none text-[#ffc66d]"><img src="/images/yubera/YUBERA_Plus_Crown_Simple.webp" alt="" className="h-3.5 w-3.5 object-contain" />Plus</span>}
+                {profile.isPlus && <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-[#ffc66d]/55 bg-[#ffc66d]/10 px-2.5 py-1 text-[11px] font-bold leading-none text-[#ffc66d]"><img src="/images/yubera/YUBERA_Plus_Crown_Simple.webp" alt="" className="h-6 w-6 object-contain" />Plus</span>}
               </div>
               <div className="min-w-0 self-start">
                 {profile.username && <p className="whitespace-normal break-words text-[13px] leading-tight text-white/75">@{profile.username}</p>}
-                {profile.bio.trim() && <button type="button" aria-expanded={bioExpanded} aria-label={bioExpanded ? "Свернуть описание профиля" : "Развернуть описание профиля"} onClick={() => setBioExpanded(value => !value)} className={`mt-1 block w-full text-left text-[11px] leading-snug text-white/80 ${bioExpanded ? "whitespace-pre-wrap break-words" : "line-clamp-1"}`}>{profile.bio}</button>}
+                {profile.bio.trim() && <div className="mt-1 min-w-0">
+                  <p className="line-clamp-2 whitespace-pre-wrap break-words text-[11px] leading-snug text-white/80">{profile.bio}</p>
+                  {profile.bio.length > 110 && <button type="button" onClick={() => setBioSheet({ title: "Описание профиля", bio: profile.bio })} className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-[#ff795b] transition-colors hover:text-[#ff9a7f]">Читать полностью <ChevronDown className="h-3.5 w-3.5" /></button>}
+                </div>}
               </div>
               <button type="button" onClick={() => changeScreen("edit")} className="inline-flex min-h-9 shrink-0 items-center justify-center gap-1.5 self-center whitespace-nowrap rounded-full bg-white/10 px-3 py-2 text-[12px] font-semibold leading-none text-white" aria-label="Редактировать профиль"><Pencil className="h-3.5 w-3.5 shrink-0" /><span>Редактировать</span></button>
             </div>
@@ -548,12 +565,12 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
             <div className="min-w-0 flex-1">
               <div className="flex min-w-0 items-center gap-x-2">
                 <h3 className="min-w-0 truncate whitespace-nowrap text-[clamp(15px,4vw,22px)] font-bold leading-tight text-white">{publicProfile.displayName}</h3>
-                {publicProfile.isPlus && <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-[#ffc66d]/55 bg-[#ffc66d]/10 px-2.5 py-1 text-[11px] font-bold leading-none text-[#ffc66d]"><img src="/images/yubera/YUBERA_Plus_Crown_Simple.webp" alt="" className="h-5 w-5 object-contain" />Plus</span>}
+                {publicProfile.isPlus && <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-[#ffc66d]/55 bg-[#ffc66d]/10 px-2.5 py-1 text-[11px] font-bold leading-none text-[#ffc66d]"><img src="/images/yubera/YUBERA_Plus_Crown_Simple.webp" alt="" className="h-6 w-6 object-contain" />Plus</span>}
               </div>
               {publicProfile.username && <p className="mt-1 whitespace-nowrap text-[13px] leading-tight text-white/75">@{publicProfile.username}</p>}
-              {publicProfile.bio && <div className="mt-1">
-                <p className={publicBioExpanded ? "whitespace-pre-wrap break-words text-[11px] leading-snug text-white/80" : "line-clamp-1 whitespace-pre-wrap break-words text-[11px] leading-snug text-white/80"}>{publicProfile.bio}</p>
-                {publicProfile.bio.length > 110 && <button type="button" onClick={() => setPublicBioExpanded(value => !value)} className="mt-1 text-[10px] font-semibold text-[#ff8768]">{publicBioExpanded ? "Свернуть" : "Показать полностью"}</button>}
+              {publicProfile.bio && <div className="mt-1 min-w-0">
+                <p className="line-clamp-2 whitespace-pre-wrap break-words text-[11px] leading-snug text-white/80">{publicProfile.bio}</p>
+                {publicProfile.bio.length > 110 && <button type="button" onClick={() => setBioSheet({ title: "Описание профиля", bio: publicProfile.bio })} className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-[#ff795b] transition-colors hover:text-[#ff9a7f]">Читать полностью <ChevronDown className="h-3.5 w-3.5" /></button>}
               </div>}
             </div>
           </div>
@@ -603,6 +620,18 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
     {discardProfileOpen && <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4" role="dialog" aria-modal="true" aria-labelledby="discard-profile-title"><div className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#202127] p-5"><h3 id="discard-profile-title" className="text-lg font-bold">Отменить изменения профиля?</h3><p className="mt-2 text-sm text-white/60">Описание, видимость и выбранная рамка не будут сохранены.</p><div className="mt-5 flex gap-2"><button type="button" onClick={()=>setDiscardProfileOpen(false)} className="flex-1 rounded-xl bg-white/10 py-3">Продолжить</button><button type="button" onClick={confirmDiscardProfileEdit} className="flex-1 rounded-xl bg-[#FF5738] py-3 font-semibold text-black">Отменить</button></div></div></div>}
     {discardCollectionOpen && <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4" role="dialog" aria-modal="true" aria-labelledby="discard-collection-title"><div className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#202127] p-5"><h3 id="discard-collection-title" className="text-lg font-bold">Отменить изменения?</h3><p className="mt-2 text-sm text-white/60">Введённые данные и выбранные параметры не сохранятся.</p><div className="mt-5 flex gap-2"><button type="button" onClick={()=>setDiscardCollectionOpen(false)} className="flex-1 rounded-xl bg-white/10 py-3">Продолжить</button><button type="button" onClick={confirmDiscardCollectionForm} className="flex-1 rounded-xl bg-[#FF5738] py-3 font-semibold text-black">Отменить</button></div></div></div>}
     {deleteTarget && <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4"><div className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#202127] p-5"><h3 className="text-lg font-bold">Удалить подборку?</h3><p className="mt-2 text-sm text-white/60">«{deleteTarget.title}» будет удалена. Тайтлы каталога и другие подборки не изменятся.</p><div className="mt-5 flex gap-2"><button onClick={()=>setDeleteTarget(null)} className="flex-1 rounded-xl bg-white/10 py-3">Отмена</button><button onClick={()=>{const target=deleteTarget;setDeleteTarget(null);void collectionAction({action:"collection.delete",id:target.id});}} className="flex-1 rounded-xl bg-red-500/90 py-3 font-semibold">Удалить</button></div></div></div>}
+    {bioSheet && <div className="fixed inset-0 z-[90] flex items-end justify-center bg-black/65 sm:items-center sm:p-4" role="presentation" onClick={() => setBioSheet(null)}>
+      <section role="dialog" aria-modal="true" aria-labelledby="profile-bio-sheet-title" className="flex max-h-[min(78dvh,680px)] w-full max-w-2xl flex-col overflow-hidden rounded-t-[28px] border border-white/10 bg-[#17181e] pb-[max(20px,env(safe-area-inset-bottom))] shadow-[0_-16px_50px_rgba(0,0,0,.5)] sm:rounded-[28px]" onClick={event => event.stopPropagation()}>
+        <div className="flex shrink-0 justify-center pb-1 pt-3" aria-hidden="true"><span className="h-1.5 w-16 rounded-full bg-white/35" /></div>
+        <div className="flex shrink-0 items-center justify-between gap-3 px-5 pb-3 pt-2">
+          <h2 id="profile-bio-sheet-title" className="text-lg font-bold text-white">{bioSheet.title}</h2>
+          <button type="button" onClick={() => setBioSheet(null)} aria-label="Закрыть описание профиля" className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white/10 text-white transition hover:bg-white/15"><X className="h-5 w-5" /></button>
+        </div>
+        <div className="min-h-0 overflow-y-auto overscroll-contain px-5 pb-5 text-[15px] leading-relaxed text-white/85">
+          <p className="whitespace-pre-wrap break-words">{bioSheet.bio}</p>
+        </div>
+      </section>
+    </div>}
     <TelegramStarsDonation open={donationOpen} onClose={()=>setDonationOpen(false)}/>
   </div>;
 }
