@@ -1392,6 +1392,7 @@ function Index() {
       return;
     }
     telegramHapticImpact("light");
+    if (v === view) window.dispatchEvent(new Event("yume-reset-current-tab"));
     if (v === "login" || v === "register") {
       setViewRaw(v);
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -2085,9 +2086,9 @@ function Index() {
       ) : view === "profile" ? (
         <Profile animeList={ANIME} onSelect={select} onCatalog={() => setView("catalog")} isAdmin={isAdmin} onAdmin={() => setView("admin")} telegramMiniApp={isTelegramMiniApp} />
       ) : view === "favorites" ? (
-        <Profile key="favorites" initialPanel="favorites" animeList={ANIME} onSelect={select} onCatalog={() => setView("catalog")} telegramMiniApp={isTelegramMiniApp} />
+        <Profile key="favorites" initialPanel="favorites" animeList={ANIME} onSelect={select} onCatalog={() => setView("catalog")} telegramMiniApp={isTelegramMiniApp} onBack={() => { setViewRaw("my"); void navigate({ to: "/", replace: true, search: { section: "my" } }); window.scrollTo({ top: 0, behavior: "auto" }); }} />
       ) : view === "watchlist" ? (
-        <Profile key="watchlist" initialPanel="watchlist" animeList={ANIME} onSelect={select} onCatalog={() => setView("catalog")} telegramMiniApp={isTelegramMiniApp} />
+        <Profile key="watchlist" initialPanel="watchlist" animeList={ANIME} onSelect={select} onCatalog={() => setView("catalog")} telegramMiniApp={isTelegramMiniApp} onBack={() => { setViewRaw("my"); void navigate({ to: "/", replace: true, search: { section: "my" } }); window.scrollTo({ top: 0, behavior: "auto" }); }} />
       ) : view === "privacy" ? (
         <Profile key="privacy" initialPanel="documents" animeList={ANIME} onSelect={select} onCatalog={() => setView("catalog")} />
       ) : view === "privacy-policy" ? (
