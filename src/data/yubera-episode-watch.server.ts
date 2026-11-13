@@ -27,10 +27,12 @@ export async function handleYuberaEpisodeWatch(r:Request):Promise<Response>{
   const episodeCount=Number(anime.episodes);
   if(Number.isSafeInteger(episodeCount)&&episodeCount>0&&episode>episodeCount)return json({error:"episode_not_in_catalog"},400);
   await d.prepare("DELETE FROM yume_episode_watch_sessions WHERE expires_at<=?").bind(now).run();
-  const activeSessions=await d.prepare("SELECT COUNT(*) AS count FROM yume_episode_watch_sessions WHERE user_id=? AND expires_at>? AND completed_at IS NULL").bind(userId,now).first<{count:number}>();
-  if(Number(activeSessions?.count??0)>=5)return json({error:"too_many_active_watch_sessions"},429);
-  const id=crypto.randomUUID();await d.prepare("INSERT INTO yume_episode_watch_sessions(id,user_id,anime_id,episode_number,duration_seconds,last_position_seconds,last_heartbeat_at,watched_segments_json,created_at,expires_at) VALUES(?,?,?,?,?,?,?,?,?,?)")
-   .bind(id,userId,animeId,episode,duration,position,now,"[]",now,now+3*60*60*1000).run();
+  const id=crypto.randomUUID();
+  const inserted=await d.prepare(
+   "INSERT INTO yume_episode_watch_sessions(id,user_id,anime_id,episode_number,duration_seconds,last_position_seconds,last_heartbeat_at,watched_segments_json,created_at,expires_at) " +
+   "SELECT ?,?,?,?,?,?,?,?,?,? WHERE (SELECT COUNT(*) FROM yume_episode_watch_sessions WHERE user_id=? AND expires_at>? AND completed_at IS NULL) < 5",
+  ).bind(id,userId,animeId,episode,duration,position,now,"[]",now,now+3*60*60*1000,userId,now).run();
+  if(Number(inserted.meta?.changes??0)!==1)return json({error:"too_many_active_watch_sessions"},429);
   return json({ok:true,sessionId:id,heartbeatSeconds:10});
  }
  if(x.action!=="heartbeat")return json({error:"invalid_action"},400);
