@@ -91,8 +91,10 @@ async function xpTotal(database: Database, userId: string): Promise<number> {
     .bind(userId).first<{ total: number }>();
   return Math.max(0, Number(row?.total ?? 0));
 }
-function xpState(total: number) {
-  const current = [...YUBERA_XP_LEVELS].reverse().find((level) => total >= level.min) ?? YUBERA_XP_LEVELS[0];
+function xpState(total: number, manualLevel: number | null = null) {
+  const current = manualLevel === null
+    ? [...YUBERA_XP_LEVELS].reverse().find((level) => total >= level.min) ?? YUBERA_XP_LEVELS[0]
+    : YUBERA_XP_LEVELS.find((level) => level.level === manualLevel) ?? YUBERA_XP_LEVELS[0];
   const next = YUBERA_XP_LEVELS.find((level) => level.level === current.level + 1) ?? null;
   return {
     total, level: current.level, title: current.title,
@@ -102,14 +104,16 @@ function xpState(total: number) {
     remaining: next ? Math.max(0, next.min - total) : 0,
   };
 }
-async function supportState(database: Database, telegramUserId: string) {
+async function supportState(database: Database, telegramUserId: string, manualLevel: number | null = null) {
   const row = await database.prepare(`SELECT COALESCE(SUM(d.amount), 0) AS total
     FROM yume_stars_donations d
     LEFT JOIN yume_stars_refunds r ON r.telegram_payment_charge_id = d.telegram_payment_charge_id
     WHERE d.telegram_user_id = ? AND d.status = 'paid' AND r.telegram_payment_charge_id IS NULL`)
     .bind(telegramUserId).first<{ total: number }>();
   const total = Math.max(0, Number(row?.total ?? 0));
-  const current = [...YUBERA_SUPPORT_LEVELS].reverse().find((level) => total >= level.min) ?? YUBERA_SUPPORT_LEVELS[0];
+  const current = manualLevel === null
+    ? [...YUBERA_SUPPORT_LEVELS].reverse().find((level) => total >= level.min) ?? YUBERA_SUPPORT_LEVELS[0]
+    : YUBERA_SUPPORT_LEVELS.find((level) => level.level === manualLevel) ?? YUBERA_SUPPORT_LEVELS[0];
   const next = YUBERA_SUPPORT_LEVELS.find((level) => level.level === current.level + 1) ?? null;
   return { total, level: current.level, title: current.title, asset: current.asset,
     nextLevel: next?.level ?? null, nextTitle: next?.title ?? null, nextThreshold: next?.min ?? null,
@@ -121,9 +125,11 @@ async function profileSummary(database: Database, userId: string, viewerId: stri
   if (!account) return null;
   const isOwner = viewerId === userId;
   if (!isOwner && account.profile.visibility !== "public") return { private: true };
-  const [xp, support, plus, followers, following, collections, unlockedSupportFrames, favoriteCount, watchlistCount, historyCount] = await Promise.all([
-    xpTotal(database, userId).then(xpState),
-    supportState(database, account.user.telegram_user_id),
+  const [xpLedgerTotal, supportOverride, xpOverride, support, plus, followers, following, collections, unlockedSupportFrames, favoriteCount, watchlistCount, historyCount] = await Promise.all([
+    xpTotal(database, userId),
+    database.prepare("SELECT support_level FROM yume_user_level_overrides WHERE user_id = ?").bind(userId).first<{ support_level: number | null }>(),
+    database.prepare("SELECT xp_level FROM yume_user_level_overrides WHERE user_id = ?").bind(userId).first<{ xp_level: number | null }>(),
+    supportState(database, account.user.telegram_user_id, null),
     plusActive(database, userId),
     database.prepare("SELECT COUNT(*) AS count FROM yume_follows WHERE followed_id = ?").bind(userId).first<{ count: number }>(),
     database.prepare("SELECT COUNT(*) AS count FROM yume_follows WHERE follower_id = ?").bind(userId).first<{ count: number }>(),
@@ -133,6 +139,10 @@ async function profileSummary(database: Database, userId: string, viewerId: stri
     isOwner ? database.prepare("SELECT COUNT(*) AS count FROM yume_saved_anime WHERE user_id=? AND list_type='watchlist'").bind(userId).first<{count:number}>() : Promise.resolve(null),
     isOwner ? database.prepare("SELECT COUNT(*) AS count FROM yume_view_history WHERE user_id=?").bind(userId).first<{count:number}>() : Promise.resolve(null),
   ]);
+  const xp = xpState(xpLedgerTotal, xpOverride?.xp_level ?? null);
+  const effectiveSupport = supportOverride?.support_level === null || supportOverride?.support_level === undefined
+    ? support
+    : await supportState(database, account.user.telegram_user_id, supportOverride.support_level);
   const follow = viewerId && viewerId !== userId
     ? await database.prepare("SELECT 1 AS followed FROM yume_follows WHERE follower_id = ? AND followed_id = ?").bind(viewerId, userId).first()
     : null;
@@ -141,7 +151,7 @@ async function profileSummary(database: Database, userId: string, viewerId: stri
     displayName: [account.user.telegram_first_name, account.user.telegram_last_name].filter(Boolean).join(" ") || account.user.telegram_username || "Пользователь",
     username: account.user.telegram_username, photoUrl: account.user.telegram_photo_url,
     bio: account.profile.bio, avatarFrame: isSupportFrame(account.profile.avatar_frame) ? account.profile.avatar_frame : plus ? account.profile.avatar_frame : null,
-    visibility: account.profile.visibility, xp: isOwner ? xp : { level: xp.level, title: xp.title }, support: isOwner ? support : { level: support.level, title: support.title, asset: support.asset },
+    visibility: account.profile.visibility, xp: isOwner ? xp : { level: xp.level, title: xp.title }, support: isOwner ? effectiveSupport : { level: effectiveSupport.level, title: effectiveSupport.title, asset: effectiveSupport.asset },
     availableSupportFrames: isOwner ? unlockedSupportFrames.results.map((row) => SUPPORT_FRAME_ASSETS[row.frame_level - 1]).filter(Boolean) : [],
     isPlus: plus, followers: Number(followers?.count ?? 0), following: Number(following?.count ?? 0),
     publicCollections: Number(collections?.count ?? 0), publicTitles: Number(collections?.titles ?? 0),
