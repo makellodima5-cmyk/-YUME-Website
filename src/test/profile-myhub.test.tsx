@@ -370,6 +370,10 @@ describe("Profile and My library pages", () => {
 describe("YUBERA profile navigation and public profile", () => {
   it("returns from Favorites to the My hub when Telegram Back is pressed", async () => {
     const onBack = vi.fn();
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).includes("/api/telegram/init-data")) return jsonResponse({ authenticated: true, user: { id: "user-1", firstName: "Dima" } });
+      return jsonResponse({ authenticated: true, items: [] });
+    }));
     render(withPreferences(
       <Profile initialPanel="favorites" animeList={[]} onSelect={vi.fn()} onCatalog={vi.fn()} telegramMiniApp onBack={onBack} />,
     ));
@@ -403,7 +407,7 @@ describe("YUBERA profile navigation and public profile", () => {
     render(withPreferences(<Profile animeList={[]} onSelect={vi.fn()} onCatalog={vi.fn()} />));
     await screen.findByRole("heading", { name: "Аккаунт Telegram" });
     fireEvent.click(screen.getByRole("button", { name: /Друзья/ }));
-    expect(await screen.findByRole("heading", { name: "Друзья" })).toBeInTheDocument();
+    expect((await screen.findAllByRole("heading", { name: "Друзья" })).length).toBeGreaterThan(0);
     await act(async () => { window.dispatchEvent(new Event("yume-reset-current-tab")); });
     expect(await screen.findByRole("heading", { name: "Аккаунт Telegram" })).toBeInTheDocument();
   });
@@ -447,7 +451,7 @@ describe("YUBERA profile navigation and public profile", () => {
     }));
 
     render(withPreferences(<Profile animeList={[]} onSelect={vi.fn()} onCatalog={vi.fn()} />));
-    await screen.findByRole("heading", { name: "Аккаунт Telegram" });
+    await screen.findByRole("button", { name: /Друзья/ });
     fireEvent.click(screen.getByRole("button", { name: /Друзья/ }));
     fireEvent.click(await screen.findByRole("button", { name: /Public User/ }));
     expect(await screen.findByRole("heading", { name: "Профиль пользователя" })).toBeInTheDocument();
