@@ -327,6 +327,15 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
 
   if (!profile) return <div className="mx-auto max-w-3xl px-4 py-8 text-white"><Header title="YUBERA" />{error ? <p role="alert" className="text-sm text-red-300">{error}</p> : <div className="animate-pulse space-y-3"><div className="h-28 rounded-2xl bg-white/5"/><div className="h-20 rounded-2xl bg-white/5"/></div>}</div>;
 
+  const xpTotal = profile.xp.total ?? 0;
+  const currentXpLevel = YUBERA_XP_LEVELS.find((item) => item.level === profile.xp.level);
+  const nextXpLevel = YUBERA_XP_LEVELS.find((item) => item.level === profile.xp.level + 1);
+  const xpProgress = currentXpLevel && nextXpLevel
+    ? Math.max(0, Math.min(100, ((xpTotal - currentXpLevel.min) / (nextXpLevel.min - currentXpLevel.min)) * 100))
+    : null;
+  const levelTitle = profile.xp.title || currentXpLevel?.title || `Уровень ${profile.xp.level}`;
+  const levelAsset = levelAssets[profile.xp.level - 1] || levelAssets[0];
+
   return <div className="mx-auto w-full max-w-none px-0 pb-3 pt-0 text-white">
     {screen === "home" && !getTelegramWebApp()?.initData && <button type="button" onClick={onBack} className="mb-3 inline-flex items-center gap-2 rounded-xl bg-white/5 px-3 py-2 text-sm text-white/80" aria-label="Назад"><ArrowLeft className="h-4 w-4" />Назад</button>}
     {error && <p role="alert" className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">{error}</p>}
@@ -356,13 +365,13 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
         </div>
         <div className="grid grid-cols-2 gap-2 px-3 pt-3 sm:gap-3 sm:px-4">
           <button type="button" onClick={() => changeScreen("level")} className="flex min-h-[104px] min-w-0 items-center gap-2 rounded-2xl border border-white/10 bg-[#202127] px-2.5 py-3 text-left sm:gap-3 sm:px-3">
-            <img src={`/images/yubera/${levelAssets[profile.xp.level - 1]}`} alt="" className="h-[clamp(42px,7vw,60px)] w-[clamp(42px,7vw,60px)] shrink-0 object-contain" />
+            <img src={`/images/yubera/${levelAsset}`} alt="" className="h-[clamp(42px,7vw,60px)] w-[clamp(42px,7vw,60px)] shrink-0 object-contain" />
             <span className="min-w-0 flex-1">
-              <b className="block whitespace-normal break-words text-xs font-semibold leading-tight sm:text-sm">{profile.xp.title || YUBERA_XP_LEVELS[profile.xp.level - 1]?.title || `Уровень ${profile.xp.level}`}</b>
+              <b className="block whitespace-normal break-words text-xs font-semibold leading-tight sm:text-sm">{levelTitle}</b>
               <span className="mt-1 block whitespace-normal text-[10px] leading-snug text-white/65 sm:text-xs">
-                Уровень {profile.xp.level} · {(profile.xp.total ?? 0).toLocaleString("ru-RU")}{YUBERA_XP_LEVELS[profile.xp.level] ? ` / ${YUBERA_XP_LEVELS[profile.xp.level].min.toLocaleString("ru-RU")} XP` : " XP"}
+                Уровень {profile.xp.level} · {xpTotal.toLocaleString("ru-RU")}{nextXpLevel ? ` / ${nextXpLevel.min.toLocaleString("ru-RU")} XP` : " XP"}
               </span>
-              {YUBERA_XP_LEVELS[profile.xp.level] && <span className="mt-2 block h-2 overflow-hidden rounded-full bg-white/10"><span className="block h-full rounded-full bg-gradient-to-r from-[#FF5738] to-[#FF6245]" style={{ width: `${Math.max(0, Math.min(100, profile.xp.progress ?? (((profile.xp.total ?? 0) - YUBERA_XP_LEVELS[profile.xp.level - 1].min) / (YUBERA_XP_LEVELS[profile.xp.level].min - YUBERA_XP_LEVELS[profile.xp.level - 1].min)) * 100))}%` }} /></span>}
+              {xpProgress !== null && <span className="mt-2 block h-2 overflow-hidden rounded-full bg-white/10"><span className="block h-full rounded-full bg-gradient-to-r from-[#FF5738] to-[#FF6245]" style={{ width: `${xpProgress}%` }} /></span>}
             </span>
             <ChevronRight className="h-4 w-4 shrink-0 text-white/65" />
           </button>
