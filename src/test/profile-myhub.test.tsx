@@ -365,3 +365,103 @@ describe("Profile and My library pages", () => {
     },
   );
 });
+
+
+describe("YUBERA profile navigation and public profile", () => {
+  it("returns from Favorites to the My hub when Telegram Back is pressed", async () => {
+    const onBack = vi.fn();
+    render(withPreferences(
+      <Profile initialPanel="favorites" animeList={[]} onSelect={vi.fn()} onCatalog={vi.fn()} telegramMiniApp onBack={onBack} />,
+    ));
+    expect(await screen.findByRole("heading", { name: /Избранное/i })).toBeInTheDocument();
+    const backEvent = new Event("yume-telegram-back", { cancelable: true });
+    await act(async () => { window.dispatchEvent(backEvent); });
+    expect(backEvent.defaultPrevented).toBe(true);
+    expect(onBack).toHaveBeenCalledTimes(1);
+  });
+
+  it("resets an open profile subpage when the active Profile tab is tapped again", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).includes("/api/telegram/init-data")) {
+        return jsonResponse({ authenticated: true, user: { id: "user-1", firstName: "Dima", username: "dima" } });
+      }
+      if (String(input).includes("/api/yubera/community?action=me")) {
+        return jsonResponse({
+          profile: {
+            id: "user-1", displayName: "Dima", username: "dima", photoUrl: null, bio: "",
+            avatarFrame: null, availableSupportFrames: [], visibility: "public", isPlus: false,
+            followers: 0, following: 0, publicCollections: 0, publicTitles: 0, collectionLikes: 0,
+            xp: { total: 10, level: 1, title: "Начинающий зритель" },
+            support: { level: 0, title: "Без статуса", asset: null },
+            stats: { favorites: 0, watchlist: 0, history: 0 },
+          },
+          collections: [],
+        });
+      }
+      return jsonResponse({ users: [], total: 0, hasMore: false, authenticated: true, items: [] });
+    }));
+    render(withPreferences(<Profile animeList={[]} onSelect={vi.fn()} onCatalog={vi.fn()} />));
+    await screen.findByRole("heading", { name: "Аккаунт Telegram" });
+    fireEvent.click(screen.getByRole("button", { name: /Друзья/ }));
+    expect(await screen.findByRole("heading", { name: "Друзья" })).toBeInTheDocument();
+    await act(async () => { window.dispatchEvent(new Event("yume-reset-current-tab")); });
+    expect(await screen.findByRole("heading", { name: "Аккаунт Telegram" })).toBeInTheDocument();
+  });
+
+  it("keeps the public profile summary, Plus badge, level, support and counters in one non-interactive profile card", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/api/telegram/init-data")) {
+        return jsonResponse({ authenticated: true, user: { id: "owner-1", firstName: "Owner", username: "owner" } });
+      }
+      if (url.includes("/api/yubera/community?action=me")) {
+        return jsonResponse({
+          profile: {
+            id: "owner-1", displayName: "Owner", username: "owner", photoUrl: null, bio: "",
+            avatarFrame: null, availableSupportFrames: [], visibility: "public", isPlus: false,
+            followers: 0, following: 1, publicCollections: 0, publicTitles: 0, collectionLikes: 0,
+            xp: { total: 10, level: 1, title: "Начинающий зритель" },
+            support: { level: 0, title: "Без статуса", asset: null },
+            stats: { favorites: 0, watchlist: 0, history: 0 },
+          },
+          collections: [],
+        });
+      }
+      if (url.includes("action=friends")) {
+        return jsonResponse({ users: [{ id: "public-1", telegram_first_name: "Public", telegram_last_name: "User", telegram_username: "public_user", telegram_photo_url: "https://example.com/public.jpg", avatar_frame: null }], total: 1, hasMore: false });
+      }
+      if (url.includes("action=recommendations")) return jsonResponse({ users: [], total: 0, hasMore: false });
+      if (url.includes("action=profile&userId=public-1")) {
+        return jsonResponse({
+          profile: {
+            id: "public-1", displayName: "Public User", username: "public_user", photoUrl: "https://example.com/public.jpg",
+            bio: "Описание публичного профиля", avatarFrame: null, isPlus: true, isFollowing: false,
+            publicCollections: 5, publicTitles: 28, collectionLikes: 13,
+            xp: { level: 2, title: "Любитель аниме" },
+            support: { level: 4, title: "Почётный покровитель", asset: null },
+          },
+          collections: [],
+        });
+      }
+      return jsonResponse({ authenticated: true, items: [] });
+    }));
+
+    render(withPreferences(<Profile animeList={[]} onSelect={vi.fn()} onCatalog={vi.fn()} />));
+    await screen.findByRole("heading", { name: "Аккаунт Telegram" });
+    fireEvent.click(screen.getByRole("button", { name: /Друзья/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /Public User/ }));
+    expect(await screen.findByRole("heading", { name: "Профиль пользователя" })).toBeInTheDocument();
+
+    const publicName = screen.getByText("Public User");
+    const profileCard = publicName.closest("section");
+    expect(profileCard).toHaveTextContent("Plus");
+    expect(profileCard).toHaveTextContent("Любитель аниме");
+    expect(profileCard).toHaveTextContent("Почётный покровитель");
+    expect(profileCard).toHaveTextContent("5");
+    expect(profileCard).toHaveTextContent("28");
+    expect(profileCard).toHaveTextContent("13");
+    expect(screen.getByRole("button", { name: "Подписаться" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Уровень 2/ })).not.toBeInTheDocument();
+    expect(screen.getByText("Публичные подборки")).toBeInTheDocument();
+  });
+});
