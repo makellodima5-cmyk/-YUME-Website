@@ -83,7 +83,7 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
 
   useEffect(() => {
     if (settingsExpanded) {
-      document.getElementById("app-settings")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      document.getElementById("app-settings")?.scrollIntoView?.({ behavior: "smooth", block: "nearest" });
     }
   }, [settingsExpanded]);
   const [supportLinks, setSupportLinks] = useState<{ group: string | null; personal: string | null }>({ group: null, personal: null });
