@@ -468,5 +468,43 @@ describe("YUBERA profile navigation and public profile", () => {
     expect(screen.getByRole("button", { name: "Подписаться" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Уровень 2/ })).not.toBeInTheDocument();
     expect(screen.getByText("Публичные подборки")).toBeInTheDocument();
+    expect(publicName).toHaveClass("whitespace-nowrap");
+    expect(screen.getByText("@public_user")).toHaveClass("whitespace-nowrap");
+  });
+
+  it("keeps collection form fields focused while typing", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).includes("/api/telegram/init-data")) {
+        return jsonResponse({ authenticated: true, user: { id: "user-1", firstName: "Dima", username: "dima" } });
+      }
+      if (String(input).includes("/api/yubera/community?action=me")) {
+        return jsonResponse({
+          profile: {
+            id: "user-1", displayName: "Dima", username: "dima", photoUrl: null, bio: "",
+            avatarFrame: null, availableSupportFrames: [], visibility: "public", isPlus: false,
+            followers: 0, following: 0, publicCollections: 0, publicTitles: 0, collectionLikes: 0,
+            xp: { total: 10, level: 1, title: "Начинающий зритель" },
+            support: { level: 0, title: "Без статуса", asset: null },
+            stats: { favorites: 0, watchlist: 0, history: 0 },
+          },
+          collections: [],
+        });
+      }
+      return jsonResponse({ authenticated: true, items: [] });
+    }));
+
+    render(withPreferences(<Profile animeList={[]} onSelect={vi.fn()} onCatalog={vi.fn()} />));
+    await screen.findByText("Мои подборки");
+    fireEvent.click(screen.getByRole("button", { name: /Создать подборку/ }));
+
+    const titleInput = await screen.findByPlaceholderText("Введите название");
+    fireEvent.change(titleInput, { target: { value: "P" } });
+    expect(titleInput).toHaveValue("P");
+    expect(document.activeElement).toBe(titleInput);
+
+    const descriptionInput = screen.getByPlaceholderText("Расскажите о подборке");
+    fireEvent.change(descriptionInput, { target: { value: "Описание" } });
+    expect(descriptionInput).toHaveValue("Описание");
+    expect(document.activeElement).toBe(descriptionInput);
   });
 });
