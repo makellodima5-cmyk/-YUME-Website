@@ -64,7 +64,6 @@ function formatCollectionTitleCount(value: number): string {
 
 export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false, onSettings, settingsExpanded = false, onLegal, onAbout, onAdmin, onSupport, onAccount, onScreenChange }: Props) {
   const [screen, setScreen] = useState<Screen>("home");
-  useEffect(() => { onScreenChange?.(screen); }, [screen, onScreenChange]);
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [collections, setCollections] = useState<Collection[]>([]);
   const [busy, setBusy] = useState(false);
@@ -131,7 +130,7 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Ошибка запроса"); return null; }
     finally { setBusy(false); }
   };
-  const changeScreen = (next: Screen) => { setMenuId(null); setError(""); setScreen(next); window.scrollTo({ top: 0, behavior: "auto" }); };
+  const changeScreen = (next: Screen) => { setMenuId(null); setError(""); setScreen(next); onScreenChange?.(next); window.scrollTo({ top: 0, behavior: "auto" }); };
   const orderedCollections = useMemo(() => [...collections].sort((a,b) => Number(b.is_pinned)-Number(a.is_pinned)), [collections]);
   const pinned = orderedCollections.filter(item => item.is_pinned);
   const rest = orderedCollections.filter(item => !item.is_pinned);

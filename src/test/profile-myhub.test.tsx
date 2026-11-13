@@ -115,12 +115,34 @@ describe("Profile and My library pages", () => {
     expect(await screen.findByRole("heading", { name: "Аккаунт Telegram" })).toBeInTheDocument();
     expect(await screen.findByRole("button", { name: "Редактировать профиль" })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /Друзья/ }));
-    expect((await screen.findAllByRole("heading", { name: "Друзья" })).length).toBeGreaterThan(0);
-    expect(screen.queryByRole("heading", { name: "Аккаунт Telegram" })).not.toBeInTheDocument();
+    const accountHeading = () => screen.queryByRole("heading", { name: "Аккаунт Telegram" });
+    const expectAccountPanelHidden = () => expect(accountHeading()).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Назад" }));
+    // Every nested YUBERA view must hide the account controls, not just Friends.
+    for (const [label, heading] of [
+      [/Все подборки/, "Мои подборки"],
+      [/Друзья/, "Друзья"],
+      [/Уровень 1/, "Уровень пользователя"],
+      [/Статус поддержки/, "Статус поддержки"],
+    ] as const) {
+      fireEvent.click(screen.getByRole("button", { name: label }));
+      expect((await screen.findAllByRole("heading", { name: heading })).length).toBeGreaterThan(0);
+      expectAccountPanelHidden();
+      fireEvent.click(screen.getByRole("button", { name: "Назад" }));
+      expect(await screen.findByRole("heading", { name: "Аккаунт Telegram" })).toBeInTheDocument();
+    }
+
+    // Return to profile home before opening the create/edit forms.
     expect(await screen.findByRole("heading", { name: "Аккаунт Telegram" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Создать подборку" }));
+    expect(await screen.findByRole("heading", { name: "Создать подборку" })).toBeInTheDocument();
+    expectAccountPanelHidden();
+    fireEvent.click(screen.getByRole("button", { name: "Отменить" }));
+    expect(await screen.findByRole("heading", { name: "Аккаунт Telegram" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Редактировать профиль" }));
+    expect(await screen.findByRole("heading", { name: "Редактирование профиля" })).toBeInTheDocument();
+    expectAccountPanelHidden();
   });
 
   it("uses Telegram BackButton to return from profile subpages and hides the in-page back link", async () => {
