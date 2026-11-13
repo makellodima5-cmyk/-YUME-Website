@@ -445,7 +445,7 @@ async function readCommentUpdates(
   viewer: Viewer | null,
   since: string,
   now: string,
-): Promise<{ updates: Array<{ root: CommentDto; replies: CommentDto[] }>; totalCount: number; checkedAt: string }> {
+): Promise<{ updates: Array<{ root: CommentDto; replies: CommentDto[] }>; totalCount?: number; checkedAt: string }> {
   const changedResult = await db.prepare(
     COMMENT_SELECT +
     "WHERE c.anime_id = ? AND c.created_at > ? AND c.expires_at > ? " +
@@ -455,7 +455,9 @@ async function readCommentUpdates(
   const changed = changedResult.results;
   const rootIds = Array.from(new Set(changed.map(row => row.thread_root_id)));
   if (!rootIds.length) {
-    return { updates: [], totalCount: await readCommentCount(db, animeId, now), checkedAt: now };
+    // Empty polls need no summary-count query: the client already has the
+    // current count and no comment data changed.
+    return { updates: [], checkedAt: now };
   }
   const placeholders = rootIds.map(() => "?").join(", ");
   const rootsResult = await db.prepare(
