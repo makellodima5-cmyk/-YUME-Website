@@ -552,6 +552,7 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
     </>}
     {screen === "friends" && <><Header title="Друзья" subtitle="Подписки и поиск пользователей YUBERA"/><YuberaFriendsPanel onOpenProfile={(id) => void viewPublicProfile(id)} onFollowChange={load}/></>}
     {screen === "level" && <>
+      {backButton()}
       <div className="relative mb-3 flex min-h-[112px] items-center overflow-hidden rounded-[20px] border border-white/10 bg-[#17181e] px-4 py-4 sm:min-h-[132px] sm:px-6">
         <img src="/images/yubera/yubera_banner.webp" alt="" className="absolute inset-0 h-full w-full object-cover object-[center_38%]" />
         <div className="absolute inset-0 bg-gradient-to-r from-[#101116]/95 via-[#101116]/75 to-[#101116]/35" />
