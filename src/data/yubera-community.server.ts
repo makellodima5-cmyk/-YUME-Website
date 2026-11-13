@@ -168,12 +168,16 @@ async function createCollection(database: Database, userId: string, input: Recor
   const description = typeof input.description === "string" ? input.description.trim() : "";
   if (!title || title.length > 50 || description.length > 250) return json({ error: "invalid_collection" }, 400);
   const plus = await plusActive(database, userId);
-  const count = await database.prepare("SELECT COUNT(*) AS count FROM yume_collections WHERE user_id = ?").bind(userId).first<{ count: number }>();
-  if (Number(count?.count ?? 0) >= (plus ? PLUS_COLLECTIONS : FREE_COLLECTIONS)) return json({ error: "collection_limit_reached" }, 409);
+  const collectionLimit = plus ? PLUS_COLLECTIONS : FREE_COLLECTIONS;
   const id = crypto.randomUUID();
-  const cover = typeof input.coverKey === "string" && /^YUBERA_Collection_Cover_[A-Za-z_]+\.webp$/.test(input.coverKey) ? input.coverKey : null;
-  await database.prepare("INSERT INTO yume_collections(id,user_id,title,description,cover_key,is_public) VALUES(?,?,?,?,?,?)")
-    .bind(id, userId, title, description, cover, input.isPublic === true ? 1 : 0).run();
+  const cover = typeof input.coverKey === "string" && /^YUBERA_Collection_Cover_[A-Za-z_]+\\.webp$/.test(input.coverKey) ? input.coverKey : null;
+  // Enforce the cap in the INSERT itself. A separate COUNT followed by INSERT
+  // lets concurrent requests exceed the Free/Plus limit.
+  const inserted = await database.prepare(
+    "INSERT INTO yume_collections(id,user_id,title,description,cover_key,is_public) " +
+    "SELECT ?,?,?,?,?,? WHERE (SELECT COUNT(*) FROM yume_collections WHERE user_id=?) < ?",
+  ).bind(id, userId, title, description, cover, input.isPublic === true ? 1 : 0, userId, collectionLimit).run();
+  if (Number(inserted.meta?.changes ?? 0) !== 1) return json({ error: "collection_limit_reached" }, 409);
   return json({ ok: true, id });
 }
 async function collectionsFor(database: Database, ownerId: string, viewerId: string, includePrivate: boolean) {
