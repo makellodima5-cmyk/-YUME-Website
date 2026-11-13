@@ -20,7 +20,7 @@ describe("YUBERA community foundation", () => {
     expect(server).toContain("profile.visibility !== \"public\"");
     expect(server).toContain("p.visibility = 'public'");
     expect(server).toContain("ownedCollection(database, userId, id)");
-    expect(server).toContain("YUBERA_Collection_Cover_[A-Za-z_]+\\\\.webp");
+    expect(server).toContain("YUBERA_Collection_Cover_[A-Za-z_]+\\.webp");
     expect(server).toContain("PLUS_COLLECTIONS : FREE_COLLECTIONS");
     expect(server).toContain("SELECT ?,?,?,?,?,? WHERE (SELECT COUNT(*) FROM yume_collections WHERE user_id=?) < ?");
     expect(server).toContain("inserted.meta?.changes");
