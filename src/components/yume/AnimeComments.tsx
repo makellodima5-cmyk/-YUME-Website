@@ -321,12 +321,30 @@ export function AnimeComments({ animeId, language }: Props) {
         pollLock.current = false;
       }
     };
-    const timer = window.setInterval(() => { void poll(); }, 5000);
-    const onVisibility = () => { if (document.visibilityState === "visible") void poll(); };
+    let timer: number | null = null;
+    const startPolling = () => {
+      if (!active || timer !== null || document.visibilityState !== "visible") return;
+      timer = window.setInterval(() => { void poll(); }, 30_000);
+    };
+    const stopPolling = () => {
+      if (timer === null) return;
+      window.clearInterval(timer);
+      timer = null;
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") {
+        stopPolling();
+        return;
+      }
+      // Catch up immediately when the user returns to the discussion.
+      void poll();
+      startPolling();
+    };
+    startPolling();
     document.addEventListener("visibilitychange", onVisibility);
     return () => {
       active = false;
-      window.clearInterval(timer);
+      stopPolling();
       document.removeEventListener("visibilitychange", onVisibility);
     };
   }, [animeId]);
