@@ -385,8 +385,10 @@ export async function handleYuberaCommunity(request: Request): Promise<Response>
     if (!exists && Number(count?.count ?? 0) >= (plus ? PLUS_TITLES : FREE_TITLES)) return json({ error: "collection_title_limit_reached" }, 409);
     if (!database.batch) return json({ error: "atomic_xp_batch_unavailable" }, 503);
     await database.batch([
-      database.prepare("INSERT OR IGNORE INTO yume_collection_items(collection_id,anime_id,position) VALUES(?,?,?)")
-        .bind(id, animeId, Number(count?.count ?? 0)),
+      database.prepare(
+        "INSERT OR IGNORE INTO yume_collection_items(collection_id,anime_id,position) " +
+        "SELECT ?,?,COALESCE(MAX(position),-1)+1 FROM yume_collection_items WHERE collection_id=? HAVING COUNT(*) < ?",
+      ).bind(id, animeId, id, plus ? PLUS_TITLES : FREE_TITLES),
       database.prepare("INSERT OR IGNORE INTO yume_xp_ledger(id,user_id,event_key,event_type,amount,metadata_json) SELECT ?,?,?,'collection_add',?,? WHERE changes()=1")
         .bind(crypto.randomUUID(), userId, `collection-add:${id}:${animeId}`, YUBERA_XP_REWARDS.collectionTitleAdded, JSON.stringify({ collectionId: id, animeId })),
       database.prepare("INSERT OR IGNORE INTO yume_xp_ledger(id,user_id,event_key,event_type,amount,metadata_json) SELECT ?,?,?,'collection_milestone',?,? WHERE changes()=1 AND (SELECT COUNT(*) FROM yume_collection_items WHERE collection_id=?)=?")
