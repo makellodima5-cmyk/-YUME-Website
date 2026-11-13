@@ -123,6 +123,7 @@ describe("Profile and My library pages", () => {
     }));
 
     const { container } = render(withPreferences(<Profile animeList={[]} onSelect={vi.fn()} onCatalog={vi.fn()} />));
+    await screen.findByRole("button", { name: "Уровень 2: Любитель аниме" });
     const hero = container.querySelector<HTMLElement>('[aria-label="Профиль пользователя"]');
     expect(hero).toBeInTheDocument();
     expect(hero).toHaveClass("px-3", "pb-2", "pt-2");
