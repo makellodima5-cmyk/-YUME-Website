@@ -204,7 +204,7 @@ describe("YUBERA community foundation", () => {
     expect(publicView).toContain("publicProfile.publicCollections");
     expect(publicView).toContain("publicProfile.publicTitles");
     expect(publicView).toContain("publicProfile.collectionLikes");
-    expect(publicView).toContain("Показать полностью");
+    expect(publicView).toContain("Читать полностью");
     expect(publicView).toContain("whitespace-nowrap");
     expect(publicView).toContain("publicCollections.slice(0, 4)");
     expect(publicView).not.toContain("publicProfile.xp.total");
