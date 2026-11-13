@@ -405,6 +405,7 @@ describe("YUBERA profile navigation and public profile", () => {
       return jsonResponse({ users: [], total: 0, hasMore: false, authenticated: true, items: [] });
     }));
     render(withPreferences(<Profile animeList={[]} onSelect={vi.fn()} onCatalog={vi.fn()} />));
+    await screen.findByText("Мои подборки");
     await screen.findByRole("heading", { name: "Аккаунт Telegram" });
     fireEvent.click(screen.getByRole("button", { name: /Друзья/ }));
     expect((await screen.findAllByRole("heading", { name: "Друзья" })).length).toBeGreaterThan(0);
