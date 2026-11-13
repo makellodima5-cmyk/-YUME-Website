@@ -43,6 +43,12 @@ describe("YUBERA community foundation", () => {
     expect(friendsPanel).toContain("line-clamp-1");
     expect(friendsPanel).not.toContain("По дате подписки");
     expect(friendsPanel).toContain("bg-neon text-white shadow-neon");
+    expect(component).not.toContain("text-black");
+    const styles = await readFile(resolve(process.cwd(), "src/styles.css"), "utf8");
+    const brandTokens = styles.slice(styles.lastIndexOf("/* One saturated YUBERA orange"));
+    expect(brandTokens).toContain("--primary: #FF5738");
+    expect(brandTokens).toContain("--primary-foreground: #FFFFFF");
+    expect(brandTokens).toContain("linear-gradient(120deg, #FF5738 0%, #FF704F 100%)");
   });
 
   it("awards collection XP atomically with unique-add and milestone guards", async () => {
