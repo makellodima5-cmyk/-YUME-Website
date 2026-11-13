@@ -396,7 +396,7 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
             <div className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto] grid-rows-[auto_auto] items-center gap-x-2">
               <div className="col-span-2 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
                 <h2 className="min-w-0 whitespace-normal break-words text-[clamp(18px,4.6vw,22px)] font-bold leading-tight">{profile.displayName}</h2>
-                {profile.isPlus && <span className="inline-flex shrink-0 items-center gap-0.5 whitespace-nowrap rounded-full border border-[#ffc66d]/55 bg-[#ffc66d]/10 px-1.5 py-0.5 text-[10px] font-bold leading-none text-[#ffc66d]"><Crown className="h-6 w-6 shrink-0" strokeWidth={2.75} />Plus</span>}
+                {profile.isPlus && <span className="inline-flex shrink-0 items-center gap-0.5 whitespace-nowrap rounded-full border border-[#ffc66d]/55 bg-[#ffc66d]/10 px-1.5 py-0.5 text-[10px] font-bold leading-none text-[#ffc66d]"><Crown className="h-[18px] w-[18px] shrink-0" strokeWidth={2.75} />Plus</span>}
               </div>
               <div className="min-w-0 self-start">
                 {profile.username && <p className="whitespace-normal break-words text-[13px] leading-tight text-white/75">@{profile.username}</p>}
@@ -565,7 +565,7 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
             <div className="min-w-0 flex-1">
               <div className="flex min-w-0 items-center gap-x-2">
                 <h3 className="min-w-0 truncate whitespace-nowrap text-[clamp(15px,4vw,22px)] font-bold leading-tight text-white">{publicProfile.displayName}</h3>
-                {publicProfile.isPlus && <span className="inline-flex shrink-0 items-center gap-0.5 whitespace-nowrap rounded-full border border-[#ffc66d]/55 bg-[#ffc66d]/10 px-1.5 py-0.5 text-[10px] font-bold leading-none text-[#ffc66d]"><Crown className="h-6 w-6 shrink-0" strokeWidth={2.75} />Plus</span>}
+                {publicProfile.isPlus && <span className="inline-flex shrink-0 items-center gap-0.5 whitespace-nowrap rounded-full border border-[#ffc66d]/55 bg-[#ffc66d]/10 px-1.5 py-0.5 text-[10px] font-bold leading-none text-[#ffc66d]"><Crown className="h-[18px] w-[18px] shrink-0" strokeWidth={2.75} />Plus</span>}
               </div>
               {publicProfile.username && <p className="mt-1 whitespace-nowrap text-[13px] leading-tight text-white/75">@{publicProfile.username}</p>}
               {publicProfile.bio && <div className="mt-1 min-w-0">
