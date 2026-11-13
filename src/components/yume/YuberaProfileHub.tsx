@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Bookmark, Check, ChevronRight, Crown, Eye, FileText, Globe2, Heart, Image as ImageIcon, Info, Layers3, LifeBuoy, LockKeyhole, LogOut, Pencil, Pin, Plus, Search, Settings, Shield, ShieldCheck, Sparkles, Star, Trash2, Type, Users, X } from "lucide-react";
+import { ArrowLeft, Bookmark, Check, ChevronRight, ChevronDown, Crown, Eye, FileText, Globe2, Heart, Image as ImageIcon, Info, Layers3, LifeBuoy, LockKeyhole, LogOut, Pencil, Pin, Plus, Search, Settings, Shield, ShieldCheck, Sparkles, Star, Trash2, Type, Users, X } from "lucide-react";
 import { TelegramStarsDonation } from "./TelegramStarsDonation";
 import { getTelegramWebApp } from "@/lib/telegram-mini-app";
 import { YuberaPlusPanel } from "./YuberaPlusPanel";
