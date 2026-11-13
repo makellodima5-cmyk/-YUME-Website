@@ -19,7 +19,7 @@ type ProfileData = {
 type Collection = { id: string; title: string; description: string; cover_key: string | null; is_public: number; is_pinned: number; title_count: number; like_count: number; liked: number };
 type CollectionFormSnapshot = { title: string; description: string; cover: string | null; isPublic: boolean; editingCollectionId: string | null };
 type ProfileFormSnapshot = { bio: string; visibility: "public" | "private"; frame: string | null };
-type Props = { animeList: Anime[]; onSelect: (anime: Anime) => void; onBack: () => void; isAdmin?: boolean; onSettings?: () => void; settingsExpanded?: boolean; onLegal?: () => void; onAbout?: () => void; onAdmin?: () => void; onSupport?: () => void; onAccount?: () => void };
+type Props = { animeList: Anime[]; onSelect: (anime: Anime) => void; onBack: () => void; isAdmin?: boolean; onSettings?: () => void; settingsExpanded?: boolean; onLegal?: () => void; onAbout?: () => void; onAdmin?: () => void; onSupport?: () => void; onAccount?: () => void; onScreenChange?: (screen: Screen) => void };
 
 const covers = [
   "YUBERA_Collection_Cover_Action.webp",
@@ -62,8 +62,9 @@ function formatCollectionTitleCount(value: number): string {
   return `${value} ${word}`;
 }
 
-export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false, onSettings, settingsExpanded = false, onLegal, onAbout, onAdmin, onSupport, onAccount }: Props) {
+export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false, onSettings, settingsExpanded = false, onLegal, onAbout, onAdmin, onSupport, onAccount, onScreenChange }: Props) {
   const [screen, setScreen] = useState<Screen>("home");
+  useEffect(() => { onScreenChange?.(screen); }, [screen, onScreenChange]);
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [collections, setCollections] = useState<Collection[]>([]);
   const [busy, setBusy] = useState(false);
@@ -272,9 +273,9 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
   );
   const Card = ({ children, className = "" }: { children: React.ReactNode; className?: string }) => <section className={`rounded-[18px] border border-white/10 bg-[#17181e] p-3 ${className}`}>{children}</section>;
   const Action = ({ icon, label, onClick, detail, expanded, controls }: { icon: React.ReactNode; label: string; onClick: () => void; detail?: string; expanded?: boolean; controls?: string }) => (
-    <button type="button" onClick={onClick} aria-expanded={expanded} aria-controls={controls} className={`flex min-h-[62px] w-full items-center gap-3 border-b border-white/5 py-2 text-left last:border-0 ${label === "Панель администратора" ? "rounded-xl border border-[#FF5738]/45 bg-[#FF5738]/[0.09] px-2.5" : "px-1"}`}>
-      <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-full ${label === "Панель администратора" ? "bg-[#FF5738]/25 text-[#FF704F]" : "bg-[#FF5738]/15 text-[#FF6847]"}`}>{icon}</span>
-      <span className="min-w-0 flex-1"><span className="block font-semibold text-white">{label}</span>{detail && <span className="block text-xs text-white/50">{detail}</span>}</span>
+    <button type="button" onClick={onClick} aria-expanded={expanded} aria-controls={controls} className={`flex min-h-[70px] w-full items-center gap-3 border-b border-white/5 py-2.5 text-left last:border-0 ${label === "Панель администратора" ? "rounded-xl border border-[#FF5738]/45 bg-[#FF5738]/[0.09] px-2.5" : "px-1"}`}>
+      <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-full ${label === "Панель администратора" ? "bg-[#FF5738]/25 text-[#FF704F]" : "bg-[#FF5738]/15 text-[#FF6847]"}`}>{icon}</span>
+      <span className="min-w-0 flex-1"><span className="block text-[15px] font-semibold text-white">{label}</span>{detail && <span className="block text-[13px] leading-snug text-white/55">{detail}</span>}</span>
       <ChevronRight className="h-4 w-4 text-white/40" />
     </button>
   );
@@ -328,7 +329,7 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
         <div className="relative -mt-7 px-2.5 pb-2.5 sm:px-3">
           <div className="flex items-end gap-3">
             <div className="shrink-0">{avatar(profile)}</div>
-            <div className="min-w-0 flex-1 pb-1"><p className="text-[10px] font-bold tracking-[.14em] text-[#FF5738]">ЛИЧНОЕ ПРОСТРАНСТВО</p><h2 className="mt-1 truncate text-lg font-bold">{profile.displayName}</h2>{profile.isPlus && <span className="mt-1 inline-flex items-center gap-1 rounded-full border border-[#ffc66d]/40 bg-[#ffc66d]/10 px-2 py-0.5 text-[10px] font-bold tracking-wide text-[#ffc66d]"><img src="/images/yubera/YUBERA_Plus_Crown_Simple.webp" alt="" className="h-3.5 w-3.5 object-contain"/>YUBERA Plus</span>}<p className="truncate text-xs text-white/65">@{profile.username || "YUBERA"}</p><p className="mt-1 line-clamp-1 text-[11px] text-white/65">{profile.bio || "Твоя коллекция и настройки Yubera"}</p></div>
+            <div className="min-w-0 flex-1 pb-1"><h2 className="truncate text-lg font-bold">{profile.displayName}</h2>{profile.isPlus && <span className="mt-1 inline-flex items-center gap-1 rounded-full border border-[#ffc66d]/40 bg-[#ffc66d]/10 px-2 py-0.5 text-[10px] font-bold tracking-wide text-[#ffc66d]"><img src="/images/yubera/YUBERA_Plus_Crown_Simple.webp" alt="" className="h-3.5 w-3.5 object-contain"/>YUBERA Plus</span>}<p className="truncate text-xs text-white/65">@{profile.username || "YUBERA"}</p><p className="mt-1 line-clamp-1 text-[11px] text-white/65">{profile.bio || "Твоя коллекция и настройки Yubera"}</p></div>
             <button onClick={()=>changeScreen("edit")} className="mb-1 inline-flex shrink-0 items-center gap-1.5 rounded-full bg-white/10 px-3 py-2 text-[11px] font-semibold text-white" aria-label="Редактировать профиль"><Pencil className="h-3.5 w-3.5"/>Редактировать</button>
           </div>
           <div className="mt-2.5 grid grid-cols-2 gap-2">

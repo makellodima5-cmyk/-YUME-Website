@@ -97,6 +97,7 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
   const [accountMessage, setAccountMessage] = useState("");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [historyCount, setHistoryCount] = useState(0);
+  const [profileHubScreen, setProfileHubScreen] = useState("home");
   useEffect(() => {
     let cancelled = false;
     const syncLocalHistory = () => setHistoryCount(new Set(readPlaybackProgress().map(entry => entry.animeId)).size);
@@ -544,18 +545,19 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
               onAdmin={onAdmin}
               onSupport={() => navigatePanel("support")}
               onAccount={() => document.getElementById("telegram-account")?.scrollIntoView({ behavior: "smooth", block: "center" })}
+              onScreenChange={setProfileHubScreen}
             />
-            <section id="telegram-account" className="mt-2 rounded-[18px] border border-border bg-card/50 p-3">
-              <h2 className="text-base font-semibold">{language === "ru" ? "Аккаунт Telegram" : "Telegram account"}</h2>
-              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+            {profileHubScreen === "home" && <section id="telegram-account" className="mt-3 rounded-[18px] border border-border bg-card/50 p-4">
+              <h2 className="text-lg font-semibold">{language === "ru" ? "Аккаунт Telegram" : "Telegram account"}</h2>
+              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
                 {language === "ru" ? "Выход завершит текущий сеанс. Удаление аккаунта необратимо удалит избранное, список и историю просмотров." : "Signing out ends this session. Account deletion permanently removes favorites, your list, and viewing history."}
               </p>
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                <button type="button" disabled={accountBusy} onClick={() => void signOut()} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-full border border-border px-3 py-2 text-sm font-semibold hover:bg-accent disabled:opacity-50">
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                <button type="button" disabled={accountBusy} onClick={() => void signOut()} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-border px-3 py-2.5 text-sm font-semibold hover:bg-accent disabled:opacity-50">
                   {accountBusy ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />}
                   {language === "ru" ? "Выйти" : "Sign out"}
                 </button>
-                <button type="button" disabled={accountBusy} onClick={() => setShowDeleteConfirm(true)} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-full border border-destructive/50 px-3 py-2 text-sm font-semibold text-destructive hover:bg-destructive/10 disabled:opacity-50">
+                <button type="button" disabled={accountBusy} onClick={() => setShowDeleteConfirm(true)} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-destructive/50 px-3 py-2.5 text-sm font-semibold text-destructive hover:bg-destructive/10 disabled:opacity-50">
                   <Trash2 className="h-4 w-4" /> {language === "ru" ? "Удалить аккаунт" : "Delete account"}
                 </button>
               </div>
@@ -572,7 +574,7 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
                   </div>
                 </div>
               )}
-            </section>
+            </section>}
 
             {settingsExpanded && (
               <section id="app-settings" className="mt-6 rounded-2xl border border-border bg-card p-4 sm:p-5">

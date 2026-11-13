@@ -81,15 +81,46 @@ describe("Profile and My library pages", () => {
 
     render(withPreferences(<Profile animeList={[]} onSelect={vi.fn()} onCatalog={vi.fn()} />));
 
-    expect(await screen.findByText("ЛИЧНОЕ ПРОСТРАНСТВО")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Уровень 1/ })).toBeInTheDocument();
-    expect(screen.getAllByText("ЛИЧНОЕ ПРОСТРАНСТВО")).toHaveLength(1);
+    expect(await screen.findByRole("button", { name: /Уровень 1/ })).toBeInTheDocument();
     expect(screen.getByText("Мои подборки")).toBeInTheDocument();
     expect(screen.getAllByText("Dima")).toHaveLength(1);
     expect(screen.queryByText("Профиль, уровень, подборки и друзья")).not.toBeInTheDocument();
     const settingsButton = screen.getByRole("button", { name: /Настройки приложения/ });
     expect(settingsButton).toHaveAttribute("aria-expanded", "false");
 
+  });
+
+  it("keeps the Telegram account panel exclusive to the profile home screen", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).includes("/api/telegram/init-data")) {
+        return jsonResponse({ authenticated: true, user: { id: "user-1", firstName: "Dima", username: "dima" } });
+      }
+      if (String(input).includes("/api/yubera/community?action=me")) {
+        return jsonResponse({
+          profile: {
+            id: "user-1", displayName: "Dima", username: "dima", photoUrl: null, bio: "",
+            avatarFrame: null, availableSupportFrames: [], visibility: "public", isPlus: false,
+            followers: 0, following: 0, publicCollections: 0, publicTitles: 0, collectionLikes: 0,
+            xp: { total: 10, level: 1, title: "Начинающий зритель" },
+            support: { level: 0, title: "Без статуса", asset: null },
+            stats: { favorites: 0, watchlist: 0, history: 0 },
+          },
+          collections: [],
+        });
+      }
+      return jsonResponse({ authenticated: true, items: [] });
+    }));
+
+    render(withPreferences(<Profile animeList={[]} onSelect={vi.fn()} onCatalog={vi.fn()} />));
+    expect(await screen.findByRole("heading", { name: "Аккаунт Telegram" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Редактировать профиль" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Друзья/ }));
+    expect((await screen.findAllByRole("heading", { name: "Друзья" })).length).toBeGreaterThan(0);
+    expect(screen.queryByRole("heading", { name: "Аккаунт Telegram" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Назад" }));
+    expect(await screen.findByRole("heading", { name: "Аккаунт Telegram" })).toBeInTheDocument();
   });
 
   it("uses Telegram BackButton to return from profile subpages and hides the in-page back link", async () => {
