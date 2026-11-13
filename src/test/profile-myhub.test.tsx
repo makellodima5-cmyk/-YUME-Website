@@ -498,11 +498,13 @@ describe("YUBERA profile navigation and public profile", () => {
     fireEvent.click(screen.getByRole("button", { name: /Создать подборку/ }));
 
     const titleInput = await screen.findByPlaceholderText("Введите название");
+    titleInput.focus();
     fireEvent.change(titleInput, { target: { value: "P" } });
     expect(titleInput).toHaveValue("P");
     expect(document.activeElement).toBe(titleInput);
 
     const descriptionInput = screen.getByPlaceholderText("Расскажите о подборке");
+    descriptionInput.focus();
     fireEvent.change(descriptionInput, { target: { value: "Описание" } });
     expect(descriptionInput).toHaveValue("Описание");
     expect(document.activeElement).toBe(descriptionInput);
