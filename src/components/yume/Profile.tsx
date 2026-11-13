@@ -500,7 +500,7 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
   );
 
   return (
-    <main id="main-content" className={`yubera-with-bottom-nav px-3 pb-8 sm:px-4 md:px-6 lg:px-8 ${panel === "support" ? "pt-20" : "pt-[78px]"}`}>
+    <main id="main-content" className={`yubera-with-bottom-nav px-2 pb-5 sm:px-3 md:px-5 lg:px-8 ${panel === "support" ? "pt-20" : "pt-[78px]"}`}>
       <div className="mx-auto max-w-[1600px]">
         {!authChecked && (panel === "overview" || panel === "favorites") ? (
           <section className="mx-auto max-w-xl rounded-3xl border border-border bg-card/60 p-6 text-center sm:p-8" aria-live="polite" aria-busy="true">
@@ -545,17 +545,17 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
               onSupport={() => navigatePanel("support")}
               onAccount={() => document.getElementById("telegram-account")?.scrollIntoView({ behavior: "smooth", block: "center" })}
             />
-            <section id="telegram-account" className="mt-6 rounded-2xl border border-border bg-card/50 p-4">
+            <section id="telegram-account" className="mt-2 rounded-[18px] border border-border bg-card/50 p-3">
               <h2 className="text-base font-semibold">{language === "ru" ? "Аккаунт Telegram" : "Telegram account"}</h2>
               <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                 {language === "ru" ? "Выход завершит текущий сеанс. Удаление аккаунта необратимо удалит избранное, список и историю просмотров." : "Signing out ends this session. Account deletion permanently removes favorites, your list, and viewing history."}
               </p>
-              <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-                <button type="button" disabled={accountBusy} onClick={() => void signOut()} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-border px-4 py-2 text-sm font-semibold hover:bg-accent disabled:opacity-50">
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <button type="button" disabled={accountBusy} onClick={() => void signOut()} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-full border border-border px-3 py-2 text-sm font-semibold hover:bg-accent disabled:opacity-50">
                   {accountBusy ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />}
                   {language === "ru" ? "Выйти" : "Sign out"}
                 </button>
-                <button type="button" disabled={accountBusy} onClick={() => setShowDeleteConfirm(true)} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-destructive/40 px-4 py-2 text-sm font-semibold text-destructive hover:bg-destructive/10 disabled:opacity-50">
+                <button type="button" disabled={accountBusy} onClick={() => setShowDeleteConfirm(true)} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-full border border-destructive/50 px-3 py-2 text-sm font-semibold text-destructive hover:bg-destructive/10 disabled:opacity-50">
                   <Trash2 className="h-4 w-4" /> {language === "ru" ? "Удалить аккаунт" : "Delete account"}
                 </button>
               </div>
