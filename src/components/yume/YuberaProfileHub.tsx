@@ -69,6 +69,7 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [bio, setBio] = useState("");
+  const [bioExpanded, setBioExpanded] = useState(false);
   const [visibility, setVisibility] = useState<"public" | "private">("private");
   const [frame, setFrame] = useState<string | null>(null);
   const [frameCategory, setFrameCategory] = useState<"support" | "plus">("support");
@@ -272,10 +273,10 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
   );
   const Card = ({ children, className = "" }: { children: React.ReactNode; className?: string }) => <section className={`rounded-[18px] border border-white/10 bg-[#17181e] p-3 ${className}`}>{children}</section>;
   const Action = ({ icon, label, onClick, detail, expanded, controls }: { icon: React.ReactNode; label: string; onClick: () => void; detail?: string; expanded?: boolean; controls?: string }) => (
-    <button type="button" onClick={onClick} aria-expanded={expanded} aria-controls={controls} className={`flex min-h-[70px] w-full items-center gap-3 border-b border-white/5 py-2.5 text-left last:border-0 ${label === "Панель администратора" ? "rounded-xl border border-[#FF5738]/45 bg-[#FF5738]/[0.09] px-2.5" : "px-1"}`}>
-      <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-full ${label === "Панель администратора" ? "bg-[#FF5738]/25 text-[#FF704F]" : "bg-[#FF5738]/15 text-[#FF6847]"}`}>{icon}</span>
-      <span className="min-w-0 flex-1"><span className="block text-[15px] font-semibold text-white">{label}</span>{detail && <span className="block text-[13px] leading-snug text-white/55">{detail}</span>}</span>
-      <ChevronRight className="h-4 w-4 text-white/40" />
+    <button type="button" onClick={onClick} aria-expanded={expanded} aria-controls={controls} className={`flex min-h-[68px] w-full items-center gap-3 rounded-[14px] border px-3 py-2.5 text-left transition hover:border-white/20 ${label === "Панель администратора" ? "border-[#FF5738]/45 bg-[#FF5738]/[0.09]" : "border-white/10 bg-[#17181e]"}`}>
+      <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-full ${label === "Панель администратора" ? "bg-[#FF5738]/25 text-[#FF704F]" : "bg-[#FF5738]/15 text-[#FF6847]"}`}>{icon}</span>
+      <span className="min-w-0 flex-1"><span className="block whitespace-normal break-words text-[14px] font-semibold leading-tight text-white">{label}</span>{detail && <span className="mt-0.5 block whitespace-normal break-words text-[12px] leading-snug text-white/55">{detail}</span>}</span>
+      <ChevronRight className="h-4 w-4 shrink-0 text-white/45" />
     </button>
   );
   const avatar = (p: ProfileData | null) => (
@@ -324,22 +325,58 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
     {error && <p role="alert" className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">{error}</p>}
     {screen === "home" && <>
       <Card className="overflow-hidden p-0">
-        <div className="relative h-28 overflow-hidden sm:h-32"><img src="/images/yubera/yubera_banner.webp" alt="" className="h-full w-full object-cover object-[center_38%]"/><div className="absolute inset-0 bg-gradient-to-t from-[#17181e] via-[#17181e]/15 to-transparent"/></div>
-        <div className="relative -mt-7 px-2.5 pb-2.5 sm:px-3">
-          <div className="flex items-end gap-3">
+        <div className="relative h-[184px] overflow-hidden sm:h-[208px]">
+          <img src="/images/yubera/yubera_banner.webp" alt="" className="h-full w-full object-cover object-[center_38%]" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#17181e] via-[#17181e]/25 to-transparent" />
+          <div className="absolute inset-x-0 bottom-0 flex items-end gap-2.5 px-3 pb-3">
             <div className="shrink-0">{avatar(profile)}</div>
-            <div className="min-w-0 flex-1 pb-1"><h2 className="truncate text-lg font-bold">{profile.displayName}</h2>{profile.isPlus && <span className="mt-1 inline-flex items-center gap-1 rounded-full border border-[#ffc66d]/40 bg-[#ffc66d]/10 px-2 py-0.5 text-[10px] font-bold tracking-wide text-[#ffc66d]"><img src="/images/yubera/YUBERA_Plus_Crown_Simple.webp" alt="" className="h-3.5 w-3.5 object-contain"/>YUBERA Plus</span>}<p className="truncate text-xs text-white/65">@{profile.username || "YUBERA"}</p><p className="mt-1 line-clamp-1 text-[11px] text-white/65">{profile.bio || "Твоя коллекция и настройки Yubera"}</p></div>
-            <button onClick={()=>changeScreen("edit")} className="mb-1 inline-flex shrink-0 items-center gap-1.5 rounded-full bg-white/10 px-3 py-2 text-[11px] font-semibold text-white" aria-label="Редактировать профиль"><Pencil className="h-3.5 w-3.5"/>Редактировать</button>
+            <div className="min-w-0 flex-1 pb-0.5">
+              <h2 className="truncate text-lg font-bold">{profile.displayName}</h2>
+              {profile.isPlus && <span className="mt-1 inline-flex items-center gap-1 rounded-full border border-[#ffc66d]/40 bg-[#ffc66d]/10 px-2 py-0.5 text-[10px] font-bold tracking-wide text-[#ffc66d]"><img src="/images/yubera/YUBERA_Plus_Crown_Simple.webp" alt="" className="h-3.5 w-3.5 object-contain" />YUBERA Plus</span>}
+              <p className="truncate text-xs text-white/75">@{profile.username || "YUBERA"}</p>
+              {profile.bio.trim() && <button type="button" aria-expanded={bioExpanded} aria-label={bioExpanded ? "Свернуть описание профиля" : "Развернуть описание профиля"} onClick={() => setBioExpanded(value => !value)} className={`mt-1 block w-full text-left text-[11px] leading-snug text-white/80 ${bioExpanded ? "whitespace-pre-wrap break-words" : "line-clamp-1"}`}>{profile.bio}</button>}
+            </div>
+            <button type="button" onClick={() => changeScreen("edit")} className="mb-0.5 inline-flex shrink-0 items-center gap-1 rounded-full bg-white/10 px-2.5 py-2 text-[11px] font-semibold text-white" aria-label="Редактировать профиль"><Pencil className="h-3 w-3" />Редактировать</button>
           </div>
-          <div className="mt-2.5 grid grid-cols-2 gap-2">
-            <button onClick={()=>changeScreen("level")} className="flex min-h-[58px] min-w-0 items-center gap-2 rounded-xl border border-white/10 bg-[#202127] px-2 py-1.5 text-left"><img src={`/images/yubera/${levelAssets[profile.xp.level - 1]}`} alt="" className="h-10 w-10 shrink-0 object-contain"/><span className="min-w-0 flex-1"><b className="block truncate text-xs">Уровень {profile.xp.level}</b><span className="block truncate text-[10px] text-white/65">{(profile.xp.total ?? 0).toLocaleString("ru-RU")} / {(profile.xp.nextThreshold ?? profile.xp.total ?? 0).toLocaleString("ru-RU")} XP</span><span className="mt-1 block h-1.5 overflow-hidden rounded-full bg-white/10"><span className="block h-full rounded-full bg-gradient-to-r from-[#FF5738] to-[#FF6245]" style={{width:`${Math.max(0,Math.min(100,profile.xp.progress ?? 0))}%`}}/></span></span><ChevronRight className="h-4 w-4 shrink-0 text-white/65"/></button>
-            <button onClick={()=>changeScreen("support-status")} className="flex min-w-0 items-center gap-2 rounded-2xl border border-white/10 bg-[#202127] px-2.5 py-2 text-left">{profile.support.asset ? <img src={`/images/yubera/${profile.support.asset}`} alt="" className="h-11 w-11 shrink-0 object-contain"/> : <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#FF5738]/15 text-[#FF5738]"><Star className="h-6 w-6"/></span>}<span className="min-w-0 flex-1"><b className="block truncate text-xs">{profile.support.level > 0 ? profile.support.title : "Поддержка"}</b><span className="block truncate text-[10px] text-white/60">Статус поддержки</span></span><ChevronRight className="h-4 w-4 shrink-0 text-white/65"/></button>
-          </div>
-          <div className="mt-2 grid grid-cols-3 divide-x divide-white/10 rounded-xl border border-white/10 bg-black/20 text-center">{[["В избранном",profile.stats?.favorites],["В моём списке",profile.stats?.watchlist],["В истории",profile.stats?.history]].map(([label,value])=><div key={String(label)} className="px-1 py-2"><b className="block text-lg">{typeof value==="number"?value:"—"}</b><span className="block text-[10px] leading-tight text-white/60">{label}</span></div>)}</div>
+        </div>
+        <div className="grid grid-cols-2 gap-2 px-3 pt-3">
+          <button type="button" onClick={() => changeScreen("level")} className="flex min-h-[72px] min-w-0 items-center gap-2 rounded-xl border border-white/10 bg-[#202127] px-2 py-2 text-left">
+            <img src={`/images/yubera/${levelAssets[profile.xp.level - 1]}`} alt="" className="h-9 w-9 shrink-0 object-contain" />
+            <span className="min-w-0 flex-1">
+              <b className="block whitespace-normal break-words text-[11px] font-semibold leading-tight">{profile.xp.title || `Уровень ${profile.xp.level}`}</b>
+              <span className="mt-0.5 block whitespace-normal text-[9px] leading-tight text-white/65">Уровень {profile.xp.level} · {(profile.xp.total ?? 0).toLocaleString("ru-RU")} / {(profile.xp.nextThreshold ?? profile.xp.total ?? 0).toLocaleString("ru-RU")} XP</span>
+              <span className="mt-1.5 block h-1.5 overflow-hidden rounded-full bg-white/10"><span className="block h-full rounded-full bg-gradient-to-r from-[#FF5738] to-[#FF6245]" style={{ width: `${Math.max(0, Math.min(100, profile.xp.progress ?? 0))}%` }} /></span>
+            </span>
+            <ChevronRight className="h-4 w-4 shrink-0 text-white/65" />
+          </button>
+          <button type="button" onClick={() => changeScreen("support-status")} className="flex min-h-[72px] min-w-0 items-center gap-2 rounded-xl border border-white/10 bg-[#202127] px-2 py-2 text-left">
+            {profile.support.asset ? <img src={`/images/yubera/${profile.support.asset}`} alt="" className="h-9 w-9 shrink-0 object-contain" /> : <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#FF5738]/15 text-[#FF5738]"><Star className="h-5 w-5" /></span>}
+            <span className="min-w-0 flex-1">
+              <b className="block whitespace-normal break-words text-[11px] font-semibold leading-tight">{profile.support.level > 0 ? profile.support.title : "Поддержка"}</b>
+              <span className="mt-0.5 block whitespace-normal break-words text-[10px] leading-tight text-white/60">Статус поддержки</span>
+            </span>
+            <ChevronRight className="h-4 w-4 shrink-0 text-white/65" />
+          </button>
+        </div>
+        <div className="mx-3 mb-[7px] mt-2 grid grid-cols-3 divide-x divide-white/10 rounded-xl border border-white/10 bg-black/20 text-center">
+          {[[ "В избранном", profile.stats?.favorites ], [ "В моём списке", profile.stats?.watchlist ], [ "В истории", profile.stats?.history ]].map(([label, value]) => <div key={String(label)} className="px-1 py-2"><b className="block text-lg">{typeof value === "number" ? value : "—"}</b><span className="block text-[10px] leading-tight text-white/60">{label}</span></div>)}
         </div>
       </Card>
-      <Card className="mt-2 p-3"><div className="mb-2 flex items-center justify-between"><h3 className="flex items-center gap-2 text-sm font-semibold"><Layers3 className="h-4 w-4 text-[#FF5738]"/>Мои подборки</h3><button onClick={()=>changeScreen("collections")} className="text-xs text-[#FF5738]">Все подборки <ChevronRight className="inline h-3 w-3"/></button></div><div className="flex gap-2 overflow-x-auto pb-1"><button onClick={startCreateCollection} className="grid h-[92px] w-[92px] shrink-0 place-items-center rounded-xl border border-dashed border-white/30 text-center text-xs text-white/75"><Plus className="h-6 w-6 text-[#FF5738]"/><span>Создать подборку</span></button>{orderedCollections.slice(0,5).map(item=><button key={item.id} onClick={()=>void openCollection(item)} className="relative h-[92px] w-32 shrink-0 overflow-hidden rounded-xl border border-white/10 text-left">{item.cover_key?<img src={`/images/yubera/${item.cover_key}`} alt="" className="absolute inset-0 h-full w-full object-cover"/>:<div className="absolute inset-0 bg-white/5"/>}<div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/15 to-transparent"/><span className="absolute bottom-2 left-2 right-2"><b className="block truncate text-xs">{item.title}</b><span className="text-[10px] text-white/75">{item.title_count} тайтлов</span></span></button>)}</div></Card>
-      <Card className="mt-2 p-2"><Action icon={<Users/>} label="Друзья" detail="Пользователи, на которых вы подписаны" onClick={()=>changeScreen("friends")}/><Action icon={<Settings/>} label="Настройки приложения" detail="Тема, язык и другие параметры" onClick={()=>onSettings?.()} expanded={settingsExpanded} controls="app-settings"/><Action icon={<ShieldCheck/>} label="Правовая информация" detail="Политика конфиденциальности и правила сайта" onClick={()=>onLegal?.()}/><Action icon={<Info/>} label="О Yubera" detail="О проекте и версии сайта" onClick={()=>onAbout?.()}/>{isAdmin&&<Action icon={<Shield/>} label="Панель администратора" detail="Управление сайтом и каталогом" onClick={()=>onAdmin?.()}/>}<Action icon={<LifeBuoy/>} label="Поддержка" detail="Помощь и сообщения о проблемах" onClick={()=>onSupport?.()}/></Card>
+      <Card className="mt-2 p-3">
+        <div className="mb-2 flex items-center justify-between gap-2"><h3 className="flex items-center gap-2 text-sm font-semibold"><Layers3 className="h-4 w-4 text-[#FF5738]" />Мои подборки</h3><button type="button" onClick={() => changeScreen("collections")} className="shrink-0 text-xs text-[#FF5738]">Все подборки <ChevronRight className="inline h-3 w-3" /></button></div>
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          <button type="button" onClick={startCreateCollection} className="grid h-[92px] w-[92px] shrink-0 place-items-center rounded-xl border border-dashed border-white/30 text-center text-xs text-white/75"><Plus className="h-6 w-6 text-[#FF5738]" /><span>Создать подборку</span></button>
+          {orderedCollections.slice(0, 5).map(item => <button type="button" key={item.id} onClick={() => void openCollection(item)} className="relative h-[92px] w-32 shrink-0 overflow-hidden rounded-xl border border-white/10 text-left">{item.cover_key ? <img src={`/images/yubera/${item.cover_key}`} alt="" className="absolute inset-0 h-full w-full object-cover" /> : <div className="absolute inset-0 bg-white/5" />}<div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/15 to-transparent" /><span className="absolute bottom-2 left-2 right-2"><b className="block truncate text-xs">{item.title}</b><span className="text-[10px] text-white/75">{item.title_count} тайтлов</span></span></button>)}
+        </div>
+      </Card>
+      <div className="mt-2 space-y-2">
+        <Action icon={<Users />} label="Друзья" detail="Пользователи, на которых вы подписаны" onClick={() => changeScreen("friends")} />
+        <Action icon={<Settings />} label="Настройки приложения" detail="Тема, язык и другие параметры" onClick={() => onSettings?.()} expanded={settingsExpanded} controls="app-settings" />
+        <Action icon={<ShieldCheck />} label="Правовая информация" detail="Политика конфиденциальности и правила сайта" onClick={() => onLegal?.()} />
+        <Action icon={<Info />} label="О Yubera" detail="О проекте и версии сайта" onClick={() => onAbout?.()} />
+        {isAdmin && <Action icon={<Shield />} label="Панель администратора" detail="Управление сайтом и каталогом" onClick={() => onAdmin?.()} />}
+        <Action icon={<LifeBuoy />} label="Поддержка" detail="Помощь и сообщения о проблемах" onClick={() => onSupport?.()} />
+      </div>
     </>}
     {screen === "edit" && <><Header title="Редактирование профиля" subtitle="Настройте описание, видимость и оформление профиля"/><Card>
       <div className="mb-4 flex items-center gap-3">{avatar(profile)}<div><b>{profile.displayName}</b><p className="text-sm text-white/50">@{profile.username || "username"}</p></div></div>
