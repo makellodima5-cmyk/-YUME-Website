@@ -439,6 +439,49 @@ async function readJsonBody(request: Request): Promise<Record<string, unknown> |
   }
 }
 
+async function readCommentUpdates(
+  db: Database,
+  animeId: string,
+  viewer: Viewer | null,
+  since: string,
+  now: string,
+): Promise<{ updates: Array<{ root: CommentDto; replies: CommentDto[] }>; totalCount: number }> {
+  const changedResult = await db.prepare(
+    COMMENT_SELECT +
+    "WHERE c.anime_id = ? AND c.created_at > ? AND c.expires_at > ? " +
+    "ORDER BY c.created_at ASC, c.id ASC LIMIT 100",
+  ).bind(animeId, since, now).all<CommentRow>();
+  logD1("read_live_comment_updates", changedResult.meta);
+  const changed = changedResult.results;
+  const rootIds = Array.from(new Set(changed.map(row => row.thread_root_id)));
+  if (!rootIds.length) {
+    return { updates: [], totalCount: await readCommentCount(db, animeId, now) };
+  }
+  const placeholders = rootIds.map(() => "?").join(", ");
+  const rootsResult = await db.prepare(
+    COMMENT_SELECT + "WHERE c.anime_id = ? AND c.parent_id IS NULL AND c.id IN (" + placeholders + ")",
+  ).bind(animeId, ...rootIds).all<CommentRow>();
+  logD1("read_live_comment_roots", rootsResult.meta);
+  const roots = rootsResult.results;
+  const allRows = [...roots, ...changed.filter(row => row.parent_id !== null)];
+  const likedIds = await readLikedIds(db, viewer?.id ?? null, allRows);
+  const rootsById = new Map(roots.map(root => [root.id, commentDto(root, likedIds)]));
+  const repliesByRoot = new Map<string, CommentDto[]>();
+  for (const row of changed) {
+    if (row.parent_id === null) continue;
+    const list = repliesByRoot.get(row.thread_root_id) ?? [];
+    list.push(commentDto(row, likedIds));
+    repliesByRoot.set(row.thread_root_id, list);
+  }
+  return {
+    updates: rootIds.flatMap(rootId => {
+      const root = rootsById.get(rootId);
+      return root ? [{ root, replies: repliesByRoot.get(rootId) ?? [] }] : [];
+    }),
+    totalCount: await readCommentCount(db, animeId, now),
+  };
+}
+
 async function handleRead(request: Request): Promise<Response> {
   const url = new URL(request.url);
   const animeId = url.searchParams.get("animeId") ?? "";
@@ -454,6 +497,16 @@ async function handleRead(request: Request): Promise<Response> {
     const telegramProfile = !viewer || !viewer.avatarUrl
       ? await telegramProfileFromInitData(request, env)
       : null;
+    const since = url.searchParams.get("since");
+    if (since !== null) {
+      const timestamp = Date.parse(since);
+      if (!Number.isFinite(timestamp) || new Date(timestamp).toISOString() !== since) {
+        return json({ error: "invalid_since" }, 400);
+      }
+      const updates = await readCommentUpdates(db, animeId, viewer, since, now);
+      return json({ ...updates, viewer, telegramProfile });
+    }
+
     const threadId = url.searchParams.get("threadId");
     if (threadId) {
       if (!UUID_PATTERN.test(threadId)) return json({ error: "invalid_thread_id" }, 400);
