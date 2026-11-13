@@ -132,8 +132,9 @@ describe("Profile and My library pages", () => {
       expect(await screen.findByRole("heading", { name: "Аккаунт Telegram" })).toBeInTheDocument();
     }
 
-    // Collection creation and profile editing are also nested screens.
-    fireEvent.click(screen.getByRole("button", { name: /Создать подборку/ }));
+    // Return to profile home before opening the create/edit forms.
+    expect(await screen.findByRole("heading", { name: "Аккаунт Telegram" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Создать подборку" }));
     expect(await screen.findByRole("heading", { name: "Создать подборку" })).toBeInTheDocument();
     expectAccountPanelHidden();
     fireEvent.click(screen.getByRole("button", { name: "Отменить" }));
