@@ -313,7 +313,9 @@ export function AnimeComments({ animeId, language }: Props) {
           }
           return next.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
         });
-        setCount(Math.max(0, Number(payload.totalCount) || 0));
+        if (typeof payload.totalCount === "number") {
+          setCount(Math.max(0, payload.totalCount));
+        }
         if (payload.checkedAt) lastUpdateAt.current = payload.checkedAt;
       } catch {
         // Keep the last rendered comments; the next polling cycle retries.
