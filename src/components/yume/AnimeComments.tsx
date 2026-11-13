@@ -28,6 +28,7 @@ type Comment = {
   authorId: string | null;
   authorName: string;
   avatarUrl: string | null;
+  avatarFrame: string | null;
   liked: boolean;
 };
 type ThreadComment = Comment & {
@@ -143,13 +144,16 @@ function relativeTime(value: string, language: Language): string {
   return Math.floor(seconds / 86400) + " " + copy.days;
 }
 
-function Avatar({ name, url, size = "h-10 w-10" }: { name: string; url: string | null; size?: string }) {
+function Avatar({ name, url, frame, size = "h-10 w-10" }: { name: string; url: string | null; frame?: string | null; size?: string }) {
   const [failed, setFailed] = useState(false);
   return (
-    <span className={"flex " + size + " shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-secondary text-xs font-semibold text-foreground"}>
-      {url && !failed ? (
-        <img src={url} alt="" loading="lazy" referrerPolicy="no-referrer" className="h-full w-full object-cover" onError={() => setFailed(true)} />
-      ) : initials(name)}
+    <span className={"relative flex " + size + " shrink-0 items-center justify-center"}>
+      <span className="absolute inset-[12%] flex items-center justify-center overflow-hidden rounded-full border border-white/10 bg-secondary text-xs font-semibold text-foreground">
+        {url && !failed ? (
+          <img src={url} alt="" loading="lazy" referrerPolicy="no-referrer" className="h-full w-full object-cover" onError={() => setFailed(true)} />
+        ) : initials(name)}
+      </span>
+      {frame && <img src={"/images/yubera/" + frame} alt="" aria-hidden="true" loading="lazy" className="pointer-events-none absolute inset-0 h-full w-full object-contain" />}
     </span>
   );
 }
@@ -230,6 +234,7 @@ export function AnimeComments({ animeId, language }: Props) {
   const [status, setStatus] = useState("");
   const requestLock = useRef(false);
   const pageLock = useRef(false);
+  const pollLock = useRef(false);
   const busyLikeIds = useRef(new Set<string>());
 
   const loadInitial = useCallback(async () => {
@@ -262,6 +267,53 @@ export function AnimeComments({ animeId, language }: Props) {
   useEffect(() => {
     void loadInitial();
   }, [loadInitial]);
+  useEffect(() => {
+    let active = true;
+    const poll = async () => {
+      if (!active || pollLock.current || document.visibilityState === "hidden") return;
+      pollLock.current = true;
+      try {
+        const response = await fetch("/api/anime-comments?animeId=" + encodeURIComponent(animeId), {
+          credentials: "same-origin",
+          cache: "no-store",
+          headers: { Accept: "application/json" },
+        });
+        const payload = await response.json().catch(() => ({})) as Partial<PageResponse>;
+        if (!active || !response.ok || !Array.isArray(payload.comments)) return;
+        setComments(current => {
+          const existing = new Map(current.map(root => [root.id, root]));
+          const incomingIds = new Set(payload.comments!.map(root => root.id));
+          const refreshed = payload.comments!.map(incoming => {
+            const previous = existing.get(incoming.id);
+            if (!previous) return incoming;
+            const replies = new Map(previous.replies.map(reply => [reply.id, reply]));
+            for (const reply of incoming.replies) replies.set(reply.id, reply);
+            return {
+              ...previous,
+              ...incoming,
+              replies: Array.from(replies.values()).sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
+              replyCount: Math.max(incoming.replyCount, previous.replyCount),
+            };
+          });
+          return [...refreshed, ...current.filter(root => !incomingIds.has(root.id))]
+            .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+        });
+        setCount(Math.max(0, Number(payload.totalCount) || 0));
+      } catch {
+        // Keep the last rendered comments; the next polling cycle retries.
+      } finally {
+        pollLock.current = false;
+      }
+    };
+    const timer = window.setInterval(() => { void poll(); }, 5000);
+    const onVisibility = () => { if (document.visibilityState === "visible") void poll(); };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [animeId]);
 
   const loadMore = useCallback(async () => {
     if (!nextCursor || pageLock.current) return;
@@ -619,7 +671,7 @@ function CommentRow({
     : comment.createdAt;
   return (
     <div className="flex min-w-0 items-start gap-3">
-      <Avatar name={comment.authorName} url={comment.avatarUrl} size={compact ? "h-9 w-9" : "h-10 w-10"} />
+      <Avatar name={comment.authorName} url={comment.avatarUrl} frame={comment.avatarFrame} size={compact ? "h-10 w-10" : "h-11 w-11"} />
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-center gap-2">
           <span className="min-w-0 truncate text-sm font-semibold">{comment.deleted ? copy.deleted : comment.authorName}</span>
