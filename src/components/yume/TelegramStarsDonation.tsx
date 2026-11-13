@@ -189,7 +189,7 @@ export function TelegramStarsDonation({ open, onClose }: Props) {
             </label>
             <p className="mt-0.5 min-h-3 px-2 text-[8px] text-white/45 sm:mt-2 sm:min-h-4 sm:px-3 sm:text-xs">{customAmount ? "От 1 до 100 000 Stars" : " "}</p>
 
-            <button type="button" onClick={submit} disabled={loading || !valid} className="mt-1.5 flex h-11 w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-violet-500 via-fuchsia-500 to-pink-500 px-4 text-[14px] font-bold text-[#17091f] shadow-[0_7px_24px_rgba(208,55,218,.22)] transition hover:brightness-110 active:scale-[.99] disabled:cursor-not-allowed disabled:opacity-55 sm:mt-2 sm:h-16 sm:gap-3 sm:px-5 sm:text-lg">
+            <button type="button" onClick={submit} disabled={loading || !valid} className="mt-1.5 flex h-11 w-full items-center justify-center gap-2 rounded-full bg-neon px-4 text-[14px] font-bold text-white shadow-neon transition hover:brightness-110 active:scale-[.99] disabled:cursor-not-allowed disabled:opacity-55 sm:mt-2 sm:h-16 sm:gap-3 sm:px-5 sm:text-lg">
               <Send className="h-4 w-4 fill-current sm:h-5 sm:w-5" />{loading ? "Создаём счёт…" : "Отправить донат в Stars"}
             </button>
 
