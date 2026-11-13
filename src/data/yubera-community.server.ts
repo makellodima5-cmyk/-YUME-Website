@@ -170,7 +170,7 @@ async function createCollection(database: Database, userId: string, input: Recor
   const plus = await plusActive(database, userId);
   const collectionLimit = plus ? PLUS_COLLECTIONS : FREE_COLLECTIONS;
   const id = crypto.randomUUID();
-  const cover = typeof input.coverKey === "string" && /^YUBERA_Collection_Cover_[A-Za-z_]+\\.webp$/.test(input.coverKey) ? input.coverKey : null;
+  const cover = typeof input.coverKey === "string" && /^YUBERA_Collection_Cover_[A-Za-z_]+\.webp$/.test(input.coverKey) ? input.coverKey : null;
   // Enforce the cap in the INSERT itself. A separate COUNT followed by INSERT
   // lets concurrent requests exceed the Free/Plus limit.
   const inserted = await database.prepare(
