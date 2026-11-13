@@ -9,10 +9,11 @@ Base branch: `main` (not modified)
 
 The owner confirmed that migrations 1–8 have already been applied to the existing D1 database. **Do not edit, replace, replay, or otherwise modify migrations 1–8.**
 
-Only migrations 9 and 10 are pending:
+Migrations 9, 10 and 11 are pending:
 - Migration 9 contains Plus recurring-payment columns, the Plus payment event ledger, renewal-failure state, permanent support-frame unlock storage/backfill, and the owner-approved initial 100-Star price (30 days). The price update is conditional on `updated_by IS NULL`, so an administrator-configured price is not overwritten.
 - Migration 10 creates episode-watch sessions and their indexes.
-- No production D1 migration has been run from this branch. Apply migrations 9 and 10 once, in order, after reviewing the SQL and backing up the database.
+- Migration 11 creates persistent administrator overrides for XP levels and support statuses, plus a dedicated audit log. These overrides do not change earned XP or confirmed donation/refund accounting.
+- No production D1 migration has been run from this branch. Apply migrations 9, 10 and 11 once, in order, after reviewing the SQL and backing up the database. Do not deploy code that reads the override table before migration 11 has been applied.
 
 ## Implemented in code
 
