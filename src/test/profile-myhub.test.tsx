@@ -101,6 +101,46 @@ describe("Profile and My library pages", () => {
 
   });
 
+  it("renders the compact profile hero with full level and support labels and server XP progress", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).includes("/api/telegram/init-data")) {
+        return jsonResponse({ authenticated: true, user: { id: "user-1", firstName: "Dima", username: "dima" } });
+      }
+      if (String(input).includes("/api/yubera/community?action=me")) {
+        return jsonResponse({
+          profile: {
+            id: "user-1", displayName: "Dima", username: "dima", photoUrl: null, bio: "Аниме, манга и многое другое.",
+            avatarFrame: null, availableSupportFrames: [], visibility: "public", isPlus: false,
+            followers: 0, following: 0, publicCollections: 0, publicTitles: 0, collectionLikes: 0,
+            xp: { total: 53, level: 2, title: "Любитель аниме", nextThreshold: 150, progress: 3 },
+            support: { level: 4, title: "Почётный покровитель", asset: "YUBERA_Support_Status_Level_04_Pochetnyy_Pokrovitel.webp" },
+            stats: { favorites: 4, watchlist: 3, history: 6 },
+          },
+          collections: [],
+        });
+      }
+      return jsonResponse({ authenticated: true, items: [] });
+    }));
+
+    const { container } = render(withPreferences(<Profile animeList={[]} onSelect={vi.fn()} onCatalog={vi.fn()} />));
+    const hero = container.querySelector<HTMLElement>('[aria-label="Профиль пользователя"]');
+    expect(hero).toBeInTheDocument();
+    expect(hero).toHaveClass("px-3", "pb-2", "pt-2");
+    const banner = hero?.querySelector<HTMLImageElement>('img[src="/images/yubera/yubera_banner.webp"]');
+    expect(banner?.parentElement).toHaveClass("h-[clamp(170px,46vw,190px)]");
+
+    const levelCard = await screen.findByRole("button", { name: "Уровень 2: Любитель аниме" });
+    expect(levelCard).toHaveTextContent("Уровень 2 · 53 / 150 XP");
+    expect(levelCard.querySelector('[data-testid="profile-xp-progress"]')?.firstElementChild).toHaveStyle({ width: "3%" });
+
+    const supportCard = screen.getByRole("button", { name: "Статус поддержки: Почётный покровитель" });
+    expect(supportCard).toHaveTextContent("Почётный покровитель");
+    expect(supportCard).toHaveTextContent("Статус поддержки");
+    expect(hero).toHaveTextContent("4");
+    expect(hero).toHaveTextContent("3");
+    expect(hero).toHaveTextContent("6");
+  });
+
   it("shows the compact Plus badge and omits progress for the maximum XP level", async () => {
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
       if (String(input).includes("/api/telegram/init-data")) {
