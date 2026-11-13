@@ -387,6 +387,21 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
           {[[ "В избранном", profile.stats?.favorites ], [ "В моём списке", profile.stats?.watchlist ], [ "В истории", profile.stats?.history ]].map(([label, value]) => <div key={String(label)} className="min-w-0 px-1 py-2"><b className="block text-[22px] font-bold leading-none">{typeof value === "number" ? value : "—"}</b><span className="mt-1.5 block whitespace-nowrap text-[clamp(10px,2.7vw,12px)] leading-tight text-white/65">{label}</span></div>)}
         </div>
       </section>
+      <Card className="mt-2 p-3">
+        <div className="mb-2 flex items-center justify-between gap-2"><h3 className="flex items-center gap-2 text-sm font-semibold"><Layers3 className="h-4 w-4 text-[#FF5738]" />Мои подборки</h3><button type="button" onClick={() => changeScreen("collections")} className="shrink-0 text-xs text-[#FF5738]">Все подборки <ChevronRight className="inline h-3 w-3" /></button></div>
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          <button type="button" onClick={startCreateCollection} className="grid h-[92px] w-[92px] shrink-0 place-items-center rounded-xl border border-dashed border-white/30 text-center text-xs text-white/75"><Plus className="h-6 w-6 text-[#FF5738]" /><span>Создать подборку</span></button>
+          {orderedCollections.slice(0, 5).map(item => <button type="button" key={item.id} onClick={() => void openCollection(item)} className="relative h-[92px] w-32 shrink-0 overflow-hidden rounded-xl border border-white/10 text-left">{item.cover_key ? <img src={`/images/yubera/${item.cover_key}`} alt="" className="absolute inset-0 h-full w-full object-cover" /> : <div className="absolute inset-0 bg-white/5" />}<div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/15 to-transparent" /><span className="absolute bottom-2 left-2 right-2"><b className="block truncate text-xs">{item.title}</b><span className="text-[10px] text-white/75">{item.title_count} тайтлов</span></span></button>)}
+        </div>
+      </Card>
+      <div className="mt-2 space-y-2">
+        <Action icon={<Users />} label="Друзья" detail="Пользователи, на которых вы подписаны" onClick={() => changeScreen("friends")} />
+        <Action icon={<Settings />} label="Настройки приложения" detail="Тема, язык и другие параметры" onClick={() => onSettings?.()} expanded={settingsExpanded} controls="app-settings" />
+        <Action icon={<ShieldCheck />} label="Правовая информация" detail="Политика конфиденциальности и правила сайта" onClick={() => onLegal?.()} />
+        <Action icon={<Info />} label="О Yubera" detail="О проекте и версии сайта" onClick={() => onAbout?.()} />
+        {isAdmin && <Action icon={<Shield />} label="Панель администратора" detail="Управление сайтом и каталогом" onClick={() => onAdmin?.()} />}
+        <Action icon={<LifeBuoy />} label="Поддержка" detail="Помощь и сообщения о проблемах" onClick={() => onSupport?.()} />
+      </div>
     </>}
     {screen === "edit" && <><Header title="Редактирование профиля" subtitle="Настройте описание, видимость и оформление профиля"/><Card>
       <div className="mb-4 flex items-center gap-3">{avatar(profile)}<div><b>{profile.displayName}</b><p className="text-sm text-white/50">@{profile.username || "username"}</p></div></div>
