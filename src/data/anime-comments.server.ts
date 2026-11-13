@@ -46,6 +46,7 @@ type CommentRow = {
   author_id: string | null;
   author_name: string | null;
   avatar_url: string | null;
+  avatar_frame?: string | null;
   reply_to_name?: string | null;
   reply_rank?: number;
   reply_count?: number;
@@ -65,6 +66,7 @@ type CommentDto = {
   authorId: string | null;
   authorName: string;
   avatarUrl: string | null;
+  avatarFrame: string | null;
   liked: boolean;
 };
 type SessionRow = {
@@ -161,6 +163,23 @@ function displayName(firstName: string | null, lastName: string | null, username
   return fullName || "Yubera user";
 }
 
+const AVATAR_FRAME_ASSETS = new Set([
+  "YUBERA_Contribution_Avatar_Frame_01_Soyuznik.webp.webp",
+  "YUBERA_Contribution_Avatar_Frame_02_Storonnik.webp.webp",
+  "YUBERA_Contribution_Avatar_Frame_03_Predanniy_Uchastnik.webp.webp",
+  "YUBERA_Contribution_Avatar_Frame_04_Pochetnyy_Pokrovitel.webp",
+  "YUBERA_Contribution_Avatar_Frame_05_Legenda_YUBERA.webp",
+  "YUBERA_Plus_Avatar_Frame_01_Sakura_Gold.webp",
+  "YUBERA_Plus_Avatar_Frame_02_Mystic_Kitsune.webp",
+  "YUBERA_Plus_Avatar_Frame_03_Samurai_Steel.webp",
+  "YUBERA_Plus_Avatar_Frame_04_Celestial_Archive.webp",
+  "YUBERA_Plus_Avatar_Frame_05_Cyberpunk_Neon.webp",
+]);
+
+function safeAvatarFrame(value: unknown): string | null {
+  return typeof value === "string" && AVATAR_FRAME_ASSETS.has(value) ? value : null;
+}
+
 function safePhotoUrl(value: unknown): string | null {
   if (typeof value !== "string" || value.length > 2048) return null;
   try {
@@ -235,6 +254,7 @@ function commentDto(row: CommentRow, likedIds: ReadonlySet<string>): CommentDto 
     authorId: row.deleted_at ? null : row.author_id,
     authorName: row.deleted_at ? "" : row.author_name || "Yubera user",
     avatarUrl: row.deleted_at ? null : safePhotoUrl(row.avatar_url),
+    avatarFrame: row.deleted_at ? null : safeAvatarFrame(row.avatar_frame),
     liked: !row.deleted_at && likedIds.has(row.id),
   };
 }
@@ -275,10 +295,12 @@ const COMMENT_SELECT = (
   "CASE WHEN c.deleted_at IS NULL THEN COALESCE(NULLIF(u.telegram_username, ''), " +
   "NULLIF(TRIM(COALESCE(u.telegram_first_name, '') || ' ' || COALESCE(u.telegram_last_name, '')), ''), 'Yubera user') ELSE NULL END AS author_name, " +
   "CASE WHEN c.deleted_at IS NULL THEN u.telegram_photo_url ELSE NULL END AS avatar_url, " +
+  "CASE WHEN c.deleted_at IS NULL THEN p.avatar_frame ELSE NULL END AS avatar_frame, " +
   "CASE WHEN c.deleted_at IS NULL THEN COALESCE(NULLIF(reply_to.telegram_username, ''), " +
   "NULLIF(TRIM(COALESCE(reply_to.telegram_first_name, '') || ' ' || COALESCE(reply_to.telegram_last_name, '')), '')) ELSE NULL END AS reply_to_name " +
   "FROM yume_anime_comments c " +
   "LEFT JOIN yume_users u ON u.id = c.user_id " +
+  "LEFT JOIN yume_profiles p ON p.user_id = c.user_id " +
   "LEFT JOIN yume_users reply_to ON reply_to.id = c.reply_to_user_id "
 );
 
