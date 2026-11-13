@@ -66,7 +66,7 @@ describe("Profile and My library pages", () => {
       if (String(input).includes("/api/yubera/community?action=me")) {
         return jsonResponse({
           profile: {
-            id: "user-1", displayName: "Dima", username: "dima", photoUrl: null, bio: "Описание",
+            id: "user-1", displayName: "Dima", username: "dima", photoUrl: null, bio: "Люблю аниме, собираю подборки и делюсь впечатлениями о просмотренных историях. Это длинное описание должно раскрываться по нажатию и полностью помещаться в карточке профиля.",
             avatarFrame: null, availableSupportFrames: [], visibility: "public", isPlus: false,
             followers: 0, following: 0, publicCollections: 0, publicTitles: 0, collectionLikes: 0,
             xp: { total: 10, level: 1, title: "Начинающий зритель" },
@@ -82,6 +82,17 @@ describe("Profile and My library pages", () => {
     render(withPreferences(<Profile animeList={[]} onSelect={vi.fn()} onCatalog={vi.fn()} />));
 
     expect(await screen.findByRole("button", { name: /Уровень 1/ })).toBeInTheDocument();
+    expect(screen.getByText("Начинающий зритель")).toBeInTheDocument();
+    expect(screen.getByText("Поддержка")).toBeInTheDocument();
+    expect(screen.getByText("Статус поддержки")).toBeInTheDocument();
+    const bioToggle = screen.getByRole("button", { name: "Развернуть описание профиля" });
+    expect(bioToggle).toHaveAttribute("aria-expanded", "false");
+    expect(bioToggle).toHaveClass("line-clamp-1");
+    fireEvent.click(bioToggle);
+    expect(screen.getByRole("button", { name: "Свернуть описание профиля" })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText(/полностью помещаться в карточке профиля/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Свернуть описание профиля" }));
+    expect(screen.getByRole("button", { name: "Развернуть описание профиля" })).toHaveAttribute("aria-expanded", "false");
     expect(screen.getByText("Мои подборки")).toBeInTheDocument();
     expect(screen.getAllByText("Dima")).toHaveLength(1);
     expect(screen.queryByText("Профиль, уровень, подборки и друзья")).not.toBeInTheDocument();
