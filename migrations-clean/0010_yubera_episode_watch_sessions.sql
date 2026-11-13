@@ -1,3 +1,0 @@
-CREATE TABLE IF NOT EXISTS yume_episode_watch_sessions (id TEXT PRIMARY KEY NOT NULL,user_id TEXT NOT NULL REFERENCES yume_users(id) ON DELETE CASCADE,anime_id TEXT NOT NULL,episode_number INTEGER NOT NULL CHECK (episode_number BETWEEN 1 AND 10000),duration_seconds REAL NOT NULL CHECK (duration_seconds BETWEEN 60 AND 10800),last_position_seconds REAL NOT NULL DEFAULT 0,last_heartbeat_at INTEGER NOT NULL,watched_segments_json TEXT NOT NULL DEFAULT '[]',created_at INTEGER NOT NULL,expires_at INTEGER NOT NULL,completed_at INTEGER);
-CREATE INDEX IF NOT EXISTS idx_yume_episode_watch_user_created ON yume_episode_watch_sessions(user_id,created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_yume_episode_watch_expiry ON yume_episode_watch_sessions(expires_at);

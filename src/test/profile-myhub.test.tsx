@@ -84,6 +84,7 @@ describe("Profile and My library pages", () => {
     expect(await screen.findByText("ЛИЧНОЕ ПРОСТРАНСТВО")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Уровень 1/ })).toBeInTheDocument();
     expect(screen.getAllByText("ЛИЧНОЕ ПРОСТРАНСТВО")).toHaveLength(1);
+    expect(screen.getByText("Мои подборки")).toBeInTheDocument();
     expect(screen.getAllByText("Dima")).toHaveLength(1);
     expect(screen.queryByText("Профиль, уровень, подборки и друзья")).not.toBeInTheDocument();
     const settingsButton = screen.getByRole("button", { name: /Настройки приложения/ });
