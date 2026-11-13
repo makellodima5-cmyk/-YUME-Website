@@ -39,7 +39,7 @@ describe("YUBERA community foundation", () => {
     expect(component).toContain("Публичные подборки");
     expect(component).toContain("YuberaFriendsPanel");
     expect(component).toContain("w-max max-w-none flex-nowrap items-center gap-1 whitespace-nowrap");
-    expect(component).toContain("h-6 w-6 shrink-0");
+    expect(component).toContain("h-9 w-9 sm:h-11 sm:w-11");
     expect(friendsPanel).toContain("Показать ещё");
     expect(friendsPanel).toContain("Найти друзей");
     expect(friendsPanel).toContain("truncate whitespace-nowrap line-clamp-1");
