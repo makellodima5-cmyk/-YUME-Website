@@ -290,7 +290,7 @@ export function AnimeComments({ animeId, language }: Props) {
         const payload = await response.json().catch(() => ({})) as LiveUpdatesResponse;
         if (!active || !response.ok || !Array.isArray(payload.updates)) return;
         setComments(current => {
-          let next = [...current];
+          const next = [...current];
           for (const update of payload.updates!) {
             const index = next.findIndex(root => root.id === update.root.id);
             if (index < 0) {
