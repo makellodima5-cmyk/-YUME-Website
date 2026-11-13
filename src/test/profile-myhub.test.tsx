@@ -87,6 +87,7 @@ describe("Profile and My library pages", () => {
     expect(screen.getByText("Статус поддержки")).toBeInTheDocument();
     const bioToggle = screen.getByRole("button", { name: "Читать полностью" });
     expect(bioToggle).toHaveTextContent("Читать полностью");
+    expect(bioToggle).toHaveClass("whitespace-nowrap");
     expect(bioToggle.querySelector("svg")).toBeInTheDocument();
     fireEvent.click(bioToggle);
     const bioDialog = screen.getByRole("dialog", { name: "Описание профиля" });
