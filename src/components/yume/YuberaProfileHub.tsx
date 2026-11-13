@@ -400,9 +400,9 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
               </div>
               <div className="min-w-0 self-start">
                 {profile.username && <p className="whitespace-normal break-words text-[13px] leading-tight text-white/75">@{profile.username}</p>}
-                {profile.bio.trim() && <div className="mt-1 min-w-0">
+                {profile.bio.trim() && <div className="relative mt-1 min-w-0">
                   <p className="line-clamp-2 whitespace-pre-wrap break-words text-[11px] leading-snug text-white/80">{profile.bio}</p>
-                  {profile.bio.length > 110 && <button type="button" onClick={() => setBioSheet({ title: "Описание профиля", bio: profile.bio })} className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-[#ff795b] transition-colors hover:text-[#ff9a7f]">Читать полностью <ChevronDown className="h-3.5 w-3.5" /></button>}
+                  {profile.bio.length > 110 && <button type="button" onClick={() => setBioSheet({ title: "Описание профиля", bio: profile.bio })} className="absolute left-0 top-full z-10 mt-0.5 inline-flex items-center gap-1 whitespace-nowrap text-[11px] font-semibold text-primary transition-colors">Читать полностью <ChevronDown className="h-3.5 w-3.5" /></button>}
                 </div>}
               </div>
               <button type="button" onClick={() => changeScreen("edit")} className="inline-flex min-h-9 shrink-0 items-center justify-center gap-1.5 self-center whitespace-nowrap rounded-full bg-white/10 px-3 py-2 text-[12px] font-semibold leading-none text-white" aria-label="Редактировать профиль"><Pencil className="h-3.5 w-3.5 shrink-0" /><span>Редактировать</span></button>
