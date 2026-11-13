@@ -543,12 +543,12 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
         <div className="relative h-[clamp(170px,46vw,190px)] overflow-hidden">
           <img src="/images/yubera/yubera_banner.webp" alt="" className="h-full w-full object-cover object-[center_38%]" />
           <div className="absolute inset-0 bg-gradient-to-t from-[#17181e] via-[#17181e]/20 to-transparent" />
-          <div className="absolute inset-x-3 bottom-3 grid grid-cols-[72px_minmax(0,1fr)] items-end gap-x-3 gap-y-2">
-            <div className="row-span-2 self-end">{avatar(publicProfile, "h-[72px] w-[72px]")}</div>
-            <div className="min-w-0">
+          <div className="absolute inset-x-3 bottom-3 flex items-center gap-3">
+            <div className="shrink-0">{avatar(publicProfile, "h-[72px] w-[72px]")}</div>
+            <div className="min-w-0 flex-1">
               <div className="flex min-w-0 items-center gap-x-2">
-                <h3 className="min-w-0 whitespace-nowrap text-[clamp(16px,4.2vw,22px)] font-bold leading-tight text-white">{publicProfile.displayName}</h3>
-                {publicProfile.isPlus && <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-[#ffc66d]/55 bg-[#ffc66d]/10 px-2.5 py-1 text-[11px] font-bold leading-none text-[#ffc66d]"><img src="/images/yubera/YUBERA_Plus_Crown_Simple.webp" alt="" className="h-3.5 w-3.5 object-contain" />Plus</span>}
+                <h3 className="min-w-0 truncate whitespace-nowrap text-[clamp(15px,4vw,22px)] font-bold leading-tight text-white">{publicProfile.displayName}</h3>
+                {publicProfile.isPlus && <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-[#ffc66d]/55 bg-[#ffc66d]/10 px-2.5 py-1 text-[11px] font-bold leading-none text-[#ffc66d]"><img src="/images/yubera/YUBERA_Plus_Crown_Simple.webp" alt="" className="h-5 w-5 object-contain" />Plus</span>}
               </div>
               {publicProfile.username && <p className="mt-1 whitespace-nowrap text-[13px] leading-tight text-white/75">@{publicProfile.username}</p>}
               {publicProfile.bio && <div className="mt-1">
@@ -556,10 +556,6 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
                 {publicProfile.bio.length > 110 && <button type="button" onClick={() => setPublicBioExpanded(value => !value)} className="mt-1 text-[10px] font-semibold text-[#ff8768]">{publicBioExpanded ? "Свернуть" : "Показать полностью"}</button>}
               </div>}
             </div>
-            <button type="button" disabled={busy} onClick={() => void follow(publicProfile.id, !publicProfile.isFollowing)} className="inline-flex min-h-8 shrink-0 items-center justify-center gap-1 justify-self-end rounded-full border border-[#ff7658]/70 bg-gradient-to-r from-[#ff795b] to-[#ff5738] px-2.5 py-1.5 text-[10px] font-bold text-white shadow-[0_4px_16px_rgba(255,91,61,.2)] transition-colors hover:brightness-110 disabled:opacity-50">
-              <Users className="h-3.5 w-3.5" />
-              {publicProfile.isFollowing ? "Вы подписаны" : "Подписаться"}
-            </button>
           </div>
         </div>
         <div className="space-y-2.5 px-3 pb-3 pt-2">
@@ -586,6 +582,10 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
             <div className="min-w-0 px-1 py-2"><b className="block text-xl leading-none text-white">{publicProfile.publicTitles}</b><span className="mt-1 block text-[10px] leading-tight text-white/60">Аниме в подборках</span></div>
             <div className="min-w-0 px-1 py-2"><b className="block text-xl leading-none text-white">{publicProfile.collectionLikes}</b><span className="mt-1 block text-[10px] leading-tight text-white/60">Лайков</span></div>
           </div>
+          <button type="button" disabled={busy} onClick={() => void follow(publicProfile.id, !publicProfile.isFollowing)} className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-full border border-[#ff7658]/70 bg-gradient-to-r from-[#ff795b] to-[#ff5738] px-4 py-2 text-xs font-bold text-white shadow-[0_4px_16px_rgba(255,91,61,.2)] transition-colors hover:brightness-110 disabled:opacity-50">
+            <Users className="h-4 w-4" />
+            {publicProfile.isFollowing ? "Вы подписаны" : "Подписаться"}
+          </button>
         </div>
       </YuberaCard>
       <YuberaCard className="mt-3">
