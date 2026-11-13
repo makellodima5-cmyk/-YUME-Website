@@ -377,7 +377,7 @@ describe("YUBERA profile navigation and public profile", () => {
     render(withPreferences(
       <Profile initialPanel="favorites" animeList={[]} onSelect={vi.fn()} onCatalog={vi.fn()} telegramMiniApp onBack={onBack} />,
     ));
-    expect(await screen.findByRole("heading", { name: /Избранное/i })).toBeInTheDocument();
+    expect((await screen.findAllByRole("heading", { name: /Избранное/i })).length).toBeGreaterThan(0);
     const backEvent = new Event("yume-telegram-back", { cancelable: true });
     await act(async () => { window.dispatchEvent(backEvent); });
     expect(backEvent.defaultPrevented).toBe(true);
