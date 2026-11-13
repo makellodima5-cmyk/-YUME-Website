@@ -538,6 +538,7 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
               onBack={() => undefined}
               isAdmin={isAdmin}
               onSettings={() => setSettingsExpanded(current => !current)}
+              settingsExpanded={settingsExpanded}
               onLegal={() => navigatePanel("documents")}
               onAbout={() => navigatePanel("about")}
               onAdmin={onAdmin}
