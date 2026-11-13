@@ -282,7 +282,8 @@ export async function handleYuberaCommunity(request: Request): Promise<Response>
       if (!row || (row.owner_id !== userId && (row.visibility !== "public" || Number(row.is_public) !== 1))) return json({ error: "not_found" }, 404);
       const items = await database.prepare("SELECT anime_id,position,added_at FROM yume_collection_items WHERE collection_id = ? ORDER BY position,added_at")
         .bind(collectionId).all<{ anime_id: string; position: number; added_at: string }>();
-      return json({ collection: row, items: items.results });
+      const ownerPlus = await plusActive(database, row.owner_id);
+      return json({ collection: row, items: items.results, titleLimit: ownerPlus ? PLUS_TITLES : FREE_TITLES });
     }
     return json({ error: "unknown_action" }, 400);
   }

@@ -22,6 +22,7 @@ describe("YUBERA community foundation", () => {
     expect(server).toContain("ownedCollection(database, userId, id)");
     expect(server).toContain("PLUS_COLLECTIONS : FREE_COLLECTIONS");
     expect(server).toContain("PLUS_TITLES : FREE_TITLES");
+    expect(server).toContain("titleLimit: ownerPlus ? PLUS_TITLES : FREE_TITLES");
     expect(server).toContain("INSERT OR IGNORE INTO yume_xp_ledger");
     expect(server).toContain("LIMIT 30 OFFSET ?");
     expect(server).toContain("LIMIT 13 OFFSET ?");
@@ -163,6 +164,9 @@ describe("YUBERA community foundation", () => {
     expect(server).toContain("return json({ users: rows.results, total: count, hasMore: offset + rows.results.length < count })");
     expect(server).toContain("p.visibility = 'public'");
     expect(panel).toContain("По дате подписки");
+    expect(panel).toContain("Мои подписчики");
+    expect(panel).toContain("direction=followers");
+    expect(panel).toContain("UserRound");
     expect(panel).toContain("followingTotal");
     expect(panel).toContain("Поиск по нику или @username");
     expect(panel).toContain("Показать ещё");
@@ -201,9 +205,13 @@ describe("YUBERA community foundation", () => {
     expect(publicView).toContain("publicProfile.publicTitles");
     expect(publicView).toContain("publicProfile.collectionLikes");
     expect(publicView).toContain("Показать полностью");
+    expect(publicView).toContain("flex-nowrap");
     expect(publicView).toContain("publicCollections.slice(0, 4)");
     expect(publicView).not.toContain("publicProfile.xp.total");
     expect(component).toContain("activeCollectionIsOwner &&");
+    expect(component).toContain("activeCollectionTitleLimit");
+    expect(component).toContain("data.titleLimit");
+    expect(component).toContain("likeBusyCollectionId");
     expect(server).toContain("row.owner_id !== userId && (row.visibility !== \"public\" || Number(row.is_public) !== 1)");
   });
 

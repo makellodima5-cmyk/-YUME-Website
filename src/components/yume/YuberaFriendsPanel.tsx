@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ChevronDown, ChevronRight, LoaderCircle, Search, UserPlus, Users, UserCheck } from "lucide-react";
+import { ChevronDown, ChevronRight, LoaderCircle, Search, UserPlus, Users, UserCheck, UserRound } from "lucide-react";
 
 type CommunityPerson = {
   id: string;
@@ -30,7 +30,7 @@ function PersonAvatar({ person }: { person: CommunityPerson }) {
     <span className={"relative block h-14 w-14 shrink-0 rounded-full " + (hasFrame ? "bg-transparent" : "border border-white/20 bg-[#252630] p-1")}>
       {person.telegram_photo_url
         ? <img src={person.telegram_photo_url} alt="" className={hasFrame ? "absolute inset-[13%] h-[74%] w-[74%] rounded-full object-cover" : "h-full w-full rounded-full object-cover"} />
-        : <span className={hasFrame ? "absolute inset-[13%] grid h-[74%] w-[74%] place-items-center rounded-full bg-white/5 text-lg font-semibold text-white/55" : "grid h-full w-full place-items-center rounded-full bg-white/5 text-lg font-semibold text-white/55"}>{displayName(person).slice(0, 1).toUpperCase()}</span>}
+        : <span className={hasFrame ? "absolute inset-[13%] grid h-[74%] w-[74%] place-items-center rounded-full bg-white/5 text-white/55" : "grid h-full w-full place-items-center rounded-full bg-white/5 text-white/55"}><UserRound className="h-7 w-7" /></span>}
       {person.avatar_frame && <img src={`/images/yubera/${person.avatar_frame}`} alt="" className="pointer-events-none absolute inset-0 h-full w-full object-contain" />}
     </span>
   );
@@ -42,6 +42,13 @@ export function YuberaFriendsPanel({ onOpenProfile, onFollowChange }: Props) {
   const [followingPage, setFollowingPage] = useState(0);
   const [followingHasMore, setFollowingHasMore] = useState(false);
   const [followingLoading, setFollowingLoading] = useState(true);
+  const [followers, setFollowers] = useState<CommunityPerson[]>([]);
+  const [followersTotal, setFollowersTotal] = useState(0);
+  const [followersPage, setFollowersPage] = useState(0);
+  const [followersHasMore, setFollowersHasMore] = useState(false);
+  const [followersLoading, setFollowersLoading] = useState(true);
+  const [followersError, setFollowersError] = useState("");
+  const [listMode, setListMode] = useState<"following" | "followers">("following");
   const [recommendations, setRecommendations] = useState<CommunityPerson[]>([]);
   const [recommendationPage, setRecommendationPage] = useState(0);
   const [recommendationSeed] = useState(() => Math.floor(Math.random() * 2147483646) + 1);
@@ -80,6 +87,28 @@ export function YuberaFriendsPanel({ onOpenProfile, onFollowChange }: Props) {
     }
   }, []);
 
+  const loadFollowers = useCallback(async (page = 0, append = false) => {
+    setFollowersLoading(true);
+    setFollowersError("");
+    try {
+      const response = await fetch(`/api/yubera/community?action=friends&direction=followers&page=${page}`, { credentials: "same-origin", cache: "no-store" });
+      const data = await response.json() as PeopleResponse;
+      if (!response.ok) throw new Error(data.error || "Не удалось загрузить подписчиков");
+      const incoming = Array.isArray(data.users) ? data.users : [];
+      setFollowers((current) => {
+        const combined = append ? [...current, ...incoming] : incoming;
+        return combined.filter((person, index) => combined.findIndex((candidate) => candidate.id === person.id) === index);
+      });
+      setFollowersTotal(Number(data.total ?? 0));
+      setFollowersPage(page);
+      setFollowersHasMore(Boolean(data.hasMore));
+    } catch (cause) {
+      setFollowersError(cause instanceof Error ? cause.message : "Не удалось загрузить подписчиков");
+    } finally {
+      setFollowersLoading(false);
+    }
+  }, []);
+
   const loadRecommendations = useCallback(async (page: number, append: boolean) => {
     const requestId = ++recommendationRequestId.current;
     setRecommendationsLoading(true);
@@ -105,8 +134,9 @@ export function YuberaFriendsPanel({ onOpenProfile, onFollowChange }: Props) {
 
   useEffect(() => {
     void loadFollowing();
+    void loadFollowers();
     void loadRecommendations(0, false);
-  }, [loadFollowing, loadRecommendations]);
+  }, [loadFollowing, loadFollowers, loadRecommendations]);
 
   useEffect(() => {
     const query = search.trim();
@@ -153,8 +183,7 @@ export function YuberaFriendsPanel({ onOpenProfile, onFollowChange }: Props) {
       if (!response.ok) throw new Error(data.error || "Не удалось подписаться на пользователя");
       setRecommendations((current) => current.filter((item) => item.id !== person.id));
       setSearchResults((current) => current.map((item) => item.id === person.id ? { ...item, is_following: 1 } : item));
-      await loadFollowing(0, false);
-      await loadRecommendations(0, false);
+      await Promise.all([loadFollowing(0, false), loadFollowers(0, false), loadRecommendations(0, false)]);
       await onFollowChange?.();
     } catch (cause) {
       setActionError(cause instanceof Error ? cause.message : "Не удалось подписаться на пользователя");
@@ -163,7 +192,7 @@ export function YuberaFriendsPanel({ onOpenProfile, onFollowChange }: Props) {
     }
   };
 
-  const personCard = (person: CommunityPerson, mode: "following" | "discover" | "search") => (
+  const personCard = (person: CommunityPerson, mode: "following" | "followers" | "discover" | "search") => (
     <div key={person.id} className="flex items-center gap-3 rounded-2xl border border-white/[0.08] bg-[#1d1e25] p-3">
       <button type="button" onClick={() => onOpenProfile(person.id)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
         <PersonAvatar person={person} />
@@ -172,12 +201,12 @@ export function YuberaFriendsPanel({ onOpenProfile, onFollowChange }: Props) {
           <span className="block truncate text-xs text-white/50">{person.telegram_username ? `@${person.telegram_username}` : ""}</span>
           {person.bio && <span className="mt-1 block line-clamp-2 text-xs leading-relaxed text-white/45">{person.bio}</span>}
         </span>
-        {mode === "following" && <ChevronRight className="h-4 w-4 shrink-0 text-white/35" />}
+        {(mode === "following" || mode === "followers") && <ChevronRight className="h-4 w-4 shrink-0 text-white/35" />}
       </button>
       {mode !== "following" && (
         person.is_following
           ? <span className="inline-flex shrink-0 items-center gap-1 rounded-xl border border-white/10 px-2.5 py-2 text-[11px] text-white/55"><UserCheck className="h-3.5 w-3.5" />Вы подписаны</span>
-          : <button type="button" disabled={busyUserId !== null} onClick={() => void follow(person)} className="inline-flex min-h-10 shrink-0 items-center gap-1 rounded-xl border border-[#ff7658]/45 bg-[#ff7658]/10 px-3 text-xs font-semibold text-[#ff9a7f] transition hover:bg-[#ff7658]/15 disabled:opacity-50">
+          : <button type="button" disabled={busyUserId !== null} onClick={() => void follow(person)} className="inline-flex min-h-10 shrink-0 items-center gap-1 rounded-xl border border-[#ff7658]/70 bg-gradient-to-r from-[#ff795b] to-[#ff5738] px-3 text-xs font-semibold text-white shadow-[0_4px_16px_rgba(255,91,61,.2)] transition-colors hover:brightness-110 disabled:opacity-50">
               {busyUserId === person.id ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
               <span>Подписаться</span>
             </button>
@@ -187,13 +216,12 @@ export function YuberaFriendsPanel({ onOpenProfile, onFollowChange }: Props) {
 
   return (
     <div className="space-y-4">
-      <div className="relative isolate overflow-hidden rounded-2xl border border-[#8a3d35]/60 bg-gradient-to-br from-[#351b25] via-[#241923] to-[#17181e] px-4 py-5 shadow-[0_0_22px_rgba(255,91,61,.13)]">
-        <img src="/images/yubera/yubera_banner.webp" alt="" className="pointer-events-none absolute inset-0 -z-10 h-full w-full object-cover object-center opacity-40" />
-        <div className="absolute inset-0 -z-10 bg-[linear-gradient(105deg,rgba(39,17,25,.92)_0%,rgba(83,28,36,.72)_48%,rgba(29,20,31,.58)_100%)]" />
-        <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_12%_100%,rgba(255,92,60,.28),transparent_42%),radial-gradient(circle_at_88%_0%,rgba(255,116,80,.2),transparent_38%)]" />
+      <div className="relative isolate overflow-hidden rounded-2xl border border-white/10 bg-[#17181e] px-4 py-5">
+        <img src="/images/yubera/yubera_banner.webp" alt="" className="pointer-events-none absolute inset-0 -z-10 h-full w-full object-cover object-[center_38%] opacity-90" />
+        <div className="absolute inset-0 -z-10 bg-[linear-gradient(100deg,rgba(12,13,17,.76)_0%,rgba(12,13,17,.34)_62%,rgba(12,13,17,.12)_100%)]" />
         <div className="flex items-center gap-3">
-          <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[#ff7658]/10 text-[#ff815f]"><Users className="h-6 w-6" /></span>
-          <span><h2 className="text-xl font-bold text-white">Друзья</h2><p className="text-sm text-white/55">Пользователи, на которых вы подписаны</p></span>
+          <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-[#ff805c] to-[#ff5035] text-white shadow-[0_4px_18px_rgba(255,91,61,.24)]"><Users className="h-6 w-6" /></span>
+          <span><h2 className="text-xl font-bold text-white">Друзья</h2><p className="text-sm text-white/70">Пользователи, на которых вы подписаны</p></span>
         </div>
       </div>
 
@@ -205,14 +233,25 @@ export function YuberaFriendsPanel({ onOpenProfile, onFollowChange }: Props) {
       </label>
 
       <section className="rounded-2xl border border-white/10 bg-[#17181e] p-4">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h3 className="flex items-center gap-2 font-semibold text-white"><Users className="h-4 w-4 text-[#ff7658]" />Мои подписки <span className="text-xs font-normal text-white/45">{followingTotal}</span></h3>
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <h3 className="flex items-center gap-2 font-semibold text-white"><Users className="h-4 w-4 text-[#ff7658]" />{listMode === "following" ? "Мои подписки" : "Мои подписчики"} <span className="text-xs font-normal text-white/45">{listMode === "following" ? followingTotal : followersTotal}</span></h3>
           <span className="inline-flex items-center gap-1 rounded-lg border border-white/10 bg-black/15 px-2.5 py-1.5 text-[11px] text-white/55">По дате подписки <ChevronDown className="h-3 w-3" /></span>
         </div>
-        {followingLoading && !following.length ? <div className="space-y-2" aria-label="Загрузка подписок">{[0,1,2].map((item) => <div key={item} className="h-[82px] animate-pulse rounded-2xl bg-white/[0.04]" />)}</div>
-          : followingError && !following.length ? <div className="py-5 text-center"><p className="text-sm text-red-200">{followingError}</p><button type="button" onClick={() => void loadFollowing()} className="mt-3 text-sm text-[#ff9a7f]">Повторить</button></div>
-          : following.length ? <><div className="space-y-2">{following.map((person) => personCard(person, "following"))}</div>{followingHasMore && <button type="button" disabled={followingLoading} onClick={() => void loadFollowing(followingPage + 1, true)} className="mt-3 flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-white/10 text-xs text-white/65 disabled:opacity-50">{followingLoading ? <LoaderCircle className="h-4 w-4 animate-spin" /> : "Загрузить ещё подписки"}</button>}</>
-          : <div className="py-5 text-center"><Users className="mx-auto mb-2 h-7 w-7 text-white/25" /><p className="text-sm font-medium text-white/75">Вы пока ни на кого не подписаны</p><p className="mt-1 text-xs text-white/45">Найдите пользователей YUBERA и подпишитесь на интересные профили</p></div>}
+        <div className="mb-3 grid grid-cols-2 gap-1 rounded-xl border border-white/10 bg-black/20 p-1">
+          <button type="button" onClick={() => setListMode("following")} aria-pressed={listMode === "following"} className={`rounded-lg px-2 py-2 text-xs font-semibold transition-colors ${listMode === "following" ? "bg-gradient-to-r from-[#ff795b] to-[#ff5738] text-white shadow-[0_2px_12px_rgba(255,91,61,.2)]" : "text-white/55 hover:text-white"}`}>Мои подписки</button>
+          <button type="button" onClick={() => setListMode("followers")} aria-pressed={listMode === "followers"} className={`rounded-lg px-2 py-2 text-xs font-semibold transition-colors ${listMode === "followers" ? "bg-gradient-to-r from-[#ff795b] to-[#ff5738] text-white shadow-[0_2px_12px_rgba(255,91,61,.2)]" : "text-white/55 hover:text-white"}`}>Мои подписчики</button>
+        </div>
+        {listMode === "following" ? (
+          followingLoading && !following.length ? <div className="space-y-2" aria-label="Загрузка подписок">{[0,1,2].map((item) => <div key={item} className="h-[82px] animate-pulse rounded-2xl bg-white/[0.04]" />)}</div>
+            : followingError && !following.length ? <div className="py-5 text-center"><p className="text-sm text-red-200">{followingError}</p><button type="button" onClick={() => void loadFollowing()} className="mt-3 text-sm text-[#ff9a7f]">Повторить</button></div>
+            : following.length ? <><div className="space-y-2">{following.map((person) => personCard(person, "following"))}</div>{followingHasMore && <button type="button" disabled={followingLoading} onClick={() => void loadFollowing(followingPage + 1, true)} className="mt-3 flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-white/10 text-xs text-white/65 disabled:opacity-50">{followingLoading ? <LoaderCircle className="h-4 w-4 animate-spin" /> : "Загрузить ещё подписки"}</button>}</>
+            : <div className="py-5 text-center"><Users className="mx-auto mb-2 h-7 w-7 text-white/25" /><p className="text-sm font-medium text-white/75">Вы пока ни на кого не подписаны</p><p className="mt-1 text-xs text-white/45">Найдите пользователей YUBERA и подпишитесь на интересные профили</p></div>
+        ) : (
+          followersLoading && !followers.length ? <div className="space-y-2" aria-label="Загрузка подписчиков">{[0,1,2].map((item) => <div key={item} className="h-[82px] animate-pulse rounded-2xl bg-white/[0.04]" />)}</div>
+            : followersError && !followers.length ? <div className="py-5 text-center"><p className="text-sm text-red-200">{followersError}</p><button type="button" onClick={() => void loadFollowers()} className="mt-3 text-sm text-[#ff9a7f]">Повторить</button></div>
+            : followers.length ? <><div className="space-y-2">{followers.map((person) => personCard(person, "followers"))}</div>{followersHasMore && <button type="button" disabled={followersLoading} onClick={() => void loadFollowers(followersPage + 1, true)} className="mt-3 flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-white/10 text-xs text-white/65 disabled:opacity-50">{followersLoading ? <LoaderCircle className="h-4 w-4 animate-spin" /> : "Загрузить ещё подписчиков"}</button>}</>
+            : <div className="py-5 text-center"><Users className="mx-auto mb-2 h-7 w-7 text-white/25" /><p className="text-sm font-medium text-white/75">На вас пока никто не подписан</p><p className="mt-1 text-xs text-white/45">Когда пользователи подпишутся на вас, они появятся здесь</p></div>
+        )}
       </section>
 
       {search.trim() ? (
