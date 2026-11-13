@@ -279,12 +279,19 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
       <ChevronRight className="h-4 w-4 shrink-0 text-white/45" />
     </button>
   );
-  const avatar = (p: ProfileData | null) => (
-    <div className="relative h-[76px] w-[76px] shrink-0 rounded-full border-2 border-[#FF5738] bg-[#252630] p-1">
-      {p?.photoUrl ? <img src={p.photoUrl} alt="" className="h-full w-full rounded-full object-cover" /> : <div className="grid h-full w-full place-items-center rounded-full text-2xl text-white/50"><Users /></div>}
-      {p?.avatarFrame && <img src={`/images/yubera/${p.avatarFrame}`} alt="" className="pointer-events-none absolute -inset-2 h-[104px] w-[104px] max-w-none" />}
-    </div>
-  );
+  const avatar = (p: ProfileData | null) => {
+    const hasFrame = Boolean(p?.avatarFrame);
+    return (
+      <div className={`relative h-[76px] w-[76px] shrink-0 rounded-full ${hasFrame ? "bg-transparent" : "border-2 border-[#FF5738] bg-[#252630] p-1"}`}>
+        {p?.photoUrl
+          ? <img src={p.photoUrl} alt="" className={hasFrame ? "absolute inset-[14%] h-[72%] w-[72%] rounded-full object-cover" : "h-full w-full rounded-full object-cover"} />
+          : hasFrame
+            ? <div className="absolute inset-[14%] grid h-[72%] w-[72%] place-items-center rounded-full text-2xl text-white/50"><Users /></div>
+            : <div className="grid h-full w-full place-items-center rounded-full text-2xl text-white/50"><Users /></div>}
+        {p?.avatarFrame && <img src={`/images/yubera/${p.avatarFrame}`} alt="" className="pointer-events-none absolute inset-0 h-full w-full rounded-full object-contain" />}
+      </div>
+    );
+  };
   const openCollection = async (item: Collection, isOwner = true) => {
     try {
       setCollectionReturnScreen(screen);

@@ -101,6 +101,40 @@ describe("Profile and My library pages", () => {
 
   });
 
+  it("fits the selected avatar frame to the avatar and removes the default orange outline", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).includes("/api/telegram/init-data")) {
+        return jsonResponse({ authenticated: true, user: { id: "user-1", firstName: "Dima", username: "dima" } });
+      }
+      if (String(input).includes("/api/yubera/community?action=me")) {
+        return jsonResponse({
+          profile: {
+            id: "user-1", displayName: "Dima", username: "dima", photoUrl: "https://example.com/avatar.jpg", bio: "",
+            avatarFrame: "YUBERA_Plus_Avatar_Frame_05_Cyberpunk_Neon.webp", availableSupportFrames: [], visibility: "public", isPlus: true,
+            followers: 0, following: 0, publicCollections: 0, publicTitles: 0, collectionLikes: 0,
+            xp: { total: 10, level: 1, title: "Начинающий зритель" },
+            support: { level: 0, title: "Без статуса", asset: null },
+            stats: { favorites: 0, watchlist: 0, history: 0 },
+          },
+          collections: [],
+        });
+      }
+      return jsonResponse({ authenticated: true, items: [] });
+    }));
+
+    const { container } = render(withPreferences(<Profile animeList={[]} onSelect={vi.fn()} onCatalog={vi.fn()} />));
+    const frame = await waitFor(() => {
+      const image = container.querySelector<HTMLImageElement>('img[src="/images/yubera/YUBERA_Plus_Avatar_Frame_05_Cyberpunk_Neon.webp"]');
+      expect(image).toBeInTheDocument();
+      return image as HTMLImageElement;
+    });
+    const avatarWrapper = frame.parentElement;
+    expect(avatarWrapper).not.toHaveClass("border-2");
+    expect(frame).toHaveClass("absolute", "inset-0", "h-full", "w-full");
+    const photo = avatarWrapper?.querySelector<HTMLImageElement>('img[src="https://example.com/avatar.jpg"]');
+    expect(photo).toHaveClass("inset-[14%]", "h-[72%]", "w-[72%]");
+  });
+
   it("keeps the Telegram account panel exclusive to the profile home screen", async () => {
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
       if (String(input).includes("/api/telegram/init-data")) {
