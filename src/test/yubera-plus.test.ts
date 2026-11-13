@@ -1,5 +1,5 @@
 import {describe,expect,it} from "vitest";
-import {isValidPlusPrice,isValidPlusGrantDays,normalizePlusGrantUsername,resolveInitialPlusExpiry,YUBERA_PLUS_PERIOD_SECONDS} from "@/data/yubera-plus.server";
+import {isValidPlusPrice,isValidPlusGrantDays,normalizePlusGrantUsername,resolveInitialPlusExpiry,YUBERA_PLUS_PERIOD_SECONDS,calculateYuberaPlusPlanPrice} from "@/data/yubera-plus.server";
 describe("YUBERA Plus",()=>{it("validates Stars price bounds",()=>{expect(isValidPlusPrice(1)).toBe(true);expect(isValidPlusPrice(10000)).toBe(true);expect(isValidPlusPrice(0)).toBe(false);expect(isValidPlusPrice(-1)).toBe(false);expect(isValidPlusPrice(1.5)).toBe(false);expect(isValidPlusPrice(10001)).toBe(false);expect(isValidPlusPrice("250")).toBe(false);});it("uses Telegram's fixed period",()=>expect(YUBERA_PLUS_PERIOD_SECONDS).toBe(2592000));it("uses Telegram expiration or 30 days",()=>{const now=1800000000000;expect(resolveInitialPlusExpiry(now/1000+2592000,now)).toBe(now+2592000000);expect(resolveInitialPlusExpiry(undefined,now)).toBe(now+2592000000);});});
 
 it("guards payment ledger and subscription updates in one atomic batch",async()=>{const source=await import("node:fs/promises").then(m=>m.readFile("src/data/yubera-plus.server.ts","utf8"));expect(source).toContain("if(!d.batch)throw new Error(\"atomic_payment_batch_unavailable\")");expect(source).toContain("WHERE changes()=1");expect(source).toContain("d.batch([");expect(source).toContain("WHERE changes()=1");expect(source).toContain("price_changed_concurrently");expect(source).toContain("plus_price_not_configured");expect(source).toContain("const n=Number(x?.setting_value??0);return isValidPlusPrice(n)?n:0;");});
@@ -53,4 +53,22 @@ describe("YUBERA Plus admin grants",()=>{
   expect(panel).toContain("Plus granted");
   expect(panel).toContain("История операций Plus");
  });
+});
+
+it("calculates the one-month and discounted three-month Plus plans from the configured monthly price",()=>{
+ expect(calculateYuberaPlusPlanPrice(199,1)).toBe(199);
+ expect(calculateYuberaPlusPlanPrice(199,3)).toBe(496);
+ expect(calculateYuberaPlusPlanPrice(100,3)).toBe(249);
+ expect(calculateYuberaPlusPlanPrice(5000,3)).toBe(0);
+});
+it("persists the selected 30- or 90-day plan and extends non-recurring access by its purchased term",async()=>{
+ const [server,migration]=await Promise.all([
+  import("node:fs/promises").then(m=>m.readFile("src/data/yubera-plus.server.ts","utf8")),
+  import("node:fs/promises").then(m=>m.readFile("migrations-clean/0010_yubera_plus_duration.sql","utf8"))
+ ]);
+ expect(server).toContain("period_days");
+ expect(server).toContain("now+order.period_days*86400000");
+ expect(server).toContain("monthlyPrice*3*0.83");
+ expect(migration).toContain("DEFAULT 30");
+ expect(migration).toContain("IN (30, 90)");
 });
