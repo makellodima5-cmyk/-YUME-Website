@@ -64,7 +64,7 @@ it("calculates the one-month and discounted three-month Plus plans from the conf
 it("persists the selected 30- or 90-day plan and extends non-recurring access by its purchased term",async()=>{
  const [server,migration]=await Promise.all([
   import("node:fs/promises").then(m=>m.readFile("src/data/yubera-plus.server.ts","utf8")),
-  import("node:fs/promises").then(m=>m.readFile("migrations-clean/0010_yubera_plus_duration.sql","utf8"))
+  import("node:fs/promises").then(m=>m.readFile("migrations-clean/0011_yubera_plus_duration.sql","utf8"))
  ]);
  expect(server).toContain("period_days");
  expect(server).toContain("now+order.period_days*86400000");
