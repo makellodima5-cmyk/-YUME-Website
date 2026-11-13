@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AnimeComments } from "@/components/yume/AnimeComments";
 import { toast } from "sonner";
@@ -14,6 +14,7 @@ const emptyPage = {
 };
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
@@ -113,6 +114,54 @@ describe("AnimeComments", () => {
 
     expect(await screen.findByText("My own comment")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Reply" })).toBeNull();
+  });
+
+  it("receives new comments through incremental polling without reloading the page", async () => {
+    vi.useFakeTimers();
+    const createdAt = new Date(Date.now() + 1000).toISOString();
+    const checkedAt = new Date(Date.now() + 2000).toISOString();
+    const root = {
+      id: "123e4567-e89b-42d3-a456-426614174002",
+      animeId: "123",
+      parentId: null,
+      threadRootId: "123e4567-e89b-42d3-a456-426614174002",
+      replyToUserId: null,
+      replyToName: null,
+      body: "Live comment arrived",
+      likeCount: 0,
+      createdAt,
+      deleted: false,
+      authorId: "user-2",
+      authorName: "Haru",
+      avatarUrl: null,
+      avatarFrame: null,
+      liked: false,
+    };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(emptyPage), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        updates: [{ root, replies: [] }],
+        totalCount: 1,
+        checkedAt,
+      }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<AnimeComments animeId="123" language="en" />);
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(screen.getByText("No comments yet")).toBeTruthy();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000);
+    });
+
+    expect(screen.getByText("Live comment arrived")).toBeTruthy();
+    expect(screen.getByText("1")).toBeTruthy();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(String(fetchMock.mock.calls[1][0])).toContain("&since=");
   });
 
   it("publishes one comment and refreshes the displayed count without duplicate submits", async () => {
