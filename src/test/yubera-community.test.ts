@@ -172,7 +172,7 @@ describe("YUBERA community foundation", () => {
     expect(server).toContain("AS avatar_frame");
     expect(server).toContain("return json({ users: rows.results, total: count, hasMore: offset + rows.results.length < count })");
     expect(server).toContain("p.visibility = 'public'");
-    expect(panel).toContain("По дате подписки");
+    expect(panel).not.toContain("По дате подписки");
     expect(panel).toContain("Мои подписчики");
     expect(panel).toContain("direction=followers");
     expect(panel).toContain("UserRound");
