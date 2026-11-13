@@ -319,8 +319,7 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
 
   if (!profile) return <div className="mx-auto max-w-3xl px-4 py-8 text-white"><Header title="YUBERA" />{error ? <p role="alert" className="text-sm text-red-300">{error}</p> : <div className="animate-pulse space-y-3"><div className="h-28 rounded-2xl bg-white/5"/><div className="h-20 rounded-2xl bg-white/5"/></div>}</div>;
 
-  return <div className="mx-auto max-w-3xl px-4 pb-28 pt-5 text-white">
-    <div className="mb-4 flex items-center justify-center"><div className="font-black tracking-[.18em] text-white"><span className="text-[#FF5738]">◆</span> YUBERA</div></div>
+  return <div className="mx-auto max-w-3xl px-4 pb-28 pt-2 text-white">
     {error && <p role="alert" className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">{error}</p>}
     {screen === "home" && <>
       <Card className="overflow-hidden p-0">
