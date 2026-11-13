@@ -612,7 +612,7 @@ html[data-theme="light"] nav[aria-label="Main navigation"] button[aria-current="
 .yubera-news-card:hover { border-color:color-mix(in srgb,var(--primary) 48%,var(--border)); transform:translateY(-1px); }
 .yubera-bottom-nav { position:fixed; z-index:45; inset-inline:0; bottom:0; display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:.2rem; padding:.55rem .55rem calc(.55rem + env(safe-area-inset-bottom)); border-top:1px solid var(--border); background:color-mix(in srgb,var(--background) 94%,transparent); -webkit-backdrop-filter:blur(18px); backdrop-filter:blur(18px); }
 .yubera-bottom-nav button { display:flex; min-width:0; flex-direction:column; align-items:center; justify-content:center; gap:.22rem; padding:.3rem .1rem; color:var(--muted-foreground); font-size:.65rem; font-weight:600; }
-.yubera-bottom-nav button[aria-current="page"] { color:var(--primary); }
+.yubera-bottom-nav button[aria-current="page"] { color:#FF5738; filter:drop-shadow(0 0 7px rgba(255,87,56,.32)); }
 .yubera-bottom-nav button[aria-current="page"] svg { stroke-width:2.5; }
 .yubera-with-bottom-nav { padding-bottom:calc(5.1rem + env(safe-area-inset-bottom)); }
 @media(min-width:768px) {
@@ -1923,7 +1923,6 @@ html.telegram-mini-app #telegram-account { margin-top: 8px !important; }
 
 /* Keep all CTA labels legible on saturated orange: never inherit dark text. */
 .bg-neon,
-.yubera-primary-button,
-.yubera-bottom-nav button[aria-current="page"] {
+ .yubera-primary-button {
   color: #FFFFFF;
 }
