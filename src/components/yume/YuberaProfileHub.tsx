@@ -330,8 +330,9 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
   const xpTotal = profile.xp.total ?? 0;
   const currentXpLevel = YUBERA_XP_LEVELS.find((item) => item.level === profile.xp.level);
   const nextXpLevel = YUBERA_XP_LEVELS.find((item) => item.level === profile.xp.level + 1);
-  const xpProgress = currentXpLevel && nextXpLevel
-    ? Math.max(0, Math.min(100, ((xpTotal - currentXpLevel.min) / (nextXpLevel.min - currentXpLevel.min)) * 100))
+  const nextXpThreshold = profile.xp.nextThreshold ?? nextXpLevel?.min ?? null;
+  const xpProgress = nextXpThreshold !== null && typeof profile.xp.progress === "number"
+    ? Math.max(0, Math.min(100, profile.xp.progress))
     : null;
   const levelTitle = profile.xp.title || currentXpLevel?.title || `Уровень ${profile.xp.level}`;
   const levelAsset = levelAssets[profile.xp.level - 1] || levelAssets[0];
@@ -340,70 +341,52 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
     {screen === "home" && !getTelegramWebApp()?.initData && <button type="button" onClick={onBack} className="mb-3 inline-flex items-center gap-2 rounded-xl bg-white/5 px-3 py-2 text-sm text-white/80" aria-label="Назад"><ArrowLeft className="h-4 w-4" />Назад</button>}
     {error && <p role="alert" className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">{error}</p>}
     {screen === "home" && <>
-      <section aria-label="Профиль пользователя" className="overflow-hidden rounded-[28px] border border-white/10 bg-[#17181e]">
-        <div className="relative h-[clamp(250px,44vw,360px)] overflow-hidden">
+      <section aria-label="Профиль пользователя" className="overflow-hidden rounded-[28px] border border-white/10 bg-[#17181e] px-3 pb-2 pt-2">
+        <div className="relative h-[clamp(170px,46vw,190px)] overflow-hidden rounded-[21px]">
           <img src="/images/yubera/yubera_banner.webp" alt="" className="h-full w-full object-cover object-[center_38%]" />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#17181e] via-[#17181e]/20 to-transparent" />
-        </div>
-        <div className="relative -mt-[clamp(88px,19vw,132px)] px-3 pb-1 sm:px-4">
-          <div className="grid grid-cols-[clamp(88px,19vw,132px)_minmax(0,1fr)] grid-rows-[auto_auto] items-end gap-x-3 gap-y-2 px-1">
-            <div className="row-span-2 self-end">
-              {avatar(profile, "h-[clamp(88px,19vw,132px)] w-[clamp(88px,19vw,132px)]")}
-            </div>
-            <div className="min-w-0 self-end pb-1">
-              <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-                <h2 className="min-w-0 whitespace-normal break-words text-[clamp(18px,4vw,28px)] font-bold leading-tight">{profile.displayName}</h2>
-                {profile.isPlus && <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-[#ffc66d]/55 bg-[#ffc66d]/10 px-2.5 py-1 text-[11px] font-bold text-[#ffc66d]"><img src="/images/yubera/YUBERA_Plus_Crown_Simple.webp" alt="" className="h-3.5 w-3.5 object-contain" />Plus</span>}
+          <div className="absolute inset-0 bg-gradient-to-t from-[#17181e]/95 via-[#17181e]/20 to-transparent" />
+          <div className="absolute inset-x-2 bottom-2 flex items-end gap-2">
+            <div className="shrink-0">{avatar(profile, "h-[72px] w-[72px]")}</div>
+            <div className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto] grid-rows-[auto_auto] items-center gap-x-2">
+              <div className="col-span-2 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                <h2 className="min-w-0 whitespace-normal break-words text-[clamp(18px,4.6vw,22px)] font-bold leading-tight">{profile.displayName}</h2>
+                {profile.isPlus && <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-[#ffc66d]/55 bg-[#ffc66d]/10 px-2.5 py-1 text-[11px] font-bold leading-none text-[#ffc66d]"><img src="/images/yubera/YUBERA_Plus_Crown_Simple.webp" alt="" className="h-3.5 w-3.5 object-contain" />Plus</span>}
               </div>
-              {profile.username && <p className="mt-1 whitespace-normal break-words text-sm text-white/75 sm:text-base">@{profile.username}</p>}
-              {profile.bio.trim() && <button type="button" aria-expanded={bioExpanded} aria-label={bioExpanded ? "Свернуть описание профиля" : "Развернуть описание профиля"} onClick={() => setBioExpanded(value => !value)} className={`mt-1 block w-full text-left text-xs leading-snug text-white/80 sm:text-sm ${bioExpanded ? "whitespace-pre-wrap break-words" : "line-clamp-1"}`}>{profile.bio}</button>}
-            </div>
-            <div className="col-start-2 flex justify-end">
-              <button type="button" onClick={() => changeScreen("edit")} className="inline-flex min-h-9 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-white/10 px-3 py-2 text-xs font-semibold text-white sm:px-4 sm:text-sm" aria-label="Редактировать профиль"><Pencil className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" /><span>Редактировать</span></button>
+              <div className="min-w-0 self-start">
+                {profile.username && <p className="whitespace-normal break-words text-[13px] leading-tight text-white/75">@{profile.username}</p>}
+                {profile.bio.trim() && <button type="button" aria-expanded={bioExpanded} aria-label={bioExpanded ? "Свернуть описание профиля" : "Развернуть описание профиля"} onClick={() => setBioExpanded(value => !value)} className={`mt-1 block w-full text-left text-[11px] leading-snug text-white/80 ${bioExpanded ? "whitespace-pre-wrap break-words" : "line-clamp-1"}`}>{profile.bio}</button>}
+              </div>
+              <button type="button" onClick={() => changeScreen("edit")} className="inline-flex min-h-9 shrink-0 items-center justify-center gap-1.5 self-center whitespace-nowrap rounded-full bg-white/10 px-3 py-2 text-[12px] font-semibold leading-none text-white" aria-label="Редактировать профиль"><Pencil className="h-3.5 w-3.5 shrink-0" /><span>Редактировать</span></button>
             </div>
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-2 px-3 pt-3 sm:gap-3 sm:px-4">
-          <button type="button" onClick={() => changeScreen("level")} className="flex min-h-[104px] min-w-0 items-center gap-2 rounded-2xl border border-white/10 bg-[#202127] px-2.5 py-3 text-left sm:gap-3 sm:px-3">
-            <img src={`/images/yubera/${levelAsset}`} alt="" className="h-[clamp(42px,7vw,60px)] w-[clamp(42px,7vw,60px)] shrink-0 object-contain" />
+        <div className="mt-2 grid grid-cols-[1.12fr_1fr] gap-2">
+          <button type="button" onClick={() => changeScreen("level")} aria-label={`Уровень ${profile.xp.level}: ${levelTitle}`} className="flex min-h-[58px] min-w-0 items-center gap-1.5 rounded-2xl border border-white/10 bg-[#202127] px-2 py-2 text-left">
+            <img src={`/images/yubera/${levelAsset}`} alt="" className="h-9 w-9 shrink-0 object-contain" />
             <span className="min-w-0 flex-1">
-              <b className="block whitespace-normal break-words text-xs font-semibold leading-tight sm:text-sm">{levelTitle}</b>
-              <span className="mt-1 block whitespace-normal text-[10px] leading-snug text-white/65 sm:text-xs">
-                Уровень {profile.xp.level} · {xpTotal.toLocaleString("ru-RU")}{nextXpLevel ? ` / ${nextXpLevel.min.toLocaleString("ru-RU")} XP` : " XP"}
+              <b className="block whitespace-normal break-normal text-[12px] font-semibold leading-[1.15] text-white">{levelTitle}</b>
+              <span className="mt-1 block whitespace-normal break-normal text-[10px] leading-tight text-white/65">
+                Уровень {profile.xp.level} · {xpTotal.toLocaleString("ru-RU")}{nextXpThreshold !== null ? ` / ${nextXpThreshold.toLocaleString("ru-RU")} XP` : " XP"}
               </span>
-              {xpProgress !== null && <span className="mt-2 block h-2 overflow-hidden rounded-full bg-white/10"><span className="block h-full rounded-full bg-gradient-to-r from-[#FF5738] to-[#FF6245]" style={{ width: `${xpProgress}%` }} /></span>}
+              {xpProgress !== null && <span data-testid="profile-xp-progress" className="mt-1.5 block h-1.5 overflow-hidden rounded-full bg-white/10"><span className="block h-full rounded-full bg-gradient-to-r from-[#FF5738] to-[#FF6245]" style={{ width: `${xpProgress}%` }} /></span>}
             </span>
             <ChevronRight className="h-4 w-4 shrink-0 text-white/65" />
           </button>
-          <button type="button" onClick={() => changeScreen("support-status")} className="flex min-h-[104px] min-w-0 items-center gap-2 rounded-2xl border border-white/10 bg-[#202127] px-2.5 py-3 text-left sm:gap-3 sm:px-3">
-            {profile.support.asset ? <img src={`/images/yubera/${profile.support.asset}`} alt="" className="h-[clamp(42px,7vw,60px)] w-[clamp(42px,7vw,60px)] shrink-0 object-contain" /> : <span className="grid h-[clamp(42px,7vw,60px)] w-[clamp(42px,7vw,60px)] shrink-0 place-items-center rounded-full bg-[#FF5738]/15 text-[#FF5738]"><Star className="h-6 w-6" /></span>}
+          <button type="button" onClick={() => changeScreen("support-status")} aria-label={`Статус поддержки: ${profile.support.title}`} className="flex min-h-[58px] min-w-0 items-center gap-1.5 rounded-2xl border border-white/10 bg-[#202127] px-2 py-2 text-left">
+            {profile.support.asset
+              ? <img src={`/images/yubera/${profile.support.asset}`} alt="" className="h-9 w-9 shrink-0 object-contain" />
+              : <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#FF5738]/15 text-[#FF5738]"><Star className="h-5 w-5" /></span>}
             <span className="min-w-0 flex-1">
-              <b className="block whitespace-normal break-words text-xs font-semibold leading-tight sm:text-sm">{profile.support.level > 0 ? profile.support.title : "Поддержка"}</b>
-              <span className="mt-1 block whitespace-normal break-words text-[10px] leading-snug text-white/65 sm:text-xs">Статус поддержки</span>
+              <b className="block whitespace-normal break-normal text-[12px] font-semibold leading-[1.15] text-white">{profile.support.level > 0 ? profile.support.title : "Поддержка"}</b>
+              <span className="mt-1 block whitespace-normal break-normal text-[10px] leading-tight text-white/65">Статус поддержки</span>
             </span>
             <ChevronRight className="h-4 w-4 shrink-0 text-white/65" />
           </button>
         </div>
-        <div className="mx-3 mb-4 mt-3 grid grid-cols-3 divide-x divide-white/10 rounded-[22px] border border-white/10 bg-black/20 text-center sm:mx-4">
-          {[[ "В избранном", profile.stats?.favorites ], [ "В моём списке", profile.stats?.watchlist ], [ "В истории", profile.stats?.history ]].map(([label, value]) => <div key={String(label)} className="min-w-0 px-1.5 py-3"><b className="block text-2xl font-bold leading-none">{typeof value === "number" ? value : "—"}</b><span className="mt-2 block whitespace-nowrap text-[clamp(10px,2.8vw,13px)] leading-tight text-white/65">{label}</span></div>)}
+        <div className="mt-2 grid grid-cols-3 divide-x divide-white/10 rounded-[20px] border border-white/10 bg-black/20 text-center">
+          {[[ "В избранном", profile.stats?.favorites ], [ "В моём списке", profile.stats?.watchlist ], [ "В истории", profile.stats?.history ]].map(([label, value]) => <div key={String(label)} className="min-w-0 px-1 py-2"><b className="block text-[22px] font-bold leading-none">{typeof value === "number" ? value : "—"}</b><span className="mt-1.5 block whitespace-nowrap text-[clamp(10px,2.7vw,12px)] leading-tight text-white/65">{label}</span></div>)}
         </div>
       </section>
-      <Card className="mt-2 p-3">
-        <div className="mb-2 flex items-center justify-between gap-2"><h3 className="flex items-center gap-2 text-sm font-semibold"><Layers3 className="h-4 w-4 text-[#FF5738]" />Мои подборки</h3><button type="button" onClick={() => changeScreen("collections")} className="shrink-0 text-xs text-[#FF5738]">Все подборки <ChevronRight className="inline h-3 w-3" /></button></div>
-        <div className="flex gap-2 overflow-x-auto pb-1">
-          <button type="button" onClick={startCreateCollection} className="grid h-[92px] w-[92px] shrink-0 place-items-center rounded-xl border border-dashed border-white/30 text-center text-xs text-white/75"><Plus className="h-6 w-6 text-[#FF5738]" /><span>Создать подборку</span></button>
-          {orderedCollections.slice(0, 5).map(item => <button type="button" key={item.id} onClick={() => void openCollection(item)} className="relative h-[92px] w-32 shrink-0 overflow-hidden rounded-xl border border-white/10 text-left">{item.cover_key ? <img src={`/images/yubera/${item.cover_key}`} alt="" className="absolute inset-0 h-full w-full object-cover" /> : <div className="absolute inset-0 bg-white/5" />}<div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/15 to-transparent" /><span className="absolute bottom-2 left-2 right-2"><b className="block truncate text-xs">{item.title}</b><span className="text-[10px] text-white/75">{item.title_count} тайтлов</span></span></button>)}
-        </div>
-      </Card>
-      <div className="mt-2 space-y-2">
-        <Action icon={<Users />} label="Друзья" detail="Пользователи, на которых вы подписаны" onClick={() => changeScreen("friends")} />
-        <Action icon={<Settings />} label="Настройки приложения" detail="Тема, язык и другие параметры" onClick={() => onSettings?.()} expanded={settingsExpanded} controls="app-settings" />
-        <Action icon={<ShieldCheck />} label="Правовая информация" detail="Политика конфиденциальности и правила сайта" onClick={() => onLegal?.()} />
-        <Action icon={<Info />} label="О Yubera" detail="О проекте и версии сайта" onClick={() => onAbout?.()} />
-        {isAdmin && <Action icon={<Shield />} label="Панель администратора" detail="Управление сайтом и каталогом" onClick={() => onAdmin?.()} />}
-        <Action icon={<LifeBuoy />} label="Поддержка" detail="Помощь и сообщения о проблемах" onClick={() => onSupport?.()} />
-      </div>
-    </>}
     {screen === "edit" && <><Header title="Редактирование профиля" subtitle="Настройте описание, видимость и оформление профиля"/><Card>
       <div className="mb-4 flex items-center gap-3">{avatar(profile)}<div><b>{profile.displayName}</b><p className="text-sm text-white/50">@{profile.username || "username"}</p></div></div>
       <div className="mb-4 flex items-start gap-2 rounded-xl bg-white/[0.04] p-3 text-xs leading-relaxed text-white/55"><Info className="mt-0.5 h-4 w-4 shrink-0 text-white/45"/><span>Аватар и никнейм берутся из Telegram и не могут быть изменены на сайте</span></div>
