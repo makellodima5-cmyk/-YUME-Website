@@ -101,6 +101,36 @@ describe("Profile and My library pages", () => {
 
   });
 
+  it("shows the compact Plus badge and omits progress for the maximum XP level", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).includes("/api/telegram/init-data")) {
+        return jsonResponse({ authenticated: true, user: { id: "user-1", firstName: "Dima", username: "dima" } });
+      }
+      if (String(input).includes("/api/yubera/community?action=me")) {
+        return jsonResponse({
+          profile: {
+            id: "user-1", displayName: "Dima", username: "dima", photoUrl: null, bio: "",
+            avatarFrame: null, availableSupportFrames: [], visibility: "public", isPlus: true,
+            followers: 0, following: 0, publicCollections: 0, publicTitles: 0, collectionLikes: 0,
+            xp: { total: 3200, level: 10, title: "Легенда YUBERA" },
+            support: { level: 0, title: "Без статуса", asset: null },
+            stats: { favorites: 0, watchlist: 0, history: 0 },
+          },
+          collections: [],
+        });
+      }
+      return jsonResponse({ authenticated: true, items: [] });
+    }));
+
+    const { container } = render(withPreferences(<Profile animeList={[]} onSelect={vi.fn()} onCatalog={vi.fn()} />));
+    expect(await screen.findByText("Plus")).toBeInTheDocument();
+    expect(screen.queryByText("YUBERA Plus")).not.toBeInTheDocument();
+    const levelCard = await screen.findByRole("button", { name: /Легенда YUBERA/ });
+    expect(levelCard).toHaveTextContent("Уровень 10 · 3 200 XP");
+    expect(levelCard.querySelector(".h-2.overflow-hidden")).not.toBeInTheDocument();
+    expect(container.querySelector('[aria-label="Профиль пользователя"]')).toBeInTheDocument();
+  });
+
   it("fits the selected avatar frame to the avatar and removes the default orange outline", async () => {
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
       if (String(input).includes("/api/telegram/init-data")) {

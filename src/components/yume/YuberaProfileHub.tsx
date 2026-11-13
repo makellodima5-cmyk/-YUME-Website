@@ -279,16 +279,16 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
       <ChevronRight className="h-4 w-4 shrink-0 text-white/45" />
     </button>
   );
-  const avatar = (p: ProfileData | null) => {
+  const avatar = (p: ProfileData | null, size = "h-[76px] w-[76px]") => {
     const hasFrame = Boolean(p?.avatarFrame);
     return (
-      <div className={`relative h-[76px] w-[76px] shrink-0 rounded-full ${hasFrame ? "bg-transparent" : "border-2 border-[#FF5738] bg-[#252630] p-1"}`}>
+      <div className={`relative ${size} shrink-0 rounded-full ${hasFrame ? "bg-transparent" : "border-2 border-[#FF5738] bg-[#252630] p-1"}`}>
         {p?.photoUrl
           ? <img src={p.photoUrl} alt="" className={hasFrame ? "absolute inset-[14%] h-[72%] w-[72%] rounded-full object-cover" : "h-full w-full rounded-full object-cover"} />
           : hasFrame
             ? <div className="absolute inset-[14%] grid h-[72%] w-[72%] place-items-center rounded-full text-2xl text-white/50"><Users /></div>
             : <div className="grid h-full w-full place-items-center rounded-full text-2xl text-white/50"><Users /></div>}
-        {p?.avatarFrame && <img src={`/images/yubera/${p.avatarFrame}`} alt="" className="pointer-events-none absolute inset-0 h-full w-full rounded-full object-contain" />}
+        {p?.avatarFrame && <img src={`/images/yubera/${p.avatarFrame}`} alt="" className="pointer-events-none absolute inset-0 h-full w-full object-contain" />}
       </div>
     );
   };
@@ -327,48 +327,67 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
 
   if (!profile) return <div className="mx-auto max-w-3xl px-4 py-8 text-white"><Header title="YUBERA" />{error ? <p role="alert" className="text-sm text-red-300">{error}</p> : <div className="animate-pulse space-y-3"><div className="h-28 rounded-2xl bg-white/5"/><div className="h-20 rounded-2xl bg-white/5"/></div>}</div>;
 
+  const xpTotal = profile.xp.total ?? 0;
+  const currentXpLevel = YUBERA_XP_LEVELS.find((item) => item.level === profile.xp.level);
+  const nextXpLevel = YUBERA_XP_LEVELS.find((item) => item.level === profile.xp.level + 1);
+  const xpProgress = currentXpLevel && nextXpLevel
+    ? Math.max(0, Math.min(100, ((xpTotal - currentXpLevel.min) / (nextXpLevel.min - currentXpLevel.min)) * 100))
+    : null;
+  const levelTitle = profile.xp.title || currentXpLevel?.title || `Уровень ${profile.xp.level}`;
+  const levelAsset = levelAssets[profile.xp.level - 1] || levelAssets[0];
+
   return <div className="mx-auto w-full max-w-none px-0 pb-3 pt-0 text-white">
     {screen === "home" && !getTelegramWebApp()?.initData && <button type="button" onClick={onBack} className="mb-3 inline-flex items-center gap-2 rounded-xl bg-white/5 px-3 py-2 text-sm text-white/80" aria-label="Назад"><ArrowLeft className="h-4 w-4" />Назад</button>}
     {error && <p role="alert" className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">{error}</p>}
     {screen === "home" && <>
-      <Card className="overflow-hidden p-0">
-        <div className="relative h-[184px] overflow-hidden sm:h-[208px]">
+      <section aria-label="Профиль пользователя" className="overflow-hidden rounded-[28px] border border-white/10 bg-[#17181e]">
+        <div className="relative h-[clamp(250px,44vw,360px)] overflow-hidden">
           <img src="/images/yubera/yubera_banner.webp" alt="" className="h-full w-full object-cover object-[center_38%]" />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#17181e] via-[#17181e]/25 to-transparent" />
-          <div className="absolute inset-x-0 bottom-0 flex items-end gap-2.5 px-3 pb-3">
-            <div className="shrink-0">{avatar(profile)}</div>
-            <div className="min-w-0 flex-1 pb-0.5">
-              <h2 className="truncate text-lg font-bold">{profile.displayName}</h2>
-              {profile.isPlus && <span className="mt-1 inline-flex items-center gap-1 rounded-full border border-[#ffc66d]/40 bg-[#ffc66d]/10 px-2 py-0.5 text-[10px] font-bold tracking-wide text-[#ffc66d]"><img src="/images/yubera/YUBERA_Plus_Crown_Simple.webp" alt="" className="h-3.5 w-3.5 object-contain" />YUBERA Plus</span>}
-              <p className="truncate text-xs text-white/75">@{profile.username || "YUBERA"}</p>
-              {profile.bio.trim() && <button type="button" aria-expanded={bioExpanded} aria-label={bioExpanded ? "Свернуть описание профиля" : "Развернуть описание профиля"} onClick={() => setBioExpanded(value => !value)} className={`mt-1 block w-full text-left text-[11px] leading-snug text-white/80 ${bioExpanded ? "whitespace-pre-wrap break-words" : "line-clamp-1"}`}>{profile.bio}</button>}
+          <div className="absolute inset-0 bg-gradient-to-t from-[#17181e] via-[#17181e]/20 to-transparent" />
+        </div>
+        <div className="relative -mt-[clamp(88px,19vw,132px)] px-3 pb-1 sm:px-4">
+          <div className="grid grid-cols-[clamp(88px,19vw,132px)_minmax(0,1fr)] grid-rows-[auto_auto] items-end gap-x-3 gap-y-2 px-1">
+            <div className="row-span-2 self-end">
+              {avatar(profile, "h-[clamp(88px,19vw,132px)] w-[clamp(88px,19vw,132px)]")}
             </div>
-            <button type="button" onClick={() => changeScreen("edit")} className="mb-0.5 inline-flex shrink-0 items-center gap-1 rounded-full bg-white/10 px-2.5 py-2 text-[11px] font-semibold text-white" aria-label="Редактировать профиль"><Pencil className="h-3 w-3" />Редактировать</button>
+            <div className="min-w-0 self-end pb-1">
+              <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                <h2 className="min-w-0 whitespace-normal break-words text-[clamp(18px,4vw,28px)] font-bold leading-tight">{profile.displayName}</h2>
+                {profile.isPlus && <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-[#ffc66d]/55 bg-[#ffc66d]/10 px-2.5 py-1 text-[11px] font-bold text-[#ffc66d]"><img src="/images/yubera/YUBERA_Plus_Crown_Simple.webp" alt="" className="h-3.5 w-3.5 object-contain" />Plus</span>}
+              </div>
+              {profile.username && <p className="mt-1 whitespace-normal break-words text-sm text-white/75 sm:text-base">@{profile.username}</p>}
+              {profile.bio.trim() && <button type="button" aria-expanded={bioExpanded} aria-label={bioExpanded ? "Свернуть описание профиля" : "Развернуть описание профиля"} onClick={() => setBioExpanded(value => !value)} className={`mt-1 block w-full text-left text-xs leading-snug text-white/80 sm:text-sm ${bioExpanded ? "whitespace-pre-wrap break-words" : "line-clamp-1"}`}>{profile.bio}</button>}
+            </div>
+            <div className="col-start-2 flex justify-end">
+              <button type="button" onClick={() => changeScreen("edit")} className="inline-flex min-h-9 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-white/10 px-3 py-2 text-xs font-semibold text-white sm:px-4 sm:text-sm" aria-label="Редактировать профиль"><Pencil className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" /><span>Редактировать</span></button>
+            </div>
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-2 px-3 pt-3">
-          <button type="button" onClick={() => changeScreen("level")} className="flex min-h-[72px] min-w-0 items-center gap-2 rounded-xl border border-white/10 bg-[#202127] px-2 py-2 text-left">
-            <img src={`/images/yubera/${levelAssets[profile.xp.level - 1]}`} alt="" className="h-9 w-9 shrink-0 object-contain" />
+        <div className="grid grid-cols-2 gap-2 px-3 pt-3 sm:gap-3 sm:px-4">
+          <button type="button" onClick={() => changeScreen("level")} className="flex min-h-[104px] min-w-0 items-center gap-2 rounded-2xl border border-white/10 bg-[#202127] px-2.5 py-3 text-left sm:gap-3 sm:px-3">
+            <img src={`/images/yubera/${levelAsset}`} alt="" className="h-[clamp(42px,7vw,60px)] w-[clamp(42px,7vw,60px)] shrink-0 object-contain" />
             <span className="min-w-0 flex-1">
-              <b className="block whitespace-normal break-words text-[11px] font-semibold leading-tight">{profile.xp.title || `Уровень ${profile.xp.level}`}</b>
-              <span className="mt-0.5 block whitespace-normal text-[9px] leading-tight text-white/65">Уровень {profile.xp.level} · {(profile.xp.total ?? 0).toLocaleString("ru-RU")} / {(profile.xp.nextThreshold ?? profile.xp.total ?? 0).toLocaleString("ru-RU")} XP</span>
-              <span className="mt-1.5 block h-1.5 overflow-hidden rounded-full bg-white/10"><span className="block h-full rounded-full bg-gradient-to-r from-[#FF5738] to-[#FF6245]" style={{ width: `${Math.max(0, Math.min(100, profile.xp.progress ?? 0))}%` }} /></span>
+              <b className="block whitespace-normal break-words text-xs font-semibold leading-tight sm:text-sm">{levelTitle}</b>
+              <span className="mt-1 block whitespace-normal text-[10px] leading-snug text-white/65 sm:text-xs">
+                Уровень {profile.xp.level} · {xpTotal.toLocaleString("ru-RU")}{nextXpLevel ? ` / ${nextXpLevel.min.toLocaleString("ru-RU")} XP` : " XP"}
+              </span>
+              {xpProgress !== null && <span className="mt-2 block h-2 overflow-hidden rounded-full bg-white/10"><span className="block h-full rounded-full bg-gradient-to-r from-[#FF5738] to-[#FF6245]" style={{ width: `${xpProgress}%` }} /></span>}
             </span>
             <ChevronRight className="h-4 w-4 shrink-0 text-white/65" />
           </button>
-          <button type="button" onClick={() => changeScreen("support-status")} className="flex min-h-[72px] min-w-0 items-center gap-2 rounded-xl border border-white/10 bg-[#202127] px-2 py-2 text-left">
-            {profile.support.asset ? <img src={`/images/yubera/${profile.support.asset}`} alt="" className="h-9 w-9 shrink-0 object-contain" /> : <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#FF5738]/15 text-[#FF5738]"><Star className="h-5 w-5" /></span>}
+          <button type="button" onClick={() => changeScreen("support-status")} className="flex min-h-[104px] min-w-0 items-center gap-2 rounded-2xl border border-white/10 bg-[#202127] px-2.5 py-3 text-left sm:gap-3 sm:px-3">
+            {profile.support.asset ? <img src={`/images/yubera/${profile.support.asset}`} alt="" className="h-[clamp(42px,7vw,60px)] w-[clamp(42px,7vw,60px)] shrink-0 object-contain" /> : <span className="grid h-[clamp(42px,7vw,60px)] w-[clamp(42px,7vw,60px)] shrink-0 place-items-center rounded-full bg-[#FF5738]/15 text-[#FF5738]"><Star className="h-6 w-6" /></span>}
             <span className="min-w-0 flex-1">
-              <b className="block whitespace-normal break-words text-[11px] font-semibold leading-tight">{profile.support.level > 0 ? profile.support.title : "Поддержка"}</b>
-              <span className="mt-0.5 block whitespace-normal break-words text-[10px] leading-tight text-white/60">Статус поддержки</span>
+              <b className="block whitespace-normal break-words text-xs font-semibold leading-tight sm:text-sm">{profile.support.level > 0 ? profile.support.title : "Поддержка"}</b>
+              <span className="mt-1 block whitespace-normal break-words text-[10px] leading-snug text-white/65 sm:text-xs">Статус поддержки</span>
             </span>
             <ChevronRight className="h-4 w-4 shrink-0 text-white/65" />
           </button>
         </div>
-        <div className="mx-3 mb-[7px] mt-2 grid grid-cols-3 divide-x divide-white/10 rounded-xl border border-white/10 bg-black/20 text-center">
-          {[[ "В избранном", profile.stats?.favorites ], [ "В моём списке", profile.stats?.watchlist ], [ "В истории", profile.stats?.history ]].map(([label, value]) => <div key={String(label)} className="px-1 py-2"><b className="block text-lg">{typeof value === "number" ? value : "—"}</b><span className="block text-[10px] leading-tight text-white/60">{label}</span></div>)}
+        <div className="mx-3 mb-4 mt-3 grid grid-cols-3 divide-x divide-white/10 rounded-[22px] border border-white/10 bg-black/20 text-center sm:mx-4">
+          {[[ "В избранном", profile.stats?.favorites ], [ "В моём списке", profile.stats?.watchlist ], [ "В истории", profile.stats?.history ]].map(([label, value]) => <div key={String(label)} className="min-w-0 px-1.5 py-3"><b className="block text-2xl font-bold leading-none">{typeof value === "number" ? value : "—"}</b><span className="mt-2 block whitespace-nowrap text-[clamp(10px,2.8vw,13px)] leading-tight text-white/65">{label}</span></div>)}
         </div>
-      </Card>
+      </section>
       <Card className="mt-2 p-3">
         <div className="mb-2 flex items-center justify-between gap-2"><h3 className="flex items-center gap-2 text-sm font-semibold"><Layers3 className="h-4 w-4 text-[#FF5738]" />Мои подборки</h3><button type="button" onClick={() => changeScreen("collections")} className="shrink-0 text-xs text-[#FF5738]">Все подборки <ChevronRight className="inline h-3 w-3" /></button></div>
         <div className="flex gap-2 overflow-x-auto pb-1">
