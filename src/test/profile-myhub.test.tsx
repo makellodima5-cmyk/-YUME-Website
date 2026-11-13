@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import type { Anime } from "@/data/anime";
 import { YumePreferencesProvider } from "@/data/preferences";
@@ -85,14 +85,15 @@ describe("Profile and My library pages", () => {
     expect(screen.getByText("Начинающий зритель")).toBeInTheDocument();
     expect((screen.getAllByText("Поддержка").length)).toBeGreaterThan(0);
     expect(screen.getByText("Статус поддержки")).toBeInTheDocument();
-    const bioToggle = screen.getByRole("button", { name: "Развернуть описание профиля" });
-    expect(bioToggle).toHaveAttribute("aria-expanded", "false");
-    expect(bioToggle).toHaveClass("line-clamp-1");
+    const bioToggle = screen.getByRole("button", { name: "Читать полностью" });
+    expect(bioToggle).toHaveTextContent("Читать полностью");
+    expect(bioToggle.querySelector("svg")).toBeInTheDocument();
     fireEvent.click(bioToggle);
-    expect(screen.getByRole("button", { name: "Свернуть описание профиля" })).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByText(/полностью помещаться в карточке профиля/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Свернуть описание профиля" }));
-    expect(screen.getByRole("button", { name: "Развернуть описание профиля" })).toHaveAttribute("aria-expanded", "false");
+    const bioDialog = screen.getByRole("dialog", { name: "Описание профиля" });
+    expect(bioDialog).toBeInTheDocument();
+    expect(within(bioDialog).getByText(/полностью помещаться в карточке профиля/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Закрыть описание профиля" }));
+    expect(screen.queryByRole("dialog", { name: "Описание профиля" })).not.toBeInTheDocument();
     expect(screen.getByText("Мои подборки")).toBeInTheDocument();
     expect(screen.getAllByText("Dima")).toHaveLength(1);
     expect(screen.queryByText("Профиль, уровень, подборки и друзья")).not.toBeInTheDocument();
