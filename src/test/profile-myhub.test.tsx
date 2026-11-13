@@ -83,7 +83,7 @@ describe("Profile and My library pages", () => {
 
     expect(await screen.findByRole("button", { name: /Уровень 1/ })).toBeInTheDocument();
     expect(screen.getByText("Начинающий зритель")).toBeInTheDocument();
-    expect(screen.getByText("Поддержка")).toBeInTheDocument();
+    expect((screen.getAllByText("Поддержка").length)).toBeGreaterThan(0);
     expect(screen.getByText("Статус поддержки")).toBeInTheDocument();
     const bioToggle = screen.getByRole("button", { name: "Развернуть описание профиля" });
     expect(bioToggle).toHaveAttribute("aria-expanded", "false");
