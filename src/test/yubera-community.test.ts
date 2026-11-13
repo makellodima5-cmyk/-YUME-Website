@@ -21,6 +21,8 @@ describe("YUBERA community foundation", () => {
     expect(server).toContain("p.visibility = 'public'");
     expect(server).toContain("ownedCollection(database, userId, id)");
     expect(server).toContain("PLUS_COLLECTIONS : FREE_COLLECTIONS");
+    expect(server).toContain("SELECT ?,?,?,?,?,? WHERE (SELECT COUNT(*) FROM yume_collections WHERE user_id=?) < ?");
+    expect(server).toContain("inserted.meta?.changes");
     expect(server).toContain("PLUS_TITLES : FREE_TITLES");
     expect(server).toContain("titleLimit: ownerPlus ? PLUS_TITLES : FREE_TITLES");
     expect(server).toContain("INSERT OR IGNORE INTO yume_xp_ledger");
