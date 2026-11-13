@@ -1926,3 +1926,41 @@ html.telegram-mini-app #telegram-account { margin-top: 8px !important; }
  .yubera-primary-button {
   color: #FFFFFF;
 }
+
+
+/* One saturated YUBERA orange: shared by buttons, icons and active navigation. */
+:root {
+  --primary: #FF5738;
+  --primary-foreground: #FFFFFF;
+  --ring: #FF5738;
+  --magenta: #FF704F;
+  --gradient-neon: linear-gradient(120deg, #FF5738 0%, #FF704F 100%);
+  --shadow-neon: 0 8px 24px rgba(255,87,56,.24);
+}
+html[data-theme="light"] {
+  --primary: #FF5738;
+  --primary-foreground: #FFFFFF;
+  --ring: #FF5738;
+  --magenta: #FF704F;
+  --gradient-neon: linear-gradient(120deg, #FF5738 0%, #FF704F 100%);
+  --shadow-neon: 0 8px 22px rgba(255,87,56,.18);
+}
+.yubera-bottom-nav button[aria-current="page"] {
+  color: #FF5738 !important;
+  -webkit-text-fill-color: #FF5738 !important;
+  filter: drop-shadow(0 0 7px rgba(255,87,56,.38));
+}
+.yubera-bottom-nav button[aria-current="page"] svg {
+  color: #FF5738 !important;
+  stroke: #FF5738 !important;
+}
+nav[aria-label="Основная навигация"] button[aria-current="page"],
+nav[aria-label="Main navigation"] button[aria-current="page"] {
+  color: #FF5738 !important;
+  -webkit-text-fill-color: #FF5738 !important;
+}
+nav[aria-label="Основная навигация"] button[aria-current="page"] svg,
+nav[aria-label="Main navigation"] button[aria-current="page"] svg {
+  color: #FF5738 !important;
+  stroke: #FF5738 !important;
+}
