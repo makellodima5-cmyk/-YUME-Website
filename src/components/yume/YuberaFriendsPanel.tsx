@@ -199,7 +199,7 @@ export function YuberaFriendsPanel({ onOpenProfile, onFollowChange }: Props) {
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-semibold text-white">{displayName(person)}</span>
           <span className="block truncate text-xs text-white/50">{person.telegram_username ? `@${person.telegram_username}` : ""}</span>
-          {person.bio && <span className="mt-1 block max-w-full truncate whitespace-nowrap text-xs leading-relaxed text-white/45">{person.bio}</span>}
+          {person.bio && <span className="mt-1 block max-w-full truncate whitespace-nowrap line-clamp-1 text-xs leading-relaxed text-white/45">{person.bio}</span>}
         </span>
         {(mode === "following" || mode === "followers") && <ChevronRight className="h-4 w-4 shrink-0 text-white/35" />}
       </button>
