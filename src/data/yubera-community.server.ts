@@ -285,7 +285,7 @@ export async function handleYuberaCommunity(request: Request): Promise<Response>
         FROM yume_users u JOIN yume_profiles p ON p.user_id = u.id
         WHERE p.visibility = 'public' AND u.id <> ?
         AND NOT EXISTS(SELECT 1 FROM yume_follows f WHERE f.follower_id = ? AND f.followed_id = u.id)
-        ORDER BY abs((CAST(substr(u.id, -8) AS INTEGER) * 1103515245 + ?) % 2147483647), u.id
+        ORDER BY abs((unicode(substr(u.id,-1))*1103515245 + unicode(substr(u.id,-2,1))*12345 + unicode(substr(u.id,-3,1))*2654435761 + unicode(substr(u.id,-4,1))*97 + unicode(substr(u.id,-5,1))*193 + unicode(substr(u.id,-6,1))*389 + unicode(substr(u.id,-7,1))*769 + unicode(substr(u.id,-8,1))*1543 + ?) % 2147483647), u.id
         LIMIT 13 OFFSET ?`).bind(Date.now(), userId, userId, seed, page * 12).all<UserRow>();
       return json({ users: rows.results.slice(0, 12), hasMore: rows.results.length > 12 });
     }
