@@ -116,7 +116,21 @@ describe("Kodik voice-over episode notification cron", () => {
     }
   });
 
-  it("preserves pre-existing subscriptions without a selected voice-over", async () => {
+  it("does not poll pre-existing subscriptions until they choose a voice-over", async () => {
+    const { db } = fakeDatabase([
+      { anime_id: "123", translation_id: null, translation_title: null, source_last_episode: null, baseline_episode: 0 },
+    ]);
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      await runScheduledEpisodeNotifications({ YUME_DB: db, KODIK_API_TOKEN: "test-kodik-token" });
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("does not send notifications for subscriptions missing a voice-over", async () => {
     const restoreCatalog = setupCatalog();
     const { db, updates } = fakeDatabase([
       { anime_id: "123", translation_id: "__legacy__", translation_title: null, source_last_episode: 5, baseline_episode: 5 },
