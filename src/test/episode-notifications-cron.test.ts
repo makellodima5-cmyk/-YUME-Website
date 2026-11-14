@@ -116,6 +116,34 @@ describe("Kodik voice-over episode notification cron", () => {
     }
   });
 
+  it("preserves pre-existing subscriptions without a selected voice-over", async () => {
+    const restoreCatalog = setupCatalog();
+    const { db, updates } = fakeDatabase([
+      { anime_id: "123", translation_id: "__legacy__", translation_title: null, source_last_episode: 5, baseline_episode: 5 },
+    ]);
+    const jobs: Array<Record<string, unknown>> = [];
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json(kodikPayload())));
+    try {
+      await runScheduledEpisodeNotifications({
+        YUME_DB: db,
+        KODIK_API_TOKEN: "test-kodik-token",
+        YUME_WEB_TASKS: { async send(message) { jobs.push(message as Record<string, unknown>); } },
+      });
+      expect(jobs).toHaveLength(1);
+      expect(jobs[0]).toMatchObject({
+        animeId: "123",
+        episodeNumber: 6,
+        notificationId: "episode-123-6",
+      });
+      expect(jobs[0].translationId).toBeUndefined();
+      expect(updates).toHaveLength(1);
+      expect(updates[0]).toContain("__legacy__");
+    } finally {
+      restoreCatalog();
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("does not call the catalog or Kodik when there are no active subscriptions", async () => {
     const { db } = fakeDatabase([]);
     const fetchMock = vi.fn();
