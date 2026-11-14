@@ -8,13 +8,14 @@ type Props = {
   disabled: boolean;
   subscribed: boolean;
   subscribedVoiceover?: string;
+  needsVoiceoverSelection?: boolean;
   onSubscribed: (subscribed: boolean, voiceover?: string) => void;
   onAuthRequired: () => void;
   onError: () => void;
 };
 
 export function AnimeEpisodeSubscription({
-  animeId, language, disabled, subscribed, subscribedVoiceover, onSubscribed, onAuthRequired, onError,
+  animeId, language, disabled, subscribed, subscribedVoiceover, needsVoiceoverSelection = false, onSubscribed, onAuthRequired, onError,
 }: Props) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [sources, setSources] = useState<Source[]>([]);
@@ -23,7 +24,7 @@ export function AnimeEpisodeSubscription({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const english = language === "en";
-  const needsVoiceover = subscribed && !subscribedVoiceover && !disabled;
+  const needsVoiceover = subscribed && (needsVoiceoverSelection || !subscribedVoiceover) && !disabled;
 
   async function beginSubscription() {
     setDialogOpen(true);
