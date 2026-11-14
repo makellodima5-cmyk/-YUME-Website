@@ -100,10 +100,11 @@ function normalizeKodikMaterial(item: KodikCatalogResult, existingIds: Set<strin
   const kodikId = String(item.id ?? "").trim();
   if (!/^\d{1,12}$/.test(id) || Number(id) < 1 || !/^\d{1,20}$/.test(kodikId)) return null;
   const data = item.material_data ?? {};
-  const originalTitle = clean(item.title_orig) || clean(data.anime_title_jp) || clean(item.title);
+  const firstTitle = (value: string | string[] | null | undefined) => clean(Array.isArray(value) ? value[0] : value);
+  const originalTitle = clean(item.title_orig) || firstTitle(data.other_titles_jp) || firstTitle(data.anime_title_jp) || clean(item.title);
   const title = clean(data.anime_title) || clean(item.title) || originalTitle;
   if (title.length < 2) return null;
-  const englishTitle = clean(data.anime_title_en) || clean(item.other_title);
+  const englishTitle = firstTitle(data.other_titles_en) || firstTitle(data.anime_title_en) || clean(item.other_title);
   const ratingValue = Number(data.shikimori_rating ?? data.kinopoisk_rating);
   const rating = Number.isFinite(ratingValue) && ratingValue > 0 && ratingValue <= 10 ? ratingValue : null;
   const studios = Array.from(new Set((data.anime_studios ?? []).map((studio) => clean(studio)).filter(Boolean))).slice(0,20);
