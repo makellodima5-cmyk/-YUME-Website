@@ -677,11 +677,6 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
         const next = YUBERA_SUPPORT_LEVELS[currentLevel + 1];
         const remaining = next ? Math.max(0, next.min - total) : 0;
         const progress = next ? Math.max(0, Math.min(100, ((total - current.min) / Math.max(1, next.min - current.min)) * 100)) : 100;
-        const donationHref = (level: number) => {
-          const target = YUBERA_SUPPORT_LEVELS[level];
-          const query = new URLSearchParams({ support: "1", targetLevel: String(level), targetStars: String(target.min) });
-          return `?section=support&${query.toString()}`;
-        };
         const accents = [
           { border: "#ff754f", glow: "rgba(255,104,65,.20)", fill: "rgba(255,93,57,.10)", line: "#ff704f" },
           { border: "#b65be8", glow: "rgba(178,85,235,.18)", fill: "rgba(145,68,194,.11)", line: "#c16cf2" },
@@ -711,7 +706,17 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
           {YUBERA_SUPPORT_LEVELS.filter(level => level.level > 0).map((level) => {
             const tone = accents[level.level - 1];
             const reached = currentLevel >= level.level;
-            return <a key={level.level} href={donationHref(level.level)} onClick={event => { event.preventDefault(); window.history.pushState({}, "", donationHref(level.level)); window.dispatchEvent(new PopStateEvent("popstate")); }} aria-label={`${level.level}. ${level.title}, от ${level.min.toLocaleString("ru-RU")} Stars. Перейти к поддержке`} className="group relative isolate flex min-h-[108px] min-w-0 items-center gap-3 overflow-hidden rounded-[23px] border px-3 py-3 shadow-[0_0_18px_var(--support-glow)] transition-transform active:scale-[.99] sm:min-h-[116px] sm:px-4" style={{ borderColor: tone.border + "88", background: `radial-gradient(ellipse at 92% 100%, ${tone.fill}, transparent 58%),linear-gradient(110deg,#1b1b21 0%,#15161c 68%,#211a1c 100%)`, boxShadow: `0 0 17px ${tone.glow}, inset 0 -18px 34px ${tone.fill}` }}>
+            return <a key={level.level} href={`?section=support&${new URLSearchParams({ support: "1", targetLevel: String(level.level), targetStars: String(level.min) }).toString()}`}
+              onClick={(event) => {
+                event.preventDefault();
+                const url = new URL(window.location.href);
+                url.searchParams.set("section", "support");
+                url.searchParams.set("support", "1");
+                url.searchParams.set("targetLevel", String(level.level));
+                url.searchParams.set("targetStars", String(level.min));
+                window.history.pushState({}, "", url);
+                window.dispatchEvent(new PopStateEvent("popstate"));
+              }} aria-label={`${level.level}. ${level.title}, от ${level.min.toLocaleString("ru-RU")} Stars. Перейти к поддержке`} className="group relative isolate flex min-h-[108px] min-w-0 items-center gap-3 overflow-hidden rounded-[23px] border px-3 py-3 shadow-[0_0_18px_var(--support-glow)] transition-transform active:scale-[.99] sm:min-h-[116px] sm:px-4" style={{ borderColor: tone.border + "88", background: `radial-gradient(ellipse at 92% 100%, ${tone.fill}, transparent 58%),linear-gradient(110deg,#1b1b21 0%,#15161c 68%,#211a1c 100%)`, boxShadow: `0 0 17px ${tone.glow}, inset 0 -18px 34px ${tone.fill}` }}>
               <span aria-hidden="true" className="pointer-events-none absolute -bottom-10 -right-5 h-24 w-44 rotate-[-12deg] rounded-[50%] border-t-2 opacity-50" style={{ borderColor: tone.border, boxShadow: `0 -7px 19px ${tone.glow}` }}/>
               <img src={`/images/yubera/${level.asset}`} alt="" className="relative z-10 h-[76px] w-[76px] shrink-0 object-contain sm:h-[84px] sm:w-[84px]"/>
               <span aria-hidden="true" className="relative z-10 h-[66px] w-px shrink-0" style={{ backgroundColor: tone.line }}/>
