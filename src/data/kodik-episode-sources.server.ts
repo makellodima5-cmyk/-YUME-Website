@@ -1,6 +1,6 @@
 import { env as cloudflareEnv } from "cloudflare:workers";
 type EpisodeValue=string|{link?:string|null};
-type Result={shikimori_id?:string|number;id?:string;title?:string;translation?:{id?:string|number;title?:string};episodes?:Record<string,EpisodeValue>;seasons?:Record<string,{episodes?:Record<string,EpisodeValue>}>};
+type Result={shikimori_id?:string|number;id?:string;title?:string;link?:string|null;translation?:{id?:string|number;title?:string};episodes?:Record<string,EpisodeValue>;seasons?:Record<string,{episodes?:Record<string,EpisodeValue>}>};
 export type KodikEpisodeSource={id:string;title:string;episodes:number[]};
 const API="https://kodik-api.com/search",HOSTS=["kodik.info","kodik.biz","kodik.cc","kodik.online","kodikplayer.com","kodikres.com"];
 function environment():{KODIK_API_TOKEN?:string}{try{return cloudflareEnv as unknown as {KODIK_API_TOKEN?:string}}catch{const x=(globalThis as typeof globalThis&{__YUME_RUNTIME_ENV__?:unknown}).__YUME_RUNTIME_ENV__;return x&&typeof x==="object"?x as {KODIK_API_TOKEN?:string}:{}}}
