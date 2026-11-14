@@ -112,11 +112,6 @@ function findKodikDuplicate(candidate:Pick<KodikCatalogCandidate,"id"|"kodikId"|
   if(items.some(item=>item.id===candidate.id||(item as Anime & {kodikId?:string}).kodikId===candidate.kodikId))return {exact:true,title:null as string|null};
   if(candidate.shikimoriId&&items.some(item=>item.id===candidate.shikimoriId))return {exact:true,title:null as string|null};
   const aliases=new Set([candidate.title,candidate.englishTitle,candidate.originalTitle].map(normalizeCatalogTitle).filter(value=>value.length>=3));
-  for(const item of items) {
-    if(!candidate.year||!item.year||candidate.year!==item.year)continue;
-    if(candidate.kind&&item.kind&&candidate.kind!==item.kind)continue;
-    if([...aliases].some(alias=>existingAliases(item).has(alias)))return {exact:true,title:item.title};
-  }
   for(const item of items)if([...aliases].some(alias=>existingAliases(item).has(alias)))return {exact:false,title:item.title};
   return {exact:false,title:null};
 }

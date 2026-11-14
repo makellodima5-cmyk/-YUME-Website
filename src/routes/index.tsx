@@ -2215,7 +2215,7 @@ function Index() {
                   <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
                 </summary>
                 <div className="border-t border-border/70 p-3 sm:p-4">
-                  <p className="text-xs leading-relaxed text-muted-foreground">{language === "ru" ? "Можно добавить аниме по названию или оставить импорт по количеству. Оба режима сохраняют метаданные, постер и доступные скриншоты из Shikimori." : "Add anime by title or keep using the quantity-based importer. Both modes save metadata, poster and available Shikimori screenshots."}</p>
+                  <p className="text-xs leading-relaxed text-muted-foreground">{language === "ru" ? "Для импорта по названию выбери Shikimori или Kodik. Массовый импорт по количеству работает только через Shikimori." : "Choose Shikimori or Kodik for single-title search and import. Quantity-based bulk import remains Shikimori-only."}</p>
                   <section className="mt-4 rounded-xl border border-[#22232B] bg-[#101116] p-3 sm:p-4" aria-label={language === "ru" ? "Импорт аниме по названию" : "Import anime by title"}>
                     <h3 className="text-sm font-semibold text-[#F6F4F5]">{language === "ru" ? "Добавить по названию" : "Import by title"}</h3>
                     <div className="mt-3 inline-flex rounded-lg border border-[#34313B] bg-[#0C0D11] p-1" role="group" aria-label={language === "ru" ? "Источник импорта" : "Import source"}>
