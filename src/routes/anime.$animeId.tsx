@@ -146,7 +146,7 @@ function AnimeDetailPage() {
   }, [anime, language]);
 
   useEffect(() => {
-    if (!anime || anime.status !== "Онгоинг") {
+    if (!anime) {
       setEpisodeSubscribed(false);
       setEpisodeSubscribedVoiceover("");
       return;
