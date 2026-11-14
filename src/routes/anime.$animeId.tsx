@@ -165,7 +165,7 @@ function AnimeDetailPage() {
       })
       .catch(() => undefined);
     return () => { cancelled = true; };
-  }, [anime?.id, anime?.status]);
+  }, [anime?.id, anime?.status, anime?.episodes, anime?.episodesAired]);
 
 
   const [kodikSources, setKodikSources] = useState<Array<{ id: string; title: string; episodes: Array<{ number: number; title: string; link: string }> }>>([]);
