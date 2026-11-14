@@ -333,7 +333,7 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, onSettings, sett
         {p?.photoUrl
           ? <img src={p.photoUrl} alt="" className={hasFrame ? `absolute ${adminFrame ? "inset-[17%] h-[66%] w-[66%]" : "inset-[14%] h-[72%] w-[72%]"} rounded-full object-cover` : "h-full w-full rounded-full object-cover"} />
           : hasFrame
-            ? <div className={`absolute ${adminFrame ? "inset-[17%] h-[66%] w-[66%]" : "inset-[14%] h-[72%] w-[72%]"} grid place-items-center rounded-full text-2xl text-white/50"><Users /></div>
+            ? <div className={`absolute ${adminFrame ? "inset-[17%] h-[66%] w-[66%]" : "inset-[14%] h-[72%] w-[72%]"} grid place-items-center rounded-full text-2xl text-white/50`}><Users /></div>
             : <div className="grid h-full w-full place-items-center rounded-full text-2xl text-white/50"><Users /></div>}
         {p?.avatarFrame && <img src={`/images/yubera/${p.avatarFrame}`} alt="" className="pointer-events-none absolute inset-0 h-full w-full object-contain" />}
       </div>
