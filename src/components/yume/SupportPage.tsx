@@ -17,7 +17,7 @@ function StarsMark({ compact = false }: { compact?: boolean }) {
   );
 }
 
-export function SupportPage() {
+export function SupportPage({ targetLevel, targetStars }: { targetLevel?: string; targetStars?: string }) {
   const [selected, setSelected] = useState<number>(100);
   const [customAmount, setCustomAmount] = useState("");
   const [customOpen, setCustomOpen] = useState(false);
@@ -32,6 +32,15 @@ export function SupportPage() {
 
   const amount = customAmount ? Number(customAmount) : selected;
   const valid = Number.isSafeInteger(amount) && amount >= MIN_STARS && amount <= MAX_STARS;
+
+  useEffect(() => {
+    const target = Number(targetStars);
+    if (targetLevel && /^[1-5]$/.test(targetLevel) && Number.isSafeInteger(target) && target > 0 && target <= MAX_STARS) {
+      setSelected(target);
+      setCustomAmount(String(target));
+      setActiveTab("support");
+    }
+  }, [targetLevel, targetStars]);
 
   useEffect(() => {
     if (!customOpen) return;
@@ -143,7 +152,7 @@ export function SupportPage() {
   };
 
   return (
-    <main id="main-content" className="yubera-support-page yubera-with-bottom-nav min-h-[var(--yume-tg-viewport-height,100dvh)] px-3 pb-8 sm:px-4">
+    <main id="main-content" className="yubera-support-page yubera-with-bottom-nav min-h-[var(--yume-tg-viewport-height,100dvh)] px-3 pb-[calc(7rem+env(safe-area-inset-bottom))] sm:px-4">
       <div className="mx-auto flex w-full max-w-[760px] flex-col gap-3">
         <section className="relative isolate min-h-[166px] overflow-hidden rounded-[22px] border border-[#3a3b43] bg-[#171820]">
           <img src="/images/yubera/yubera_banner.webp" alt="" aria-hidden="true" className="absolute inset-0 h-full w-full object-cover object-[center_34%]" />

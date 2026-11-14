@@ -79,6 +79,12 @@ function saveLocalNotificationIds(ids: string[]): boolean {
 
 type MetadataCatalogStats = { total:number; incomplete:number; complete:number; announced:number; missingTrailer:number; hasTrailer:number; savedScreenshotUrls:number; screenshotDone:number; screenshotRetry:number; screenshotFailed:number };
 
+const validateSupportSearch = (search: Record<string, unknown>) => ({
+  ...validateCatalogSearch(search),
+  targetLevel: typeof search.targetLevel === "string" && /^[1-5]$/.test(search.targetLevel) ? search.targetLevel : undefined,
+  targetStars: typeof search.targetStars === "string" && /^\d{1,6}$/.test(search.targetStars) ? search.targetStars : undefined,
+});
+
 export const Route = createFileRoute("/")({
   staleTime: 30_000,
   head: () => {
@@ -103,11 +109,11 @@ export const Route = createFileRoute("/")({
       links: [{ rel: "canonical", href: canonicalUrl("/") }],
     };
   },
-  validateSearch: validateCatalogSearch,
+  validateSearch: validateSupportSearch,
   loaderDeps: ({ search }) => ({
     section: search.section, collection: search.collection, q: search.q, page: search.page, sort: search.sort,
     genres: search.genres, status: search.status, from: search.from, to: search.to,
-    rating: search.rating, kind: search.kind, age: search.age, lang: search.lang,
+    rating: search.rating, kind: search.kind, age: search.age, lang: search.lang, targetLevel: search.targetLevel, targetStars: search.targetStars,
   }),
   loader: async ({ deps }) => {
     if (deps.section === "history") {
@@ -1810,7 +1816,7 @@ function Index() {
           showSupport={true}
         />
       ) : view === "support" ? (
-        <SupportPage />
+        <SupportPage targetLevel={targetLevel} targetStars={targetStars} />
       ) : view === "notifications" && notificationStateLoaded && !notificationRemoteAccount ? (
         <main id="main-content" className="px-4 pb-12 pt-24 md:px-10 md:pt-24">
           <section className="mx-auto max-w-lg rounded-3xl border border-border bg-card/70 p-6 text-center sm:p-8">

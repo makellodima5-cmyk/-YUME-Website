@@ -122,8 +122,8 @@ describe("YUBERA community foundation", () => {
     const required = [
       "YUBERA_Level_01_Option_A.webp","YUBERA_Level_02.webp","YUBERA_Level_03.webp","YUBERA_Level_04.webp","YUBERA_Level_05_Transparent.webp",
       "YUBERA_Level_06.webp","YUBERA_Level_07_Transparent.webp","YUBERA_Level_08_Transparent.webp","YUBERA_Level_09_Transparent.webp","YUBERA_Level_10_New_Design.webp",
-      "YUBERA_Support_Status_Level_01_Soyuznik.webp","YUBERA_Support_Status_Level_02_Storonnik.webp","YUBERA_Support_Status_Level_03_Predanniy_Uchastnik.webp",
-      "YUBERA_Support_Status_Level_04_Pochetnyy_Pokrovitel.webp","YUBERA_Support_Status_Level_05_Legenda_YUBERA.webp",
+      "YUBERA_Status_01_Soyuznik.webp","YUBERA_Status_02_Storonnik.webp","YUBERA_Status_03_Predannyi_Uchastnik.webp",
+      "YUBERA_Status_04_Pochetnyi_Pokrovitel.webp","YUBERA_Support_Status_05_Legend.webp",
       "YUBERA_Contribution_Avatar_Frame_01_Soyuznik.webp.webp","YUBERA_Contribution_Avatar_Frame_02_Storonnik.webp.webp","YUBERA_Contribution_Avatar_Frame_03_Predanniy_Uchastnik.webp.webp",
       "YUBERA_Contribution_Avatar_Frame_04_Pochetnyy_Pokrovitel.webp","YUBERA_Contribution_Avatar_Frame_05_Legenda_YUBERA.webp",
       "YUBERA_Plus_Avatar_Frame_01_Sakura_Gold.webp","YUBERA_Plus_Avatar_Frame_02_Mystic_Kitsune.webp","YUBERA_Plus_Avatar_Frame_03_Samurai_Steel.webp",
