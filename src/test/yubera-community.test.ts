@@ -318,6 +318,7 @@ describe("YUBERA community foundation", () => {
     expect(server).toContain("async function isTelegramAdministrator(request: Request, env: Environment)");
     expect(server).toContain("u.telegram_user_id === adminId");
     expect(server).toContain("availableAdminFrames: isOwner && adminCheck");
+    expect(server).toContain("profileSummary(database, target, userId, adminCheck)");
     expect(server).toContain("isAdmin: account.user.telegram_user_id === String((env().TELEGRAM_ADMIN_ID ?? \"\")).trim()");
     expect(component).toContain("profile.isAdmin &&");
     expect(component).toContain("publicProfile.isAdmin &&");
@@ -340,6 +341,7 @@ describe("YUBERA community foundation", () => {
     expect(server).toContain("availableAdminFrames: isOwner && adminCheck ? [...ADMIN_FRAME_ASSETS] : []");
     expect(component).toContain("profile.isAdmin&&(profile.availableAdminFrames??[]).includes(asset)");
     expect(component).toContain("publicProfile.avatarFrame");
+    expect(component).toContain("p?.avatarFrame && <img src={`\/images\/yubera/${p.avatarFrame}`}");
   });
 
 });
