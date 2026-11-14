@@ -19,7 +19,7 @@ type ProfileData = {
 type Collection = { id: string; title: string; description: string; cover_key: string | null; is_public: number; is_pinned: number; title_count: number; like_count: number; liked: number };
 type CollectionFormSnapshot = { title: string; description: string; cover: string | null; isPublic: boolean; editingCollectionId: string | null };
 type ProfileFormSnapshot = { bio: string; visibility: "public" | "private"; frame: string | null };
-type Props = { animeList: Anime[]; onSelect: (anime: Anime) => void; onBack: () => void; isAdmin?: boolean; onSettings?: () => void; settingsExpanded?: boolean; onLegal?: () => void; onAbout?: () => void; onAdmin?: () => void; onSupport?: () => void; onAccount?: () => void; onScreenChange?: (screen: Screen) => void };
+type Props = { animeList: Anime[]; onSelect: (anime: Anime) => void; onBack: () => void; onSettings?: () => void; settingsExpanded?: boolean; onLegal?: () => void; onAbout?: () => void; onAdmin?: () => void; onSupport?: () => void; onAccount?: () => void; onScreenChange?: (screen: Screen) => void };
 
 const covers = [
   "YUBERA_Collection_Cover_Action.webp",
@@ -67,7 +67,7 @@ function formatCollectionTitleCount(value: number): string {
   return `${value} ${word}`;
 }
 
-export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false, onSettings, settingsExpanded = false, onLegal, onAbout, onAdmin, onSupport, onAccount, onScreenChange }: Props) {
+export function YuberaProfileHub({ animeList, onSelect, onBack, onSettings, settingsExpanded = false, onLegal, onAbout, onAdmin, onSupport, onAccount, onScreenChange }: Props) {
   const [screen, setScreen] = useState<Screen>("home");
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [collections, setCollections] = useState<Collection[]>([]);
@@ -451,7 +451,7 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
         <Action icon={<Settings />} label="Настройки приложения" detail="Тема, язык и другие параметры" onClick={() => onSettings?.()} expanded={settingsExpanded} controls="app-settings" />
         <Action icon={<ShieldCheck />} label="Правовая информация" detail="Политика конфиденциальности и правила сайта" onClick={() => onLegal?.()} />
         <Action icon={<Info />} label="О Yubera" detail="О проекте и версии сайта" onClick={() => onAbout?.()} />
-        {isAdmin && <Action icon={<Shield />} label="Панель администратора" detail="Управление сайтом и каталогом" onClick={() => onAdmin?.()} />}
+        {profile.isAdmin && <Action icon={<Shield />} label="Панель администратора" detail="Управление сайтом и каталогом" onClick={() => onAdmin?.()} />}
         <Action icon={<LifeBuoy />} label="Поддержка" detail="Помощь и сообщения о проблемах" onClick={() => onSupport?.()} />
       </div>
     </>}
