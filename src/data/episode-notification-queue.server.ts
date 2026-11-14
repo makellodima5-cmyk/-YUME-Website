@@ -63,6 +63,7 @@ export async function enqueueEpisodeNotification(
     animeId, episodeNumber, animeTitle: animeTitle.slice(0, 300),
     ...(posterUrl && isSafePosterUrl(posterUrl) ? { posterUrl } : {}),
     ...(translationId && translationTitle ? { translationId, translationTitle: translationTitle.slice(0, 120) } : {}),
+    ...(translationId && translationTitle ? { translationId, translationTitle: translationTitle.slice(0, 120) } : {}),
   };
   if (!isEpisodeNotificationJob(job)) throw new Error("Invalid episode notification job");
   await queue.send(job, { contentType: "json" });
@@ -116,6 +117,7 @@ async function processEpisodeNotificationFanout(db: Database, env: QueueEnvironm
         animeId:job.animeId, episodeNumber:job.episodeNumber, animeTitle:job.animeTitle,
         ...(job.posterUrl ? {posterUrl:job.posterUrl} : {}),
         ...(job.translationId && job.translationTitle ? {translationId:job.translationId,translationTitle:job.translationTitle} : {}),
+        ...(job.translationId && job.translationTitle ? {translationId:job.translationId,translationTitle:job.translationTitle} : {}),
       } as unknown as EpisodeNotificationJob, {contentType:"json"});
     }
   }
@@ -123,7 +125,7 @@ async function processEpisodeNotificationFanout(db: Database, env: QueueEnvironm
 
 type TelegramDeliveryJob = {
   type:"telegram_episode_delivery";
-  notificationId:string; userId:string; animeId:string; episodeNumber:number; animeTitle:string; posterUrl?:string; translationId?:string; translationTitle?:string;
+  notificationId:string; userId:string; animeId:string; episodeNumber:number; animeTitle:string; posterUrl?:string; translationId?:string; translationTitle?:string; translationId?:string; translationTitle?:string;
 };
 function isTelegramDeliveryJob(value:unknown):value is TelegramDeliveryJob {
   if(!isRecord(value))return false;
@@ -132,6 +134,7 @@ function isTelegramDeliveryJob(value:unknown):value is TelegramDeliveryJob {
     typeof value.animeId==="string" && /^\d{1,20}$/.test(value.animeId) &&
     Number.isSafeInteger(value.episodeNumber) && Number(value.episodeNumber)>0 &&
     typeof value.animeTitle==="string" && value.animeTitle.length>0 && value.animeTitle.length<=300 &&
+    (value.translationId===undefined || (typeof value.translationId==="string" && /^[A-Za-z0-9_-]{1,64}$/.test(value.translationId) && typeof value.translationTitle==="string" && value.translationTitle.length>0 && value.translationTitle.length<=120)) &&
     (value.translationId===undefined || (typeof value.translationId==="string" && /^[A-Za-z0-9_-]{1,64}$/.test(value.translationId) && typeof value.translationTitle==="string" && value.translationTitle.length>0 && value.translationTitle.length<=120)) &&
     (value.posterUrl===undefined || isSafePosterUrl(value.posterUrl));
 }
