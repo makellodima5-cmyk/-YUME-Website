@@ -166,6 +166,7 @@ describe("Kodik catalogue title search mapping", () => {
       episodes_total: 64,
       episodes_aired: 64,
       shikimori_rating: 9.1,
+      anime_studios: ["Bones"],
       rating_mpaa: "PG-13",
     },
   };
@@ -178,11 +179,7 @@ describe("Kodik catalogue title search mapping", () => {
       englishTitle: "Fullmetal Alchemist: Brotherhood", originalTitle: "Hagane no Renkinjutsushi",
       year: 2009, kind: "TV", status: "Вышел", posterUrl: "https://cdn.example.org/poster.jpg",
       description: "Two brothers search for the Philosopher's Stone.",
-      genres: ["Приключения", "Фэнтези"],
-      episodes_total: 64,
-      episodes_aired: 64,
-      shikimori_rating: 9.1,
-      anime_studios: ["Bones"], alreadyInCatalog: false,
+      genres: ["Приключения", "Фэнтези"], episodes:64, episodesAired:64, rating:9.1, studios:["Bones"], alreadyInCatalog: false,
     });
   });
 
