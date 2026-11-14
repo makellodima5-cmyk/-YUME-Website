@@ -39,6 +39,7 @@ import { toSameOriginShikimoriScreenshot } from "@/lib/shikimori-image-proxy";
 import { PLAYBACK_PROGRESS_UPDATED_EVENT, readPlaybackProgress, savePlaybackProgress, markPlaybackEpisodeCompleted, type PlaybackProgressEntry } from "@/data/playback-progress";
 import { parseKodikPlaybackMessage } from "@/data/kodik-playback-events";
 import { UserAnimeRating } from "@/components/yume/UserAnimeRating";
+import { AnimeEpisodeSubscription } from "@/components/yume/AnimeEpisodeSubscription";
 import { AnimeComments } from "@/components/yume/AnimeComments";
 import { canReturnToAnimeOrigin } from "@/data/anime-navigation";
 
@@ -132,7 +133,7 @@ function AnimeDetailPage() {
   const [saveSyncError, setSaveSyncError] = useState(false);
   const [authRequired, setAuthRequired] = useState(false);
   const [episodeSubscribed, setEpisodeSubscribed] = useState(false);
-  const [subscriptionBusy, setSubscriptionBusy] = useState(false);
+  const [episodeSubscribedVoiceover, setEpisodeSubscribedVoiceover] = useState("");
   const [watchMode, setWatchMode] = useState<"trailer" | "episodes">("trailer");
   const [screenshots, setScreenshots] = useState<ShikimoriScreenshot[]>([]);
   const [activeScreenshotIndex, setActiveScreenshotIndex] = useState<number | null>(null);
@@ -148,13 +149,14 @@ function AnimeDetailPage() {
   useEffect(() => {
     if (!anime || anime.status !== "Онгоинг") {
       setEpisodeSubscribed(false);
+      setEpisodeSubscribedVoiceover("");
       return;
     }
     let cancelled = false;
     fetch("/api/anime-subscriptions", { credentials: "same-origin", cache: "no-store" })
       .then(async response => {
-        const payload = await response.json().catch(() => ({})) as { subscriptions?: string[] };
-        if (!cancelled && response.ok) setEpisodeSubscribed(Array.isArray(payload.subscriptions) && payload.subscriptions.includes(anime.id));
+        const payload = await response.json().catch(() => ({})) as { subscriptions?: string[]; subscriptionSelections?: Record<string,{translationId?:string;translationTitle?:string}> };
+        if (!cancelled && response.ok) { setEpisodeSubscribed(Array.isArray(payload.subscriptions) && payload.subscriptions.includes(anime.id)); setEpisodeSubscribedVoiceover(payload.subscriptionSelections?.[anime.id]?.translationTitle ?? ""); }
       })
       .catch(() => undefined);
     return () => { cancelled = true; };
@@ -630,43 +632,14 @@ function AnimeDetailPage() {
     </button>
   );
 
-  const canSubscribeToEpisodes = anime.status === "Онгоинг" &&
-    !(anime.episodes > 0 && (anime.episodesAired ?? 0) >= anime.episodes);
+  const canSubscribeToEpisodes = anime.status === "Онгоинг" && !(anime.episodes > 0 && (anime.episodesAired ?? 0) >= anime.episodes);
   const episodeSubscriptionButton = (
-    <button
-      type="button"
-      disabled={!canSubscribeToEpisodes || subscriptionBusy}
-      title={!canSubscribeToEpisodes ? (language === "ru" ? "Новые серии для этого тайтла больше не выходят" : "No more episodes are expected for this title") : undefined}
-      onClick={async () => {
-        if (!canSubscribeToEpisodes || subscriptionBusy) return;
-        setSubscriptionBusy(true);
-        try {
-          const response = await fetch("/api/anime-subscriptions", {
-            method: episodeSubscribed ? "DELETE" : "POST",
-            credentials: "same-origin",
-            cache: "no-store",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ animeId: anime.id }),
-          });
-          const payload = await response.json().catch(() => ({})) as { error?: string; subscribed?: boolean };
-          if (response.status === 401) {
-            navigateToSection("login");
-            return;
-          }
-          if (!response.ok) throw new Error(payload.error ?? "subscription_failed");
-          setEpisodeSubscribed(payload.subscribed === true);
-        } catch {
-          setSaveSyncError(true);
-        } finally {
-          setSubscriptionBusy(false);
-        }
-      }}
-      aria-pressed={episodeSubscribed}
-      className="hidden"
-    >
-      <Bell className={`h-4 w-4 ${episodeSubscribed ? "fill-current text-primary" : ""}`} />
-      {language === "en" ? "Follow new episodes" : "Отслеживать новые серии"}
-    </button>
+    <AnimeEpisodeSubscription
+      animeId={anime.id} language={language} disabled={!canSubscribeToEpisodes}
+      subscribed={episodeSubscribed} subscribedVoiceover={episodeSubscribedVoiceover}
+      onSubscribed={(subscribed, voiceover) => { setEpisodeSubscribed(subscribed); setEpisodeSubscribedVoiceover(voiceover ?? ""); }}
+      onAuthRequired={() => navigateToSection("login")} onError={() => setSaveSyncError(true)}
+    />
   );
 
   const listButton = (
