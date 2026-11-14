@@ -49,9 +49,6 @@ describe("Telegram library sync item validation", () => {
   });
 });
 
-import { describe, expect, it } from "vitest";
-import { normalizeTelegramLibrarySyncItems } from "@/data/telegram-library-sync.server";
-
 describe("Telegram library subscription voice-over data", () => {
   it("accepts a selected voice-over and rejects malformed IDs or empty titles", () => {
     const base = { itemType: "subscription", animeId: "123", updatedAtEpochMillis: Date.now(), deleted: false, sourceId: "web" };
