@@ -2248,8 +2248,8 @@ function Index() {
                     {adminTitleSearchResults.length > 0 && (
                       <div className="mt-3 space-y-2">
                         {adminTitleSearchResults.map(item => (
-                          <>
-                          <article key={item.id} className="flex min-w-0 items-center gap-3 rounded-xl border border-[#30263A] bg-[#101116] p-2.5 sm:p-3">
+                          <div key={item.id} className="space-y-2">
+                          <article className="flex min-w-0 items-center gap-3 rounded-xl border border-[#30263A] bg-[#101116] p-2.5 sm:p-3">
                             {item.posterUrl ? (
                               <img src={item.posterUrl} alt="" loading="lazy" decoding="async" className="h-16 w-11 shrink-0 rounded-md object-cover bg-black/30" />
                             ) : (
@@ -2282,7 +2282,7 @@ function Index() {
                               {language === "ru" ? "Подтвердить отдельный тайтл" : "Confirm separate title"}
                             </button>
                           )}
-                          </>
+                          </div>
                         ))}
                       </div>
                     )}

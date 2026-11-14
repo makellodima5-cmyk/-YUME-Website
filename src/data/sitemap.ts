@@ -1,4 +1,5 @@
 import { canonicalUrl } from "@/data/seo";
+import { isValidCatalogAnimeId } from "@/data/catalog-r2.shared";
 
 function xmlEscape(value: string): string {
   return value
@@ -10,7 +11,7 @@ function xmlEscape(value: string): string {
 }
 
 export function buildSitemapXml(animeIds: readonly string[]): string {
-  const uniqueIds = Array.from(new Set(animeIds.filter((id) => /^\d+$/.test(id))));
+  const uniqueIds = Array.from(new Set(animeIds.filter(isValidCatalogAnimeId)));
   const urls = [canonicalUrl("/"), ...uniqueIds.map((id) => canonicalUrl("/anime/" + encodeURIComponent(id)))];
   const entries = urls.map((url) => "  <url><loc>" + xmlEscape(url) + "</loc></url>").join("\n");
 

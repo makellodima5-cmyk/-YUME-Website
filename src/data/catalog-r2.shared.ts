@@ -1,8 +1,13 @@
-import type { Anime } from "@/data/anime";
+import { isValidAnimeCatalogId, type Anime } from "@/data/anime";
 
 export const CATALOG_SCHEMA_VERSION = 1;
 export const CATALOG_CURRENT_KEY = "catalog/v1/current.json";
 export const CATALOG_REVISION_PREFIX = "catalog/v1/revisions/";
+
+/** Existing numeric catalogue IDs plus stable IDs for Kodik-only anime. */
+export function isValidCatalogAnimeId(value: unknown): value is string {
+  return typeof value === "string" && (/^[0-9]{1,20}$/.test(value) || isValidAnimeCatalogId(value));
+}
 
 export type CatalogState = {
   schemaVersion: number;

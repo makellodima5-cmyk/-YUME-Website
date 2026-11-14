@@ -1,4 +1,5 @@
 import type { Anime } from "@/data/anime";
+import { isValidCatalogAnimeId } from "@/data/catalog-r2.shared";
 import { isNewRelease } from "@/data/anime-sections";
 
 export const HOME_FEATURED_MIN_RATING = 9;
@@ -20,7 +21,7 @@ export function rankFeaturedCandidates(
   const unique = new Map<string, Anime>();
   for (const item of items) {
     if (
-      !/^\d{1,12}$/.test(item.id) ||
+      !isValidCatalogAnimeId(item.id) ||
       typeof item.posterUrl !== "string" ||
       !item.posterUrl.trim() ||
       typeof item.rating !== "number" ||
