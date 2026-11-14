@@ -98,7 +98,7 @@ function normalizeKodikAge(value: string | null | undefined, minimalAge: number 
 function normalizeKodikMaterial(item: KodikCatalogResult, existingIds: Set<string>): KodikCatalogSearchItem | null {
   const id = String(item.shikimori_id ?? "").trim();
   const kodikId = String(item.id ?? "").trim();
-  if (!/^\\d{1,12}$/.test(id) || Number(id) < 1 || !/^\\d{1,20}$/.test(kodikId)) return null;
+  if (!/^\d{1,12}$/.test(id) || Number(id) < 1 || !/^\d{1,20}$/.test(kodikId)) return null;
   const data = item.material_data ?? {};
   const originalTitle = clean(item.title_orig) || clean(data.anime_title_jp) || clean(item.title);
   const title = clean(data.anime_title) || clean(item.title) || originalTitle;
@@ -522,7 +522,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
       const animeId = typeof body.animeId === "string" ? body.animeId.trim() : "";
       const kodikId = typeof body.kodikId === "string" ? body.kodikId.trim() : "";
       const queryText = typeof body.query === "string" ? clean(body.query) : "";
-      if (!/^\\d{1,12}$/.test(animeId) || Number(animeId) < 1 || !/^\\d{1,20}$/.test(kodikId) || queryText.length < 2 || queryText.length > 120) return json({error:"invalid_kodik_import_target"},400);
+      if (!/^\d{1,12}$/.test(animeId) || Number(animeId) < 1 || !/^\d{1,20}$/.test(kodikId) || queryText.length < 2 || queryText.length > 120) return json({error:"invalid_kodik_import_target"},400);
       const existing = state.items.find((item)=>item.id===animeId);
       if (existing) return json({isAdmin:true,alreadyInCatalog:true,anime:{id:existing.id,title:existing.title},message:"Этот тайтл уже находится в каталоге."},409);
       const rateLimit = await enforceRateLimit(env.KODIK_RATE_LIMITER,request,"kodik");
