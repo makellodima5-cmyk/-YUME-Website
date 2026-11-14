@@ -27,7 +27,7 @@ export const YUBERA_SUPPORT_LEVELS = [
   { level: 0, title: "Без статуса", min: 0, asset: null },
   { level: 1, title: "Союзник", min: 50, asset: "YUBERA_Status_01_Soyuznik.webp" },
   { level: 2, title: "Сторонник", min: 1000, asset: "YUBERA_Status_02_Storonnik.webp" },
-  { level: 3, title: "Преданный участник", min: 2500, asset: "YUBERA_Status_03_Predanniy_Uchastnik.webp" },
-  { level: 4, title: "Почётный покровитель", min: 5000, asset: "YUBERA_Status_04_Pochetnyy_Pokrovitel.webp" },
+  { level: 3, title: "Преданный участник", min: 2500, asset: "YUBERA_Status_03_Predannyi_Uchastnik.webp" },
+  { level: 4, title: "Почётный покровитель", min: 5000, asset: "YUBERA_Status_04_Pochetnyi_Pokrovitel.webp" },
   { level: 5, title: "Легенда YUBERA", min: 10000, asset: "YUBERA_Support_Status_05_Legend.webp" },
 ] as const;
