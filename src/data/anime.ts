@@ -27,6 +27,8 @@ export type Anime = {
   youtubeTrailerId?: string;
   /** True only after Kodik confirms at least one safe episode link. */
   kodikAvailable?: boolean;
+  /** Origin of a manually imported catalogue record. */
+  catalogSource?: "shikimori" | "kodik";
 };
 
 export const ANIME: Anime[] = [

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { adminCatalogImportNextResumeAt, adminCatalogImportPageOperationId, adminCatalogImportResumeCursor, adminCatalogImportShouldResumeCounters, chunkAdminCatalogIds, isCatalogMetadataIncomplete, mapAdminCatalogScreenshots, normalizeAdminCatalogIds, isValidAdminImportTarget } from "@/data/admin-catalog-import.server";
+import { adminCatalogImportNextResumeAt, adminCatalogImportPageOperationId, adminCatalogImportResumeCursor, adminCatalogImportShouldResumeCounters, chunkAdminCatalogIds, isCatalogMetadataIncomplete, mapAdminCatalogScreenshots, normalizeAdminCatalogIds, isValidAdminImportTarget, normalizeKodikCatalogResults } from "@/data/admin-catalog-import.server";
 
 describe("admin catalog import target", () => {
   it("accepts targets above the old 500-title application cap", () => {
@@ -143,5 +143,58 @@ describe("bulk import resume counters", () => {
     expect(adminCatalogImportShouldResumeCounters({admin_import_cursor:"12",admin_import_status_filter:"",admin_import_state:"completed"}, "")).toBe(false);
     expect(adminCatalogImportShouldResumeCounters({admin_import_cursor:"12",admin_import_status_filter:"ongoing",admin_import_state:"paused"}, "released")).toBe(false);
     expect(adminCatalogImportShouldResumeCounters({admin_import_cursor:"1",admin_import_status_filter:"",admin_import_state:"paused"}, "")).toBe(false);
+  });
+});
+
+describe("Kodik catalogue title search mapping", () => {
+  const kodikMaterial = {
+    id: 98765,
+    title: "Fullmetal Alchemist: Brotherhood",
+    title_orig: "Hagane no Renkinjutsushi",
+    year: 2009,
+    shikimori_id: 5114,
+    screenshots: ["https://cdn.example.org/shot-1.jpg"],
+    material_data: {
+      anime_title: "Стальной алхимик: Братство",
+      anime_title_en: "Fullmetal Alchemist: Brotherhood",
+      anime_title_jp: "鋼の錬金術師",
+      anime_description: "Two brothers search for the Philosopher's Stone.",
+      anime_poster_url: "https://cdn.example.org/poster.jpg",
+      anime_genres: ["Приключения", "Фэнтези"],
+      anime_kind: "tv",
+      anime_status: "released",
+      episodes_total: 64,
+      episodes_aired: 64,
+      shikimori_rating: 9.1,
+      anime_studios: ["Bones"],
+      rating_mpaa: "PG-13",
+    },
+  };
+
+  it("maps Kodik material_data into the shared catalogue identity and metadata", () => {
+    const results = normalizeKodikCatalogResults([kodikMaterial], []);
+    expect(results).toHaveLength(1);
+    expect(results[0]).toMatchObject({
+      id: "5114", kodikId: "98765", title: "Стальной алхимик: Братство",
+      englishTitle: "Fullmetal Alchemist: Brotherhood", originalTitle: "Hagane no Renkinjutsushi",
+      year: 2009, kind: "TV", status: "Вышел", posterUrl: "https://cdn.example.org/poster.jpg",
+      description: "Two brothers search for the Philosopher's Stone.",
+      genres: ["Приключения", "Фэнтези"], episodes:64, episodesAired:64, rating:9.1, studios:["Bones"], alreadyInCatalog: false,
+    });
+  });
+
+  it("groups multiple Kodik voice-over records by Shikimori ID and marks existing catalogue titles", () => {
+    const secondVoice = { ...kodikMaterial, id: 98766, material_data: { ...kodikMaterial.material_data, anime_poster_url: null } };
+    const results = normalizeKodikCatalogResults([secondVoice, kodikMaterial], ["5114"]);
+    expect(results).toHaveLength(1);
+    expect(results[0]?.kodikId).toBe("98765");
+    expect(results[0]?.alreadyInCatalog).toBe(true);
+  });
+
+  it("ignores results without a valid Shikimori identity or Kodik material ID", () => {
+    expect(normalizeKodikCatalogResults([
+      { ...kodikMaterial, shikimori_id: null },
+      { ...kodikMaterial, id: "not-numeric" },
+    ], [])).toEqual([]);
   });
 });
