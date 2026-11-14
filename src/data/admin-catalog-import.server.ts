@@ -1,11 +1,11 @@
 import { env as cloudflareEnv } from "cloudflare:workers";
 import type { Anime } from "@/data/anime";
 import { readAdminCatalogState, readAdminCatalogStatus, submitCatalogMutation } from "@/data/catalog-r2.server";
-import { retryAfterMilliseconds } from "@/data/retry-after";
+import { retryAfterMilliseconds } from "@/data/retry-after";\nimport { enforceRateLimit } from "@/lib/rate-limit";
 import { hasAdminPasswordSession, isAdminPasswordConfigured } from "@/lib/admin-password.server";
 
 type RuntimeGlobal = typeof globalThis & { __YUME_RUNTIME_ENV__?: unknown };
-type Environment = Record<string, unknown> & { TELEGRAM_ADMIN_ID?: string; YUME_AUTH_SESSION_SECRET?: string; YUME_ADMIN_PASSWORD?: string; YUME_DB?: D1Database; KODIK_API_TOKEN?: string };
+type Environment = Record<string, unknown> & { TELEGRAM_ADMIN_ID?: string; YUME_AUTH_SESSION_SECRET?: string; YUME_ADMIN_PASSWORD?: string; YUME_DB?: D1Database; KODIK_API_TOKEN?: string; KODIK_RATE_LIMITER?: unknown };
 type ShikimoriAnime = {
   id: string; name?: string | null; russian?: string | null; english?: string | string[] | null;
   kind?: string | null; score?: string | number | null; status?: string | null;
@@ -27,7 +27,7 @@ const METADATA_LOOKUP_BATCH_SIZE = 40;
 const FIELDS = "id name english russian kind score status episodes episodesAired airedOn { date year } releasedOn { date year } description poster { mainUrl previewUrl originalUrl } opengraphImageUrl genres { id name russian kind } nextEpisodeAt rating studios { name } videos { url playerUrl name kind }";
 const IMPORT_FIELDS = FIELDS + " screenshots { originalUrl x332Url x166Url }";
 
-type KodikMaterialData = {
+type KodikMaterialData = {\n  year?: number | string | null;
   anime_title?: string | null;
   anime_title_en?: string | null;
   anime_title_jp?: string | null;
@@ -93,7 +93,7 @@ function normalizeKodikMaterial(item: KodikCatalogResult, existingIds: Set<strin
   const originalTitle = clean(item.title_orig) || clean(data.anime_title_jp) || clean(item.title);
   const title = clean(data.anime_title) || clean(item.title) || originalTitle;
   if (title.length < 2) return null;
-  const englishTitle = clean(data.anime_title_en) || clean(item.other_title);
+  const englishTitle = clean(data.anime_title_en) || clean(item.other_title);\n  const ratingValue = Number(data.shikimori_rating ?? data.kinopoisk_rating);\n  const rating = Number.isFinite(ratingValue) && ratingValue > 0 && ratingValue <= 10 ? ratingValue : null;\n  const studios = Array.from(new Set((data.anime_studios ?? []).map((studio) => clean(studio)).filter(Boolean))).slice(0,20);
   const year = Math.max(0,Math.floor(Number(data.year ?? item.year ?? 0) || 0));
   const genres = Array.from(new Set((data.anime_genres ?? []).map((genre) => clean(genre)).filter(Boolean))).slice(0,20);
   return {
@@ -121,11 +121,11 @@ function mapKodikAnime(item: KodikCatalogSearchItem): Anime {
   const numericId = Number(item.id);
   return {
     id:item.id,title:item.title,englishTitle:item.englishTitle || undefined,original:item.originalTitle || item.title,
-    year:item.year,episodes:0,episodesAired:0,rating:null,genres:item.genres,status:item.status,
+    year:item.year,episodes:item.episodes,episodesAired:item.episodesAired,rating:item.rating,genres:item.genres,status:item.status,
     description:item.description,hue:Number.isSafeInteger(numericId)?Math.abs(numericId*37)%360:280,
     glyph:Array.from(item.originalTitle || item.title)[0] || "Y",isNew:item.status==="Онгоинг",popular:false,
     posterUrl:item.posterUrl ?? undefined,bannerUrl:item.posterUrl ?? undefined,kind:item.kind ?? undefined,
-    ageRating:item.ageRating ?? undefined,catalogSource:"kodik",
+    ageRating:item.ageRating ?? undefined,studios:item.studios,catalogSource:"kodik",
   };
 }
 function mapKodikScreenshots(item: KodikCatalogResult): Array<{original:string;preview:string}> {
@@ -143,7 +143,7 @@ function mapKodikScreenshots(item: KodikCatalogResult): Array<{original:string;p
 async function fetchKodikByTitle(title: string): Promise<KodikCatalogResult[]> {
   const normalized = clean(title).slice(0,120);
   if (normalized.length < 2) return [];
-  const token = typeof environment().KODIK_API_TOKEN === "string" ? String(environment().KODIK_API_TOKEN).trim() : "";
+  const env = environment();\n  const token = typeof env.KODIK_API_TOKEN === "string" ? env.KODIK_API_TOKEN.trim() : "";
   if (!token) throw new Error("Kodik API не настроен.");
   const url = new URL("https://kodik-api.com/search");
   url.searchParams.set("token",token);
@@ -495,7 +495,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
       const queryText = typeof body.query === "string" ? body.query : typeof body.title === "string" ? body.title : "";
       const normalized = clean(queryText);
       if (normalized.length < 2 || normalized.length > 120) return json({error:"invalid_query"},400);
-      const rows = await fetchKodikByTitle(normalized);
+      const rateLimit = await enforceRateLimit(env.KODIK_RATE_LIMITER,request,"kodik");\n      if (rateLimit === "limited") return json({error:"Слишком много запросов к Kodik. Повтори через минуту."},429,);\n      if (rateLimit !== "allowed") return json({error:"Ограничитель запросов Kodik временно недоступен."},503);\n      const rows = await fetchKodikByTitle(normalized);
       const results = normalizeKodikCatalogResults(rows,state.items.map((item)=>item.id));
       return json({isAdmin:true,source:"kodik",query:normalized,results});
     }
@@ -506,7 +506,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
       if (!/^\\d{1,12}$/.test(animeId) || Number(animeId) < 1 || !/^\\d{1,20}$/.test(kodikId) || queryText.length < 2 || queryText.length > 120) return json({error:"invalid_kodik_import_target"},400);
       const existing = state.items.find((item)=>item.id===animeId);
       if (existing) return json({isAdmin:true,alreadyInCatalog:true,anime:{id:existing.id,title:existing.title},message:"Этот тайтл уже находится в каталоге."},409);
-      const rows = await fetchKodikByTitle(queryText);
+      const rateLimit = await enforceRateLimit(env.KODIK_RATE_LIMITER,request,"kodik");\n      if (rateLimit === "limited") return json({error:"Слишком много запросов к Kodik. Повтори через минуту."},429);\n      if (rateLimit !== "allowed") return json({error:"Ограничитель запросов Kodik временно недоступен."},503);\n      const rows = await fetchKodikByTitle(queryText);
       const selected = rows.find((item)=>String(item.id??"")===kodikId && String(item.shikimori_id??"")===animeId);
       if (!selected) return json({error:"kodik_title_not_found"},404);
       const mapped = normalizeKodikCatalogResults([selected],state.items.map((item)=>item.id))[0];
