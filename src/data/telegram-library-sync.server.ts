@@ -75,7 +75,14 @@ async function authenticatedUserId(request: Request, db: Database, secret: strin
 
 function validPayload(type: SyncType, payload: Record<string, unknown>): boolean {
   if (type === "favorite" || type === "watchlist") return typeof payload.saved === "boolean";
-  if (type === "subscription") return typeof payload.notificationsEnabled === "boolean";
+  if (type === "subscription") {
+    if (typeof payload.notificationsEnabled !== "boolean") return false;
+    if (payload.translationId !== undefined &&
+        (typeof payload.translationId !== "string" || !/^[A-Za-z0-9_-]{1,64}$/.test(payload.translationId))) return false;
+    if (payload.translationTitle !== undefined &&
+        (typeof payload.translationTitle !== "string" || payload.translationTitle.trim().length < 1 || payload.translationTitle.length > 120)) return false;
+    return true;
+  }
   const optionalInteger = (value: unknown) => value == null || (typeof value === "number" && Number.isSafeInteger(value) && value >= 0);
   return optionalInteger(payload.seasonNumber) &&
     optionalInteger(payload.episodeNumber) &&
@@ -170,9 +177,22 @@ async function applyLegacyView(db: Database, userId: string, item: SyncItem): Pr
       ).bind(userId, item.itemType, item.animeId).run();
     }
   } else if (item.itemType === "subscription") {
-    await db.prepare(
-      "INSERT INTO yume_anime_subscriptions (user_id, anime_id, active) VALUES (?, ?, ?) ON CONFLICT(user_id, anime_id) DO UPDATE SET active = excluded.active",
-    ).bind(userId, item.animeId, item.deleted ? 0 : 1).run();
+    const hasSelectedVoiceover = typeof item.payload.translationId === "string" &&
+      /^[A-Za-z0-9_-]{1,64}$/.test(item.payload.translationId);
+    if (hasSelectedVoiceover) {
+      const title = typeof item.payload.translationTitle === "string" ? item.payload.translationTitle.trim().slice(0, 120) : "";
+      await db.prepare(
+        "INSERT INTO yume_anime_subscriptions (user_id, anime_id, translation_id, translation_title, active) VALUES (?, ?, ?, ?, ?) " +
+        "ON CONFLICT(user_id, anime_id) DO UPDATE SET translation_id=excluded.translation_id,translation_title=excluded.translation_title,active=excluded.active",
+      ).bind(userId, item.animeId, item.payload.translationId, title || null, item.deleted ? 0 : 1).run();
+    } else {
+      // Older clients only know notificationsEnabled. Preserve a voice-over
+      // already selected by a newer client instead of overwriting it with NULL.
+      await db.prepare(
+        "INSERT INTO yume_anime_subscriptions (user_id, anime_id, active) VALUES (?, ?, ?) " +
+        "ON CONFLICT(user_id, anime_id) DO UPDATE SET active = excluded.active",
+      ).bind(userId, item.animeId, item.deleted ? 0 : 1).run();
+    }
   } else if (item.itemType === "progress") {
     if (item.deleted) {
       await db.prepare("DELETE FROM yume_view_history WHERE user_id = ? AND anime_id = ?")

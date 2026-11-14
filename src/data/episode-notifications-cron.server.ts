@@ -1,125 +1,101 @@
 import { env as cloudflareEnv } from "cloudflare:workers";
+import { readCatalogState } from "@/data/catalog-r2.server";
+import { fetchKodikEpisodeSources } from "@/data/kodik-episode-sources.server";
 import { enqueueEpisodeNotification } from "@/data/episode-notification-queue.server";
-import { readCatalogState, submitCatalogMutation } from "@/data/catalog-r2.server";
-import type { Anime } from "@/data/anime";
 
 type Env = Record<string, unknown> & {
-  YUME_DB?: D1Database;
-  YUME_WEB_TASKS?: { send(message: unknown, options?: { contentType?: "json" }): Promise<void> };
+  YUME_DB?: { prepare(sql: string): { bind(...v: unknown[]): { all<T>(): Promise<{ results: T[] }>; run(): Promise<unknown> }; all<T>(): Promise<{ results: T[] }> } };
+  YUME_WEB_TASKS?: { send(m: unknown, o?: { contentType?: "json" }): Promise<void> };
+  KODIK_API_TOKEN?: string;
 };
-type ShikimoriAnime = {
-  id: string;
-  status?: string | null;
-  episodes?: number | null;
-  episodesAired?: number | null;
-  nextEpisodeAt?: string | null;
-  russian?: string | null;
-  name?: string | null;
-  poster?: { originalUrl?: string | null; mainUrl?: string | null } | null;
+type Sub = {
+  anime_id: string;
+  translation_id: string | null;
+  translation_title: string | null;
+  source_last_episode: number | null;
+  baseline_episode: number | null;
 };
+
 function env(): Env {
-  try { return cloudflareEnv as unknown as Env; } catch {
+  try { return cloudflareEnv as unknown as Env; }
+  catch {
     const value = (globalThis as typeof globalThis & { __YUME_RUNTIME_ENV__?: unknown }).__YUME_RUNTIME_ENV__;
     return value && typeof value === "object" ? value as Env : {};
   }
 }
-const API = "https://shikimori.io/api/graphql";
-const STATUS: Record<string, Anime["status"]> = { ongoing: "Онгоинг", anons: "Анонс", released: "Вышел" };
-
-export function storedStatus(status: string | null | undefined, fallback: Anime["status"]): Anime["status"] {
-  return typeof status === "string" && STATUS[status]
-    ? STATUS[status]!
-    : ["Онгоинг", "Анонс", "Вышел", "Неизвестно"].includes(fallback) ? fallback : "Неизвестно";
-}
-
-function safePosterUrl(poster: ShikimoriAnime["poster"]): string | undefined {
-  const candidates = [poster?.originalUrl, poster?.mainUrl];
-  for (const candidate of candidates) {
-    if (typeof candidate !== "string") continue;
-    try {
-      const parsed = new URL(candidate);
-      if (parsed.protocol === "https:" && (parsed.hostname === "shikimori.io" || parsed.hostname.endsWith(".shikimori.io") ||
-          parsed.hostname === "shikimori.one" || parsed.hostname.endsWith(".shikimori.one"))) return parsed.toString();
-    } catch { /* Ignore malformed poster URLs. */ }
-  }
-  return undefined;
+function poster(value: unknown): string | undefined {
+  if (typeof value !== "string") return;
+  try {
+    const url = new URL(value);
+    if (url.protocol === "https:" && (
+      url.hostname === "shikimori.io" || url.hostname.endsWith(".shikimori.io") ||
+      url.hostname === "shikimori.one" || url.hostname.endsWith(".shikimori.one")
+    )) return url.toString();
+  } catch { /* ignore invalid poster URLs */ }
 }
 
 export async function runScheduledEpisodeNotifications(input: unknown): Promise<void> {
-  const e = input && typeof input === "object" ? input as Env : env();
-  const db = e.YUME_DB;
+  const bindings = input && typeof input === "object" ? input as Env : env();
+  const db = bindings.YUME_DB;
   if (!db || typeof db.prepare !== "function") throw new Error("Episode notification cron has no YUME_DB binding.");
 
-  // D1 is authoritative for demand: an empty subscription set must not touch the catalogue or Shikimori.
-  const subscribedRows = await db.prepare(
-    "SELECT DISTINCT anime_id FROM yume_anime_subscriptions WHERE active=1 ORDER BY anime_id",
-  ).all<{ anime_id: string }>();
-  const subscribedIds = [...new Set(subscribedRows.results.map((row) => String(row.anime_id)).filter((id) => /^\d{1,20}$/.test(id)))];
-  if (!subscribedIds.length) return;
+  const rows = await db.prepare(
+    "SELECT s.anime_id,s.translation_id,MAX(s.translation_title) AS translation_title,src.last_episode AS source_last_episode,MAX(s.baseline_episode) AS baseline_episode FROM yume_anime_subscriptions s LEFT JOIN yume_kodik_episode_sources src ON src.anime_id=s.anime_id AND src.translation_id=s.translation_id WHERE s.active=1 AND s.translation_id IS NOT NULL GROUP BY s.anime_id,s.translation_id,src.last_episode ORDER BY s.anime_id,s.translation_id",
+  ).all<Sub>();
+  const subscriptions = rows.results.filter((row) =>
+    /^\d{1,20}$/.test(String(row.anime_id)) &&
+    row.translation_id !== null && /^[A-Za-z0-9_-]{1,64}$/.test(String(row.translation_id))
+  );
+  if (!subscriptions.length) return;
 
-  const state = await readCatalogState();
-  const now = Date.now();
-  const subscribed = new Set(subscribedIds);
-  const due = state.items.filter((anime) => subscribed.has(anime.id) && anime.status === "Онгоинг" &&
-      anime.nextEpisodeAt && Number.isFinite(Date.parse(anime.nextEpisodeAt)) &&
-      Date.parse(anime.nextEpisodeAt) <= now && (anime.episodesAired ?? 0) < anime.episodes)
-    .sort((a, b) => Date.parse(a.nextEpisodeAt ?? "") - Date.parse(b.nextEpisodeAt ?? ""))
-    .slice(0, 40);
-  if (!due.length) return;
+  const token = typeof bindings.KODIK_API_TOKEN === "string" ? bindings.KODIK_API_TOKEN.trim() : "";
+  if (!token) throw new Error("KODIK_API_TOKEN is not configured for episode notifications.");
 
-  const query = "query EpisodeNotice($ids: String!, $limit: PositiveInt!) { animes(ids: $ids, limit: $limit) { id name russian status episodes episodesAired nextEpisodeAt poster { originalUrl mainUrl } } }";
-  const batches = Array.from({ length: Math.ceil(due.length / 50) }, (_, index) => due.slice(index * 50, (index + 1) * 50));
-  const fresh = new Map<string, ShikimoriAnime>();
-  for (const batch of batches) {
-    const response = await fetch(API, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "User-Agent": "YUME/1.0 (episode notification)" },
-      body: JSON.stringify({ query, variables: { ids: batch.map((anime) => anime.id).join(","), limit: batch.length } }),
-      signal: AbortSignal.timeout(12000),
-    });
-    if (!response.ok) throw new Error("Shikimori episode notification query failed: " + response.status);
-    const payload = await response.json() as { data?: { animes?: ShikimoriAnime[] }; errors?: { message?: string }[] };
-    if (payload.errors?.length) throw new Error("Shikimori episode notification query returned errors");
-    for (const anime of payload.data?.animes ?? []) fresh.set(String(anime.id), anime);
+  const catalog = await readCatalogState();
+  const titles = new Map(catalog.items.map((anime) => [anime.id, anime]));
+  const byAnime = new Map<string, Sub[]>();
+  for (const subscription of subscriptions) {
+    const list = byAnime.get(subscription.anime_id) ?? [];
+    list.push(subscription);
+    byAnime.set(subscription.anime_id, list);
   }
 
-  const updated: Anime[] = [];
-  const metadata: Record<string, string> = {};
-  for (const old of due) {
-    const source = fresh.get(old.id);
-    // Missing Shikimori entries are deliberately not baselined; the next hourly poll retries them.
-    if (!source) continue;
-    const aired = Math.max(0, Number(source.episodesAired ?? old.episodesAired ?? 0) || 0);
-    const total = Math.max(0, Number(source.episodes ?? old.episodes) || 0);
-    const status = storedStatus(source.status, old.status);
-    const key = "episode_last_aired:" + old.id;
-    const baselineValue = Number(state.metadata[key] ?? old.episodesAired ?? 0);
-    const baseline = Number.isSafeInteger(baselineValue) && baselineValue >= 0
-      ? baselineValue
-      : Math.max(0, Number(old.episodesAired ?? 0) || 0);
-    if (aired > baseline) {
-      const posterUrl = safePosterUrl(source.poster);
-      for (let episodeNumber = baseline + 1; episodeNumber <= aired; episodeNumber += 1) {
-        await enqueueEpisodeNotification(e, old.id, episodeNumber, source.russian || source.name || old.title, posterUrl);
+  const entries = [...byAnime.entries()];
+  const failures: string[] = [];
+  for (let offset = 0; offset < entries.length; offset += 4) {
+    await Promise.all(entries.slice(offset, offset + 4).map(async ([animeId, selected]) => {
+      try {
+        const sources = await fetchKodikEpisodeSources(animeId, token);
+        const anime = titles.get(animeId);
+        const animeTitle = anime?.title || "Аниме " + animeId;
+        const posterUrl = poster(anime?.posterUrl);
+        for (const subscription of selected) {
+          const source = sources.find((item) => item.id === subscription.translation_id);
+          if (!source) continue;
+          const stored = subscription.source_last_episode;
+          const known = stored !== null && Number.isFinite(Number(stored));
+          const baseline = known
+            ? Math.max(0, Number(stored))
+            : Math.max(0, Number(subscription.baseline_episode ?? 0));
+          const added = known ? source.episodes.filter((episode) => episode > baseline).sort((a, b) => a - b) : [];
+          for (const episodeNumber of added) {
+            await enqueueEpisodeNotification(
+              bindings, animeId, episodeNumber, animeTitle, posterUrl,
+              subscription.translation_id,
+              source.title,
+            );
+          }
+          const lastEpisode = Math.max(baseline, source.episodes.length ? Math.max(...source.episodes) : baseline);
+          const now = new Date().toISOString();
+          await db.prepare(
+            "INSERT INTO yume_kodik_episode_sources(anime_id,translation_id,translation_title,last_episode,checked_at,updated_at) VALUES(?,?,?,?,?,?) ON CONFLICT(anime_id,translation_id) DO UPDATE SET translation_title=excluded.translation_title,last_episode=MAX(yume_kodik_episode_sources.last_episode,excluded.last_episode),checked_at=excluded.checked_at,updated_at=excluded.updated_at",
+          ).bind(animeId, source.id, source.title, lastEpisode, now, now).run();
+        }
+      } catch (error) {
+        failures.push(animeId + ": " + (error instanceof Error ? error.message : "Unknown Kodik error"));
+        console.error("[YUME][EPISODE_NOTIFICATIONS] Kodik check failed; preserving source baselines.", { animeId, error });
       }
-    }
-    metadata[key] = String(Math.max(baseline, aired));
-    updated.push({
-      ...old,
-      episodes: total,
-      episodesAired: aired,
-      status,
-      nextEpisodeAt: status === "Онгоинг" ? (source.nextEpisodeAt ?? undefined) : undefined,
-      ...(safePosterUrl(source.poster) ? { posterUrl: safePosterUrl(source.poster) } : {}),
-    });
-    if (status !== "Онгоинг" || (total > 0 && aired >= total)) {
-      await db.prepare("UPDATE yume_anime_subscriptions SET active=0 WHERE anime_id=?").bind(old.id).run();
-    }
+    }));
   }
-  if (updated.length || Object.keys(metadata).length) {
-    const mutations: import("@/data/catalog-r2.shared").CatalogMutation[] = [];
-    if (updated.length) mutations.push({ type: "upsert", items: updated });
-    if (Object.keys(metadata).length) mutations.push({ type: "metadata", values: metadata });
-    await submitCatalogMutation({ type: "batch", mutations });
-  }
+  if (failures.length) throw new Error("Kodik episode notification checks failed: " + failures.join("; "));
 }

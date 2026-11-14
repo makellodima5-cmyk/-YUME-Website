@@ -1,74 +1,167 @@
 import { describe, expect, it, vi } from "vitest";
 import { env } from "cloudflare:workers";
-import { runScheduledEpisodeNotifications, storedStatus } from "@/data/episode-notifications-cron.server";
+import { runScheduledEpisodeNotifications } from "@/data/episode-notifications-cron.server";
 
-describe("scheduled episode notification status mapping", () => {
-  it.each([["ongoing","Неизвестно","Онгоинг"],["anons","Неизвестно","Анонс"],["released","Онгоинг","Вышел"]])(
-    "maps Shikimori status %s", (source,fallback,expected) => {
-      expect(storedStatus(source,fallback)).toBe(expected);
-    },
-  );
-  it("preserves a valid stored status when Shikimori returns an unknown status", () => {
-    expect(storedStatus("unexpected","Онгоинг")).toBe("Онгоинг");
-  });
-  it("normalizes an invalid fallback instead of persisting arbitrary values", () => {
-    expect(storedStatus(null,"unexpected" as never)).toBe("Неизвестно");
-  });
-});
+const catalog = {
+  schemaVersion: 1, revision: 3, updatedAt: "2026-11-14T00:00:00.000Z", exclusions: {}, metadata: {},
+  items: [{
+    id: "123", title: "Тестовое аниме", original: "Anime", year: 2020, episodes: 12, episodesAired: 5,
+    rating: 8, genres: [], status: "Онгоинг", description: "", hue: 10, glyph: "A",
+    posterUrl: "https://shikimori.one/system/animes/original/123.jpg",
+  }],
+};
 
-describe("scheduled episode notification durability with R2 catalogue state", () => {
-  const state = {
-    schemaVersion:1, revision:7, updatedAt:"2026-10-31T00:00:00.000Z", exclusions:{}, metadata:{},
-    items:[{id:"123",title:"Старое название",original:"Anime",year:2020,episodes:12,episodesAired:5,rating:8,genres:[],status:"Онгоинг",description:"",hue:10,glyph:"A",nextEpisodeAt:"2026-10-30T10:00:00+00:00"}],
+function setupCatalog() {
+  const bindings = env as unknown as Record<string, unknown>;
+  const previous = {
+    reader: bindings.YUME_CATALOG_READER,
+    coordinator: bindings.YUME_CATALOG_COORDINATOR,
+    token: bindings.YUME_CATALOG_READER_TOKEN,
   };
-  function setup(events:string[]) {
-    const bindings=env as unknown as Record<string,unknown>;
-    const previous={reader:bindings.YUME_CATALOG_READER,coordinator:bindings.YUME_CATALOG_COORDINATOR,token:bindings.YUME_CATALOG_READER_TOKEN};
-    bindings.YUME_CATALOG_READER={fetch:async (_url:RequestInfo|URL,init?:RequestInit)=>{events.push("read-r2-catalog");expect(new Headers(init?.headers).get("X-Yume-Reader-Token")).toBe("token");return Response.json(state);}};
-    bindings.YUME_CATALOG_COORDINATOR={fetch:async (_url:RequestInfo|URL,init?:RequestInit)=>{events.push("publish-r2");const body=JSON.parse(String(init?.body));expect(body.mutation).toBeTruthy();return Response.json({ok:true,revision:8});}};
-    bindings.YUME_CATALOG_READER_TOKEN="token";
-    const db={
-      prepare(sql:string) {
-        const statement={
-          bind(){return statement;},
-          async all<T>() {
-            if(sql.includes("SELECT DISTINCT anime_id")) {
-              events.push("read-subscribers");
-              return {results:[{anime_id:"123"}] as T[]};
-            }
-            return {results:[] as T[]};
-          },
-          async run(){events.push("deactivate-subscriptions");return{meta:{changes:0}};},
-        };
-        return statement;
+  bindings.YUME_CATALOG_READER = {
+    fetch: async () => Response.json(catalog),
+  };
+  bindings.YUME_CATALOG_READER_TOKEN = "test-reader-token";
+  return () => {
+    bindings.YUME_CATALOG_READER = previous.reader;
+    bindings.YUME_CATALOG_COORDINATOR = previous.coordinator;
+    bindings.YUME_CATALOG_READER_TOKEN = previous.token;
+  };
+}
+
+function kodikPayload() {
+  return {
+    results: [
+      {
+        shikimori_id: "123",
+        translation: { id: "voice-a", title: "Озвучка A" },
+        episodes: {
+          "1": "https://kodik.info/serial/a1",
+          "2": "https://kodik.info/serial/a2",
+          "3": "https://kodik.info/serial/a3",
+          "4": "https://kodik.info/serial/a4",
+          "5": "https://kodik.info/serial/a5",
+          "6": "https://kodik.info/serial/a6",
+        },
       },
-    };
-    return {db,restore:()=>{bindings.YUME_CATALOG_READER=previous.reader;bindings.YUME_CATALOG_COORDINATOR=previous.coordinator;bindings.YUME_CATALOG_READER_TOKEN=previous.token;}};
-  }
-  function stubShikimori(aired=6){vi.stubGlobal("fetch",vi.fn(async()=>Response.json({data:{animes:[{id:"123",name:"Anime",russian:"Аниме",status:"ongoing",episodes:12,episodesAired:aired,nextEpisodeAt:"2026-11-06T10:00:00+00:00"}]}})));}
-  it("does not publish catalogue state when Queue delivery fails",async()=>{
-    const events:string[]=[];const {db,restore}=setup(events);stubShikimori();
+      {
+        shikimori_id: "123",
+        translation: { id: "voice-b", title: "Озвучка B" },
+        episodes: {
+          "1": "https://kodik.info/serial/b1",
+          "2": "https://kodik.info/serial/b2",
+          "3": "https://kodik.info/serial/b3",
+          "4": "https://kodik.info/serial/b4",
+          "5": "https://kodik.info/serial/b5",
+        },
+      },
+    ],
+  };
+}
+
+function fakeDatabase(subscriptions: Array<Record<string, unknown>>) {
+  const statements: string[] = [];
+  const updates: unknown[][] = [];
+  const db = {
+    prepare(sql: string) {
+      statements.push(sql);
+      let params: unknown[] = [];
+      const statement = {
+        bind(...values: unknown[]) { params = values; return statement; },
+        async all<T>() { return { results: subscriptions as T[] }; },
+        async run() { updates.push(params); return { meta: { changes: 1 } }; },
+      };
+      return statement;
+    },
+  };
+  return { db, statements, updates };
+}
+
+describe("Kodik voice-over episode notification cron", () => {
+  it("checks only subscribed anime and sends only newly added episodes for the selected voice-over", async () => {
+    const restoreCatalog = setupCatalog();
+    const { db, statements, updates } = fakeDatabase([
+      { anime_id: "123", translation_id: "voice-a", translation_title: "Озвучка A", source_last_episode: 5, baseline_episode: 5 },
+      { anime_id: "123", translation_id: "voice-b", translation_title: "Озвучка B", source_last_episode: 5, baseline_episode: 5 },
+    ]);
+    const jobs: Array<Record<string, unknown>> = [];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(String(input));
+      expect(url.searchParams.get("shikimori_id")).toBe("123");
+      expect(url.searchParams.get("with_episodes_data")).toBe("true");
+      return Response.json(kodikPayload());
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
     try {
-      await expect(runScheduledEpisodeNotifications({YUME_DB:db,YUME_WEB_TASKS:{async send(){events.push("send-queue-job");throw new Error("temporary Queue failure");}}})).rejects.toThrow("temporary Queue failure");
-      expect(events).toEqual(["read-subscribers","read-r2-catalog","send-queue-job"]);
-    } finally {restore();vi.unstubAllGlobals();}
+      await runScheduledEpisodeNotifications({
+        YUME_DB: db,
+        KODIK_API_TOKEN: "test-kodik-token",
+        YUME_WEB_TASKS: { async send(message) { jobs.push(message as Record<string, unknown>); } },
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(jobs).toHaveLength(1);
+      expect(jobs[0]).toMatchObject({
+        animeId: "123",
+        translationId: "voice-a",
+        translationTitle: "Озвучка A",
+        episodeNumber: 6,
+        notificationId: "episode-123-voice-a-6",
+      });
+      expect(statements.some((sql) => sql.includes("yume_anime_subscriptions s") && sql.includes("s.active=1"))).toBe(true);
+      expect(updates).toHaveLength(2);
+    } finally {
+      restoreCatalog();
+      vi.unstubAllGlobals();
+    }
   });
-  it("enqueues every episode missed between hourly polls",async()=>{
-    const events:string[]=[];const {db,restore}=setup(events);stubShikimori(8);
-    const jobs:unknown[]=[];
+
+  it("does not poll pre-existing subscriptions until they choose a voice-over", async () => {
+    const { db } = fakeDatabase([
+      { anime_id: "123", translation_id: null, translation_title: null, source_last_episode: null, baseline_episode: 0 },
+    ]);
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
     try {
-      await runScheduledEpisodeNotifications({YUME_DB:db,YUME_WEB_TASKS:{async send(message){jobs.push(message);events.push("send-queue-job");}}});
-      expect(jobs.map(job=>(job as {episodeNumber:number}).episodeNumber)).toEqual([6,7,8]);
-      expect(jobs.map(job=>(job as {notificationId:string}).notificationId)).toEqual(["episode-123-6","episode-123-7","episode-123-8"]);
-      expect(events.indexOf("send-queue-job")).toBeLessThan(events.indexOf("publish-r2"));
-    } finally {restore();vi.unstubAllGlobals();}
+      await runScheduledEpisodeNotifications({ YUME_DB: db, KODIK_API_TOKEN: "test-kodik-token" });
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
-  it("sends the Queue job before publishing the updated R2 catalogue",async()=>{
-    const events:string[]=[];const {db,restore}=setup(events);stubShikimori();
+
+  it("does not call the catalog or Kodik when there are no active subscriptions", async () => {
+    const { db } = fakeDatabase([]);
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
     try {
-      await runScheduledEpisodeNotifications({YUME_DB:db,YUME_WEB_TASKS:{async send(){events.push("send-queue-job");}}});
-      expect(events.indexOf("send-queue-job")).toBeLessThan(events.indexOf("publish-r2"));
-      expect(events.filter(x=>x==="publish-r2")).toHaveLength(1);
-    } finally {restore();vi.unstubAllGlobals();}
+      await runScheduledEpisodeNotifications({ YUME_DB: db, YUME_WEB_TASKS: { async send() {} } });
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("does not baseline a source mismatch or emit a false notification", async () => {
+    const restoreCatalog = setupCatalog();
+    const { db, updates } = fakeDatabase([
+      { anime_id: "123", translation_id: "voice-a", translation_title: "Озвучка A", source_last_episode: 5, baseline_episode: 5 },
+    ]);
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({
+      results: [{ shikimori_id: "999", translation: { id: "voice-a", title: "Озвучка A" }, episodes: { "6": "https://kodik.info/serial/6" } }],
+    })));
+    const jobs: unknown[] = [];
+    try {
+      await expect(runScheduledEpisodeNotifications({
+        YUME_DB: db,
+        KODIK_API_TOKEN: "test-kodik-token",
+        YUME_WEB_TASKS: { async send(message) { jobs.push(message); } },
+      })).rejects.toThrow("Kodik episode notification checks failed");
+      expect(jobs).toHaveLength(0);
+      expect(updates).toHaveLength(0);
+    } finally {
+      restoreCatalog();
+      vi.unstubAllGlobals();
+    }
   });
 });

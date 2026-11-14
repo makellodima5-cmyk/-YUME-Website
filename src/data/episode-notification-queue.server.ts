@@ -22,6 +22,8 @@ export type EpisodeNotificationJob = {
   episodeNumber: number;
   animeTitle: string;
   posterUrl?: string;
+  translationId?: string;
+  translationTitle?: string;
 };
 const SUBSCRIBER_PAGE_SIZE = 100;
 const RETRY_DELAY_SECONDS = 30;
@@ -45,36 +47,39 @@ export function isEpisodeNotificationJob(value: unknown): value is EpisodeNotifi
   return value.type === "episode_notification_fanout" &&
     typeof value.animeId === "string" && /^\d{1,20}$/.test(value.animeId) &&
     Number.isSafeInteger(value.episodeNumber) && Number(value.episodeNumber) > 0 &&
-    value.notificationId === `episode-${value.animeId}-${value.episodeNumber}` &&
+    (value.translationId === undefined ? value.notificationId === `episode-${value.animeId}-${value.episodeNumber}` : typeof value.translationId === "string" && /^[A-Za-z0-9_-]{1,64}$/.test(value.translationId) && value.notificationId === `episode-${value.animeId}-${value.translationId}-${value.episodeNumber}` && typeof value.translationTitle === "string" && value.translationTitle.length > 0 && value.translationTitle.length <= 120) &&
     typeof value.animeTitle === "string" && value.animeTitle.length > 0 &&
     value.animeTitle.length <= 300 &&
     (value.posterUrl === undefined || isSafePosterUrl(value.posterUrl));
 }
 export async function enqueueEpisodeNotification(
-  env: QueueEnvironment, animeId: string, episodeNumber: number, animeTitle: string, posterUrl?: string,
+  env: QueueEnvironment, animeId: string, episodeNumber: number, animeTitle: string, posterUrl?: string, translationId?: string, translationTitle?: string,
 ): Promise<void> {
   const queue = env.YUME_WEB_TASKS;
   if (!queue || typeof queue.send !== "function") throw new Error("YUME_WEB_TASKS Queue binding is unavailable");
   const job: EpisodeNotificationJob = {
     type: "episode_notification_fanout",
-    notificationId: `episode-${animeId}-${episodeNumber}`,
+    notificationId: translationId ? `episode-${animeId}-${translationId}-${episodeNumber}` : `episode-${animeId}-${episodeNumber}`,
     animeId, episodeNumber, animeTitle: animeTitle.slice(0, 300),
     ...(posterUrl && isSafePosterUrl(posterUrl) ? { posterUrl } : {}),
+    ...(translationId && translationTitle ? { translationId, translationTitle: translationTitle.slice(0, 120) } : {}),
   };
   if (!isEpisodeNotificationJob(job)) throw new Error("Invalid episode notification job");
   await queue.send(job, { contentType: "json" });
 }
 
 async function processEpisodeNotificationFanout(db: Database, env: QueueEnvironment, job: EpisodeNotificationJob): Promise<void> {
-  const querySubscribers = (cursor: string) => db.prepare(
-    "SELECT user_id FROM yume_anime_subscriptions WHERE anime_id=? AND active=1 AND user_id>? ORDER BY user_id LIMIT ?",
-  ).bind(job.animeId, cursor, SUBSCRIBER_PAGE_SIZE).all<{ user_id: string }>();
+  const querySubscribers = (cursor: string) => job.translationId ? db.prepare(
+    "SELECT user_id FROM yume_anime_subscriptions WHERE anime_id=? AND translation_id=? AND baseline_episode<? AND active=1 AND user_id>? ORDER BY user_id LIMIT ?",
+  ).bind(job.animeId, job.translationId, job.episodeNumber, cursor, SUBSCRIBER_PAGE_SIZE).all<{ user_id: string }>() : db.prepare(
+    "SELECT user_id FROM yume_anime_subscriptions WHERE anime_id=? AND translation_id IS NULL AND baseline_episode<? AND active=1 AND user_id>? ORDER BY user_id LIMIT ?",
+  ).bind(job.animeId, job.episodeNumber, cursor, SUBSCRIBER_PAGE_SIZE).all<{ user_id: string }>();
   let cursor = "";
   let page = await querySubscribers(cursor);
   if (!page.results.length) return;
 
-  const title = `${job.animeTitle} · Серия ${job.episodeNumber}`;
-  const body = `Вышла новая серия аниме «${job.animeTitle}».`;
+  const title = `${job.animeTitle} · Серия ${job.episodeNumber}${job.translationTitle ? " · " + job.translationTitle : ""}`;
+  const body = job.translationTitle ? `В озвучке «${job.translationTitle}» вышла новая серия аниме «${job.animeTitle}».` : `Вышла новая серия аниме «${job.animeTitle}».`;
   await db.prepare(
     "INSERT OR IGNORE INTO yume_notifications(id,title,body,type,target_url,active) VALUES(?,?,?,'episode',?,0)",
   ).bind(job.notificationId, title, body, `/anime/${job.animeId}`).run();
@@ -110,6 +115,7 @@ async function processEpisodeNotificationFanout(db: Database, env: QueueEnvironm
         type:"telegram_episode_delivery", notificationId:job.notificationId, userId:delivery.user_id,
         animeId:job.animeId, episodeNumber:job.episodeNumber, animeTitle:job.animeTitle,
         ...(job.posterUrl ? {posterUrl:job.posterUrl} : {}),
+        ...(job.translationId && job.translationTitle ? {translationId:job.translationId,translationTitle:job.translationTitle} : {}),
       } as unknown as EpisodeNotificationJob, {contentType:"json"});
     }
   }
@@ -117,7 +123,7 @@ async function processEpisodeNotificationFanout(db: Database, env: QueueEnvironm
 
 type TelegramDeliveryJob = {
   type:"telegram_episode_delivery";
-  notificationId:string; userId:string; animeId:string; episodeNumber:number; animeTitle:string; posterUrl?:string;
+  notificationId:string; userId:string; animeId:string; episodeNumber:number; animeTitle:string; posterUrl?:string; translationId?:string; translationTitle?:string;
 };
 function isTelegramDeliveryJob(value:unknown):value is TelegramDeliveryJob {
   if(!isRecord(value))return false;
@@ -126,6 +132,8 @@ function isTelegramDeliveryJob(value:unknown):value is TelegramDeliveryJob {
     typeof value.animeId==="string" && /^\d{1,20}$/.test(value.animeId) &&
     Number.isSafeInteger(value.episodeNumber) && Number(value.episodeNumber)>0 &&
     typeof value.animeTitle==="string" && value.animeTitle.length>0 && value.animeTitle.length<=300 &&
+    (value.translationId===undefined || (typeof value.translationId==="string" && /^[A-Za-z0-9_-]{1,64}$/.test(value.translationId) && typeof value.translationTitle==="string" && value.translationTitle.length>0 && value.translationTitle.length<=120)) &&
+    (value.translationId===undefined || (typeof value.translationId==="string" && /^[A-Za-z0-9_-]{1,64}$/.test(value.translationId) && typeof value.translationTitle==="string" && value.translationTitle.length>0 && value.translationTitle.length<=120)) &&
     (value.posterUrl===undefined || isSafePosterUrl(value.posterUrl));
 }
 async function telegramCall(token:string,method:string,payload:Record<string,unknown>):Promise<{response:Response;body:{ok?:boolean;description?:string;parameters?:{retry_after?:number}}}> {
@@ -157,7 +165,7 @@ async function processTelegramDelivery(db:Database,env:QueueEnvironment,job:Tele
   if(Number(lease.meta?.changes??0)!==1)return;
 
   const siteUrl=(typeof env.SITE_URL==="string" && env.SITE_URL.startsWith("https://")?env.SITE_URL:SITE_URL_FALLBACK).replace(/\/$/,"");
-  const caption=`Новая серия уже вышла! Ваше ожидание окончено\n\n${job.animeTitle}\nСерия ${job.episodeNumber}`;
+  const caption=`Новая серия уже вышла! Ваше ожидание окончено\n\n${job.animeTitle}\nСерия ${job.episodeNumber}${job.translationTitle ? "\nОзвучка: " + job.translationTitle : ""}`;
   const replyMarkup={inline_keyboard:[[{text:"Открыть Yubera",web_app:{url:`${siteUrl}/anime/${job.animeId}`}}]]};
   const request=job.posterUrl && isSafePosterUrl(job.posterUrl)
     ? await telegramCall(token,"sendPhoto",{chat_id:delivery.chat_id,photo:job.posterUrl,caption,reply_markup:replyMarkup})

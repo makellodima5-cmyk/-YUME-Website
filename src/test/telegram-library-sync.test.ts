@@ -47,4 +47,17 @@ describe("Telegram library sync item validation", () => {
       updatedAtEpochMillis: Date.now(), deleted: true, sourceId: "web",
     }])).toHaveLength(1);
   });
+
+  it("accepts selected voice-over data and rejects malformed source fields", () => {
+    const base = { itemType: "subscription", animeId: "123", updatedAtEpochMillis: Date.now(), deleted: false, sourceId: "web" };
+    expect(normalizeTelegramLibrarySyncItems([{ ...base, payload: { notificationsEnabled: true, translationId: "voice-a", translationTitle: "Voice A" } }])).not.toBeNull();
+    expect(normalizeTelegramLibrarySyncItems([{ ...base, payload: { notificationsEnabled: true, translationId: "../bad", translationTitle: "Voice A" } }])).toBeNull();
+    expect(normalizeTelegramLibrarySyncItems([{ ...base, payload: { notificationsEnabled: true, translationId: "voice-a", translationTitle: "" } }])).toBeNull();
+  });
+
+  it("continues accepting old subscription payloads", () => {
+    const base = { itemType: "subscription", animeId: "123", updatedAtEpochMillis: Date.now(), deleted: false, sourceId: "web" };
+    expect(normalizeTelegramLibrarySyncItems([{ ...base, payload: { notificationsEnabled: true } }])).not.toBeNull();
+  });
+
 });
