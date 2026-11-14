@@ -133,6 +133,7 @@ function AnimeDetailPage() {
   const [authRequired, setAuthRequired] = useState(false);
   const [episodeSubscribed, setEpisodeSubscribed] = useState(false);
   const [episodeSubscribedVoiceover, setEpisodeSubscribedVoiceover] = useState("");
+  const [episodeSubscriptionNeedsVoiceover, setEpisodeSubscriptionNeedsVoiceover] = useState(false);
   const [watchMode, setWatchMode] = useState<"trailer" | "episodes">("trailer");
   const [screenshots, setScreenshots] = useState<ShikimoriScreenshot[]>([]);
   const [activeScreenshotIndex, setActiveScreenshotIndex] = useState<number | null>(null);
@@ -149,13 +150,20 @@ function AnimeDetailPage() {
     if (!anime) {
       setEpisodeSubscribed(false);
       setEpisodeSubscribedVoiceover("");
+      setEpisodeSubscriptionNeedsVoiceover(false);
       return;
     }
     let cancelled = false;
     fetch("/api/anime-subscriptions", { credentials: "same-origin", cache: "no-store" })
       .then(async response => {
-        const payload = await response.json().catch(() => ({})) as { subscriptions?: string[]; subscriptionSelections?: Record<string,{translationId?:string;translationTitle?:string}> };
-        if (!cancelled && response.ok) { setEpisodeSubscribed(Array.isArray(payload.subscriptions) && payload.subscriptions.includes(anime.id)); setEpisodeSubscribedVoiceover(payload.subscriptionSelections?.[anime.id]?.translationTitle ?? ""); }
+        const payload = await response.json().catch(() => ({})) as { subscriptions?: string[]; subscriptionSelections?: Record<string,{translationId?:string|null;translationTitle?:string|null}> };
+        if (!cancelled && response.ok) {
+          const isSubscribed = Array.isArray(payload.subscriptions) && payload.subscriptions.includes(anime.id);
+          const selection = payload.subscriptionSelections?.[anime.id];
+          setEpisodeSubscribed(isSubscribed);
+          setEpisodeSubscribedVoiceover(selection?.translationTitle ?? "");
+          setEpisodeSubscriptionNeedsVoiceover(isSubscribed && !selection?.translationId);
+        }
       })
       .catch(() => undefined);
     return () => { cancelled = true; };
@@ -635,8 +643,8 @@ function AnimeDetailPage() {
   const episodeSubscriptionButton = (
     <AnimeEpisodeSubscription
       animeId={anime.id} language={language} disabled={!canSubscribeToEpisodes}
-      subscribed={episodeSubscribed} subscribedVoiceover={episodeSubscribedVoiceover}
-      onSubscribed={(subscribed, voiceover) => { setEpisodeSubscribed(subscribed); setEpisodeSubscribedVoiceover(voiceover ?? ""); }}
+      subscribed={episodeSubscribed} subscribedVoiceover={episodeSubscribedVoiceover} needsVoiceoverSelection={episodeSubscriptionNeedsVoiceover}
+      onSubscribed={(subscribed, voiceover) => { setEpisodeSubscribed(subscribed); setEpisodeSubscribedVoiceover(voiceover ?? ""); setEpisodeSubscriptionNeedsVoiceover(false); }}
       onAuthRequired={() => navigateToSection("login")} onError={() => setSaveSyncError(true)}
     />
   );
