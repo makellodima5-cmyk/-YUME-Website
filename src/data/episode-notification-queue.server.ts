@@ -63,7 +63,6 @@ export async function enqueueEpisodeNotification(
     animeId, episodeNumber, animeTitle: animeTitle.slice(0, 300),
     ...(posterUrl && isSafePosterUrl(posterUrl) ? { posterUrl } : {}),
     ...(translationId && translationTitle ? { translationId, translationTitle: translationTitle.slice(0, 120) } : {}),
-    ...(translationId && translationTitle ? { translationId, translationTitle: translationTitle.slice(0, 120) } : {}),
   };
   if (!isEpisodeNotificationJob(job)) throw new Error("Invalid episode notification job");
   await queue.send(job, { contentType: "json" });
@@ -117,7 +116,6 @@ async function processEpisodeNotificationFanout(db: Database, env: QueueEnvironm
         animeId:job.animeId, episodeNumber:job.episodeNumber, animeTitle:job.animeTitle,
         ...(job.posterUrl ? {posterUrl:job.posterUrl} : {}),
         ...(job.translationId && job.translationTitle ? {translationId:job.translationId,translationTitle:job.translationTitle} : {}),
-        ...(job.translationId && job.translationTitle ? {translationId:job.translationId,translationTitle:job.translationTitle} : {}),
       } as unknown as EpisodeNotificationJob, {contentType:"json"});
     }
   }
@@ -125,7 +123,7 @@ async function processEpisodeNotificationFanout(db: Database, env: QueueEnvironm
 
 type TelegramDeliveryJob = {
   type:"telegram_episode_delivery";
-  notificationId:string; userId:string; animeId:string; episodeNumber:number; animeTitle:string; posterUrl?:string; translationId?:string; translationTitle?:string; translationId?:string; translationTitle?:string;
+  notificationId:string; userId:string; animeId:string; episodeNumber:number; animeTitle:string; posterUrl?:string; translationId?:string; translationTitle?:string;
 };
 function isTelegramDeliveryJob(value:unknown):value is TelegramDeliveryJob {
   if(!isRecord(value))return false;
