@@ -40,6 +40,7 @@ import { PLAYBACK_PROGRESS_UPDATED_EVENT, readPlaybackProgress, savePlaybackProg
 import { parseKodikPlaybackMessage } from "@/data/kodik-playback-events";
 import { UserAnimeRating } from "@/components/yume/UserAnimeRating";
 import { AnimeEpisodeSubscription } from "@/components/yume/AnimeEpisodeSubscription";
+import { AnimeEpisodeSubscription } from "@/components/yume/AnimeEpisodeSubscription";
 import { AnimeComments } from "@/components/yume/AnimeComments";
 import { canReturnToAnimeOrigin } from "@/data/anime-navigation";
 
