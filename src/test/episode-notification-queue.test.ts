@@ -52,6 +52,14 @@ describe("episode notification Queue", () => {
     expect(contentType).toBe("json");
   });
 
+  it("filters fanout by selected voice-over and per-user baseline", async () => {
+    const { database, statements } = createDatabase();
+    let acknowledged = false;
+    await handleEpisodeNotificationQueue({ messages: [{ body: { type:"episode_notification_fanout", notificationId:"episode-123-a-7", animeId:"123", episodeNumber:7, animeTitle:"Anime", translationId:"a", translationTitle:"Voice A" }, ack(){acknowledged=true}, retry(){} }] }, { YUME_DB: database });
+    expect(acknowledged).toBe(true);
+    expect(statements.some(sql => sql.includes("translation_id=?") && sql.includes("baseline_episode<?"))).toBe(true);
+  });
+
   it("acknowledges completed fanout after creating site notification targets", async () => {
     const { database, statements } = createDatabase();
     let acknowledged = false;
