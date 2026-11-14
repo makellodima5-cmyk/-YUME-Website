@@ -81,7 +81,7 @@ describe("YUBERA community foundation", () => {
 
   it("hides Plus-only avatar frames when the paid period is no longer active", async () => {
     const server = await readFile(resolve(process.cwd(), "src/data/yubera-community.server.ts"), "utf8");
-    expect(server).toContain("avatarFrame: isSupportFrame(account.profile.avatar_frame) ? account.profile.avatar_frame : plus ? account.profile.avatar_frame : null");
+    expect(server).toContain("avatarFrame: isAdminFrame(account.profile.avatar_frame) || isSupportFrame(account.profile.avatar_frame) ? account.profile.avatar_frame : plus ? account.profile.avatar_frame : null");
     expect(server).toContain("expires_at > ?");
   });
 
@@ -311,5 +311,40 @@ describe("YUBERA community foundation", () => {
     expect(panel).toContain("recommendationSeed");
     expect(panel).toContain("&seed=${recommendationSeed}");
   });
+
+  it("verifies admin identity using the existing Telegram session and configured Telegram ID", async () => {
+    const server = await readFile(resolve(process.cwd(), "src/data/yubera-community.server.ts"), "utf8");
+    const adminAuth = await readFile(resolve(process.cwd(), "src/data/admin-password.server.ts"), "utf8");
+    expect(server).toContain("import { hasTelegramAdminIdentity } from \"@/data/admin-password.server\"");
+    expect(server).toContain("await hasTelegramAdminIdentity(request)");
+    expect(adminAuth).toContain("async function isTelegramAdministrator(request: Request, env: Environment)");
+    expect(adminAuth).toContain("row.telegram_user_id === adminId");
+    expect(adminAuth).toContain("row.expires_at > Date.now()");
+    expect(adminAuth).toContain("u.provider='telegram'");
+    expect(server).toContain("profileSummary(database, target, userId, adminCheck)");
+  });
+
+  it("restricts admin frames to the verified owner and rejects forged saves", async () => {
+    const server = await readFile(resolve(process.cwd(), "src/data/yubera-community.server.ts"), "utf8");
+    const component = await readFile(resolve(process.cwd(), "src/components/yume/YuberaProfileHub.tsx"), "utf8");
+    expect(server).toContain("availableAdminFrames: isOwner && adminCheck ? [...ADMIN_FRAME_ASSETS] : []");
+    expect(server).toContain('if (frame && isAdminFrame(frame) && !adminCheck) return json({ error: "admin_frame_forbidden" }, 403)');
+    expect(component).toContain('profile.isAdmin&&(profile.availableAdminFrames??[]).includes(asset)');
+    expect(component).toContain('frameCategory==="admin"');
+    expect(component).toContain("Admin_Frame_08.webp");
+  });
+
+  it("renders the server-derived admin badge on owner and public profile headers", async () => {
+    const component = await readFile(resolve(process.cwd(), "src/components/yume/YuberaProfileHub.tsx"), "utf8");
+    const profile = await readFile(resolve(process.cwd(), "src/components/yume/Profile.tsx"), "utf8");
+    const server = await readFile(resolve(process.cwd(), "src/data/yubera-community.server.ts"), "utf8");
+    expect(server).toContain('isAdmin: account.user.telegram_user_id === String((env().TELEGRAM_ADMIN_ID ?? "")).trim()');
+    expect(component).toContain("{profile.isAdmin &&");
+    expect(component).toContain("{publicProfile.isAdmin &&");
+    expect(component).toContain("АДМИН");
+    expect(component).toContain('p?.avatarFrame && <img src={`/images/yubera/${p.avatarFrame}`}');
+    expect(profile).not.toContain("isAdmin={isAdmin}");
+  });
+
 
 });

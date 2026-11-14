@@ -555,7 +555,6 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
               animeList={animeList}
               onSelect={onSelect}
               onBack={() => { if (window.history.length > 1) window.history.back(); }}
-              isAdmin={isAdmin}
               onSettings={() => setSettingsExpanded(current => !current)}
               settingsExpanded={settingsExpanded}
               onLegal={() => navigatePanel("documents")}

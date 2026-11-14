@@ -1,5 +1,6 @@
 import { env as cloudflareEnv } from "cloudflare:workers";
 import { getAuthenticatedYumeUserId } from "@/data/telegram-auth.server";
+import { hasTelegramAdminIdentity } from "@/data/admin-password.server";
 import { getR2Anime } from "@/data/catalog-r2.server";
 import { YUBERA_SUPPORT_LEVELS, YUBERA_XP_LEVELS, YUBERA_XP_REWARDS, YUBERA_XP_RULES } from "@/data/yubera-config";
 
@@ -10,7 +11,7 @@ type Statement = {
   run(): Promise<{ meta?: { changes?: number } }>;
 };
 type Database = { prepare(sql: string): Statement; batch?: (statements: Statement[]) => Promise<Array<{ meta?: { changes?: number } }>> };
-type Environment = { YUME_DB?: unknown };
+type Environment = { YUME_DB?: unknown; TELEGRAM_ADMIN_ID?: string; YUME_AUTH_SESSION_SECRET?: string };
 type RuntimeGlobal = typeof globalThis & { __YUME_RUNTIME_ENV__?: unknown };
 type UserRow = {
   id: string; telegram_user_id: string; telegram_first_name: string; telegram_last_name: string | null;
@@ -63,6 +64,9 @@ const PLUS_FRAME_ASSETS = [
   "YUBERA_Plus_Avatar_Frame_04_Celestial_Archive.webp",
   "YUBERA_Plus_Avatar_Frame_05_Cyberpunk_Neon.webp",
 ] as const;
+
+const ADMIN_FRAME_ASSETS = ["Admin_Frame_01.webp","Admin_Frame_02.webp","Admin_Frame_03.webp","Admin_Frame_04.webp","Admin_Frame_05.webp","Admin_Frame_06.webp","Admin_Frame_07.webp","Admin_Frame_08.webp"] as const;
+function isAdminFrame(value: string | null): boolean { return Boolean(value && (ADMIN_FRAME_ASSETS as readonly string[]).includes(value)); }
 function profileAssetFrame(value: unknown): string | null {
   return typeof value === "string" && [...SUPPORT_FRAME_ASSETS, ...PLUS_FRAME_ASSETS].includes(value) ? value : null;
 }
@@ -120,7 +124,7 @@ async function supportState(database: Database, telegramUserId: string, manualLe
     progress: next ? Math.max(0, Math.min(100, ((total - current.min) / (next.min - current.min)) * 100)) : 100,
     remaining: next ? Math.max(0, next.min - total) : 0 };
 }
-async function profileSummary(database: Database, userId: string, viewerId: string | null) {
+async function profileSummary(database: Database, userId: string, viewerId: string | null, adminCheck: boolean) {
   const account = await userAndProfile(database, userId);
   if (!account) return null;
   const isOwner = viewerId === userId;
@@ -150,9 +154,10 @@ async function profileSummary(database: Database, userId: string, viewerId: stri
     private: false, id: userId,
     displayName: [account.user.telegram_first_name, account.user.telegram_last_name].filter(Boolean).join(" ") || account.user.telegram_username || "Пользователь",
     username: account.user.telegram_username, photoUrl: account.user.telegram_photo_url,
-    bio: account.profile.bio, avatarFrame: isSupportFrame(account.profile.avatar_frame) ? account.profile.avatar_frame : plus ? account.profile.avatar_frame : null,
+    bio: account.profile.bio, avatarFrame: isAdminFrame(account.profile.avatar_frame) || isSupportFrame(account.profile.avatar_frame) ? account.profile.avatar_frame : plus ? account.profile.avatar_frame : null,
     visibility: account.profile.visibility, xp: isOwner ? xp : { level: xp.level, title: xp.title }, support: isOwner ? effectiveSupport : { level: effectiveSupport.level, title: effectiveSupport.title, asset: effectiveSupport.asset },
     availableSupportFrames: isOwner ? unlockedSupportFrames.results.map((row) => SUPPORT_FRAME_ASSETS[row.frame_level - 1]).filter(Boolean) : [],
+    availableAdminFrames: isOwner && adminCheck ? [...ADMIN_FRAME_ASSETS] : [], isAdmin: account.user.telegram_user_id === String((env().TELEGRAM_ADMIN_ID ?? "")).trim() && /^\d{1,20}$/.test(String(env().TELEGRAM_ADMIN_ID ?? "")),
     isPlus: plus, followers: Number(followers?.count ?? 0), following: Number(following?.count ?? 0),
     publicCollections: Number(collections?.count ?? 0), publicTitles: Number(collections?.titles ?? 0),
     collectionLikes: Number(collections?.likes ?? 0), isFollowing: Boolean(follow),
@@ -194,20 +199,21 @@ export async function handleYuberaCommunity(request: Request): Promise<Response>
   const database = db();
   if (!database) return json({ error: "database_unavailable" }, 503);
   const userId = await getAuthenticatedYumeUserId(request);
+  const adminCheck = await hasTelegramAdminIdentity(request);
   const url = new URL(request.url);
   if (request.method === "GET") {
     const action = url.searchParams.get("action") ?? "me";
     if (action === "me") {
       if (!userId) return json({ authenticated: false }, 401);
       const [profile, collections] = await Promise.all([
-        profileSummary(database, userId, userId), collectionsFor(database, userId, userId, true),
+        profileSummary(database, userId, userId, adminCheck), collectionsFor(database, userId, userId, true),
       ]);
       return json({ authenticated: true, profile, collections });
     }
     if (action === "profile") {
       const target = url.searchParams.get("userId") ?? "";
       if (!target || target.length > 128) return json({ error: "invalid_user" }, 400);
-      const profile = await profileSummary(database, target, userId);
+      const profile = await profileSummary(database, target, userId, adminCheck);
       if (!profile) return json({ error: "not_found" }, 404);
       if ("private" in profile && profile.private) return json({ error: "profile_private" }, 403);
       const collections = await collectionsFor(database, target, userId ?? "", false);
@@ -318,13 +324,16 @@ export async function handleYuberaCommunity(request: Request): Promise<Response>
     const visibility = input.visibility === "public" ? "public" : input.visibility === "private" ? "private" : null;
     if (bio.length > 250 || !visibility) return json({ error: "invalid_profile" }, 400);
     const plus = await plusActive(database, userId);
-    const frame = input.avatarFrame === null ? null : profileAssetFrame(input.avatarFrame);
+    const adminCheck = await isCurrentTelegramAdmin(request);
+    const frame = input.avatarFrame === null ? null : isAdminFrame(input.avatarFrame) ? input.avatarFrame : profileAssetFrame(input.avatarFrame);
     if (input.avatarFrame !== null && !frame) return json({ error: "invalid_avatar_frame" }, 400);
+    if (frame && isAdminFrame(frame) && !adminCheck) return json({ error: "admin_frame_forbidden" }, 403);
     if (frame && isSupportFrame(frame)) {
       const unlocked = await database.prepare("SELECT 1 AS unlocked FROM yume_support_frame_unlocks WHERE user_id = ? AND frame_level = ?")
         .bind(userId, supportFrameLevel(frame)).first();
       if (!unlocked) return json({ error: "support_frame_locked" }, 403);
-    } else if (frame && !plus) return json({ error: "plus_required" }, 403);
+    } else if (frame && isAdminFrame(frame)) { /* Admin frame: checked against the authenticated Telegram session above. */ }
+    else if (frame && !plus) return json({ error: "plus_required" }, 403);
     await database.prepare("INSERT INTO yume_profiles(user_id,bio,visibility,avatar_frame) VALUES(?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET bio=excluded.bio,visibility=excluded.visibility,avatar_frame=excluded.avatar_frame,updated_at=CURRENT_TIMESTAMP")
       .bind(userId, bio, visibility, frame).run();
     return json({ ok: true });
