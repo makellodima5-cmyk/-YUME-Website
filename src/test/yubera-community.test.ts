@@ -314,10 +314,13 @@ describe("YUBERA community foundation", () => {
 
   it("verifies admin identity using the existing Telegram session and configured Telegram ID", async () => {
     const server = await readFile(resolve(process.cwd(), "src/data/yubera-community.server.ts"), "utf8");
-    expect(server).toContain("async function isTelegramAdministrator(request: Request, env: Environment)");
-    expect(server).toContain("row.telegram_user_id === adminId");
-    expect(server).toContain("row.expires_at > Date.now()");
-    expect(server).toContain("u.provider='telegram'");
+    const adminAuth = await readFile(resolve(process.cwd(), "src/data/admin-password.server.ts"), "utf8");
+    expect(server).toContain("import { hasTelegramAdminIdentity } from \"@/data/admin-password.server\"");
+    expect(server).toContain("await hasTelegramAdminIdentity(request)");
+    expect(adminAuth).toContain("async function isTelegramAdministrator(request: Request, env: Environment)");
+    expect(adminAuth).toContain("row.telegram_user_id === adminId");
+    expect(adminAuth).toContain("row.expires_at > Date.now()");
+    expect(adminAuth).toContain("u.provider='telegram'");
     expect(server).toContain("profileSummary(database, target, userId, adminCheck)");
   });
 
