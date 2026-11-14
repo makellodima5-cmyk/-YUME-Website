@@ -668,7 +668,64 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
       })()}
     </>}
 
-    {screen === "support-status" && <><Header title="Статус поддержки" subtitle="Ваш вклад в развитие YUBERA"/><YuberaCard className="text-center">{profile.support.asset ? <img src={`/images/yubera/${profile.support.asset}`} alt="" className="mx-auto h-36 w-36 object-contain"/> : <div className="mx-auto grid h-36 w-36 place-items-center rounded-3xl bg-white/5 text-white/40"><Star className="h-16 w-16"/></div>}<h3 className="text-2xl font-bold">{profile.support.title}</h3><p className="mt-2 text-sm text-white/55">Статус присваивается за подтверждённую поддержку проекта в Telegram Stars.</p>{typeof profile.support.total === "number" && profile.support.nextThreshold && <><div className="mt-4 h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-gradient-to-r from-[#FF5738] to-[#FF6245]" style={{width:`${profile.support.progress ?? 0}%`}}/></div><p className="mt-2 text-xs text-white/50">До следующего статуса: {profile.support.remaining} ⭐</p></>}</YuberaCard><YuberaCard className="mt-3">{supportLevels.map(([name,threshold,asset],i)=><div key={name} className="flex items-center gap-3 border-b border-white/5 py-3 last:border-0"><img src={`/images/yubera/${asset}`} alt="" className="h-14 w-14 object-contain"/><div className="flex-1"><b>{i+1}. {name}</b><p className="text-xs text-white/50">От {threshold}</p></div>{profile.support.level>=i+1&&<Check className="h-5 w-5 text-emerald-400"/>}</div>)}</YuberaCard></>}
+    {screen === "support-status" && <>
+      <Header title="Статус поддержки" subtitle="Ваш вклад в развитие YUBERA"/>
+      {(() => {
+        const currentLevel = Math.max(0, Math.min(5, profile.support.level || 0));
+        const total = Math.max(0, Number(profile.support.total ?? 0));
+        const current = YUBERA_SUPPORT_LEVELS[currentLevel] ?? YUBERA_SUPPORT_LEVELS[0];
+        const next = YUBERA_SUPPORT_LEVELS[currentLevel + 1];
+        const remaining = next ? Math.max(0, next.min - total) : 0;
+        const progress = next ? Math.max(0, Math.min(100, ((total - current.min) / Math.max(1, next.min - current.min)) * 100)) : 100;
+        const donationHref = (level: number) => {
+          const target = YUBERA_SUPPORT_LEVELS[level];
+          const query = new URLSearchParams({ support: "1", targetLevel: String(level), targetStars: String(target.min) });
+          return `?section=support&${query.toString()}`;
+        };
+        const accents = [
+          { border: "#ff754f", glow: "rgba(255,104,65,.20)", fill: "rgba(255,93,57,.10)", line: "#ff704f" },
+          { border: "#b65be8", glow: "rgba(178,85,235,.18)", fill: "rgba(145,68,194,.11)", line: "#c16cf2" },
+          { border: "#57aaff", glow: "rgba(64,153,255,.18)", fill: "rgba(43,117,193,.11)", line: "#58aaff" },
+          { border: "#eab34e", glow: "rgba(239,174,65,.18)", fill: "rgba(191,134,35,.11)", line: "#e8b34e" },
+          { border: "#ff6548", glow: "rgba(255,68,45,.25)", fill: "rgba(145,34,27,.16)", line: "#ff6045" },
+        ];
+        return <div className="space-y-3 pb-5">
+          <section className="relative isolate overflow-hidden rounded-[24px] border border-[#ff704f]/85 bg-[linear-gradient(135deg,#211714_0%,#151418_55%,#261512_100%)] p-4 shadow-[0_0_24px_rgba(255,91,59,.18),inset_0_0_28px_rgba(255,100,60,.08)] sm:p-5">
+            <div aria-hidden="true" className="pointer-events-none absolute -right-7 -top-5 opacity-[.12]"><img src="/images/yubera/yubera_logo.webp" alt="" className="h-36 w-36 object-contain"/></div>
+            <div className="relative flex min-w-0 items-center gap-3">
+              <div className="grid h-[74px] w-[74px] shrink-0 place-items-center rounded-[19px] bg-[#28272a] text-white/65 shadow-inner">
+                {current.asset ? <img src={`/images/yubera/${current.asset}`} alt="" className="h-[66px] w-[66px] object-contain"/> : <Star className="h-12 w-12" strokeWidth={1.8}/>}
+              </div>
+              <span className="h-[68px] w-px shrink-0 bg-[#ff704f]/90"/>
+              <div className="min-w-0 flex-1">
+                <h2 className="text-[clamp(18px,5vw,24px)] font-extrabold leading-tight text-white">{current.title}</h2>
+                <p className="mt-1.5 max-w-[440px] text-[13px] leading-[1.4] text-white/65">Статус присваивается за подтверждённую поддержку проекта в Telegram Stars.</p>
+              </div>
+            </div>
+            <div className="relative mt-5 h-3 overflow-hidden rounded-full bg-[#414147]">
+              <div className="h-full rounded-full bg-gradient-to-r from-[#ff4f35] via-[#ff7547] to-[#ffac58] shadow-[0_0_12px_rgba(255,104,65,.45)] transition-[width]" style={{ width: `${progress}%` }}/>
+            </div>
+            <p className="relative mt-2 text-center text-[13px] font-medium text-white/65">{next ? <>До следующего статуса: {remaining.toLocaleString("ru-RU")} ⭐</> : "Достигнут высший статус поддержки"}</p>
+            <p className="relative mt-1 text-center text-[11px] text-white/40">Подтверждено: {total.toLocaleString("ru-RU")} ⭐</p>
+          </section>
+          {YUBERA_SUPPORT_LEVELS.filter(level => level.level > 0).map((level) => {
+            const tone = accents[level.level - 1];
+            const reached = currentLevel >= level.level;
+            return <a key={level.level} href={donationHref(level.level)} onClick={event => { event.preventDefault(); window.history.pushState({}, "", donationHref(level.level)); window.dispatchEvent(new PopStateEvent("popstate")); }} aria-label={`${level.level}. ${level.title}, от ${level.min.toLocaleString("ru-RU")} Stars. Перейти к поддержке`} className="group relative isolate flex min-h-[108px] min-w-0 items-center gap-3 overflow-hidden rounded-[23px] border px-3 py-3 shadow-[0_0_18px_var(--support-glow)] transition-transform active:scale-[.99] sm:min-h-[116px] sm:px-4" style={{ borderColor: tone.border + "88", background: `radial-gradient(ellipse at 92% 100%, ${tone.fill}, transparent 58%),linear-gradient(110deg,#1b1b21 0%,#15161c 68%,#211a1c 100%)`, boxShadow: `0 0 17px ${tone.glow}, inset 0 -18px 34px ${tone.fill}` }}>
+              <span aria-hidden="true" className="pointer-events-none absolute -bottom-10 -right-5 h-24 w-44 rotate-[-12deg] rounded-[50%] border-t-2 opacity-50" style={{ borderColor: tone.border, boxShadow: `0 -7px 19px ${tone.glow}` }}/>
+              <img src={`/images/yubera/${level.asset}`} alt="" className="relative z-10 h-[76px] w-[76px] shrink-0 object-contain sm:h-[84px] sm:w-[84px]"/>
+              <span aria-hidden="true" className="relative z-10 h-[66px] w-px shrink-0" style={{ backgroundColor: tone.line }}/>
+              <span className="relative z-10 min-w-0 flex-1">
+                <b className="block whitespace-nowrap text-[clamp(14px,4.25vw,20px)] font-extrabold leading-tight text-white">{level.level}. {level.title}</b>
+                <span className="mt-1.5 block whitespace-nowrap text-[clamp(12px,3.6vw,16px)] text-white/65">От {level.min.toLocaleString("ru-RU")} ⭐</span>
+              </span>
+              <ChevronRight className="relative z-10 h-6 w-6 shrink-0 text-white/75 transition-transform group-hover:translate-x-0.5"/>
+              {reached && <span className="sr-only">Статус уже достигнут</span>}
+            </a>;
+          })}
+        </div>;
+      })()}
+    </>}
     {screen === "plus" && <><Header title="YUBERA Plus" subtitle="Расширенные возможности личного пространства"/><YuberaPlusPanel /></>}
     {screen === "public-profile" && publicProfile && <>
       <Header title="Профиль пользователя" />
