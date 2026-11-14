@@ -72,7 +72,7 @@ async function processEpisodeNotificationFanout(db: Database, env: QueueEnvironm
   const querySubscribers = (cursor: string) => job.translationId ? db.prepare(
     "SELECT user_id FROM yume_anime_subscriptions WHERE anime_id=? AND translation_id=? AND baseline_episode<? AND active=1 AND user_id>? ORDER BY user_id LIMIT ?",
   ).bind(job.animeId, job.translationId, job.episodeNumber, cursor, SUBSCRIBER_PAGE_SIZE).all<{ user_id: string }>() : db.prepare(
-    "SELECT user_id FROM yume_anime_subscriptions WHERE anime_id=? AND baseline_episode<? AND active=1 AND user_id>? ORDER BY user_id LIMIT ?",
+    "SELECT user_id FROM yume_anime_subscriptions WHERE anime_id=? AND translation_id IS NULL AND baseline_episode<? AND active=1 AND user_id>? ORDER BY user_id LIMIT ?",
   ).bind(job.animeId, job.episodeNumber, cursor, SUBSCRIBER_PAGE_SIZE).all<{ user_id: string }>();
   let cursor = "";
   let page = await querySubscribers(cursor);
