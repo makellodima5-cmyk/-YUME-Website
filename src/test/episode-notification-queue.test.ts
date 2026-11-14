@@ -62,6 +62,16 @@ describe("episode notification Queue", () => {
     expect(statements.some(sql => sql.includes("translation_id=?") && sql.includes("baseline_episode<?"))).toBe(true);
   });
 
+  it("keeps legacy fanout limited to subscriptions without a selected voice-over", async () => {
+    const { database, statements } = createDatabase();
+    let acknowledged = false;
+    await handleEpisodeNotificationQueue({
+      messages: [{ body: validJob, ack() { acknowledged = true; }, retry() {} }],
+    }, { YUME_DB: database });
+    expect(acknowledged).toBe(true);
+    expect(statements.some(sql => sql.includes("translation_id IS NULL") && sql.includes("baseline_episode<?"))).toBe(true);
+  });
+
   it("acknowledges completed fanout after creating site notification targets", async () => {
     const { database, statements } = createDatabase();
     let acknowledged = false;
