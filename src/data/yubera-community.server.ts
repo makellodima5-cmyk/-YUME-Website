@@ -10,7 +10,7 @@ type Statement = {
   run(): Promise<{ meta?: { changes?: number } }>;
 };
 type Database = { prepare(sql: string): Statement; batch?: (statements: Statement[]) => Promise<Array<{ meta?: { changes?: number } }>> };
-type Environment = { YUME_DB?: unknown };
+type Environment = { YUME_DB?: unknown; TELEGRAM_ADMIN_ID?: string; YUME_AUTH_SESSION_SECRET?: string };
 type RuntimeGlobal = typeof globalThis & { __YUME_RUNTIME_ENV__?: unknown };
 type UserRow = {
   id: string; telegram_user_id: string; telegram_first_name: string; telegram_last_name: string | null;
@@ -64,6 +64,8 @@ const PLUS_FRAME_ASSETS = [
   "YUBERA_Plus_Avatar_Frame_05_Cyberpunk_Neon.webp",
 ] as const;
 
+const USER_SESSION_COOKIE = "__Host-yume-session";
+function cookie(request: Request, name: string): string { for (const part of (request.headers.get("cookie") ?? "").split(";")) { const index = part.indexOf("="); if (index >= 0 && part.slice(0,index).trim() === name) return part.slice(index+1).trim(); } return ""; }
 const ADMIN_FRAME_ASSETS = ["Admin_Frame_01.webp","Admin_Frame_02.webp","Admin_Frame_03.webp","Admin_Frame_04.webp","Admin_Frame_05.webp","Admin_Frame_06.webp","Admin_Frame_07.webp","Admin_Frame_08.webp"] as const;
 async function isTelegramAdministrator(request: Request, env: Environment): Promise<boolean> {
   const db = env.YUME_DB;
