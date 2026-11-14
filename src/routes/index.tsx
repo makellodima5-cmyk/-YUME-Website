@@ -1288,6 +1288,7 @@ function Index() {
         missingTrailers?: number;
       };
       if (response.status === 409 && payload.possibleDuplicate) {
+        setAdminTitleSearchResults(current => current.map(result => result.id === animeId ? { ...result, possibleDuplicateTitle: payload.duplicateTitle ?? result.possibleDuplicateTitle ?? "" } : result));
         setAdminTitleSearchMessage(payload.message ?? (language === "ru" ? "Проверь возможный дубликат." : "Check the possible duplicate."));
         return;
       }

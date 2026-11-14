@@ -8,6 +8,7 @@ describe("Telegram library sync item validation", () => {
       { itemType: "favorite", animeId: "20", payload: { saved: true }, updatedAtEpochMillis: timestamp, deleted: false, sourceId: "android-a" },
       { itemType: "subscription", animeId: "42", payload: { notificationsEnabled: true }, updatedAtEpochMillis: timestamp + 1, deleted: false, sourceId: "android-a" },
       { itemType: "progress", animeId: "99", payload: { seasonNumber: null, episodeNumber: 3, positionMillis: 1200, durationMillis: 2400 }, updatedAtEpochMillis: timestamp + 2, deleted: false, sourceId: "android-a" },
+      { itemType: "watchlist", animeId: "kodik-serial-12345", payload: { saved: true }, updatedAtEpochMillis: timestamp + 3, deleted: false, sourceId: "android-a" },
     ])).toHaveLength(4);
   });
   it("projects Android episode progress into the backward-compatible viewing history shape", () => {

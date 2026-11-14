@@ -87,7 +87,7 @@ function kodikStatus(value:unknown):Anime["status"] {
   return "Неизвестно";
 }
 function kodikAgeRating(value:unknown,minimalAge:unknown):string|null {
-  const key=typeof value==="string"?value.trim().toUpperCase().replace(/\\s+/g,""):"";
+  const key=typeof value==="string"?value.trim().toUpperCase().replace(/\s+/g,""):"";
   const map:Record<string,string>={G:"Без ограничений",PG:"Без ограничений","PG-13":"12+",R:"16+","R+":"16+",RX:"18+"};
   if(map[key])return map[key];
   const age=numericMetadata(minimalAge);

@@ -32,6 +32,7 @@ describe("anime comments shared validation", () => {
 
   it("accepts numeric and Kodik-native catalogue IDs while rejecting malformed IDs", () => {
     expect(isValidAnimeCommentId("123")).toBe(true);
+    expect(isValidAnimeCommentId("0")).toBe(true);
     expect(isValidAnimeCommentId("kodik-serial-12345")).toBe(true);
     expect(isValidAnimeCommentId("kodik-movie-987654")).toBe(true);
     expect(isValidAnimeCommentId("kodik-serial-nope")).toBe(false);
