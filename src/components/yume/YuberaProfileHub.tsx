@@ -327,12 +327,13 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
   );
   const avatar = (p: ProfileData | null, size = "h-[76px] w-[76px]") => {
     const hasFrame = Boolean(p?.avatarFrame);
+    const adminFrame = Boolean(p?.avatarFrame?.startsWith("Admin_Frame_"));
     return (
       <div className={`relative ${size} shrink-0 rounded-full ${hasFrame ? "bg-transparent" : "border-2 border-[#FF5738] bg-[#252630] p-1"}`}>
         {p?.photoUrl
-          ? <img src={p.photoUrl} alt="" className={hasFrame ? "absolute inset-[14%] h-[72%] w-[72%] rounded-full object-cover" : "h-full w-full rounded-full object-cover"} />
+          ? <img src={p.photoUrl} alt="" className={hasFrame ? `absolute ${adminFrame ? "inset-[17%] h-[66%] w-[66%]" : "inset-[14%] h-[72%] w-[72%]"} rounded-full object-cover` : "h-full w-full rounded-full object-cover"} />
           : hasFrame
-            ? <div className="absolute inset-[14%] grid h-[72%] w-[72%] place-items-center rounded-full text-2xl text-white/50"><Users /></div>
+            ? <div className={`absolute ${adminFrame ? "inset-[17%] h-[66%] w-[66%]" : "inset-[14%] h-[72%] w-[72%]"} grid place-items-center rounded-full text-2xl text-white/50"><Users /></div>
             : <div className="grid h-full w-full place-items-center rounded-full text-2xl text-white/50"><Users /></div>}
         {p?.avatarFrame && <img src={`/images/yubera/${p.avatarFrame}`} alt="" className="pointer-events-none absolute inset-0 h-full w-full object-contain" />}
       </div>
