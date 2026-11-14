@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { env as cloudflareEnv } from "cloudflare:workers";
 import { enforceRateLimit } from "@/lib/rate-limit";
+import { isValidAnimeCatalogId } from "@/data/anime";
 
 type Environment = Record<string, unknown> & { KODIK_API_TOKEN?: string; KODIK_RATE_LIMITER?: unknown };
 type EpisodeValue = string | { link?: string; title?: string | null };
@@ -59,7 +60,7 @@ export function episodeLink(value: EpisodeValue): { link: string; title: string 
 
 async function handleKodik(request: Request): Promise<Response> {
   const animeId = new URL(request.url).searchParams.get("animeId") ?? "";
-  if (!/^\d{1,12}$/.test(animeId) || Number(animeId) < 1) return json({ error: "Invalid anime ID." }, 400);
+  if (!isValidAnimeCatalogId(animeId) || (/^\d+$/.test(animeId) && Number(animeId) < 1)) return json({ error: "Invalid anime ID." }, 400);
 
   let token = "";
   let rateLimitBinding: unknown;
@@ -84,7 +85,8 @@ async function handleKodik(request: Request): Promise<Response> {
 
   const url = new URL("https://kodik-api.com/search");
   url.searchParams.set("token", token);
-  url.searchParams.set("shikimori_id", animeId);
+  if (animeId.startsWith("kodik-")) url.searchParams.set("id", animeId.slice("kodik-".length));
+  else url.searchParams.set("shikimori_id", animeId);
   url.searchParams.set("with_episodes_data", "true");
   url.searchParams.set("limit", "100");
 

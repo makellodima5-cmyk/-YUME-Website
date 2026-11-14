@@ -472,7 +472,8 @@ function Index() {
   const [adminImport, setAdminImport] = useState<{target:number;cursor:number;added:number;skipped:number;incomplete:number;errors:number;state:string;delayMs?:number;statusFilter?:string}>({target:0,cursor:1,added:0,skipped:0,incomplete:0,errors:0,state:"idle",statusFilter:""});
   const [adminImportMessage, setAdminImportMessage] = useState("");
   const [adminImportTitleQuery, setAdminImportTitleQuery] = useState("");
-  const [adminTitleSearchResults, setAdminTitleSearchResults] = useState<Array<{id:string;title:string;englishTitle:string;originalTitle:string;year:number;kind:string|null;status:string;posterUrl:string|null;genres:string[];ageRating:string|null;alreadyInCatalog:boolean}>>([]);
+  const [adminTitleImportSource, setAdminTitleImportSource] = useState<"shikimori" | "kodik">("shikimori");
+  const [adminTitleSearchResults, setAdminTitleSearchResults] = useState<Array<{id:string;title:string;englishTitle:string;originalTitle:string;year:number;kind:string|null;status:string;posterUrl:string|null;genres:string[];ageRating:string|null;alreadyInCatalog:boolean;kodikId?:string;shikimoriId?:string|null;description?:string;possibleDuplicateTitle?:string|null}>>([]);
   const [adminTitleSearchBusy, setAdminTitleSearchBusy] = useState(false);
   const [adminTitleImportBusy, setAdminTitleImportBusy] = useState<string | null>(null);
   const [adminTitleSearchMessage, setAdminTitleSearchMessage] = useState("");
@@ -1234,7 +1235,7 @@ function Index() {
         credentials: "same-origin",
         cache: "no-store",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "search_title", query }),
+        body: JSON.stringify({ action: adminTitleImportSource === "kodik" ? "search_kodik_title" : "search_title", query }),
       });
       const payload = await response.json().catch(() => ({})) as {
         isAdmin?: boolean;
@@ -1257,8 +1258,9 @@ function Index() {
     }
   };
 
-  const importCatalogTitle = async (animeId: string) => {
+  const importCatalogTitle = async (item: typeof adminTitleSearchResults[number], confirmPossibleDuplicate = false) => {
     if (!isAdmin || adminTitleImportBusy || adminImportRunning || metadataRefreshRunning) return;
+    const animeId = item.id;
     setAdminTitleImportBusy(animeId);
     setAdminTitleSearchMessage("");
     try {
@@ -1267,7 +1269,9 @@ function Index() {
         credentials: "same-origin",
         cache: "no-store",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "import_title", animeId }),
+        body: JSON.stringify(adminTitleImportSource === "kodik"
+          ? { action: "import_kodik_title", kodikId: item.kodikId, confirmPossibleDuplicate }
+          : { action: "import_title", animeId }),
       });
       const payload = await response.json().catch(() => ({})) as {
         isAdmin?: boolean;
@@ -1278,9 +1282,16 @@ function Index() {
         anime?: { id: string; title: string; year?: number; originalTitle?: string; englishTitle?: string };
         screenshots?: number;
         catalogTotal?: number;
+        possibleDuplicate?: boolean;
+        duplicateTitle?: string;
         catalogWithTrailer?: number;
         missingTrailers?: number;
       };
+      if (response.status === 409 && payload.possibleDuplicate) {
+        setAdminTitleSearchResults(current => current.map(result => result.id === animeId ? { ...result, possibleDuplicateTitle: payload.duplicateTitle ?? result.possibleDuplicateTitle ?? "" } : result));
+        setAdminTitleSearchMessage(payload.message ?? (language === "ru" ? "Проверь возможный дубликат." : "Check the possible duplicate."));
+        return;
+      }
       if (response.status === 409 && payload.alreadyInCatalog) {
         setAdminTitleSearchResults(current => current.map(item => item.id === animeId ? { ...item, alreadyInCatalog: true } : item));
         setAdminTitleSearchMessage(payload.message ?? (language === "ru" ? "Этот тайтл уже есть в каталоге." : "This title is already in the catalog."));
@@ -1291,8 +1302,8 @@ function Index() {
       }
       setAdminTitleSearchResults(current => current.map(item => item.id === animeId ? { ...item, alreadyInCatalog: true } : item));
       setAdminTitleSearchMessage(language === "ru"
-        ? `Добавлено: ${payload.anime?.title ?? animeId}. Скриншотов сохранено: ${payload.screenshots ?? 0}.`
-        : `Added: ${payload.anime?.title ?? animeId}. Screenshots saved: ${payload.screenshots ?? 0}.`);
+        ? `Добавлено: ${payload.anime?.title ?? animeId}. Источник: ${adminTitleImportSource === "kodik" ? "Kodik" : "Shikimori"}. Скриншотов сохранено: ${payload.screenshots ?? 0}.`
+        : `Added: ${payload.anime?.title ?? animeId}. Source: ${adminTitleImportSource === "kodik" ? "Kodik" : "Shikimori"}. Screenshots saved: ${payload.screenshots ?? 0}.`);
       setAdminStats(current => ({
         total: payload.catalogTotal ?? current?.total ?? 0,
         pending: current?.pending ?? 0,
@@ -2204,10 +2215,14 @@ function Index() {
                   <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
                 </summary>
                 <div className="border-t border-border/70 p-3 sm:p-4">
-                  <p className="text-xs leading-relaxed text-muted-foreground">{language === "ru" ? "Можно добавить аниме по названию или оставить импорт по количеству. Оба режима сохраняют метаданные, постер и доступные скриншоты из Shikimori." : "Add anime by title or keep using the quantity-based importer. Both modes save metadata, poster and available Shikimori screenshots."}</p>
+                  <p className="text-xs leading-relaxed text-muted-foreground">{language === "ru" ? "Для импорта по названию выбери Shikimori или Kodik. Массовый импорт по количеству работает только через Shikimori." : "Choose Shikimori or Kodik for single-title search and import. Quantity-based bulk import remains Shikimori-only."}</p>
                   <section className="mt-4 rounded-xl border border-[#22232B] bg-[#101116] p-3 sm:p-4" aria-label={language === "ru" ? "Импорт аниме по названию" : "Import anime by title"}>
                     <h3 className="text-sm font-semibold text-[#F6F4F5]">{language === "ru" ? "Добавить по названию" : "Import by title"}</h3>
-                    <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{language === "ru" ? "Введи русское, английское или японское название. Поиск покажет варианты, чтобы ты выбрал правильный сезон или фильм." : "Search using the Russian, English or Japanese title. Choose the exact season or movie from the results."}</p>
+                    <div className="mt-3 inline-flex rounded-lg border border-[#34313B] bg-[#0C0D11] p-1" role="group" aria-label={language === "ru" ? "Источник импорта" : "Import source"}>
+                      <button type="button" onClick={() => { setAdminTitleImportSource("shikimori"); setAdminTitleSearchResults([]); setAdminTitleSearchMessage(""); }} disabled={adminTitleSearchBusy || Boolean(adminTitleImportBusy)} aria-pressed={adminTitleImportSource === "shikimori"} className={"rounded-md px-3 py-1.5 text-xs font-semibold transition " + (adminTitleImportSource === "shikimori" ? "bg-[#FF764F] text-white" : "text-muted-foreground hover:text-white")}>Shikimori</button>
+                      <button type="button" onClick={() => { setAdminTitleImportSource("kodik"); setAdminTitleSearchResults([]); setAdminTitleSearchMessage(""); }} disabled={adminTitleSearchBusy || Boolean(adminTitleImportBusy)} aria-pressed={adminTitleImportSource === "kodik"} className={"rounded-md px-3 py-1.5 text-xs font-semibold transition " + (adminTitleImportSource === "kodik" ? "bg-[#FF764F] text-white" : "text-muted-foreground hover:text-white")}>Kodik</button>
+                    </div>
+                    <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{language === "ru" ? "Введи название. Выбери источник, затем нужный сезон или фильм." : "Enter a title, choose a source, then select the correct season or movie."}</p>
                     <form className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]" onSubmit={event => { event.preventDefault(); void searchCatalogTitle(); }}>
                       <input
                         type="search"
@@ -2215,7 +2230,7 @@ function Index() {
                         onChange={event => { setAdminImportTitleQuery(event.target.value); setAdminTitleSearchResults([]); setAdminTitleSearchMessage(""); }}
                         maxLength={120}
                         minLength={2}
-                        placeholder={language === "ru" ? "Например: Frieren, フリーレン, Фрирен" : "For example: Frieren, フリーレン"}
+                        placeholder={language === "ru" ? (adminTitleImportSource === "kodik" ? "Например: Стальной алхимик" : "Например: Frieren, フリーレン, Фрирен") : "For example: Frieren, フリーレン"}
                         aria-label={language === "ru" ? "Название аниме для поиска" : "Anime title to search"}
                         disabled={adminTitleSearchBusy || Boolean(adminTitleImportBusy) || adminImportRunning || metadataRefreshRunning}
                         className="h-11 min-w-0 rounded-xl border border-[#22232B] bg-[#101116] px-3 text-sm text-white placeholder:text-muted-foreground focus:border-[#FF764F] focus:outline-none focus:ring-1 focus:ring-[#FF764F] disabled:opacity-60"
@@ -2233,7 +2248,8 @@ function Index() {
                     {adminTitleSearchResults.length > 0 && (
                       <div className="mt-3 space-y-2">
                         {adminTitleSearchResults.map(item => (
-                          <article key={item.id} className="flex min-w-0 items-center gap-3 rounded-xl border border-[#30263A] bg-[#101116] p-2.5 sm:p-3">
+                          <div key={item.id} className="space-y-2">
+                          <article className="flex min-w-0 items-center gap-3 rounded-xl border border-[#30263A] bg-[#101116] p-2.5 sm:p-3">
                             {item.posterUrl ? (
                               <img src={item.posterUrl} alt="" loading="lazy" decoding="async" className="h-16 w-11 shrink-0 rounded-md object-cover bg-black/30" />
                             ) : (
@@ -2242,11 +2258,13 @@ function Index() {
                             <div className="min-w-0 flex-1">
                               <h4 className="break-words text-sm font-medium text-white">{item.title}</h4>
                               <p className="mt-0.5 break-words text-xs text-muted-foreground">{[item.originalTitle !== item.title ? item.originalTitle : "", item.englishTitle !== item.originalTitle ? item.englishTitle : "", item.year > 0 ? String(item.year) : "", item.kind ?? "", item.ageRating ? (language==="ru" ? "Возраст: " : "Age: ") + item.ageRating : "", ...(item.genres ?? []).slice(0,3)].filter(Boolean).join(" · ")}</p>
-                              <p className="mt-0.5 text-[11px] text-muted-foreground">Shikimori ID: {item.id}{item.status ? " · " + item.status : ""}</p>
+                              {item.description && <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-muted-foreground">{item.description}</p>}
+                              <p className="mt-0.5 text-[11px] text-muted-foreground">{item.kodikId ? "Kodik ID: " + item.kodikId : "Shikimori ID: " + item.id}{item.shikimoriId ? " · Shikimori ID: " + item.shikimoriId : ""}{item.status ? " · " + item.status : ""}</p>
+                              {item.possibleDuplicateTitle && <p className="mt-1 text-[11px] text-amber-400">{language === "ru" ? "Возможное совпадение: " : "Possible match: "}{item.possibleDuplicateTitle}</p>}
                             </div>
                             <button
                               type="button"
-                              onClick={() => { void importCatalogTitle(item.id); }}
+                              onClick={() => { void importCatalogTitle(item); }}
                               disabled={item.alreadyInCatalog || Boolean(adminTitleImportBusy) || adminTitleSearchBusy || adminImportRunning || metadataRefreshRunning}
                               className={item.alreadyInCatalog
                                 ? "min-h-9 shrink-0 rounded-lg border border-border px-2.5 py-2 text-[11px] font-medium text-muted-foreground"
@@ -2259,11 +2277,17 @@ function Index() {
                                   : (language === "ru" ? "Импортировать" : "Import")}
                             </button>
                           </article>
+                          {adminTitleImportSource === "kodik" && item.possibleDuplicateTitle && !item.alreadyInCatalog && (
+                            <button type="button" onClick={() => { void importCatalogTitle(item, true); }} disabled={Boolean(adminTitleImportBusy) || adminTitleSearchBusy || adminImportRunning || metadataRefreshRunning} className="ml-2 rounded-lg border border-amber-500/50 px-3 py-2 text-[11px] font-semibold text-amber-300 disabled:opacity-50">
+                              {language === "ru" ? "Подтвердить отдельный тайтл" : "Confirm separate title"}
+                            </button>
+                          )}
+                          </div>
                         ))}
                       </div>
                     )}
                   </section>
-                  <div className="my-4 flex items-center gap-3 text-[11px] uppercase tracking-[0.15em] text-muted-foreground"><span className="h-px flex-1 bg-border" /><span>{language === "ru" ? "или импорт по количеству" : "or import by quantity"}</span><span className="h-px flex-1 bg-border" /></div>
+                  <div className="my-4 flex items-center gap-3 text-[11px] uppercase tracking-[0.15em] text-muted-foreground"><span className="h-px flex-1 bg-border" /><span>{language === "ru" ? "или массовый импорт Shikimori" : "or bulk Shikimori import"}</span><span className="h-px flex-1 bg-border" /></div>
                   <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
                     <label className="text-sm">
                       <span className="mb-1 block text-xs text-muted-foreground">{language === "ru" ? "Количество новых записей" : "Number of new records"}</span>

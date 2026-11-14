@@ -1,6 +1,7 @@
 import { env as cloudflareEnv } from "cloudflare:workers";
 import { getAuthenticatedYumeUserId } from "@/data/telegram-auth.server";
 import { getR2Anime } from "@/data/catalog-r2.server";
+import { isValidAnimeCatalogId } from "@/data/anime";
 import { YUBERA_XP_REWARDS, YUBERA_XP_RULES } from "@/data/yubera-config";
 type S={bind(...v:unknown[]):S;first<T=Record<string,unknown>>():Promise<T|null>;run():Promise<{meta?:{changes?:number}}>} ;
 type DB={prepare(sql:string):S;batch?:(statements:S[])=>Promise<Array<{meta?:{changes?:number}}>>};
@@ -21,7 +22,7 @@ export async function handleYuberaEpisodeWatch(r:Request):Promise<Response>{
  if(!body||typeof body!=="object"||Array.isArray(body))return json({error:"invalid_request"},400);const x=body as Record<string,unknown>,now=Date.now();
  if(x.action==="start"){
   const animeId=typeof x.animeId==="string"?x.animeId:"",episode=Number(x.episodeNumber),duration=Number(x.durationSeconds),position=Number(x.currentTime);
-  if(!/^\d{1,12}$/.test(animeId)||!Number.isSafeInteger(episode)||episode<1||episode>10000||!finiteNumber(duration)||duration<60||duration>10800||!finiteNumber(position)||position<0||position>duration)return json({error:"invalid_playback_data"},400);
+  if(!isValidAnimeCatalogId(animeId)||!Number.isSafeInteger(episode)||episode<1||episode>10000||!finiteNumber(duration)||duration<60||duration>10800||!finiteNumber(position)||position<0||position>duration)return json({error:"invalid_playback_data"},400);
   let anime: Awaited<ReturnType<typeof getR2Anime>>;
   try{anime=await getR2Anime(animeId);if(!anime)return json({error:"anime_not_found"},404);}catch{return json({error:"catalog_unavailable"},503);}
   const episodeCount=Number(anime.episodes);

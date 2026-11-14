@@ -1,3 +1,5 @@
+import { isValidAnimeCatalogId } from "@/data/anime";
+
 export const ANIME_COMMENT_MAX_LENGTH = 1000;
 export const ANIME_COMMENT_FIRST_PAGE_SIZE = 3;
 export const ANIME_COMMENT_PAGE_SIZE = 20;
@@ -8,7 +10,7 @@ export const ANIME_COMMENT_RETENTION_MS = ANIME_COMMENT_RETENTION_DAYS * 24 * 60
 export type AnimeCommentCursor = { createdAt: string; id: string };
 
 export function isValidAnimeCommentId(value: unknown): value is string {
-  return typeof value === "string" && /^\d{1,12}$/.test(value);
+  return isValidAnimeCatalogId(value);
 }
 
 export function normalizeCommentText(value: unknown): string | null {

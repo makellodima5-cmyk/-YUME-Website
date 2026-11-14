@@ -44,13 +44,14 @@ describe("global home featured candidates", () => {
     expect(isHomeFeaturedEligible(oldReleased, now)).toBe(false);
   });
 
-  it("accepts ordinary numeric Shikimori IDs and rejects non-numeric IDs", () => {
+  it("accepts Shikimori and Kodik catalogue IDs and rejects unrelated non-numeric IDs", () => {
     const result = rankFeaturedCandidates([
       candidate("37141", 9.7),
       candidate("5114", 9.6),
-      candidate("not-a-shikimori-id", 10),
+      candidate("kodik-serial-12345", 9.8),
+      candidate("not-a-catalogue-id", 10),
     ]);
-    expect(result.map((item) => item.id)).toEqual(["37141", "5114"]);
+    expect(result.map((item) => item.id)).toEqual(["kodik-serial-12345", "37141", "5114"]);
   });
 
   it("returns only the available number of titles and no placeholder entries", () => {

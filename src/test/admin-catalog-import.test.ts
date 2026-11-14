@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { adminCatalogImportNextResumeAt, adminCatalogImportPageOperationId, adminCatalogImportResumeCursor, adminCatalogImportShouldResumeCounters, chunkAdminCatalogIds, isCatalogMetadataIncomplete, mapAdminCatalogScreenshots, normalizeAdminCatalogIds, isValidAdminImportTarget } from "@/data/admin-catalog-import.server";
+import { adminCatalogImportNextResumeAt, adminCatalogImportPageOperationId, adminCatalogImportResumeCursor, adminCatalogImportShouldResumeCounters, chunkAdminCatalogIds, isCatalogMetadataIncomplete, mapAdminCatalogScreenshots, normalizeAdminCatalogIds, isValidAdminImportTarget, normalizeKodikCatalogResults } from "@/data/admin-catalog-import.server";
 
 describe("admin catalog import target", () => {
   it("accepts targets above the old 500-title application cap", () => {
@@ -15,8 +15,8 @@ describe("admin catalog import target", () => {
 
 describe("admin catalog ID normalization", () => {
   it("accepts numeric IDs, removes duplicates, and ignores malformed IDs", () => {
-    expect(normalizeAdminCatalogIds(["42", "42", "123", "../other-user", "x".repeat(21), 7, null]))
-      .toEqual(["42", "123"]);
+    expect(normalizeAdminCatalogIds(["42", "42", "123", "kodik-serial-12345", "../other-user", "x".repeat(21), 7, null]))
+      .toEqual(["42", "123", "kodik-serial-12345"]);
   });
 
   it("caps a request to 100 unique numeric IDs", () => {
@@ -143,5 +143,63 @@ describe("bulk import resume counters", () => {
     expect(adminCatalogImportShouldResumeCounters({admin_import_cursor:"12",admin_import_status_filter:"",admin_import_state:"completed"}, "")).toBe(false);
     expect(adminCatalogImportShouldResumeCounters({admin_import_cursor:"12",admin_import_status_filter:"ongoing",admin_import_state:"paused"}, "released")).toBe(false);
     expect(adminCatalogImportShouldResumeCounters({admin_import_cursor:"1",admin_import_status_filter:"",admin_import_state:"paused"}, "")).toBe(false);
+  });
+});
+
+
+describe("Kodik catalogue import mapping", () => {
+  it("maps the available Kodik metadata and screenshot URLs into a catalogue candidate", () => {
+    const result = normalizeKodikCatalogResults([{
+      id: "serial-12345", type: "anime-serial", title: "Example", title_orig: "Example Original",
+      shikimori_id: 123, year: 2021, screenshots: ["https://images.example/screenshot.jpg"],
+      material_data: {
+        anime_title: "Пример", anime_title_en: "Example", year: 2021,
+        anime_poster_url: "https://images.example/poster.jpg",
+        anime_description: "A description", anime_genres: ["Драма", "Фэнтези"],
+        anime_studios: ["Studio"], anime_kind: "tv", episodes_total: 12, episodes_aired: 8,
+        shikimori_rating: 8.4, minimal_age: 12,
+      },
+    }], []);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      id: "123", kodikId: "serial-12345", shikimoriId: "123",
+      title: "Пример", englishTitle: "Example", originalTitle: "Example Original",
+      year: 2021, kind: "TV", posterUrl: "https://images.example/poster.jpg",
+      description: "A description", genres: ["Драма", "Фэнтези"], studios: ["Studio"],
+      episodes: 12, episodesAired: 8, rating: 8.4, ageRating: "12+",
+      screenshots: [{ originalUrl: "https://images.example/screenshot.jpg" }],
+    });
+  });
+
+  it("uses a safe prefixed catalogue ID when Kodik does not return a Shikimori ID", () => {
+    const result = normalizeKodikCatalogResults([{
+      id: "movie-9988", type: "anime", title: "Movie",
+      material_data: { anime_title: "Movie", title_orig: "Movie Original" },
+    }], []);
+    expect(result[0]?.id).toBe("kodik-movie-9988");
+    expect(result[0]?.shikimoriId).toBeNull();
+  });
+
+  it("deduplicates identical Kodik IDs and flags title collisions for manual confirmation", () => {
+    const duplicateRows = [
+      { id: "serial-1", type: "anime-serial", title: "Title", material_data: { anime_title: "Title" } },
+      { id: "serial-1", type: "anime-serial", title: "Title", material_data: { anime_title: "Title" } },
+    ];
+    expect(normalizeKodikCatalogResults(duplicateRows, [])).toHaveLength(1);
+    const collision = normalizeKodikCatalogResults([{
+      id: "serial-2", type: "anime-serial", title: "Title", year: 2021,
+      material_data: { anime_title: "Title", year: 2021, anime_kind: "tv" },
+    }], [{ id: "7", title: "Title", original: "Title", year: 2021, kind: "TV" } as import("@/data/anime").Anime]);
+    expect(collision[0]?.alreadyInCatalog).toBe(false);
+    expect(collision[0]?.possibleDuplicateTitle).toBe("Title");
+  });
+
+  it("blocks a duplicate Shikimori identity and rejects malformed Kodik material IDs", () => {
+    const duplicate = normalizeKodikCatalogResults([{
+      id: "serial-7", shikimori_id: "42", type: "anime-serial", title: "Title",
+      material_data: { anime_title: "Title" },
+    }], [{ id: "42" } as import("@/data/anime").Anime]);
+    expect(duplicate[0]?.alreadyInCatalog).toBe(true);
+    expect(normalizeKodikCatalogResults([{ id: "../bad", title: "Bad" }], [])).toEqual([]);
   });
 });

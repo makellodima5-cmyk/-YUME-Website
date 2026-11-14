@@ -1,4 +1,5 @@
 import { env as cloudflareEnv } from "cloudflare:workers";
+import { isValidAnimeCatalogId } from "@/data/anime";
 import { ensureTelegramLibrarySyncSchema } from "@/data/telegram-library-schema.server";
 import { validateTelegramInitData, type TelegramValidatedUser } from "@/data/telegram-init-data";
 import { MAX_SAVED_ANIME_IDS, normalizeSavedAnimeIds } from "@/data/telegram-library.shared";
@@ -283,7 +284,7 @@ export async function handleTelegramLibrary(request: Request): Promise<Response>
     const animeId = input?.animeId;
     const saved = input?.saved;
     if ((listType !== "favorite" && listType !== "watchlist") ||
-        typeof animeId !== "string" || !/^\d{1,12}$/.test(animeId) ||
+        !isValidAnimeCatalogId(animeId) ||
         typeof saved !== "boolean") {
       return jsonResponse({ error: "invalid_library_item" }, 400);
     }
@@ -561,7 +562,7 @@ export async function handleTelegramHistory(request: Request): Promise<Response>
       return jsonResponse({ error: "invalid_request" }, 400);
     }
     const animeId = input.animeId;
-    if (typeof animeId !== "string" || !/^\d{1,12}$/.test(animeId)) return jsonResponse({ error: "invalid_anime_id" }, 400);
+    if (!isValidAnimeCatalogId(animeId)) return jsonResponse({ error: "invalid_anime_id" }, 400);
     if (request.method === "DELETE") {
       const current = await db.prepare("SELECT payload_json, updated_at_epoch_ms FROM yume_library_sync_items WHERE user_id = ? AND item_type = 'progress' AND anime_id = ?")
         .bind(userId, animeId).first<{ payload_json: string; updated_at_epoch_ms: number }>();

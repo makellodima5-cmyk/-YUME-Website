@@ -1,5 +1,6 @@
 import { env as cloudflareEnv } from "cloudflare:workers";
 import { ensureTelegramLibrarySyncSchema } from "@/data/telegram-library-schema.server";
+import { isValidAnimeCatalogId } from "@/data/anime";
 import { isSameOriginRequest } from "@/lib/request-security";
 
 type Env = Record<string, unknown> & { YUME_DB?: unknown; YUME_AUTH_SESSION_SECRET?: string };
@@ -103,7 +104,7 @@ export function normalizeTelegramLibrarySyncItems(value: unknown): SyncItem[] | 
     const deleted = item.deleted;
     const sourceId = item.sourceId;
     if ((type !== "favorite" && type !== "watchlist" && type !== "subscription" && type !== "progress") ||
-        typeof animeId !== "string" || !/^\d{1,12}$/.test(animeId) ||
+        !isValidAnimeCatalogId(animeId) ||
         !payload || typeof payload !== "object" || Array.isArray(payload) ||
         typeof updatedAt !== "number" || !Number.isSafeInteger(updatedAt) || updatedAt < 0 || updatedAt > Date.now() + 300_000 ||
         typeof deleted !== "boolean" ||

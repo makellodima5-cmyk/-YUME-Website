@@ -1,5 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
-import { applyCatalogMutation, CATALOG_CURRENT_KEY, CATALOG_REVISION_PREFIX, emptyCatalogState, isCatalogRevisionPinned, type CatalogMutation, type CatalogPointer, type CatalogState } from "@/data/catalog-r2.shared";
+import { applyCatalogMutation, CATALOG_CURRENT_KEY, CATALOG_REVISION_PREFIX, emptyCatalogState, isCatalogRevisionPinned, isValidCatalogAnimeId, type CatalogMutation, type CatalogPointer, type CatalogState } from "@/data/catalog-r2.shared";
 import { deleteCatalogSnapshotCacheRevision, pruneCatalogSnapshotCache, publishCatalogSnapshotCachePointer, readCatalogAdminCachePointer, readCatalogCachePointer, writeCatalogAdminSnapshotCache } from "@/data/catalog-kv-cache.shared";
 import type { Anime } from "@/data/anime";
 import { isHomeFeaturedEligible } from "@/data/home-featured.shared";
@@ -15,10 +15,10 @@ const FEATURED_RETRY_MS = 5 * 60 * 1000;
 function validMutation(value:unknown):value is CatalogMutation {
   if(!value||typeof value!=="object")return false;
   const mutation=value as Record<string,unknown>;
-  if(mutation.type==="upsert"||mutation.type==="replace")return Array.isArray(mutation.items)&&mutation.items.length<=100&&mutation.items.every(item=>Boolean(item)&&typeof item==="object"&&/^\d{1,20}$/.test(item.id)&&typeof item.title==="string"&&item.title.length<=500);
-  if(mutation.type==="delete"||mutation.type==="restore")return Array.isArray(mutation.animeIds)&&mutation.animeIds.length<=500&&mutation.animeIds.every(id=>typeof id==="string"&&/^\d{1,20}$/.test(id))&&(!("titles" in mutation)||Boolean(mutation.titles)&&Object.entries(mutation.titles??{}).every(([id,title])=>/^\d{1,20}$/.test(id)&&typeof title==="string"&&title.length<=500));
+  if(mutation.type==="upsert"||mutation.type==="replace")return Array.isArray(mutation.items)&&mutation.items.length<=100&&mutation.items.every(item=>Boolean(item)&&typeof item==="object"&&isValidCatalogAnimeId(item.id)&&typeof item.title==="string"&&item.title.length<=500);
+  if(mutation.type==="delete"||mutation.type==="restore")return Array.isArray(mutation.animeIds)&&mutation.animeIds.length<=500&&mutation.animeIds.every(id=>isValidCatalogAnimeId(id))&&(!("titles" in mutation)||Boolean(mutation.titles)&&Object.entries(mutation.titles??{}).every(([id,title])=>isValidCatalogAnimeId(id)&&typeof title==="string"&&title.length<=500));
   if(mutation.type==="metadata")return !!mutation.values&&typeof mutation.values==="object"&&!Array.isArray(mutation.values)&&Object.entries(mutation.values).length<=100&&Object.entries(mutation.values).every(([key,value])=>/^[A-Za-z0-9:_-]{1,200}$/.test(key)&&typeof value==="string"&&value.length<=256000)&&(!mutation.deleteKeys||(Array.isArray(mutation.deleteKeys)&&mutation.deleteKeys.length<=100&&mutation.deleteKeys.every(key=>typeof key==="string"&&/^[A-Za-z0-9:_-]{1,200}$/.test(key))));
-  if(mutation.type==="screenshots")return typeof mutation.animeId==="string"&&/^\d{1,20}$/.test(mutation.animeId)&&Array.isArray(mutation.items)&&mutation.items.length<=100&&mutation.items.every(item=>{try{return Number.isSafeInteger(item.position)&&[item.originalUrl,item.previewUrl].every(value=>{const url=new URL(value);return (url.protocol==="https:"||url.protocol==="http:")&&value.length<=2048;});}catch{return false;}});
+  if(mutation.type==="screenshots")return isValidCatalogAnimeId(mutation.animeId)&&Array.isArray(mutation.items)&&mutation.items.length<=100&&mutation.items.every(item=>{try{return Number.isSafeInteger(item.position)&&[item.originalUrl,item.previewUrl].every(value=>{const url=new URL(value);return (url.protocol==="https:"||url.protocol==="http:")&&value.length<=2048;});}catch{return false;}});
   if(mutation.type==="batch")return Array.isArray(mutation.mutations)&&mutation.mutations.length>0&&mutation.mutations.length<=100&&mutation.mutations.every(validMutation)&&!mutation.mutations.some(item=>item.type==="batch");
   return false;
 }

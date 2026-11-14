@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyCatalogMutation, emptyCatalogState, isCatalogRevisionPinned } from "@/data/catalog-r2.shared";
+import { applyCatalogMutation, emptyCatalogState, isCatalogRevisionPinned, isValidCatalogAnimeId } from "@/data/catalog-r2.shared";
 import type { Anime } from "@/data/anime";
 
 const anime=(id:string,title="Title"):Anime=>({id,title,original:title,year:2024,episodes:12,episodesAired:0,rating:8,genres:["Драма"],status:"Онгоинг",description:"",hue:120,glyph:"A"});
@@ -41,5 +41,21 @@ describe("catalogue revision retention",()=>{
     expect(isCatalogRevisionPinned(11,12,14)).toBe(false);
     expect(isCatalogRevisionPinned(12,null,14)).toBe(false);
     expect(isCatalogRevisionPinned(0,0,0)).toBe(false);
+  });
+});
+
+describe("catalogue record IDs", () => {
+  it("accepts existing numeric IDs and stable Kodik-only anime IDs", () => {
+    expect(isValidCatalogAnimeId("123")).toBe(true);
+    expect(isValidCatalogAnimeId("12345678901234567890")).toBe(true);
+    expect(isValidCatalogAnimeId("kodik-serial-12345")).toBe(true);
+    expect(isValidCatalogAnimeId("kodik-movie-987654")).toBe(true);
+  });
+
+  it("rejects malformed and unsupported provider IDs", () => {
+    expect(isValidCatalogAnimeId("kodik-serial-nope")).toBe(false);
+    expect(isValidCatalogAnimeId("kodik-series-123")).toBe(false);
+    expect(isValidCatalogAnimeId("../catalog")).toBe(false);
+    expect(isValidCatalogAnimeId("")).toBe(false);
   });
 });
