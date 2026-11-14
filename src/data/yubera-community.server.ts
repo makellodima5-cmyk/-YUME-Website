@@ -217,7 +217,7 @@ export async function handleYuberaCommunity(request: Request): Promise<Response>
   const database = db();
   if (!database) return json({ error: "database_unavailable" }, 503);
   const userId = await getAuthenticatedYumeUserId(request);
-  const adminCheck = userId ? await isCurrentTelegramAdmin(request) : false;
+  const adminCheck = await isCurrentTelegramAdmin(request);
   const url = new URL(request.url);
   if (request.method === "GET") {
     const action = url.searchParams.get("action") ?? "me";
@@ -231,7 +231,7 @@ export async function handleYuberaCommunity(request: Request): Promise<Response>
     if (action === "profile") {
       const target = url.searchParams.get("userId") ?? "";
       if (!target || target.length > 128) return json({ error: "invalid_user" }, 400);
-      const profile = await profileSummary(database, target, userId, false);
+      const profile = await profileSummary(database, target, userId, adminCheck);
       if (!profile) return json({ error: "not_found" }, 404);
       if ("private" in profile && profile.private) return json({ error: "profile_private" }, 403);
       const collections = await collectionsFor(database, target, userId ?? "", false);
