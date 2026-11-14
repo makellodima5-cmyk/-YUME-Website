@@ -41,6 +41,7 @@ import { UserAnimeRating } from "@/components/yume/UserAnimeRating";
 import { AnimeEpisodeSubscription } from "@/components/yume/AnimeEpisodeSubscription";
 import { AnimeComments } from "@/components/yume/AnimeComments";
 import { canReturnToAnimeOrigin } from "@/data/anime-navigation";
+import { shouldTreatEpisodeSubscriptionAsActive } from "@/data/anime-subscription-state";
 
 function formatAnimeDate(value: string | undefined, language: "ru" | "en", includeTime = false): string | null {
   if (!value) return null;
@@ -155,7 +156,12 @@ function AnimeDetailPage() {
     fetch("/api/anime-subscriptions", { credentials: "same-origin", cache: "no-store" })
       .then(async response => {
         const payload = await response.json().catch(() => ({})) as { subscriptions?: string[]; subscriptionSelections?: Record<string,{translationId?:string;translationTitle?:string}> };
-        if (!cancelled && response.ok) { setEpisodeSubscribed(Array.isArray(payload.subscriptions) && payload.subscriptions.includes(anime.id)); setEpisodeSubscribedVoiceover(payload.subscriptionSelections?.[anime.id]?.translationTitle ?? ""); }
+        if (!cancelled && response.ok) {
+          const voiceoverTitle = payload.subscriptionSelections?.[anime.id]?.translationTitle ?? "";
+          const hasSubscription = Array.isArray(payload.subscriptions) && payload.subscriptions.includes(anime.id);
+          setEpisodeSubscribed(hasSubscription && shouldTreatEpisodeSubscriptionAsActive(anime, voiceoverTitle));
+          setEpisodeSubscribedVoiceover(voiceoverTitle);
+        }
       })
       .catch(() => undefined);
     return () => { cancelled = true; };
