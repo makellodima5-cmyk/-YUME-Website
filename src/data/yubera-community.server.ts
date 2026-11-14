@@ -324,7 +324,8 @@ export async function handleYuberaCommunity(request: Request): Promise<Response>
     const visibility = input.visibility === "public" ? "public" : input.visibility === "private" ? "private" : null;
     if (bio.length > 250 || !visibility) return json({ error: "invalid_profile" }, 400);
     const plus = await plusActive(database, userId);
-    const adminCheck = await isCurrentTelegramAdmin(request);
+    // Reuse the server-verified Telegram admin identity computed for this request.
+    // Do not introduce a second checker or trust client-supplied role data.
     const frame = input.avatarFrame === null ? null : isAdminFrame(input.avatarFrame) ? input.avatarFrame : profileAssetFrame(input.avatarFrame);
     if (input.avatarFrame !== null && !frame) return json({ error: "invalid_avatar_frame" }, 400);
     if (frame && isAdminFrame(frame) && !adminCheck) return json({ error: "admin_frame_forbidden" }, 403);
