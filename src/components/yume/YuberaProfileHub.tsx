@@ -689,7 +689,7 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
             <div aria-hidden="true" className="pointer-events-none absolute -right-7 -top-5 opacity-[.12]"><img src="/images/yubera/yubera_logo.webp" alt="" className="h-36 w-36 object-contain"/></div>
             <div className="relative flex min-w-0 items-center gap-3">
               <div className="grid h-[74px] w-[74px] shrink-0 place-items-center rounded-[19px] bg-[#28272a] text-white/65 shadow-inner">{current.asset ? <img src={`/images/yubera/${current.asset}`} alt="" className="h-[66px] w-[66px] object-contain"/> : <Star className="h-12 w-12" strokeWidth={1.8}/>}</div>
-              <span className="h-[68px] w-px shrink-0 bg-[#ff704f]/90"/>
+              <span className="h-[68px] w-px shrink-0" style={{backgroundColor: currentLevel === 0 ? "#85858d" : accents[currentLevel - 1].line}}/>
               <div className="min-w-0 flex-1"><h2 className="text-[clamp(18px,5vw,24px)] font-extrabold leading-tight text-white">{current.title}</h2><p className="mt-1.5 max-w-[440px] text-[13px] leading-[1.4] text-white/65">Статус присваивается за подтверждённую поддержку проекта в Telegram Stars.</p></div>
             </div>
             <div className="relative mt-5 h-3 overflow-hidden rounded-full bg-[#414147]"><div className="h-full rounded-full bg-gradient-to-r from-[#ff4f35] via-[#ff7547] to-[#ffac58] shadow-[0_0_12px_rgba(255,104,65,.45)] transition-[width]" style={{width:`${progress}%`}}/></div>
