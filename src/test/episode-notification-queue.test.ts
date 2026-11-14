@@ -50,20 +50,14 @@ describe("episode notification Queue", () => {
     }, "123", 7, "Тестовое аниме");
     expect(sent).toEqual(validJob);
     expect(contentType).toBe("json");
+    await enqueueEpisodeNotification({ YUME_WEB_TASKS: { async send(message) { sent = message; } } }, "123", 8, "Тестовое аниме", undefined, "voice-a", "Озвучка A");
+    expect(sent).toMatchObject({ notificationId: "episode-123-voice-a-8", translationId: "voice-a", translationTitle: "Озвучка A" });
   });
 
   it("filters fanout by selected voice-over and per-user baseline", async () => {
     const { database, statements } = createDatabase();
     let acknowledged = false;
     await handleEpisodeNotificationQueue({ messages: [{ body: { type:"episode_notification_fanout", notificationId:"episode-123-a-7", animeId:"123", episodeNumber:7, animeTitle:"Anime", translationId:"a", translationTitle:"Voice A" }, ack(){acknowledged=true}, retry(){} }] }, { YUME_DB: database });
-    expect(acknowledged).toBe(true);
-    expect(statements.some(sql => sql.includes("translation_id=?") && sql.includes("baseline_episode<?"))).toBe(true);
-  });
-
-  it("filters recipients by selected voice-over and the user baseline", async () => {
-    const { database, statements } = createDatabase();
-    let acknowledged = false;
-    await handleEpisodeNotificationQueue({ messages: [{ body: { type:"episode_notification_fanout", notificationId:"episode-123-voice-a-7", animeId:"123", episodeNumber:7, animeTitle:"Anime", translationId:"voice-a", translationTitle:"Озвучка A" }, ack(){acknowledged=true}, retry(){} }] }, { YUME_DB: database });
     expect(acknowledged).toBe(true);
     expect(statements.some(sql => sql.includes("translation_id=?") && sql.includes("baseline_episode<?"))).toBe(true);
   });
