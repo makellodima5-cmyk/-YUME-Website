@@ -312,4 +312,34 @@ describe("YUBERA community foundation", () => {
     expect(panel).toContain("&seed=${recommendationSeed}");
   });
 
+  it("exposes admin badges from server-derived Telegram identity and hides them from visitors", async () => {
+    const server = await readFile(resolve(process.cwd(), "src/data/yubera-community.server.ts"), "utf8");
+    const component = await readFile(resolve(process.cwd(), "src/components/yume/YuberaProfileHub.tsx"), "utf8");
+    expect(server).toContain("async function isTelegramAdministrator(request: Request, env: Environment)");
+    expect(server).toContain("u.telegram_user_id === adminId");
+    expect(server).toContain("availableAdminFrames: isOwner && adminCheck");
+    expect(server).toContain("isAdmin: account.user.telegram_user_id === String((env().TELEGRAM_ADMIN_ID ?? \"\")).trim()");
+    expect(component).toContain("profile.isAdmin &&");
+    expect(component).toContain("publicProfile.isAdmin &&");
+    expect(component).toContain("АДМИН");
+    expect(component).toContain("Admin_Frame_08.webp");
+  });
+
+  it("rejects administrative avatar frames for non-admins on the server", async () => {
+    const server = await readFile(resolve(process.cwd(), "src/data/yubera-community.server.ts"), "utf8");
+    expect(server).toContain("if (frame && isAdminFrame(frame) && !adminCheck) return json({ error: \"admin_frame_forbidden\" }, 403)");
+    expect(server).toContain("isAdminFrame(input.avatarFrame) ? input.avatarFrame : profileAssetFrame(input.avatarFrame)");
+    expect(server).toContain("Admin_Frame_01.webp");
+    expect(server).toContain("Admin_Frame_08.webp");
+  });
+
+  it("keeps admin avatar frames visible in public profiles and restricted in the owner picker", async () => {
+    const server = await readFile(resolve(process.cwd(), "src/data/yubera-community.server.ts"), "utf8");
+    const component = await readFile(resolve(process.cwd(), "src/components/yume/YuberaProfileHub.tsx"), "utf8");
+    expect(server).toContain("avatarFrame: isAdminFrame(account.profile.avatar_frame)");
+    expect(server).toContain("availableAdminFrames: isOwner && adminCheck ? [...ADMIN_FRAME_ASSETS] : []");
+    expect(component).toContain("profile.isAdmin&&(profile.availableAdminFrames??[]).includes(asset)");
+    expect(component).toContain("publicProfile.avatarFrame");
+  });
+
 });
