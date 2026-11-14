@@ -688,42 +688,23 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
           <section className="relative isolate overflow-hidden rounded-[24px] border border-[#ff704f]/85 bg-[linear-gradient(135deg,#211714_0%,#151418_55%,#261512_100%)] p-4 shadow-[0_0_24px_rgba(255,91,59,.18),inset_0_0_28px_rgba(255,100,60,.08)] sm:p-5">
             <div aria-hidden="true" className="pointer-events-none absolute -right-7 -top-5 opacity-[.12]"><img src="/images/yubera/yubera_logo.webp" alt="" className="h-36 w-36 object-contain"/></div>
             <div className="relative flex min-w-0 items-center gap-3">
-              <div className="grid h-[74px] w-[74px] shrink-0 place-items-center rounded-[19px] bg-[#28272a] text-white/65 shadow-inner">
-                {current.asset ? <img src={`/images/yubera/${current.asset}`} alt="" className="h-[66px] w-[66px] object-contain"/> : <Star className="h-12 w-12" strokeWidth={1.8}/>}
-              </div>
+              <div className="grid h-[74px] w-[74px] shrink-0 place-items-center rounded-[19px] bg-[#28272a] text-white/65 shadow-inner">{current.asset ? <img src={`/images/yubera/${current.asset}`} alt="" className="h-[66px] w-[66px] object-contain"/> : <Star className="h-12 w-12" strokeWidth={1.8}/>}</div>
               <span className="h-[68px] w-px shrink-0 bg-[#ff704f]/90"/>
-              <div className="min-w-0 flex-1">
-                <h2 className="text-[clamp(18px,5vw,24px)] font-extrabold leading-tight text-white">{current.title}</h2>
-                <p className="mt-1.5 max-w-[440px] text-[13px] leading-[1.4] text-white/65">Статус присваивается за подтверждённую поддержку проекта в Telegram Stars.</p>
-              </div>
+              <div className="min-w-0 flex-1"><h2 className="text-[clamp(18px,5vw,24px)] font-extrabold leading-tight text-white">{current.title}</h2><p className="mt-1.5 max-w-[440px] text-[13px] leading-[1.4] text-white/65">Статус присваивается за подтверждённую поддержку проекта в Telegram Stars.</p></div>
             </div>
-            <div className="relative mt-5 h-3 overflow-hidden rounded-full bg-[#414147]">
-              <div className="h-full rounded-full bg-gradient-to-r from-[#ff4f35] via-[#ff7547] to-[#ffac58] shadow-[0_0_12px_rgba(255,104,65,.45)] transition-[width]" style={{ width: `${progress}%` }}/>
-            </div>
+            <div className="relative mt-5 h-3 overflow-hidden rounded-full bg-[#414147]"><div className="h-full rounded-full bg-gradient-to-r from-[#ff4f35] via-[#ff7547] to-[#ffac58] shadow-[0_0_12px_rgba(255,104,65,.45)] transition-[width]" style={{width:`${progress}%`}}/></div>
             <p className="relative mt-2 text-center text-[13px] font-medium text-white/65">{next ? <>До следующего статуса: {remaining.toLocaleString("ru-RU")} ⭐</> : "Достигнут высший статус поддержки"}</p>
             <p className="relative mt-1 text-center text-[11px] text-white/40">Подтверждено: {total.toLocaleString("ru-RU")} ⭐</p>
           </section>
-          {YUBERA_SUPPORT_LEVELS.filter(level => level.level > 0).map((level) => {
+          {YUBERA_SUPPORT_LEVELS.filter(level => level.level > 0).map(level => {
             const tone = accents[level.level - 1];
+            const href = `?section=support&support=1&targetLevel=${level.level}&targetStars=${level.min}`;
             const reached = currentLevel >= level.level;
-            return <a key={level.level} href={`?section=support&${new URLSearchParams({ support: "1", targetLevel: String(level.level), targetStars: String(level.min) }).toString()}`}
-              onClick={(event) => {
-                event.preventDefault();
-                const url = new URL(window.location.href);
-                url.searchParams.set("section", "support");
-                url.searchParams.set("support", "1");
-                url.searchParams.set("targetLevel", String(level.level));
-                url.searchParams.set("targetStars", String(level.min));
-                window.history.pushState({}, "", url);
-                window.dispatchEvent(new PopStateEvent("popstate"));
-              }} aria-label={`${level.level}. ${level.title}, от ${level.min.toLocaleString("ru-RU")} Stars. Перейти к поддержке`} className="group relative isolate flex min-h-[108px] min-w-0 items-center gap-3 overflow-hidden rounded-[23px] border px-3 py-3 shadow-[0_0_18px_var(--support-glow)] transition-transform active:scale-[.99] sm:min-h-[116px] sm:px-4" style={{ borderColor: tone.border + "88", background: `radial-gradient(ellipse at 92% 100%, ${tone.fill}, transparent 58%),linear-gradient(110deg,#1b1b21 0%,#15161c 68%,#211a1c 100%)`, boxShadow: `0 0 17px ${tone.glow}, inset 0 -18px 34px ${tone.fill}` }}>
-              <span aria-hidden="true" className="pointer-events-none absolute -bottom-10 -right-5 h-24 w-44 rotate-[-12deg] rounded-[50%] border-t-2 opacity-50" style={{ borderColor: tone.border, boxShadow: `0 -7px 19px ${tone.glow}` }}/>
+            return <a key={level.level} href={href} aria-label={`${level.level}. ${level.title}, от ${level.min.toLocaleString("ru-RU")} Stars. Перейти к поддержке`} className="group relative isolate flex min-h-[108px] min-w-0 items-center gap-3 overflow-hidden rounded-[23px] border px-3 py-3 transition-transform active:scale-[.99] sm:min-h-[116px] sm:px-4" style={{borderColor:tone.border+"88",background:`radial-gradient(ellipse at 92% 100%, ${tone.fill}, transparent 58%),linear-gradient(110deg,#1b1b21 0%,#15161c 68%,#211a1c 100%)`,boxShadow:`0 0 17px ${tone.glow},inset 0 -18px 34px ${tone.fill}`}}>
+              <span aria-hidden="true" className="pointer-events-none absolute -bottom-10 -right-5 h-24 w-44 rotate-[-12deg] rounded-[50%] border-t-2 opacity-50" style={{borderColor:tone.border,boxShadow:`0 -7px 19px ${tone.glow}`}}/>
               <img src={`/images/yubera/${level.asset}`} alt="" className="relative z-10 h-[76px] w-[76px] shrink-0 object-contain sm:h-[84px] sm:w-[84px]"/>
-              <span aria-hidden="true" className="relative z-10 h-[66px] w-px shrink-0" style={{ backgroundColor: tone.line }}/>
-              <span className="relative z-10 min-w-0 flex-1">
-                <b className="block whitespace-nowrap text-[clamp(14px,4.25vw,20px)] font-extrabold leading-tight text-white">{level.level}. {level.title}</b>
-                <span className="mt-1.5 block whitespace-nowrap text-[clamp(12px,3.6vw,16px)] text-white/65">От {level.min.toLocaleString("ru-RU")} ⭐</span>
-              </span>
+              <span aria-hidden="true" className="relative z-10 h-[66px] w-px shrink-0" style={{backgroundColor:tone.line}}/>
+              <span className="relative z-10 min-w-0 flex-1"><b className="block whitespace-nowrap text-[clamp(14px,4.25vw,20px)] font-extrabold leading-tight text-white">{level.level}. {level.title}</b><span className="mt-1.5 block whitespace-nowrap text-[clamp(12px,3.6vw,16px)] text-white/65">От {level.min.toLocaleString("ru-RU")} ⭐</span></span>
               <ChevronRight className="relative z-10 h-6 w-6 shrink-0 text-white/75 transition-transform group-hover:translate-x-0.5"/>
               {reached && <span className="sr-only">Статус уже достигнут</span>}
             </a>;
