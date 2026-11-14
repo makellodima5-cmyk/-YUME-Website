@@ -346,5 +346,15 @@ describe("YUBERA community foundation", () => {
     expect(profile).not.toContain("isAdmin={isAdmin}");
   });
 
+  it("reuses the request's verified Telegram admin identity when saving profile frames", async () => {
+    const server = await readFile(resolve(process.cwd(), "src/data/yubera-community.server.ts"), "utf8");
+    expect(server).toContain("const adminCheck = await hasTelegramAdminIdentity(request)");
+    expect(server).toContain('if (frame && isAdminFrame(frame) && !adminCheck) return json({ error: "admin_frame_forbidden" }, 403)');
+    expect(server).not.toContain("isCurrentTelegramAdmin");
+    const updateStart = server.indexOf('if (action === "profile.update")');
+    const updateEnd = server.indexOf('if (action === "follow")', updateStart);
+    const update = server.slice(updateStart, updateEnd);
+    expect(update).toContain("!adminCheck");
+  });
 
 });
