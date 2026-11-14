@@ -40,12 +40,14 @@ export async function runScheduledEpisodeNotifications(input: unknown): Promise<
   const db = bindings.YUME_DB;
   if (!db || typeof db.prepare !== "function") throw new Error("Episode notification cron has no YUME_DB binding.");
 
+  // NULL translation_id rows are pre-feature subscriptions. Keep their old
+  // all-voiceovers behaviour instead of silently dropping existing users.
   const rows = await db.prepare(
-    "SELECT s.anime_id,s.translation_id,MAX(s.translation_title) AS translation_title,src.last_episode AS source_last_episode,MAX(s.baseline_episode) AS baseline_episode FROM yume_anime_subscriptions s LEFT JOIN yume_kodik_episode_sources src ON src.anime_id=s.anime_id AND src.translation_id=s.translation_id WHERE s.active=1 AND s.translation_id IS NOT NULL GROUP BY s.anime_id,s.translation_id,src.last_episode ORDER BY s.anime_id,s.translation_id",
+    "SELECT s.anime_id,COALESCE(s.translation_id,'__legacy__') AS translation_id,MAX(s.translation_title) AS translation_title,src.last_episode AS source_last_episode,MAX(s.baseline_episode) AS baseline_episode FROM yume_anime_subscriptions s LEFT JOIN yume_kodik_episode_sources src ON src.anime_id=s.anime_id AND src.translation_id=COALESCE(s.translation_id,'__legacy__') WHERE s.active=1 GROUP BY s.anime_id,COALESCE(s.translation_id,'__legacy__'),src.last_episode ORDER BY s.anime_id,translation_id",
   ).all<Sub>();
   const subscriptions = rows.results.filter((row) =>
-    /^\d{1,20}$/.test(String(row.anime_id)) &&
-    row.translation_id !== null && /^[A-Za-z0-9_-]{1,64}$/.test(String(row.translation_id))
+    /^\\d{1,20}$/.test(String(row.anime_id)) &&
+    (row.translation_id === LEGACY_SOURCE_ID || /^[A-Za-z0-9_-]{1,64}$/.test(String(row.translation_id)))
   );
   if (!subscriptions.length) return;
 
@@ -71,8 +73,16 @@ export async function runScheduledEpisodeNotifications(input: unknown): Promise<
         const animeTitle = anime?.title || "Аниме " + animeId;
         const posterUrl = poster(anime?.posterUrl);
         for (const subscription of selected) {
-          const source = sources.find((item) => item.id === subscription.translation_id);
+          const isLegacy = subscription.translation_id === LEGACY_SOURCE_ID;
+          const source = isLegacy
+            ? {
+                id: LEGACY_SOURCE_ID,
+                title: "Kodik — все озвучки",
+                episodes: [...new Set(sources.flatMap((item) => item.episodes))].sort((a, b) => a - b),
+              }
+            : sources.find((item) => item.id === subscription.translation_id);
           if (!source) continue;
+          if (isLegacy && !sources.length) throw new Error("Kodik returned no sources for a legacy subscription.");
           const stored = subscription.source_last_episode;
           const known = stored !== null && Number.isFinite(Number(stored));
           const baseline = known
@@ -82,8 +92,8 @@ export async function runScheduledEpisodeNotifications(input: unknown): Promise<
           for (const episodeNumber of added) {
             await enqueueEpisodeNotification(
               bindings, animeId, episodeNumber, animeTitle, posterUrl,
-              subscription.translation_id,
-              source.title,
+              isLegacy ? undefined : subscription.translation_id,
+              isLegacy ? undefined : source.title,
             );
           }
           const lastEpisode = Math.max(baseline, source.episodes.length ? Math.max(...source.episodes) : baseline);
