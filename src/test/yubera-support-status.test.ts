@@ -7,8 +7,8 @@ describe("YUBERA support status tiers", () => {
     expect(YUBERA_SUPPORT_LEVELS.slice(1).map(({ asset }) => asset)).toEqual([
       "YUBERA_Status_01_Soyuznik.webp",
       "YUBERA_Status_02_Storonnik.webp",
-      "YUBERA_Status_03_Predanniy_Uchastnik.webp",
-      "YUBERA_Status_04_Pochetnyy_Pokrovitel.webp",
+      "YUBERA_Status_03_Predannyi_Uchastnik.webp",
+      "YUBERA_Status_04_Pochetnyi_Pokrovitel.webp",
       "YUBERA_Support_Status_05_Legend.webp",
     ]);
   });
