@@ -10,7 +10,7 @@ import { YUBERA_SUPPORT_LEVELS, YUBERA_XP_LEVELS, YUBERA_XP_REWARDS, YUBERA_XP_R
 type Screen = "home" | "edit" | "collections" | "collection-detail" | "create" | "edit-collection" | "friends" | "level" | "support-status" | "plus" | "public-profile" | "public-collections";
 type ProfileData = {
   id: string; displayName: string; username: string | null; photoUrl: string | null; bio: string;
-  avatarFrame: string | null; availableSupportFrames?: string[]; visibility: "public" | "private"; isPlus: boolean; isFollowing?: boolean;
+  avatarFrame: string | null; availableSupportFrames?: string[]; availableAdminFrames?: string[]; isAdmin: boolean; visibility: "public" | "private"; isPlus: boolean; isFollowing?: boolean;
   followers: number; following: number; publicCollections: number; publicTitles: number; collectionLikes: number;
   xp: { total?: number; level: number; title: string; nextLevel?: number | null; nextTitle?: string | null; nextThreshold?: number | null; progress?: number; remaining?: number };
   support: { level: number; title: string; asset: string | null; total?: number; nextThreshold?: number | null; progress?: number; remaining?: number };
@@ -33,6 +33,7 @@ const levels = YUBERA_XP_LEVELS.map(({ title, min, max }) => [
   title,
   max === null ? `${min.toLocaleString("ru-RU")}+ XP` : `${min.toLocaleString("ru-RU")}–${max.toLocaleString("ru-RU")} XP`,
 ] as const);
+const adminFrameOptions = ["Admin_Frame_01.webp","Admin_Frame_02.webp","Admin_Frame_03.webp","Admin_Frame_04.webp","Admin_Frame_05.webp","Admin_Frame_06.webp","Admin_Frame_07.webp","Admin_Frame_08.webp"] as const;
 const supportFrameOptions = [
   ["YUBERA_Contribution_Avatar_Frame_01_Soyuznik.webp.webp", "Союзник"],
   ["YUBERA_Contribution_Avatar_Frame_02_Storonnik.webp.webp", "Сторонник"],
@@ -76,7 +77,7 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
   const [bioSheet, setBioSheet] = useState<{ title: string; bio: string } | null>(null);
   const [visibility, setVisibility] = useState<"public" | "private">("private");
   const [frame, setFrame] = useState<string | null>(null);
-  const [frameCategory, setFrameCategory] = useState<"support" | "plus">("support");
+  const [frameCategory, setFrameCategory] = useState<"support" | "plus" | "admin">("support");
   const [profileFormInitial, setProfileFormInitial] = useState<ProfileFormSnapshot>({ bio: "", visibility: "private", frame: null });
   const [discardProfileOpen, setDiscardProfileOpen] = useState(false);
   const [title, setTitle] = useState("");
@@ -394,9 +395,10 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
           <div className="absolute inset-x-2 bottom-2 flex items-end gap-2">
             <div className="shrink-0">{avatar(profile, "h-[72px] w-[72px]")}</div>
             <div className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto] grid-rows-[auto_auto] items-center gap-x-2">
-              <div className="col-span-2 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-                <h2 className="min-w-0 whitespace-normal break-words text-[clamp(18px,4.6vw,22px)] font-bold leading-tight">{profile.displayName}</h2>
-                {profile.isPlus && <span className="inline-flex shrink-0 items-center gap-0.5 whitespace-nowrap rounded-full border border-[#ffc66d]/55 bg-[#ffc66d]/10 px-1.5 py-0.5 text-[10px] font-bold leading-none text-[#ffc66d]"><Crown className="h-[18px] w-[18px] shrink-0" strokeWidth={2.75} />Plus</span>}
+              <div className="col-span-2 flex min-w-0 flex-nowrap items-center gap-x-1.5">
+                <h2 className="min-w-0 whitespace-nowrap text-[clamp(15px,3.9vw,22px)] font-bold leading-tight">{profile.displayName}</h2>
+                {profile.isAdmin && <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-[#ff6347]/65 bg-[#281714]/90 px-1.5 py-1 text-[9px] font-bold leading-none text-[#ff6847]"><ShieldCheck className="h-3.5 w-3.5 shrink-0"/>АДМИН</span>}
+                {profile.isPlus && <span className="inline-flex shrink-0 items-center gap-0.5 whitespace-nowrap rounded-full border border-[#ffc66d]/55 bg-[#ffc66d]/10 px-1.5 py-1 text-[9px] font-bold leading-none text-[#ffc66d]"><Crown className="h-4 w-4 shrink-0" strokeWidth={2.75}/>Plus</span>}
               </div>
               <div className="min-w-0 self-start">
                 {profile.username && <p className="whitespace-normal break-words text-[13px] leading-tight text-white/75">@{profile.username}</p>}
@@ -475,16 +477,17 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
         </YuberaCard>
         <YuberaCard className="p-4 sm:p-5">
           <div className="mb-3 flex items-start gap-3"><ImageIcon className="mt-0.5 h-8 w-8 shrink-0 text-[#FF5738]"/><div className="min-w-0"><h3 className="text-base font-bold sm:text-lg">Рамка аватара</h3><p className="mt-1 text-sm text-white/55">Выберите рамку для своего аватара.</p></div></div>
-          <div className="mb-3 grid grid-cols-2 rounded-full border border-white/15 bg-black/20 p-1">
+          <div className={`mb-3 grid ${profile.isAdmin?"grid-cols-3":"grid-cols-2"} rounded-full border border-white/15 bg-black/20 p-1`}>
             <button type="button" aria-pressed={frameCategory==="support"} onClick={()=>setFrameCategory("support")} className={"flex min-h-11 items-center justify-center gap-2 rounded-full px-2 text-xs font-semibold transition-all duration-200 sm:text-sm "+(frameCategory==="support"?"border border-[#FF704F] bg-[#FF5738]/15 text-white shadow-[0_0_14px_rgba(255,87,56,0.12)]":"text-white/50")}><Star className={"h-5 w-5 "+(frameCategory==="support"?"fill-[#FF5738] text-[#FF704F]":"")}/>За поддержку</button>
             <button type="button" aria-pressed={frameCategory==="plus"} onClick={()=>setFrameCategory("plus")} className={"flex min-h-11 items-center justify-center gap-2 rounded-full px-2 text-xs font-semibold transition-all duration-200 sm:text-sm "+(frameCategory==="plus"?"border border-[#FF704F] bg-[#FF5738]/15 text-white shadow-[0_0_14px_rgba(255,87,56,0.12)]":"text-white/50")}><Crown className={"h-5 w-5 "+(frameCategory==="plus"?"text-[#FF704F]":"")}/>YUBERA Plus</button>
+            {profile.isAdmin && <button type="button" aria-pressed={frameCategory==="admin"} onClick={()=>setFrameCategory("admin")} className={"flex min-h-11 items-center justify-center gap-1 rounded-full px-1 text-[10px] font-semibold transition-all duration-200 sm:text-sm "+(frameCategory==="admin"?"border border-[#FF704F] bg-[#FF5738]/15 text-white shadow-[0_0_14px_rgba(255,87,56,0.12)]":"text-white/50")}><ShieldCheck className="h-4 w-4 shrink-0"/>Админ</button>}
           </div>
           <div className="flex snap-x snap-mandatory gap-2.5 overflow-x-auto overscroll-x-contain pb-3 pt-1 [scrollbar-width:thin]">
             <button type="button" aria-pressed={frame===null} onClick={()=>setFrame(null)} className={"relative flex w-[112px] shrink-0 snap-start flex-col items-center rounded-2xl border p-3 transition-all duration-200 sm:w-[128px] "+(frame===null?"-translate-y-0.5 scale-[1.02] border-[#FF6847] bg-[#FF5738]/[0.12] shadow-[0_0_18px_rgba(255,87,56,0.14)]":"border-white/10 bg-white/[0.025]")}><span className="relative grid h-[82px] w-[82px] place-items-center rounded-full transition-all duration-200" style={{boxShadow:frame===null?"0 0 0 3px #FF5738,0 0 18px rgba(255,87,56,.35)":"none"}}><span className="grid h-[68px] w-[68px] place-items-center rounded-full border border-white/15 bg-white/[0.04]"><Users className="h-8 w-8 text-white/45"/></span></span><span className="mt-2 text-xs font-medium text-white/80">Без рамки</span>{frame===null&&<span className="absolute right-2 top-2 grid h-5 w-5 place-items-center rounded-full bg-[#FF5738] text-white shadow-lg"><Check className="h-3.5 w-3.5"/></span>}</button>
-            {(frameCategory==="support"?supportFrameOptions:plusFrameOptions).map(([asset,label],index)=>{
-              const unlocked=frameCategory==="support"?(profile.availableSupportFrames??[]).includes(asset):profile.isPlus;
+            {(frameCategory==="support"?supportFrameOptions:frameCategory==="plus"?plusFrameOptions:adminFrameOptions.map((asset,index)=>[asset,`Административная ${index+1}`] as const)).map(([asset,label],index)=>{
+              const unlocked=frameCategory==="support"?(profile.availableSupportFrames??[]).includes(asset):frameCategory==="plus"?profile.isPlus:profile.isAdmin&&(profile.availableAdminFrames??[]).includes(asset);
               const supportLevel=YUBERA_SUPPORT_LEVELS[index+1];
-              const caption=frameCategory==="support"?(supportLevel?`От ${supportLevel.min.toLocaleString("ru-RU")} ⭐`:"Поддержка"):"YUBERA Plus";
+              const caption=frameCategory==="support"?(supportLevel?`От ${supportLevel.min.toLocaleString("ru-RU")} ⭐`:"Поддержка"):frameCategory==="plus"?"YUBERA Plus":"Администратор";
               return <button key={asset} type="button" aria-pressed={frame===asset} disabled={!unlocked} onClick={()=>setFrame(asset)} className={"relative flex w-[112px] shrink-0 snap-start flex-col items-center rounded-2xl border p-3 transition-all duration-200 sm:w-[128px] "+(frame===asset?"-translate-y-0.5 scale-[1.02] border-[#FF6847] bg-[#FF5738]/[0.12] shadow-[0_0_18px_rgba(255,87,56,0.14)]":"border-white/10 bg-white/[0.025]")+(unlocked?" hover:border-white/25":" cursor-not-allowed opacity-45")}>
                 <span className="relative grid h-[82px] w-[82px] place-items-center"><span className="absolute inset-[10%] rounded-full bg-black/35"/><img src={`/images/yubera/${asset}`} alt="" className="absolute inset-0 h-full w-full object-contain"/></span>
                 <span className="mt-2 text-center text-[11px] font-semibold leading-tight text-white/85">{caption}</span>
@@ -493,7 +496,7 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
               </button>;
             })}
           </div>
-          <div className="flex items-start gap-3 rounded-2xl bg-white/[0.055] px-4 py-3 text-xs leading-relaxed text-white/60 sm:text-sm">{frameCategory==="support"?<Sparkles className="mt-0.5 h-5 w-5 shrink-0"/>:<Crown className="mt-0.5 h-5 w-5 shrink-0"/>}<span>{frameCategory==="support"?"Рамки за поддержку открываются в зависимости от накопительного вклада в проект. Открытые рамки остаются у вас навсегда.":"Рамки YUBERA Plus доступны при активной подписке. После её окончания такая рамка перестаёт отображаться."}</span></div>
+          <div className="flex items-start gap-3 rounded-2xl bg-white/[0.055] px-4 py-3 text-xs leading-relaxed text-white/60 sm:text-sm">{frameCategory==="support"?<Sparkles className="mt-0.5 h-5 w-5 shrink-0"/>:<Crown className="mt-0.5 h-5 w-5 shrink-0"/>}<span>{frameCategory==="support"?"Рамки за поддержку открываются в зависимости от накопительного вклада в проект. Открытые рамки остаются у вас навсегда.":frameCategory==="plus"?"Рамки YUBERA Plus доступны при активной подписке. После её окончания такая рамка перестаёт отображаться.":"Административные рамки доступны только подтверждённому администратору YUBERA."}</span></div>
         </YuberaCard>
         <div className="space-y-2 pt-1">
           <button type="button" disabled={busy} onClick={()=>void saveProfile()} className="flex min-h-14 w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#FF5738] to-[#FF6245] px-4 py-3 text-base font-bold text-white shadow-[0_5px_20px_rgba(255,87,56,.18)] transition hover:brightness-110 disabled:opacity-50"><Check className="h-5 w-5"/>Сохранить изменения</button>
@@ -724,7 +727,7 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, isAdmin = false,
             <div className="min-w-0 flex-1">
               <div className="flex min-w-0 items-center gap-x-2">
                 <h3 className="min-w-0 truncate whitespace-nowrap text-[clamp(15px,4vw,22px)] font-bold leading-tight text-white">{publicProfile.displayName}</h3>
-                {publicProfile.isPlus && <span className="inline-flex shrink-0 items-center gap-0.5 whitespace-nowrap rounded-full border border-[#ffc66d]/55 bg-[#ffc66d]/10 px-1.5 py-0.5 text-[10px] font-bold leading-none text-[#ffc66d]"><Crown className="h-[18px] w-[18px] shrink-0" strokeWidth={2.75} />Plus</span>}
+                {publicProfile.isAdmin && <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-[#ff6347]/65 bg-[#281714]/90 px-1.5 py-1 text-[9px] font-bold leading-none text-[#ff6847]"><ShieldCheck className="h-3.5 w-3.5 shrink-0"/>АДМИН</span>}{publicProfile.isPlus && <span className="inline-flex shrink-0 items-center gap-0.5 whitespace-nowrap rounded-full border border-[#ffc66d]/55 bg-[#ffc66d]/10 px-1.5 py-1 text-[9px] font-bold leading-none text-[#ffc66d]"><Crown className="h-4 w-4 shrink-0" strokeWidth={2.75}/>Plus</span>}
               </div>
               {publicProfile.username && <p className="mt-1 whitespace-nowrap text-[13px] leading-tight text-white/75">@{publicProfile.username}</p>}
               {publicProfile.bio && <div className="mt-1 min-w-0">
