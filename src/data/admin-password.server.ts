@@ -73,6 +73,10 @@ async function isTelegramAdministrator(request: Request, env: Environment): Prom
   return Boolean(row && row.expires_at > Date.now() && row.telegram_user_id === adminId);
 }
 
+export async function hasTelegramAdminIdentity(request: Request): Promise<boolean> {
+  return isTelegramAdministrator(request, environment());
+}
+
 export async function handleAdminPassword(request: Request): Promise<Response> {
   if (request.method !== "GET" && request.method !== "POST") return json({ error: "method_not_allowed" }, 405);
   if (request.method === "POST" && !sameOrigin(request)) return json({ error: "cross_origin_request" }, 403);
