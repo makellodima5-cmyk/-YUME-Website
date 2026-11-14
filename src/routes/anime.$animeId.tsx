@@ -2,7 +2,6 @@ import { createFileRoute, notFound, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import {
   Bookmark,
-  Bell,
   Check,
   ChevronDown,
   ChevronLeft,
