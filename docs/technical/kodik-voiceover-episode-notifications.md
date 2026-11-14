@@ -1,22 +1,17 @@
 # Kodik voice-over episode notifications
 
-## Subscription flow
-The anime detail page requests the currently available Kodik voice-overs when a user subscribes. The user selects one source and the server validates its translation ID against a fresh Kodik response for the requested Shikimori ID. The selected ID and title are stored with the user's anime subscription.
+The anime detail page offers a Kodik voice-over selector when a user enables episode notifications. The selected Kodik translation ID and title are saved on the user's anime subscription.
 
-The first episode number available at subscription time is stored as the personal baseline. Existing episodes are not sent retroactively. A user can select one voice-over per anime; selecting another updates the existing subscription. Unsubscribing deactivates the row.
+The subscription API keeps legacy active subscription rows visible even when they do not yet contain a translation ID. Such a row is shown as **Choose a voice-over**; notification polling does not treat it as an all-voice-overs subscription. The user must explicitly select a source to resume notifications.
 
-## Scheduled polling
-The dedicated Queue Worker runs the episode checker every three hours at minute zero UTC (`0 */3 * * *`). It queries only distinct anime IDs with active subscriptions and requests Kodik once per subscribed anime. It compares only the translation IDs selected by users.
+On selection, the server revalidates that translation against a fresh Kodik search response for the exact Shikimori ID, stores the currently available episode number as the user's baseline, and activates the selected source. Episodes already present at selection time are not sent retroactively.
 
-Each source has an independent high-water mark. A new episode is queued only when its episode number exceeds the saved source high-water mark. The high-water mark advances after all new episode jobs for that source have been queued. A missing source in an otherwise successful Kodik response does not reset or advance the saved state.
+The dedicated Queue Worker polls every three hours at minute zero UTC (`0 */3 * * *`). It reads only active anime/translation pairs and makes one Kodik request per distinct subscribed anime. It compares only selected translation IDs. Queue notification identifiers include anime ID, translation ID and episode number; fan-out targets only users subscribed to that translation whose baseline is earlier than the episode.
 
-## Delivery
-Queue notification IDs include anime ID, translation ID and episode number. Fan-out selects only active users with the matching translation ID and a personal baseline earlier than the episode. The existing site-notification and Telegram delivery handlers remain in place. Older queue messages are still accepted during rollout, but cannot reach users whose personal baseline is later than the episode.
+The existing in-site notification and Telegram Queue delivery path is reused. Kodik is polled, not pushed, so delivery may lag publication by almost three hours plus any Kodik catalogue delay.
 
 ## Deployment prerequisites
-1. Apply `migrations-clean/0012_kodik_voiceover_episode_subscriptions.sql` to production D1 before deploying the application.
-2. Configure `KODIK_API_TOKEN` as a Worker secret on both the public site Worker and the dedicated Queue consumer Worker.
-3. Keep the existing `KODIK_RATE_LIMITER` binding on the public site Worker. The subscription endpoint uses it when validating the user-selected source.
-4. Deploy the Queue consumer using `wrangler.queue.jsonc` so its three-hour cron is active.
 
-Kodik does not provide a player-originated push event in the inspected material. A notification can arrive up to almost three hours after Kodik exposes the episode, plus any delay on Kodik's side. CI and Wrangler validation do not apply the database migration or deploy Cloudflare.
+- Apply `migrations-clean/0012_kodik_voiceover_episode_subscriptions.sql` before deploying.
+- Set `KODIK_API_TOKEN` as a Worker secret on both the public site Worker and the Queue consumer Worker.
+- Keep the existing `KODIK_RATE_LIMITER` binding on the public site Worker.
