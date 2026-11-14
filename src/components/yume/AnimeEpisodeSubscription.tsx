@@ -110,8 +110,8 @@ export function AnimeEpisodeSubscription({
     <>
       <button
         type="button"
-        disabled={disabled || busy}
-        title={disabled ? (english ? "No more episodes are expected for this title" : "Новые серии для этого тайтла больше не выходят") : undefined}
+        disabled={(disabled && !subscribed) || busy}
+        title={disabled && !subscribed ? (english ? "No more episodes are expected for this title" : "Новые серии для этого тайтла больше не выходят") : undefined}
         onClick={() => { if (subscribed) void unsubscribe(); else void beginSubscription(); }}
         aria-pressed={subscribed}
         className="inline-flex w-full min-w-0 flex-col items-center justify-center gap-1 rounded-full bg-secondary px-2 py-2.5 text-center text-[11px] font-semibold leading-tight ring-1 ring-border transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50 md:w-auto md:flex-row md:gap-2 md:px-4 md:py-2.5 md:text-sm"
