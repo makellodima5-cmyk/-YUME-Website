@@ -1,0 +1,6 @@
+import {createFileRoute} from "@tanstack/react-router";
+import {env} from "cloudflare:workers";
+import {fetchKodikEpisodeSources} from "@/data/kodik-episode-sources.server";
+import {enforceRateLimit} from "@/lib/rate-limit";
+import {isSameOriginRequest} from "@/lib/request-security";
+export const Route=createFileRoute("/api/kodik-episode-sources")({server:{handlers:{GET:async({request})=>{if(!isSameOriginRequest(request))return Response.json({error:"cross_origin_request"},{status:403});const u=new URL(request.url),id=u.searchParams.get("animeId")??"";if(!/^\d{1,20}$/.test(id))return Response.json({error:"invalid_anime"},{status:400});const e=env as unknown as {KODIK_API_TOKEN?:string;KODIK_RATE_LIMITER?:unknown},limit=await enforceRateLimit(e.KODIK_RATE_LIMITER,request,"kodik");if(limit!=="allowed")return Response.json({error:limit==="limited"?"too_many_requests":"rate_limit_unavailable"},{status:limit==="limited"?429:503});try{const token=typeof e.KODIK_API_TOKEN==="string"?e.KODIK_API_TOKEN.trim():"";if(!token)return Response.json({error:"kodik_not_configured"},{status:503});return Response.json({sources:await fetchKodikEpisodeSources(id,token)},{headers:{"Cache-Control":"private, no-store"}})}catch(error){console.error("[YUME][KODIK_SOURCES]",error);return Response.json({error:"kodik_sources_unavailable"},{status:503})}}}}});
