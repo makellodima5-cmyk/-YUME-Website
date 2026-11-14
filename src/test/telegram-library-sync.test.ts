@@ -48,3 +48,20 @@ describe("Telegram library sync item validation", () => {
     }])).toHaveLength(1);
   });
 });
+
+import { describe, expect, it } from "vitest";
+import { normalizeTelegramLibrarySyncItems } from "@/data/telegram-library-sync.server";
+
+describe("Telegram library subscription voice-over data", () => {
+  it("accepts a selected voice-over and rejects malformed IDs or empty titles", () => {
+    const base = { itemType: "subscription", animeId: "123", updatedAtEpochMillis: Date.now(), deleted: false, sourceId: "web" };
+    expect(normalizeTelegramLibrarySyncItems([{ ...base, payload: { notificationsEnabled: true, translationId: "voice-a", translationTitle: "Voice A" } }])).not.toBeNull();
+    expect(normalizeTelegramLibrarySyncItems([{ ...base, payload: { notificationsEnabled: true, translationId: "../bad", translationTitle: "Voice A" } }])).toBeNull();
+    expect(normalizeTelegramLibrarySyncItems([{ ...base, payload: { notificationsEnabled: true, translationId: "voice-a", translationTitle: "" } }])).toBeNull();
+  });
+
+  it("continues accepting payloads from older clients", () => {
+    const base = { itemType: "subscription", animeId: "123", updatedAtEpochMillis: Date.now(), deleted: false, sourceId: "web" };
+    expect(normalizeTelegramLibrarySyncItems([{ ...base, payload: { notificationsEnabled: true } }])).not.toBeNull();
+  });
+});
