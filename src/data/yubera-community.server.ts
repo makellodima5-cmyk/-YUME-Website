@@ -81,7 +81,7 @@ async function isTelegramAdministrator(request: Request, env: Environment): Prom
     .bind(tokenHash).first<{ telegram_user_id: string; expires_at: number }>();
   return Boolean(row && row.expires_at > Date.now() && row.telegram_user_id === adminId);
 }
-async function isCurrentTelegramAdmin(request: Request): Promise<boolean> {
+async async function isCurrentTelegramAdmin(request: Request): Promise<boolean> {
   const runtime = env();
   return isTelegramAdministrator(request, runtime);
 }
@@ -175,7 +175,7 @@ async function profileSummary(database: Database, userId: string, viewerId: stri
     bio: account.profile.bio, avatarFrame: isAdminFrame(account.profile.avatar_frame) || isSupportFrame(account.profile.avatar_frame) ? account.profile.avatar_frame : plus ? account.profile.avatar_frame : null,
     visibility: account.profile.visibility, xp: isOwner ? xp : { level: xp.level, title: xp.title }, support: isOwner ? effectiveSupport : { level: effectiveSupport.level, title: effectiveSupport.title, asset: effectiveSupport.asset },
     availableSupportFrames: isOwner ? unlockedSupportFrames.results.map((row) => SUPPORT_FRAME_ASSETS[row.frame_level - 1]).filter(Boolean) : [],
-    availableAdminFrames: isOwner && adminCheck ? [...ADMIN_FRAME_ASSETS] : [], isAdmin: account.user.telegram_user_id === String((env().TELEGRAM_ADMIN_ID ?? "")).trim() && Boolean(String(env().TELEGRAM_ADMIN_ID ?? "").trim()),
+    availableAdminFrames: isOwner && adminCheck ? [...ADMIN_FRAME_ASSETS] : [], isAdmin: adminCheck && account.user.telegram_user_id === String((env().TELEGRAM_ADMIN_ID ?? "")).trim(),
     isPlus: plus, followers: Number(followers?.count ?? 0), following: Number(following?.count ?? 0),
     publicCollections: Number(collections?.count ?? 0), publicTitles: Number(collections?.titles ?? 0),
     collectionLikes: Number(collections?.likes ?? 0), isFollowing: Boolean(follow),
@@ -343,7 +343,7 @@ export async function handleYuberaCommunity(request: Request): Promise<Response>
     if (bio.length > 250 || !visibility) return json({ error: "invalid_profile" }, 400);
     const plus = await plusActive(database, userId);
     const adminCheck = await isCurrentTelegramAdmin(request);
-    const frame = input.avatarFrame === null ? null : profileAssetFrame(input.avatarFrame) ?? (isAdminFrame(input.avatarFrame) ? input.avatarFrame : null);
+    const frame = input.avatarFrame === null ? null : isAdminFrame(input.avatarFrame) ? input.avatarFrame : profileAssetFrame(input.avatarFrame);
     if (input.avatarFrame !== null && !frame) return json({ error: "invalid_avatar_frame" }, 400);
     if (frame && isAdminFrame(frame) && !adminCheck) return json({ error: "admin_frame_forbidden" }, 403);
     if (frame && isSupportFrame(frame)) {
