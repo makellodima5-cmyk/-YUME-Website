@@ -1,5 +1,6 @@
 import { env as cloudflareEnv } from "cloudflare:workers";
 import { getAuthenticatedYumeUserId } from "@/data/telegram-auth.server";
+import { hasTelegramAdminIdentity } from "@/data/admin-password.server";
 import { getR2Anime } from "@/data/catalog-r2.server";
 import { YUBERA_SUPPORT_LEVELS, YUBERA_XP_LEVELS, YUBERA_XP_REWARDS, YUBERA_XP_RULES } from "@/data/yubera-config";
 
@@ -64,27 +65,8 @@ const PLUS_FRAME_ASSETS = [
   "YUBERA_Plus_Avatar_Frame_05_Cyberpunk_Neon.webp",
 ] as const;
 
-const USER_SESSION_COOKIE = "__Host-yume-session";
-function cookie(request: Request, name: string): string { for (const part of (request.headers.get("cookie") ?? "").split(";")) { const index = part.indexOf("="); if (index >= 0 && part.slice(0,index).trim() === name) return part.slice(index+1).trim(); } return ""; }
 const ADMIN_FRAME_ASSETS = ["Admin_Frame_01.webp","Admin_Frame_02.webp","Admin_Frame_03.webp","Admin_Frame_04.webp","Admin_Frame_05.webp","Admin_Frame_06.webp","Admin_Frame_07.webp","Admin_Frame_08.webp"] as const;
-async function isTelegramAdministrator(request: Request, env: Environment): Promise<boolean> {
-  const db = env.YUME_DB;
-  const adminId = typeof env.TELEGRAM_ADMIN_ID === "string" ? env.TELEGRAM_ADMIN_ID.trim() : "";
-  const secret = typeof env.YUME_AUTH_SESSION_SECRET === "string" ? env.YUME_AUTH_SESSION_SECRET : "";
-  const token = cookie(request, USER_SESSION_COOKIE);
-  if (!db || !/^\d{1,20}$/.test(adminId) || secret.length < 32 || !token) return false;
-
-  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-  const digest = new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(token)));
-  const tokenHash = Array.from(digest, byte => byte.toString(16).padStart(2, "0")).join("");
-  const row = await db.prepare("SELECT u.telegram_user_id, s.expires_at FROM yume_sessions s JOIN yume_users u ON u.id=s.user_id WHERE s.token_hash=? AND u.provider='telegram'")
-    .bind(tokenHash).first<{ telegram_user_id: string; expires_at: number }>();
-  return Boolean(row && row.expires_at > Date.now() && row.telegram_user_id === adminId);
-}
-async function isCurrentTelegramAdmin(request: Request): Promise<boolean> {
-  const runtime = env();
-  return isTelegramAdministrator(request, runtime);
-}
+function isAdminFrame(value: string | null): boolean { return Boolean(value && (ADMIN_FRAME_ASSETS as readonly string[]).includes(value)); }
 function profileAssetFrame(value: unknown): string | null {
   return typeof value === "string" && [...SUPPORT_FRAME_ASSETS, ...PLUS_FRAME_ASSETS].includes(value) ? value : null;
 }
@@ -217,7 +199,7 @@ export async function handleYuberaCommunity(request: Request): Promise<Response>
   const database = db();
   if (!database) return json({ error: "database_unavailable" }, 503);
   const userId = await getAuthenticatedYumeUserId(request);
-  const adminCheck = await isCurrentTelegramAdmin(request);
+  const adminCheck = await hasTelegramAdminIdentity(request);
   const url = new URL(request.url);
   if (request.method === "GET") {
     const action = url.searchParams.get("action") ?? "me";
