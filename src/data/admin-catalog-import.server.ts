@@ -1,11 +1,12 @@
 import { env as cloudflareEnv } from "cloudflare:workers";
-import type { Anime } from "@/data/anime";
+import { isValidAnimeCatalogId, type Anime } from "@/data/anime";
 import { readAdminCatalogState, readAdminCatalogStatus, submitCatalogMutation } from "@/data/catalog-r2.server";
 import { retryAfterMilliseconds } from "@/data/retry-after";
 import { hasAdminPasswordSession, isAdminPasswordConfigured } from "@/lib/admin-password.server";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 type RuntimeGlobal = typeof globalThis & { __YUME_RUNTIME_ENV__?: unknown };
-type Environment = Record<string, unknown> & { TELEGRAM_ADMIN_ID?: string; YUME_AUTH_SESSION_SECRET?: string; YUME_ADMIN_PASSWORD?: string; YUME_DB?: D1Database };
+type Environment = Record<string, unknown> & { TELEGRAM_ADMIN_ID?: string; YUME_AUTH_SESSION_SECRET?: string; YUME_ADMIN_PASSWORD?: string; YUME_DB?: D1Database; KODIK_API_TOKEN?: string; KODIK_RATE_LIMITER?: unknown };
 type ShikimoriAnime = {
   id: string; name?: string | null; russian?: string | null; english?: string | string[] | null;
   kind?: string | null; score?: string | number | null; status?: string | null;
@@ -27,11 +28,178 @@ const METADATA_LOOKUP_BATCH_SIZE = 40;
 const FIELDS = "id name english russian kind score status episodes episodesAired airedOn { date year } releasedOn { date year } description poster { mainUrl previewUrl originalUrl } opengraphImageUrl genres { id name russian kind } nextEpisodeAt rating studios { name } videos { url playerUrl name kind }";
 const IMPORT_FIELDS = FIELDS + " screenshots { originalUrl x332Url x166Url }";
 
+type KodikMaterialData = {
+  title?: string; anime_title?: string; title_en?: string; anime_title_en?: string;
+  title_orig?: string; other_titles?: string[]; other_titles_en?: string[]; other_titles_jp?: string[];
+  year?: number | string; tagline?: string; description?: string; anime_description?: string;
+  poster_url?: string; anime_poster_url?: string; drama_poster_url?: string; screenshots?: string[];
+  all_genres?: string[]; genres?: string[]; anime_genres?: string[]; anime_studios?: string[];
+  anime_kind?: string; anime_status?: string; status?: string;
+  shikimori_id?: number | string; shikimori_rating?: number | string; kinopoisk_rating?: number | string; imdb_rating?: number | string;
+  rating_mpaa?: string; minimal_age?: number | string;
+  episodes_total?: number | string; episodes_aired?: number | string;
+  aired_at?: string; next_episode_at?: string; premiere_ru?: string; premiere_world?: string;
+};
+type KodikSearchResult = {
+  id?: string; type?: string; title?: string; title_orig?: string; other_title?: string;
+  link?: string; year?: number | string; shikimori_id?: number | string;
+  episodes_count?: number | string; last_episode?: number | string; screenshots?: string[];
+  material_data?: KodikMaterialData | null;
+};
+type KodikSearchResponse = { results?: KodikSearchResult[]; error?: string };
+export type KodikCatalogCandidate = {
+  id:string; kodikId:string; shikimoriId:string|null;
+  title:string; englishTitle:string; originalTitle:string; year:number; kind:string|null;
+  status:Anime["status"]; posterUrl:string|null; description:string; genres:string[];
+  ageRating:string|null; episodes:number; episodesAired:number; rating:number|null;
+  studios:string[]; airedOn:string|null; nextEpisodeAt:string|null;
+  screenshots:Array<{originalUrl:string;previewUrl:string}>;
+  alreadyInCatalog:boolean; possibleDuplicateTitle:string|null;
+};
+const KODIK_SEARCH_URL = "https://kodik-api.com/search";
+const KODIK_MATERIAL_ID_PATTERN = /^(?:serial|movie)-\d{1,20}$/;
+const KODIK_ANIME_TYPES = "anime-serial,anime";
+
+function normalizeCatalogTitle(value:string):string {
+  return value.normalize("NFKD").toLowerCase().replace(/[\u0300-\u036f]/g,"")
+    .replace(/[^\p{L}\p{N}]+/gu," ").trim();
+}
+function numericMetadata(value:unknown):number|null {
+  if (typeof value === "string" && !value.trim()) return null;
+  const result = Number(value);
+  return Number.isFinite(result) ? result : null;
+}
+function metadataStrings(value:unknown):string[] {
+  if (!Array.isArray(value)) return [];
+  return Array.from(new Set(value.filter((item):item is string=>typeof item==="string").map(clean).filter(Boolean)));
+}
+function kodikKind(value:unknown):string|null {
+  if (typeof value!=="string" || !value.trim()) return null;
+  const normalized=value.trim().toLowerCase();
+  const values:Record<string,string>={tv:"TV",tv_13:"TV",tv_24:"TV",tv_48:"TV",movie:"Фильм",ova:"OVA",ona:"ONA",special:"Спешл",music:"Музыкальное"};
+  return values[normalized] ?? value.trim();
+}
+function kodikStatus(value:unknown):Anime["status"] {
+  const normalized=typeof value==="string"?value.trim().toLowerCase():"";
+  if(normalized==="ongoing")return "Онгоинг";
+  if(normalized==="released")return "Вышел";
+  if(normalized==="anons"||normalized==="announced")return "Анонс";
+  return "Неизвестно";
+}
+function kodikAgeRating(value:unknown,minimalAge:unknown):string|null {
+  const key=typeof value==="string"?value.trim().toUpperCase().replace(/\\s+/g,""):"";
+  const map:Record<string,string>={G:"Без ограничений",PG:"Без ограничений","PG-13":"12+",R:"16+","R+":"16+",RX:"18+"};
+  if(map[key])return map[key];
+  const age=numericMetadata(minimalAge);
+  return age!==null&&age>0&&age<=99?Math.floor(age)+"+":null;
+}
+function kodikScreenshots(row:KodikSearchResult,data:KodikMaterialData):Array<{originalUrl:string;previewUrl:string}> {
+  const result:Array<{originalUrl:string;previewUrl:string}>=[];
+  const seen=new Set<string>();
+  for(const raw of [...(row.screenshots??[]),...(data.screenshots??[])]) {
+    const safe=safeImage(raw);
+    if(!safe||seen.has(safe))continue;
+    seen.add(safe);
+    result.push({originalUrl:safe,previewUrl:safe});
+    if(result.length===5)break;
+  }
+  return result;
+}
+function existingAliases(item:Anime):Set<string> {
+  return new Set([item.title,item.englishTitle??"",item.original].map(normalizeCatalogTitle).filter(value=>value.length>=3));
+}
+function findKodikDuplicate(candidate:Pick<KodikCatalogCandidate,"id"|"kodikId"|"shikimoriId"|"title"|"englishTitle"|"originalTitle"|"year"|"kind">,items:Anime[]) {
+  if(items.some(item=>item.id===candidate.id||(item as Anime & {kodikId?:string}).kodikId===candidate.kodikId))return {exact:true,title:null as string|null};
+  if(candidate.shikimoriId&&items.some(item=>item.id===candidate.shikimoriId))return {exact:true,title:null as string|null};
+  const aliases=new Set([candidate.title,candidate.englishTitle,candidate.originalTitle].map(normalizeCatalogTitle).filter(value=>value.length>=3));
+  for(const item of items) {
+    if(!candidate.year||!item.year||candidate.year!==item.year)continue;
+    if(candidate.kind&&item.kind&&candidate.kind!==item.kind)continue;
+    if([...aliases].some(alias=>existingAliases(item).has(alias)))return {exact:true,title:item.title};
+  }
+  for(const item of items)if([...aliases].some(alias=>existingAliases(item).has(alias)))return {exact:false,title:item.title};
+  return {exact:false,title:null};
+}
+export function normalizeKodikCatalogResults(results:KodikSearchResult[],items:Anime[]):KodikCatalogCandidate[] {
+  const output:KodikCatalogCandidate[]=[];
+  const seen=new Set<string>();
+  for(const row of results) {
+    const kodikId=typeof row.id==="string"?row.id.trim():"";
+    if(!KODIK_MATERIAL_ID_PATTERN.test(kodikId)||(row.type&&row.type!=="anime-serial"&&row.type!=="anime")||seen.has(kodikId))continue;
+    seen.add(kodikId);
+    const data=row.material_data??{};
+    const externalId=String(row.shikimori_id??data.shikimori_id??"").trim();
+    const shikimoriId=/^\d{1,12}$/.test(externalId)?externalId:null;
+    const id=shikimoriId??"kodik-"+kodikId;
+    const title=clean(data.anime_title)||clean(data.title)||clean(row.title);
+    if(title.length<2)continue;
+    const englishTitle=clean(data.anime_title_en)||clean(data.title_en);
+    const originalTitle=clean(row.title_orig)||clean(data.title_orig)||clean(row.other_title)||clean(data.other_titles?.[0])||title;
+    const yearNumber=numericMetadata(data.year??row.year);
+    const year=yearNumber!==null&&yearNumber>=1900&&yearNumber<=9999?Math.floor(yearNumber):0;
+    const kind=kodikKind(data.anime_kind);
+    const status=kodikStatus(data.anime_status??data.status);
+    const posterUrl=safeImage(data.anime_poster_url)??safeImage(data.poster_url)??safeImage(data.drama_poster_url)??null;
+    const description=clean((clean(data.anime_description)||clean(data.description)||clean(data.tagline)).replace(/<[^>]*>/g," "));
+    const genreSource=data.anime_genres?.length?data.anime_genres:data.all_genres?.length?data.all_genres:data.genres;
+    const genres=metadataStrings(genreSource);
+    const studios=metadataStrings(data.anime_studios);
+    const ratingNumber=numericMetadata(data.shikimori_rating??data.kinopoisk_rating??data.imdb_rating);
+    const rating=ratingNumber!==null&&ratingNumber>0&&ratingNumber<=10?Math.round(ratingNumber*10)/10:null;
+    const episodeTotal=numericMetadata(data.episodes_total??row.episodes_count);
+    const episodeAired=numericMetadata(data.episodes_aired??row.last_episode);
+    const episodes=episodeTotal!==null&&episodeTotal>0?Math.floor(episodeTotal):0;
+    const episodesAired=episodeAired!==null&&episodeAired>0?Math.floor(episodeAired):0;
+    const duplicate=findKodikDuplicate({id,kodikId,shikimoriId,title,englishTitle,originalTitle,year,kind},items);
+    output.push({
+      id,kodikId,shikimoriId,title,englishTitle,originalTitle,year,kind,status,posterUrl,description,genres,
+      ageRating:kodikAgeRating(data.rating_mpaa,data.minimal_age),episodes,episodesAired,rating,studios,
+      airedOn:clean(data.aired_at)||clean(data.premiere_ru)||clean(data.premiere_world)||null,
+      nextEpisodeAt:clean(data.next_episode_at)||null,screenshots:kodikScreenshots(row,data),
+      alreadyInCatalog:duplicate.exact,possibleDuplicateTitle:duplicate.title,
+    });
+  }
+  return output;
+}
+export function mapKodikCatalogCandidate(item:KodikCatalogCandidate):Anime {
+  const seed=item.shikimoriId?Number(item.shikimoriId):item.kodikId.split("").reduce((sum,char)=>sum+char.charCodeAt(0),0);
+  return {
+    id:item.id,title:item.title,englishTitle:item.englishTitle||undefined,original:item.originalTitle||item.title,
+    year:item.year,episodes:item.episodes,rating:item.rating,genres:item.genres,status:item.status,
+    description:item.description,hue:Math.abs(seed*37)%360,glyph:Array.from(item.originalTitle||item.title)[0]||"Y",
+    isNew:item.status==="Онгоинг",popular:item.rating!==null&&item.rating>=8.5,
+    posterUrl:item.posterUrl??undefined,bannerUrl:item.posterUrl??item.screenshots[0]?.originalUrl,
+    kind:item.kind??undefined,ageRating:item.ageRating??undefined,episodesAired:item.episodesAired,
+    airedOn:item.airedOn??undefined,nextEpisodeAt:item.nextEpisodeAt??undefined,studios:item.studios,
+    catalogSource:"kodik",kodikId:item.kodikId,
+  };
+}
+async function fetchKodikSearch(query:{title?:string;id?:string}):Promise<KodikSearchResult[]> {
+  const env=environment();
+  const token=typeof env.KODIK_API_TOKEN==="string"?env.KODIK_API_TOKEN.trim():"";
+  if(!token)throw new Error("Kodik API не настроен.");
+  const url=new URL(KODIK_SEARCH_URL);
+  url.searchParams.set("token",token);
+  url.searchParams.set("types",KODIK_ANIME_TYPES);
+  url.searchParams.set("with_material_data","true");
+  url.searchParams.set("limit","30");
+  if(query.title)url.searchParams.set("title",query.title);
+  else if(query.id)url.searchParams.set("id",query.id);
+  else throw new Error("Не указан параметр поиска Kodik.");
+  const response=await fetch(url,{headers:{Accept:"application/json","User-Agent":"YUME/1.0"},signal:AbortSignal.timeout(12000)});
+  if(!response.ok)throw new Error(response.status===401||response.status===403?"Kodik API отклонил настроенный токен.":"Kodik API не смог выполнить запрос.");
+  let payload:KodikSearchResponse;
+  try{payload=await response.json() as KodikSearchResponse;}catch{throw new Error("Kodik API вернул некорректный JSON.");}
+  if(payload.error||!Array.isArray(payload.results))throw new Error("Kodik API вернул некорректный ответ.");
+  return payload.results;
+}
+
+
 export function isValidAdminImportTarget(value: unknown): value is number {
   return typeof value === "number" && Number.isSafeInteger(value) && value >= 1 && value <= 100000;
 }
 export function normalizeAdminCatalogIds(value: unknown): string[] {
-  return Array.from(new Set((Array.isArray(value) ? value : []).filter((id): id is string => typeof id === "string" && /^\d{1,20}$/.test(id)))).slice(0, 100);
+  return Array.from(new Set((Array.isArray(value) ? value : []).filter((id): id is string => typeof id === "string" && (/^\d{1,20}$/.test(id) || isValidAnimeCatalogId(id))))).slice(0, 100);
 }
 export function adminCatalogImportPageOperationId(runId:string,cursor:number):string {
   const safeRunId=runId.replace(/[^A-Za-z0-9]/g,"")||"legacy";
@@ -175,7 +343,7 @@ async function fetchPage(page: number, statusFilter = ""): Promise<ShikimoriAnim
 }
 async function fetchByIds(ids: string[], screenshots = false): Promise<ShikimoriAnime[]> {
   const result: ShikimoriAnime[] = [];
-  const chunks = chunkAdminCatalogIds(ids);
+  const chunks = chunkAdminCatalogIds(ids.filter((id) => /^\d{1,12}$/.test(id)));
   for (let i=0;i<chunks.length;i++) {
     if (i) await new Promise((resolve) => setTimeout(resolve, REQUEST_DELAY_MS));
     result.push(...await fetchGraphQL("query { animes(ids: " + JSON.stringify(chunks[i]!.join(",")) + ", limit: 50) { " + (screenshots ? IMPORT_FIELDS : FIELDS) + " } }"));
@@ -354,6 +522,33 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
       const after = await readAdminCatalogState(true); const qualityAfter = stats(after.items);
       return json({isAdmin:true,deleted:ids.length,quality:[],qualitySummary:qualityAfter,catalogTotal:after.items.length});
     }
+    if (action === "search_kodik_title") {
+      const queryText=clean(typeof body.query==="string"?body.query:typeof body.title==="string"?body.title:"").slice(0,120);
+      if(queryText.length<2)return json({error:"query_too_short"},400);
+      const rateLimit=await enforceRateLimit(env.KODIK_RATE_LIMITER,request,"kodik");
+      if(rateLimit!=="allowed")return json({error:rateLimit==="limited"?"too_many_requests":"rate_limit_unavailable"},rateLimit==="limited"?429:503,rateLimit==="limited"?{"Retry-After":"60"}:{});
+      const results=normalizeKodikCatalogResults(await fetchKodikSearch({title:queryText}),state.items);
+      return json({isAdmin:true,source:"kodik",query:queryText,results});
+    }
+    if (action === "import_kodik_title") {
+      const kodikId=typeof body.kodikId==="string"?body.kodikId.trim():"";
+      if(!KODIK_MATERIAL_ID_PATTERN.test(kodikId))return json({error:"invalid_kodik_id"},400);
+      const rateLimit=await enforceRateLimit(env.KODIK_RATE_LIMITER,request,"kodik");
+      if(rateLimit!=="allowed")return json({error:rateLimit==="limited"?"too_many_requests":"rate_limit_unavailable"},rateLimit==="limited"?429:503,rateLimit==="limited"?{"Retry-After":"60"}:{});
+      const selected=(await fetchKodikSearch({id:kodikId})).find(item=>item.id===kodikId);
+      if(!selected)return json({error:"kodik_title_not_found"},404);
+      const candidate=normalizeKodikCatalogResults([selected],state.items)[0];
+      if(!candidate)return json({error:"kodik_title_has_no_usable_name"},422);
+      if(candidate.alreadyInCatalog)return json({isAdmin:true,alreadyInCatalog:true,anime:{id:candidate.id,title:candidate.title},message:"Этот тайтл уже находится в каталоге."},409);
+      if(candidate.possibleDuplicateTitle&&!body.confirmPossibleDuplicate)return json({isAdmin:true,possibleDuplicate:true,duplicateTitle:candidate.possibleDuplicateTitle,anime:{id:candidate.id,title:candidate.title},message:"В каталоге уже есть похожий тайтл «"+candidate.possibleDuplicateTitle+"». Подтверди, что это отдельный сезон или версия."},409);
+      const anime=mapKodikCatalogCandidate(candidate);
+      const mutations:import("@/data/catalog-r2.shared").CatalogMutation[]=[{type:"upsert",items:[anime]}];
+      if(candidate.screenshots.length)mutations.push({type:"screenshots",animeId:anime.id,items:candidate.screenshots.map((shot,position)=>({...shot,position}))});
+      await submitCatalogMutation({type:"batch",mutations});
+      const after=await readAdminCatalogState(true);
+      await audit(db,"catalog.import.kodik","success",{animeId:anime.id,kodikId,title:anime.title,shikimoriId:candidate.shikimoriId},actor);
+      return json({isAdmin:true,imported:true,anime:{id:anime.id,title:anime.title,year:anime.year,originalTitle:anime.original,englishTitle:anime.englishTitle},screenshots:candidate.screenshots.length,catalogTotal:after.items.length,message:"Тайтл Kodik добавлен в основной каталог."});
+    }
     if (action === "import_title") {
       const id = typeof body.animeId === "string" ? body.animeId.trim() : "";
       if (!/^\d{1,20}$/.test(id)) return json({error:"invalid_anime_id"},400);
@@ -415,6 +610,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
       const page=state.items.slice(cursor,cursor+40);
       const now=Date.now();
       const candidates=page.filter((item)=>{
+        if (item.catalogSource === "kodik") return false;
         const needsMetadata=!item.posterUrl||!item.description||!item.year||item.rating==null;
         const attempts=Number(state.metadata["screenshot_attempts:"+item.id]??0);
         const checked=Date.parse(state.metadata["screenshot_checked_at:"+item.id]??"");

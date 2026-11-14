@@ -15,8 +15,8 @@ describe("admin catalog import target", () => {
 
 describe("admin catalog ID normalization", () => {
   it("accepts numeric IDs, removes duplicates, and ignores malformed IDs", () => {
-    expect(normalizeAdminCatalogIds(["42", "42", "123", "../other-user", "x".repeat(21), 7, null]))
-      .toEqual(["42", "123"]);
+    expect(normalizeAdminCatalogIds(["42", "42", "123", "kodik-serial-12345", "../other-user", "x".repeat(21), 7, null]))
+      .toEqual(["42", "123", "kodik-serial-12345"]);
   });
 
   it("caps a request to 100 unique numeric IDs", () => {

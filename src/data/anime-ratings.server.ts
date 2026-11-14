@@ -1,6 +1,6 @@
 import { env as cloudflareEnv } from "cloudflare:workers";
 import { getR2Anime } from "@/data/catalog-r2.server";
-import type { Anime } from "@/data/anime";
+import { ANIME_CATALOG_ID_PATTERN, type Anime } from "@/data/anime";
 import { isSameOriginRequest } from "@/lib/request-security";
 import { YUBERA_XP_REWARDS } from "@/data/yubera-config";
 
@@ -37,7 +37,7 @@ type RuntimeGlobal = typeof globalThis & { __YUME_RUNTIME_ENV__?: unknown };
 
 const SESSION_COOKIE = "__Host-yume-session";
 const MAX_BODY_LENGTH = 2_048;
-const ANIME_ID_PATTERN = /^\d{1,12}$/;
+const ANIME_ID_PATTERN = ANIME_CATALOG_ID_PATTERN;
 const BEARER_PATTERN = /^Bearer ([A-Za-z0-9_-]{30,60})$/;
 
 

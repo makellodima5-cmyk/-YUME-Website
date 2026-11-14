@@ -30,9 +30,11 @@ describe("anime comments shared validation", () => {
     expect(decodeCommentCursor("")).toBeNull();
   });
 
-  it("accepts only numeric anime IDs used by the R2 catalogue", () => {
+  it("accepts numeric and Kodik-native catalogue IDs while rejecting malformed IDs", () => {
     expect(isValidAnimeCommentId("123")).toBe(true);
-    expect(isValidAnimeCommentId("0")).toBe(true);
+    expect(isValidAnimeCommentId("kodik-serial-12345")).toBe(true);
+    expect(isValidAnimeCommentId("kodik-movie-987654")).toBe(true);
+    expect(isValidAnimeCommentId("kodik-serial-nope")).toBe(false);
     expect(isValidAnimeCommentId("../123")).toBe(false);
     expect(isValidAnimeCommentId("1".repeat(13))).toBe(false);
     expect(isValidAnimeCommentId("")).toBe(false);

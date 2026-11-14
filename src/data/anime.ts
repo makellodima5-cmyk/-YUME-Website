@@ -1,5 +1,11 @@
 import { matchesSearchQuery } from "@/data/search-text";
 
+export const ANIME_CATALOG_ID_PATTERN = /^(?:\d{1,12}|kodik-(?:serial|movie)-\d{1,20})$/;
+
+export function isValidAnimeCatalogId(value: unknown): value is string {
+  return typeof value === "string" && ANIME_CATALOG_ID_PATTERN.test(value);
+}
+
 // Demo data. Later replaced by a Shikimori-backed source with the same shape.
 export type Anime = {
   id: string;
@@ -25,6 +31,10 @@ export type Anime = {
   airedOn?: string;
   studios?: string[];
   youtubeTrailerId?: string;
+  /** Marks metadata imported from the Kodik catalogue. */
+  catalogSource?: "kodik";
+  /** Native Kodik material identifier (serial-… or movie-…). */
+  kodikId?: string;
   /** True only after Kodik confirms at least one safe episode link. */
   kodikAvailable?: boolean;
 };

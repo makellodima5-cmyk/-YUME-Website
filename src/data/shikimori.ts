@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { readShikimoriSharedCache, writeShikimoriSharedCache } from "@/data/shikimori-kv-cache.server";
-import type { Anime } from "@/data/anime";
+import { isValidAnimeCatalogId, type Anime } from "@/data/anime";
 import { isNewRelease } from "@/data/anime-sections";
 import { getR2Catalog, readCatalogState, getR2Screenshots } from "@/data/catalog-r2.server";
 import { selectRelatedAnime, mergeLiveAnimeDetails, isUpcomingEpisodeDate } from "@/data/catalog-details";
@@ -627,7 +627,7 @@ export const getShikimoriCatalog = createServerFn({ method: "GET" })
  */
 export const getShikimoriAnimeDetails = createServerFn({ method: "GET" })
   .validator((input: { animeId?: unknown }) => ({
-    animeId: typeof input?.animeId === "string" && /^\d{1,12}$/.test(input.animeId) ? input.animeId : "",
+    animeId: isValidAnimeCatalogId(input?.animeId) ? input.animeId : "",
   }))
   .handler(async ({ data }) => {
     const empty = { anime: null, relatedAnime: [] as Anime[], apiError: null as string | null, ratingEnabled: false };
@@ -642,6 +642,17 @@ export const getShikimoriAnimeDetails = createServerFn({ method: "GET" })
     const stored = state.items.find((item) => item.id === data.animeId);
     if (!stored) return empty;
     const related = selectRelatedAnime(stored, state.items);
+    if (stored.catalogSource === "kodik") {
+      const ratedItems = await applyPublicAnimeRatings([stored, ...related]);
+      const filtered = filterCatalogForCurrentRequest({ items: ratedItems }).items;
+      const visibleById = new Map(filtered.map((item) => [item.id, item]));
+      return {
+        anime: visibleById.get(stored.id) ?? null,
+        relatedAnime: related.map((item) => visibleById.get(item.id)).filter((item): item is Anime => Boolean(item)),
+        apiError: null,
+        ratingEnabled: stored.status !== "Анонс",
+      };
+    }
     let anime = stored;
     let apiError: string | null = null;
     try {
@@ -674,7 +685,7 @@ export const getShikimoriAnimeDetails = createServerFn({ method: "GET" })
  */
 export const getShikimoriAnimeScreenshots = createServerFn({ method: "GET" })
   .validator((input: { animeId?: unknown }) => ({
-    animeId: typeof input?.animeId === "string" && /^\d{1,12}$/.test(input.animeId) ? input.animeId : "",
+    animeId: isValidAnimeCatalogId(input?.animeId) ? input.animeId : "",
   }))
   .handler(async ({ data }) => {
     if (!data.animeId) return { items: [] as ShikimoriScreenshot[] };
@@ -693,7 +704,7 @@ export const getShikimoriAnimeScreenshots = createServerFn({ method: "GET" })
       const airedOn = anime?.airedOn;
       const futureRelease = typeof airedOn === "string" && /^\d{4}-\d{2}-\d{2}/.test(airedOn)
         && airedOn.slice(0, 10) > new Date().toISOString().slice(0, 10);
-      if (anime?.status === "Анонс" || futureRelease) return { items: [] as ShikimoriScreenshot[] };
+      if (anime?.catalogSource === "kodik" || anime?.status === "Анонс" || futureRelease) return { items: [] as ShikimoriScreenshot[] };
       const response = await fetch(SCREENSHOT_API_URL + encodeURIComponent(data.animeId) + "/screenshots", {
         headers: { Accept: "application/json", "User-Agent": "YUME/0.2.0" },
         signal: AbortSignal.timeout(8000),

@@ -1,3 +1,5 @@
+import { isValidAnimeCatalogId } from "@/data/anime";
+
 type Statement = {
   bind(...values: unknown[]): Statement;
   all<T = Record<string, unknown>>(): Promise<{ results: T[] }>;
@@ -39,13 +41,15 @@ function isSafePosterUrl(value: unknown): value is string {
     const url = new URL(value);
     return url.protocol === "https:" &&
       (url.hostname === "shikimori.io" || url.hostname.endsWith(".shikimori.io") ||
-       url.hostname === "shikimori.one" || url.hostname.endsWith(".shikimori.one"));
+       url.hostname === "shikimori.one" || url.hostname.endsWith(".shikimori.one") ||
+       url.hostname === "i.kodikres.com" || url.hostname.endsWith(".kodikres.com") ||
+       url.hostname === "st.kp.yandex.net");
   } catch { return false; }
 }
 export function isEpisodeNotificationJob(value: unknown): value is EpisodeNotificationJob {
   if (!isRecord(value)) return false;
   return value.type === "episode_notification_fanout" &&
-    typeof value.animeId === "string" && /^\d{1,20}$/.test(value.animeId) &&
+    isValidAnimeCatalogId(value.animeId) &&
     Number.isSafeInteger(value.episodeNumber) && Number(value.episodeNumber) > 0 &&
     (value.translationId === undefined ? value.notificationId === `episode-${value.animeId}-${value.episodeNumber}` : typeof value.translationId === "string" && /^[A-Za-z0-9_-]{1,64}$/.test(value.translationId) && value.notificationId === `episode-${value.animeId}-${value.translationId}-${value.episodeNumber}` && typeof value.translationTitle === "string" && value.translationTitle.length > 0 && value.translationTitle.length <= 120) &&
     typeof value.animeTitle === "string" && value.animeTitle.length > 0 &&
@@ -129,7 +133,7 @@ function isTelegramDeliveryJob(value:unknown):value is TelegramDeliveryJob {
   if(!isRecord(value))return false;
   return value.type==="telegram_episode_delivery" &&
     typeof value.notificationId==="string" && typeof value.userId==="string" &&
-    typeof value.animeId==="string" && /^\d{1,20}$/.test(value.animeId) &&
+    isValidAnimeCatalogId(value.animeId) &&
     Number.isSafeInteger(value.episodeNumber) && Number(value.episodeNumber)>0 &&
     typeof value.animeTitle==="string" && value.animeTitle.length>0 && value.animeTitle.length<=300 &&
     (value.translationId===undefined || (typeof value.translationId==="string" && /^[A-Za-z0-9_-]{1,64}$/.test(value.translationId) && typeof value.translationTitle==="string" && value.translationTitle.length>0 && value.translationTitle.length<=120)) &&

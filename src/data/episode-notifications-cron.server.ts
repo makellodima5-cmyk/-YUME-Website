@@ -1,5 +1,6 @@
 import { env as cloudflareEnv } from "cloudflare:workers";
 import { readCatalogState } from "@/data/catalog-r2.server";
+import { isValidAnimeCatalogId } from "@/data/anime";
 import { fetchKodikEpisodeSources } from "@/data/kodik-episode-sources.server";
 import { enqueueEpisodeNotification } from "@/data/episode-notification-queue.server";
 
@@ -29,7 +30,7 @@ function poster(value: unknown): string | undefined {
     const url = new URL(value);
     if (url.protocol === "https:" && (
       url.hostname === "shikimori.io" || url.hostname.endsWith(".shikimori.io") ||
-      url.hostname === "shikimori.one" || url.hostname.endsWith(".shikimori.one")
+      url.hostname === "shikimori.one" || url.hostname.endsWith(".shikimori.one") || url.hostname === "i.kodikres.com" || url.hostname.endsWith(".kodikres.com") || url.hostname === "st.kp.yandex.net"
     )) return url.toString();
   } catch { /* ignore invalid poster URLs */ }
 }
@@ -43,7 +44,7 @@ export async function runScheduledEpisodeNotifications(input: unknown): Promise<
     "SELECT s.anime_id,s.translation_id,MAX(s.translation_title) AS translation_title,src.last_episode AS source_last_episode,MAX(s.baseline_episode) AS baseline_episode FROM yume_anime_subscriptions s LEFT JOIN yume_kodik_episode_sources src ON src.anime_id=s.anime_id AND src.translation_id=s.translation_id WHERE s.active=1 AND s.translation_id IS NOT NULL GROUP BY s.anime_id,s.translation_id,src.last_episode ORDER BY s.anime_id,s.translation_id",
   ).all<Sub>();
   const subscriptions = rows.results.filter((row) =>
-    /^\d{1,20}$/.test(String(row.anime_id)) &&
+    isValidAnimeCatalogId(String(row.anime_id)) &&
     row.translation_id !== null && /^[A-Za-z0-9_-]{1,64}$/.test(String(row.translation_id))
   );
   if (!subscriptions.length) return;

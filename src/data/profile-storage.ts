@@ -1,3 +1,4 @@
+import { isValidAnimeCatalogId } from "@/data/anime";
 import {
   normalizeSavedAnimeIds,
   normalizeSavedAnimeLibrary,
@@ -110,7 +111,7 @@ async function refreshTelegramLibraryAfterFailure(): Promise<void> {
 export function toggleSavedAnimeId(key: string, animeId: string): boolean {
   if (typeof window === "undefined") return false;
   const listType = listTypeForKey(key);
-  if (!listType || !/^\d{1,12}$/.test(animeId)) return false;
+  if (!listType || !isValidAnimeCatalogId(animeId)) return false;
   if (!accountAuthenticated) {
     window.dispatchEvent(new Event(PROFILE_AUTH_REQUIRED_EVENT));
     return false;

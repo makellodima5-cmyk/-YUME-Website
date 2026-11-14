@@ -1,3 +1,5 @@
+import { isValidAnimeCatalogId } from "@/data/anime";
+
 export const MAX_SAVED_ANIME_IDS = 500;
 
 export type SavedAnimeLibrary = {
@@ -10,7 +12,7 @@ export function normalizeSavedAnimeIds(value: unknown): string[] | null {
   if (!Array.isArray(value) || value.length > MAX_SAVED_ANIME_IDS) return null;
   const ids: string[] = [];
   for (const item of value) {
-    if (typeof item !== "string" || !/^\d{1,12}$/.test(item)) return null;
+    if (!isValidAnimeCatalogId(item)) return null;
     ids.push(item);
   }
   return Array.from(new Set(ids));
