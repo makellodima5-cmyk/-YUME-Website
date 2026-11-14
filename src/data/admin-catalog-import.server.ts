@@ -32,7 +32,7 @@ type KodikMaterialData = {
   year?: number | string | null;
   anime_title?: string | null;
   anime_title_en?: string | null;
-  anime_title_jp?: string | null;
+  anime_title_jp?: string | null;\n  other_titles?: string[] | null;\n  other_titles_en?: string[] | null;\n  other_titles_jp?: string[] | null;
   anime_description?: string | null;
   anime_poster_url?: string | null;
   poster_url?: string | null;
@@ -40,7 +40,7 @@ type KodikMaterialData = {
   anime_genres?: string[] | null;
   anime_kind?: string | null;
   anime_status?: string | null;
-  anime_studios?: string[] | null;
+  anime_studios?: string[] | null;\n  screenshots?: string[] | null;
   episodes_total?: number | string | null;
   episodes_aired?: number | string | null;
   shikimori_rating?: number | string | null;
@@ -142,7 +142,7 @@ function mapKodikAnime(item: KodikCatalogSearchItem): Anime {
 function mapKodikScreenshots(item: KodikCatalogResult): Array<{original:string;preview:string}> {
   const result:Array<{original:string;preview:string}> = [];
   const seen = new Set<string>();
-  for (const value of item.screenshots ?? []) {
+  for (const value of item.material_data?.screenshots ?? item.screenshots ?? []) {
     const url = safeImage(value);
     if (!url || seen.has(url)) continue;
     seen.add(url);
