@@ -81,7 +81,7 @@ async function isTelegramAdministrator(request: Request, env: Environment): Prom
     .bind(tokenHash).first<{ telegram_user_id: string; expires_at: number }>();
   return Boolean(row && row.expires_at > Date.now() && row.telegram_user_id === adminId);
 }
-async async function isCurrentTelegramAdmin(request: Request): Promise<boolean> {
+async function isCurrentTelegramAdmin(request: Request): Promise<boolean> {
   const runtime = env();
   return isTelegramAdministrator(request, runtime);
 }
