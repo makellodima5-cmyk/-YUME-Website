@@ -118,7 +118,7 @@ export function AnimeEpisodeSubscription({
       >
         <Bell className={`h-4 w-4 ${subscribed ? "fill-current text-primary" : ""}`} />
         {subscribed
-          ? (english ? `Following: ${subscribedVoiceover || "voice-over"}` : `Подписка: ${subscribedVoiceover || "озвучка"}`)
+          ? (english ? `Following: ${subscribedVoiceover || "all voice-overs"}` : `Подписка: ${subscribedVoiceover || "все озвучки"}`)
           : (english ? "Follow new episodes" : "Отслеживать новые серии")}
       </button>
 
