@@ -65,9 +65,6 @@ const PLUS_FRAME_ASSETS = [
 ] as const;
 
 const ADMIN_FRAME_ASSETS = ["Admin_Frame_01.webp","Admin_Frame_02.webp","Admin_Frame_03.webp","Admin_Frame_04.webp","Admin_Frame_05.webp","Admin_Frame_06.webp","Admin_Frame_07.webp","Admin_Frame_08.webp"] as const;
-function isAdminFrame(value: string | null): boolean { return Boolean(value && (ADMIN_FRAME_ASSETS as readonly string[]).includes(value)); }
-function cookie(request: Request, name: string): string { for (const part of (request.headers.get("cookie") ?? "").split(";")) { const index = part.indexOf("="); if (index >= 0 && part.slice(0,index).trim() === name) return part.slice(index+1).trim(); } return ""; }
-const USER_SESSION_COOKIE = "__Host-yume-session";
 async function isTelegramAdministrator(request: Request, env: Environment): Promise<boolean> {
   const db = env.YUME_DB;
   const adminId = typeof env.TELEGRAM_ADMIN_ID === "string" ? env.TELEGRAM_ADMIN_ID.trim() : "";
@@ -83,12 +80,9 @@ async function isTelegramAdministrator(request: Request, env: Environment): Prom
   return Boolean(row && row.expires_at > Date.now() && row.telegram_user_id === adminId);
 }
 async function isCurrentTelegramAdmin(request: Request): Promise<boolean> {
-  let runtime: Environment;
-  try { const native = cloudflareEnv as unknown as Environment; runtime = native && typeof native === "object" ? native : {}; }
-  catch { const injected = (globalThis as RuntimeGlobal).__YUME_RUNTIME_ENV__; runtime = injected && typeof injected === "object" ? injected as Environment : {}; }
+  const runtime = env();
   return isTelegramAdministrator(request, runtime);
 }
-
 function profileAssetFrame(value: unknown): string | null {
   return typeof value === "string" && [...SUPPORT_FRAME_ASSETS, ...PLUS_FRAME_ASSETS].includes(value) ? value : null;
 }
