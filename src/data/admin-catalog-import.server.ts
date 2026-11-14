@@ -32,7 +32,10 @@ type KodikMaterialData = {
   year?: number | string | null;
   anime_title?: string | null;
   anime_title_en?: string | null;
-  anime_title_jp?: string | null;\n  other_titles?: string[] | null;\n  other_titles_en?: string[] | null;\n  other_titles_jp?: string[] | null;
+  anime_title_jp?: string | null;
+  other_titles?: string[] | null;
+  other_titles_en?: string[] | null;
+  other_titles_jp?: string[] | null;
   anime_description?: string | null;
   anime_poster_url?: string | null;
   poster_url?: string | null;
@@ -40,7 +43,8 @@ type KodikMaterialData = {
   anime_genres?: string[] | null;
   anime_kind?: string | null;
   anime_status?: string | null;
-  anime_studios?: string[] | null;\n  screenshots?: string[] | null;
+  anime_studios?: string[] | null;
+  screenshots?: string[] | null;
   episodes_total?: number | string | null;
   episodes_aired?: number | string | null;
   shikimori_rating?: number | string | null;
