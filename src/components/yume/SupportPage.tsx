@@ -17,7 +17,7 @@ function StarsMark({ compact = false }: { compact?: boolean }) {
   );
 }
 
-export function SupportPage() {
+export function SupportPage({ targetLevel, targetStars }: { targetLevel?: string; targetStars?: string }) {
   const [selected, setSelected] = useState<number>(100);
   const [customAmount, setCustomAmount] = useState("");
   const [customOpen, setCustomOpen] = useState(false);
@@ -32,6 +32,15 @@ export function SupportPage() {
 
   const amount = customAmount ? Number(customAmount) : selected;
   const valid = Number.isSafeInteger(amount) && amount >= MIN_STARS && amount <= MAX_STARS;
+
+  useEffect(() => {
+    const target = Number(targetStars);
+    if (targetLevel && /^[1-5]$/.test(targetLevel) && Number.isSafeInteger(target) && target > 0 && target <= MAX_STARS) {
+      setSelected(target);
+      setCustomAmount(String(target));
+      setActiveTab("support");
+    }
+  }, [targetLevel, targetStars]);
 
   useEffect(() => {
     if (!customOpen) return;
