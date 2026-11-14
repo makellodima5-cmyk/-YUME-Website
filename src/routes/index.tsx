@@ -390,7 +390,7 @@ function Index() {
     document.querySelector('meta[property="og:title"]')?.setAttribute("content", metadata.ogTitle);
     document.querySelector('meta[property="og:description"]')?.setAttribute("content", metadata.ogDescription);
   }, [language]);
-  const { section, collection: urlCollection, q: urlQuery, page: urlPage, sort: urlSort, genres: urlGenres, status: urlStatus, from: urlFrom, to: urlTo, rating: urlRating, kind: urlKind, age: urlAge, lang: urlLang } = Route.useSearch();
+  const { section, collection: urlCollection, q: urlQuery, page: urlPage, sort: urlSort, genres: urlGenres, status: urlStatus, from: urlFrom, to: urlTo, rating: urlRating, kind: urlKind, age: urlAge, lang: urlLang, targetLevel, targetStars } = Route.useSearch();
   const {
     anime: loadedAnime,
     popular: initialPopularAnime,
@@ -1816,7 +1816,7 @@ function Index() {
           showSupport={true}
         />
       ) : view === "support" ? (
-        <SupportPage targetLevel={routeSearch.targetLevel} targetStars={routeSearch.targetStars} />
+        <SupportPage targetLevel={targetLevel} targetStars={targetStars} />
       ) : view === "notifications" && notificationStateLoaded && !notificationRemoteAccount ? (
         <main id="main-content" className="px-4 pb-12 pt-24 md:px-10 md:pt-24">
           <section className="mx-auto max-w-lg rounded-3xl border border-border bg-card/70 p-6 text-center sm:p-8">
