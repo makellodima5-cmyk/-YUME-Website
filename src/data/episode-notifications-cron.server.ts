@@ -3,7 +3,6 @@ import { readCatalogState } from "@/data/catalog-r2.server";
 import { fetchKodikEpisodeSources } from "@/data/kodik-episode-sources.server";
 import { enqueueEpisodeNotification } from "@/data/episode-notification-queue.server";
 
-const LEGACY_SOURCE_ID = "__legacy__";
 type Env = Record<string, unknown> & {
   YUME_DB?: { prepare(sql: string): { bind(...v: unknown[]): { all<T>(): Promise<{ results: T[] }>; run(): Promise<unknown> }; all<T>(): Promise<{ results: T[] }> } };
   YUME_WEB_TASKS?: { send(m: unknown, o?: { contentType?: "json" }): Promise<void> };
@@ -11,7 +10,7 @@ type Env = Record<string, unknown> & {
 };
 type Sub = {
   anime_id: string;
-  translation_id: string;
+  translation_id: string | null;
   translation_title: string | null;
   source_last_episode: number | null;
   baseline_episode: number | null;
