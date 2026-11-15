@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type ChangeEvent, type FormEvent, type KeyboardEvent } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, ArrowRight, BookOpen, CalendarDays, LoaderCircle, Play, Send, Sparkles, SquarePen } from "lucide-react";
 import { useYumePreferences } from "@/data/preferences";
@@ -190,7 +190,7 @@ export function YuberaAiChat() {
     if (inputRef.current) inputRef.current.style.height = "24px";
     inputRef.current?.focus();
   };
-  const changeInput = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
+  const changeInput = (event: ChangeEvent<HTMLTextAreaElement>) => {
     const element = event.currentTarget;
     setInput(element.value);
     element.style.height = "24px";
@@ -212,7 +212,7 @@ export function YuberaAiChat() {
             <p className="yubera-ai-intro">{ru ? "Задавай вопросы, ищи аниме, получай рекомендации и узнавай новое из мира аниме." : "Ask questions, discover anime, get recommendations and learn new things about anime."}</p>
             <div className="yubera-ai-quick">{QUICK_QUESTIONS.map(question => <button key={question.text} type="button" disabled={loading || usage.remaining <= 0} onClick={() => void send(question.text)}><span className="yubera-ai-quick-icon"><QuickIcon icon={question.icon} /></span><span>{ru ? question.text : ({ "Расскажи о проекте YUBERA": "Tell me about YUBERA", "Порекомендуй мне аниме": "Recommend an anime", "Что посмотреть сегодня?": "What should I watch today?", "Расскажи интересный факт об аниме": "Tell me an interesting anime fact" } as Record<string, string>)[question.text]}</span><ArrowRight className="h-4 w-4 text-white/50" /></button>)}</div>
           </div>
-          {messages.length > 0 && <div className="yubera-ai-messages">{messages.map(message => <MessageBubble key={message.id} message={message} />)}{loading && <div className="flex items-center gap-2 text-xs text-white/60"><span className="h-2 w-2 animate-pulse rounded-full bg-[#FF6548]" />YUBERA AI…</div>}</div>}
+          {(messages.length > 0 || loading) && <div className="yubera-ai-messages">{messages.map(message => <MessageBubble key={message.id} message={message} />)}{loading && <div className="flex items-center gap-2 text-xs text-white/60"><span className="h-2 w-2 animate-pulse rounded-full bg-[#FF6548]" />YUBERA AI…</div>}</div>}
         </>}
         {notice && <div role="status" className="mx-2 mb-3 rounded-xl border border-[#FF6548]/25 bg-[#FF5738]/10 px-3 py-2 text-xs text-white/80">{notice}</div>}
       </main>
