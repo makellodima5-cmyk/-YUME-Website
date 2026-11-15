@@ -1,3 +1,18 @@
+vi.mock("@/data/catalog-r2.server", () => ({
+ readCatalogState: vi.fn(async () => ({
+  schemaVersion: 1,
+  revision: 1,
+  updatedAt: "2026-11-15T00:00:00.000Z",
+  items: [{
+   id: "101", title: "Тестовое аниме", englishTitle: "Test Anime", original: "Test Anime",
+   year: 2024, episodes: 12, rating: 8.2, genres: ["Фэнтези"], status: "Вышел",
+   description: "Тестовая запись каталога", hue: 10, glyph: " test ", posterUrl: "https://images.example.test/101.jpg",
+  }],
+  exclusions: {},
+  metadata: {},
+  screenshots: {},
+ })),
+}));
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { getAuthenticatedYumeAccount } from "@/data/telegram-auth.server";
 import { handleYuberaAiAccess, handleYuberaAiChat } from "@/data/yubera-ai.server";
@@ -24,12 +39,16 @@ class FakeStatement {
   return null;
  }
  async all<T=Record<string,unknown>>():Promise<{results:T[]}>{return{results:[]};}
- async run(){return{meta:{changes:1}};}
+ async run(){
+  if(this.sql.includes("INSERT INTO yume_ai_messages"))this.state.messageWrites++;
+  return{meta:{changes:1}};
+ }
 }
 class FakeDb {
  sessionHash="";
  plus=true;
  questions=0;
+ messageWrites=0;
  prepare(sql:string){return new FakeStatement(this,sql);}
 }
 let previousEnvironment:unknown;
@@ -75,6 +94,21 @@ describe("YUBERA AI authentication and topic checks",()=>{
    body:JSON.stringify({message:"Порекомендуй мне аниме"}),
   }));
   expect(response.status).toBe(403);
+ });
+ it("does not consume a daily question when the AI provider is unavailable",async()=>{
+  const {db,requestHeaders}=await setup(true);
+  const provider=vi.fn(async()=>new Response(JSON.stringify({error:{message:"temporarily unavailable"}}),{status:503,headers:{"Content-Type":"application/json"}}));
+  vi.stubGlobal("fetch",provider);
+  const response=await handleYuberaAiChat(new Request("https://yume.test/api/yubera/ai",{
+   method:"POST",headers:{...requestHeaders,"Content-Type":"application/json"},
+   body:JSON.stringify({message:"Порекомендуй мне аниме"}),
+  }));
+  const payload=await response.json();
+  expect(response.status).toBe(502);
+  expect(payload.questionCharged).toBe(false);
+  expect(db.questions).toBe(0);
+  expect(db.messageWrites).toBe(0);
+  expect(provider).toHaveBeenCalledOnce();
  });
  it("rejects a daily quota after 20 successful reservations",async()=>{
   const {db,requestHeaders}=await setup(true);
