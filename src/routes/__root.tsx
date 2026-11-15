@@ -20,6 +20,7 @@ import { clearAnimeNavigationOrigin } from "@/data/anime-navigation";
 import { TelegramSubscriptionGate } from "@/components/yume/TelegramSubscriptionGate";
 import { CookieConsentBanner } from "@/components/yume/CookieConsentBanner";
 import { Toaster } from "@/components/ui/sonner";
+import { YuberaAiFloatingButton } from "@/components/yume/YuberaAiFloatingButton";
 
 type InterfaceLanguage = "ru" | "en";
 
@@ -291,6 +292,7 @@ function RootComponent() {
         <SkipToContent />
         <TelegramSubscriptionGate><Outlet /></TelegramSubscriptionGate>
         <CookieConsentBanner />
+        <YuberaAiFloatingButton />
         <Toaster position="top-center" closeButton={false} />
       </YumePreferencesProvider>
     </QueryClientProvider>

@@ -5,6 +5,7 @@ import { MAX_SAVED_ANIME_IDS, normalizeSavedAnimeIds } from "@/data/telegram-lib
 import { isSameOriginRequest } from "@/lib/request-security";
 
 type TelegramEnvironment = Record<string, unknown> & {
+  YUME_AI_RATE_LIMITER?: unknown;
   TELEGRAM_BOT_TOKEN?: string;
   YUME_AUTH_SESSION_SECRET?: string;
   YUME_DB?: unknown;
@@ -38,7 +39,9 @@ type RuntimeGlobal = typeof globalThis & { __YUME_RUNTIME_ENV__?: unknown };
 function environment(): TelegramEnvironment {
   try {
     const native = cloudflareEnv as unknown as TelegramEnvironment;
-    if (native && typeof native === "object") return native;
+    if (native && typeof native === "object" && (
+      native.YUME_DB || native.YUME_AUTH_SESSION_SECRET || native.TELEGRAM_BOT_TOKEN
+    )) return native;
   } catch {
     // Allows endpoint tests to provide an isolated runtime environment.
   }
@@ -859,6 +862,25 @@ export async function handleTelegramSession(request: Request): Promise<Response>
   }
 }
 
+
+
+/** Read-only identity snapshot for server-owned feature authorization. */
+export async function getAuthenticatedYumeAccount(request: Request): Promise<{ userId: string; isPlus: boolean } | null> {
+  const env = environment();
+  const db = database(env);
+  const secret = sessionSecret(env);
+  if (!db || !secret) return null;
+  try {
+    const userId = await authenticatedTelegramUserId(request, db, secret);
+    if (!userId) return null;
+    const subscription = await db.prepare(
+      "SELECT 1 AS active FROM yume_plus_subscriptions WHERE user_id = ? AND status = 'active' AND expires_at > ? LIMIT 1",
+    ).bind(userId, Date.now()).first<{ active: number }>();
+    return { userId, isPlus: Boolean(subscription) };
+  } catch {
+    return null;
+  }
+}
 
 /** Returns the current account id after validating the signed, HttpOnly site session. */
 export async function getAuthenticatedYumeUserId(request: Request): Promise<string | null> {
