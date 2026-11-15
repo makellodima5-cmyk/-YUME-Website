@@ -1999,3 +1999,13 @@ nav[aria-label="Main navigation"] button[aria-current="page"] svg {
 @media(max-height:740px){.yubera-ai-mascot{width:clamp(94px,19vh,142px)}.yubera-ai-intro{margin-top:7px}.yubera-ai-quick{margin-top:13px;gap:6px}.yubera-ai-quick button{min-height:48px}.yubera-ai-quick-icon{width:32px;height:32px}}
 @media(max-width:370px){.yubera-ai-quick button{grid-template-columns:34px minmax(0,1fr) 16px;gap:6px;padding:6px 8px;font-size:.78rem}.yubera-ai-quick-icon{width:30px;height:30px}.yubera-ai-quick-icon svg{width:21px;height:21px}.yubera-ai-composer-wrap{padding-inline:9px}}
 @media(prefers-reduced-motion:reduce){.yubera-ai-fab,.yubera-ai-quick button{transition:none}}
+
+
+/* YUBERA AI: readable assistant typography and stable compact recommendation cards. */
+.yubera-ai-rich-text{display:grid;gap:10px;overflow-wrap:anywhere}
+.yubera-ai-rich-text p{margin:0;line-height:1.65}
+.yubera-ai-rich-text h3{margin:2px 0 0;color:#fff;font-size:1rem;font-weight:800;line-height:1.35}
+.yubera-ai-rich-text ul{display:grid;gap:6px;margin:0;padding-left:1.15rem;list-style:disc}
+.yubera-ai-rich-text li{padding-left:2px;line-height:1.55}
+.yubera-ai-rich-text strong{font-weight:750}
+.yubera-ai-rich-text code{font-size:.92em}
