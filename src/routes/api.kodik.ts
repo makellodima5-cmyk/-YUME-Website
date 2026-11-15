@@ -10,6 +10,7 @@ type KodikResult = {
   id?: string;
   shikimori_id?: string | number;
   worldart_animation_id?: string | number;
+  worldart_link?: string;
   link?: string;
   title?: string;
   translation?: { id?: number | string; title?: string; type?: string } | null;
