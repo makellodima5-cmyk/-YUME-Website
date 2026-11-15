@@ -8,7 +8,7 @@
   "workers_dev": false,
   "preview_urls": false,
   "observability": { "enabled": true },
-  "triggers": { "crons": ["0 */3 * * *"] },
+  "triggers": { "crons": ["0 * * * *"] },
   "vars": { "SITE_URL": "https://yume-website.yumesupport833.workers.dev" },
   "d1_databases": [{
     "binding": "YUME_DB",
@@ -16,6 +16,9 @@
     "database_id": "c2f0f25d-e29b-47e2-ad11-b726f7a3e9a2",
     "migrations_dir": "migrations-clean"
   }],
+  "services": [
+    { "binding": "YUME_CATALOG_READER", "service": "yume-catalog-reader" }
+  ],
   "queues": {
     "consumers": [{
       "queue": "yume-web-tasks",
