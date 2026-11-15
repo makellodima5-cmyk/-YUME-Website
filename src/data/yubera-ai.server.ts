@@ -260,7 +260,7 @@ export async function handleYuberaAiChat(request:Request):Promise<Response> {
   const env=environment(),key=typeof env.YUME_AI_API_KEY==="string"?env.YUME_AI_API_KEY.trim():"";
   if(!key)return json({error:"ai_not_configured"},503);
   const date=utcDate(),limited=await rateLimit(userId,date);
-  if(limited==="limited")return json({error:"rate_limited"},429,{"Retry-After":"86400"});
+  if(limited==="limited")return json({error:"rate_limited"},429,{"Retry-After":"60"});
   if(limited==="unavailable")return json({error:"rate_limit_unavailable"},503);
   const quota=await takeDailyQuestion(db,userId,date);
   if(!quota)return json({error:"daily_limit_reached",limit:YUBERA_AI_DAILY_QUESTION_LIMIT,remaining:0},429);
