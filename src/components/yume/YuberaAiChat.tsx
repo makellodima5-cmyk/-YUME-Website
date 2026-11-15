@@ -31,12 +31,37 @@ function RecommendationCard({ item }: { item: YuberaAiMessage["recommendations"]
     </button>
   );
 }
+function renderInline(text: string, keyPrefix: string) {
+  const parts = text.split(/(\*\*[^*]+\*\*|__[^_]+__|`[^`]+`)/g);
+  return parts.map((part, index) => {
+    if ((part.startsWith("**") && part.endsWith("**")) || (part.startsWith("__") && part.endsWith("__"))) {
+      return <strong key={keyPrefix + index} className="font-semibold text-white">{part.slice(2, -2)}</strong>;
+    }
+    if (part.startsWith("`") && part.endsWith("`")) {
+      return <code key={keyPrefix + index} className="rounded bg-black/25 px-1 py-0.5 text-[.92em] text-[#ffb19f]">{part.slice(1, -1)}</code>;
+    }
+    return <span key={keyPrefix + index}>{part.replace(/\\\\([*_])/g, "$1")}</span>;
+  });
+}
+function AssistantText({ content }: { content: string }) {
+  const normalized = content.replace(/\r\n?/g, "\n").replace(/^\s*[-*]\s+/gm, "• ");
+  const blocks = normalized.split(/\n{2,}/).map(block => block.trim()).filter(Boolean);
+  return <div className="yubera-ai-rich-text">{blocks.map((block, index) => {
+    const lines = block.split("\n");
+    const heading = /^(#{1,3})\s+(.+)$/.exec(lines[0] ?? "");
+    if (heading) return <h3 key={index}>{renderInline(heading[2]!, "h" + index)}</h3>;
+    if (lines.every(line => line.startsWith("• "))) {
+      return <ul key={index}>{lines.map((line, lineIndex) => <li key={lineIndex}>{renderInline(line.slice(2), "l" + index + "-" + lineIndex)}</li>)}</ul>;
+    }
+    return <p key={index}>{lines.map((line, lineIndex) => <span key={lineIndex}>{lineIndex > 0 && <br />}{renderInline(line.replace(/^\*\*(.+)\*\*$/, "$1"), "p" + index + "-" + lineIndex)}</span>)}</p>;
+  })}</div>;
+}
 function MessageBubble({ message }: { message: YuberaAiMessage }) {
   const user = message.role === "user";
   return (
     <div className={user ? "flex justify-end" : "flex justify-start"}>
       <div className={user ? "max-w-[88%] rounded-[22px] rounded-br-md border border-[#FF6548]/25 bg-[#FF5738]/15 px-4 py-3 text-sm leading-relaxed text-white" : "max-w-[94%] rounded-[22px] rounded-bl-md border border-white/10 bg-[#191a22] px-4 py-3 text-sm leading-relaxed text-white/90"}>
-        <p className="whitespace-pre-wrap break-words">{message.content}</p>
+        {user ? <p className="whitespace-pre-wrap break-words">{message.content}</p> : <AssistantText content={message.content} />}
         {!user && message.recommendations.length > 0 && <div className="mt-3 grid gap-2">{message.recommendations.map(item => <RecommendationCard key={item.id} item={item} />)}</div>}
         <time className="mt-2 block text-right text-[10px] text-white/35">{new Date(message.createdAt).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}</time>
       </div>
