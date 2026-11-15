@@ -680,7 +680,7 @@ export const getShikimoriAnimeDetails = createServerFn({ method: "GET" })
  */
 export const getShikimoriAnimeScreenshots = createServerFn({ method: "GET" })
   .validator((input: { animeId?: unknown }) => ({
-    animeId: typeof input?.animeId === "string" && /^\d{1,12}$/.test(input.animeId) ? input.animeId : "",
+    animeId: isValidCatalogId(input?.animeId) ? input.animeId : "",
   }))
   .handler(async ({ data }) => {
     if (!data.animeId) return { items: [] as ShikimoriScreenshot[] };
