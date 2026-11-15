@@ -39,7 +39,9 @@ type RuntimeGlobal = typeof globalThis & { __YUME_RUNTIME_ENV__?: unknown };
 function environment(): TelegramEnvironment {
   try {
     const native = cloudflareEnv as unknown as TelegramEnvironment;
-    if (native && typeof native === "object") return native;
+    if (native && typeof native === "object" && (
+      native.YUME_DB || native.YUME_AUTH_SESSION_SECRET || native.TELEGRAM_BOT_TOKEN
+    )) return native;
   } catch {
     // Allows endpoint tests to provide an isolated runtime environment.
   }
