@@ -29,6 +29,10 @@ export type Anime = {
   kodikAvailable?: boolean;
   /** Origin of a manually imported catalogue record. */
   catalogSource?: "shikimori" | "kodik";
+  /** External identifiers retained for Kodik-backed records. */
+  shikimoriId?: string;
+  worldArtId?: string;
+  kodikId?: string;
 };
 
 export const ANIME: Anime[] = [
