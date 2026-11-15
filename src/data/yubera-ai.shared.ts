@@ -20,15 +20,16 @@ export function getYuberaAiModelId(value: unknown): YuberaAiModelId | null {
     ? value as YuberaAiModelId : null;
 }
 
-const ANIME_TERMS = /аниме|тайтл|титл|мультфильм|манг|shikimori|yubera|юбер|каталог|подбор|рекоменд|посмотр|сер(ия|ии|ий|и)|эпизод|озвуч|сезон|жанр|персонаж|сюжет|студия|режиссер|режисс|факт|истори|производств|анимац|премьера|онгоинг|анонс|плеер|просмотр|избран|смотреть позже|подписк|plus|плюс|профил|функци|возможност|раздел|сайт|проект|сервис|аккаунт|пользоват|лимит|чат|бот|помощник|оплат|тариф|доступ|поддержк|настройк|поиск|описани|постер|рейтинг|оценк|фильтр|коллекци|подборк|новинк|популярн|anime|manga/i;
-const OFF_TOPIC_TERMS = /населени[ея]|погод[аы]|курс валют|программир|написать код|python|javascript|рецепт|политик|выборы|криптовалют|акции на бирже|реши уравнени|домашн(яя|юю) работ|курсов(ая|ую)|переведи текст|translate this|write an essay|сделай сайт|создай приложение/i;
-const QUESTION_START = /^(?:что|кто|когда|где|почему|зачем|как|какой|какая|какие|сколько|посоветуй|порекомендуй|подбери|расскажи|объясни|покажи|найди|хочу|мне нравится|мне понравил|что посмотреть|что глянуть|today|what|who|when|where|why|how|recommend|suggest|tell me|show me|find|i like|i loved)\b/i;
+const DOMAIN_TERMS = /аниме|тайтл|титл|мультфильм|манг(?:а|и|у|ой)?|shikimori|yubera|юбер|каталог|подбор|рекоменд|посмотр|сер(?:ия|ии|ий|и)|эпизод|озвуч|сезон|жанр|персонаж|сюжет|студи[яи]|режисс|анимац|премьера|онгоинг|анонс|плеер|просмотр|избран|смотреть позже|подписк|plus|плюс|профил|функци|возможност|раздел|сайт|проект|сервис|аккаунт|пользоват|лимит|чат|бот|помощник|оплат|тариф|доступ|поддержк|настройк|поиск|описани|постер|рейтинг|оценк|фильтр|коллекци|подборк|новинк|популярн|anime|manga/i;
+const OFF_TOPIC_TERMS = /населени[ея]|погод[аы]|курс валют|программир|написать код|python|javascript|рецепт|политик|выборы|криптовалют|акции на бирже|реши уравнени|домашн(яя|юю) работ|курсов(ая|ую)|переведи текст|translate this|write an essay|сделай сайт|создай приложение|population|weather|stock market|politic|election|recipe|solve an equation|write code|build a website/i;
+const FOLLOW_UP = /^(?:а\\s+)?(?:почему|зачем|как именно|подробнее|расскажи подробнее|а он|а она|а этот|а эта|а это|а какие|а какой|а сколько|а есть|можешь подробнее|продолжи|и что дальше|что насчет этого|почему именно|what about|tell me more|why is that|and what about)(?:\\s|[?!.,]|$)/i;
 
-export function isAllowedYuberaAiTopic(value: string): boolean {
+export function isAllowedYuberaAiTopic(value: string, previousContext = ""): boolean {
   const text = value.toLocaleLowerCase("ru-RU").replace(/ё/g, "е").trim();
   if (text.length < 2 || OFF_TOPIC_TERMS.test(text)) return false;
-  if (ANIME_TERMS.test(text)) return true;
-  return QUESTION_START.test(text);
+  if (DOMAIN_TERMS.test(text)) return true;
+  const context = previousContext.toLocaleLowerCase("ru-RU").replace(/ё/g, "е");
+  return text.length <= 100 && FOLLOW_UP.test(text) && DOMAIN_TERMS.test(context);
 }
 
 export function sanitizeAiRecommendations(value: unknown): Array<{ id: string; reason: string }> {
