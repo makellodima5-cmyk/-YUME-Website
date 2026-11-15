@@ -473,7 +473,7 @@ function Index() {
   const [adminImportMessage, setAdminImportMessage] = useState("");
   const [adminImportTitleQuery, setAdminImportTitleQuery] = useState("");
   const [adminTitleImportSource, setAdminTitleImportSource] = useState<"shikimori" | "kodik">("shikimori");
-  const [adminTitleSearchResults, setAdminTitleSearchResults] = useState<Array<{id:string;title:string;englishTitle:string;originalTitle:string;year:number;kind:string|null;status:string;posterUrl:string|null;genres:string[];ageRating:string|null;alreadyInCatalog:boolean;kodikId?:string}>>([]);
+  const [adminTitleSearchResults, setAdminTitleSearchResults] = useState<Array<{id:string;title:string;englishTitle:string;originalTitle:string;year:number;kind:string|null;status:string;posterUrl:string|null;genres:string[];ageRating:string|null;alreadyInCatalog:boolean;kodikId?:string;shikimoriId?:string|null;worldArtId?:string|null}>>([]);
   const [adminTitleSearchBusy, setAdminTitleSearchBusy] = useState(false);
   const [adminTitleImportBusy, setAdminTitleImportBusy] = useState<string | null>(null);
   const [adminTitleSearchMessage, setAdminTitleSearchMessage] = useState("");
@@ -1235,7 +1235,7 @@ function Index() {
         credentials: "same-origin",
         cache: "no-store",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: adminTitleImportSource === "kodik" ? "search_kodik_title" : "search_title", query }),
+        body: JSON.stringify(adminTitleImportSource === "kodik" ? (/^\d{1,12}$/.test(query) || /^https?:\/\//i.test(query) ? { action:"search_kodik_title", worldArt:query } : { action:"search_kodik_title", query }) : { action:"search_title", query }),
       });
       const payload = await response.json().catch(() => ({})) as {
         isAdmin?: boolean;
@@ -1258,7 +1258,7 @@ function Index() {
     }
   };
 
-  const importCatalogTitle = async (animeId: string, kodikId?: string) => {
+  const importCatalogTitle = async (animeId: string, kodikId?: string, shikimoriId?: string | null, worldArtId?: string | null) => {
     if (!isAdmin || adminTitleImportBusy || adminImportRunning || metadataRefreshRunning) return;
     setAdminTitleImportBusy(animeId);
     setAdminTitleSearchMessage("");
@@ -1268,7 +1268,7 @@ function Index() {
         credentials: "same-origin",
         cache: "no-store",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(adminTitleImportSource === "kodik" ? { action: "import_kodik_title", animeId, kodikId, query: adminImportTitleQuery.trim() } : { action: "import_title", animeId }),
+        body: JSON.stringify(adminTitleImportSource === "kodik" ? { action:"import_kodik_title", animeId, kodikId, shikimoriId, worldArtId, query: /^https?:\/\//i.test(adminImportTitleQuery.trim()) || /^\d{1,12}$/.test(adminImportTitleQuery.trim()) ? "" : adminImportTitleQuery.trim(), worldArt: /^https?:\/\//i.test(adminImportTitleQuery.trim()) || /^\d{1,12}$/.test(adminImportTitleQuery.trim()) ? adminImportTitleQuery.trim() : "" } : { action:"import_title", animeId }),
       });
       const payload = await response.json().catch(() => ({})) as {
         isAdmin?: boolean;
@@ -2220,7 +2220,7 @@ function Index() {
                         onChange={event => { setAdminImportTitleQuery(event.target.value); setAdminTitleSearchResults([]); setAdminTitleSearchMessage(""); }}
                         maxLength={120}
                         minLength={2}
-                        placeholder={language === "ru" ? (adminTitleImportSource === "kodik" ? "Например: Стальной алхимик" : "Например: Frieren, フリーレン, Фрирен") : "For example: Frieren"}
+                        placeholder={language === "ru" ? (adminTitleImportSource === "kodik" ? "Название, World Art ID или ссылка World Art" : "Например: Frieren, フリーレン, Фрирен") : "For example: Frieren"}
                         aria-label={language === "ru" ? "Название аниме для поиска" : "Anime title to search"}
                         disabled={adminTitleSearchBusy || Boolean(adminTitleImportBusy) || adminImportRunning || metadataRefreshRunning}
                         className="h-11 min-w-0 rounded-xl border border-[#22232B] bg-[#101116] px-3 text-sm text-white placeholder:text-muted-foreground focus:border-[#FF764F] focus:outline-none focus:ring-1 focus:ring-[#FF764F] disabled:opacity-60"
@@ -2247,11 +2247,11 @@ function Index() {
                             <div className="min-w-0 flex-1">
                               <h4 className="break-words text-sm font-medium text-white">{item.title}</h4>
                               <p className="mt-0.5 break-words text-xs text-muted-foreground">{[item.originalTitle !== item.title ? item.originalTitle : "", item.englishTitle !== item.originalTitle ? item.englishTitle : "", item.year > 0 ? String(item.year) : "", item.kind ?? "", item.ageRating ? (language==="ru" ? "Возраст: " : "Age: ") + item.ageRating : "", ...(item.genres ?? []).slice(0,3)].filter(Boolean).join(" · ")}</p>
-                              <p className="mt-0.5 text-[11px] text-muted-foreground">{adminTitleImportSource === "kodik" ? "Kodik ID: " + (item.kodikId ?? "—") + " · Shikimori ID: " + item.id : "Shikimori ID: " + item.id}{item.status ? " · " + item.status : ""}</p>
+                              <p className="mt-0.5 text-[11px] text-muted-foreground">{adminTitleImportSource === "kodik" ? "Kodik ID: " + (item.kodikId ?? "—") + (item.shikimoriId ? " · Shikimori ID: " + item.shikimoriId : "") + (item.worldArtId ? " · World Art ID: " + item.worldArtId : "") : "Shikimori ID: " + item.id}{item.status ? " · " + item.status : ""}</p>
                             </div>
                             <button
                               type="button"
-                              onClick={() => { void importCatalogTitle(item.id,item.kodikId); }}
+                              onClick={() => { void importCatalogTitle(item.id,item.kodikId,item.shikimoriId,item.worldArtId); }}
                               disabled={item.alreadyInCatalog || Boolean(adminTitleImportBusy) || adminTitleSearchBusy || adminImportRunning || metadataRefreshRunning}
                               className={item.alreadyInCatalog
                                 ? "min-h-9 shrink-0 rounded-lg border border-border px-2.5 py-2 text-[11px] font-medium text-muted-foreground"

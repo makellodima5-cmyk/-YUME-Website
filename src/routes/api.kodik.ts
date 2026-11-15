@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { env as cloudflareEnv } from "cloudflare:workers";
 import { enforceRateLimit } from "@/lib/rate-limit";
+import { getR2Anime } from "@/data/catalog-r2.server";
 
 type Environment = Record<string, unknown> & { KODIK_API_TOKEN?: string; KODIK_RATE_LIMITER?: unknown };
 type EpisodeValue = string | { link?: string; title?: string | null };
@@ -8,6 +9,8 @@ type KodikSeason = { episodes?: Record<string, EpisodeValue> };
 type KodikResult = {
   id?: string;
   shikimori_id?: string | number;
+  worldart_animation_id?: string | number;
+  worldart_link?: string;
   link?: string;
   title?: string;
   translation?: { id?: number | string; title?: string; type?: string } | null;
@@ -82,9 +85,16 @@ async function handleKodik(request: Request): Promise<Response> {
     return json({ error: "Rate limiting is temporarily unavailable." }, 503);
   }
 
+  const catalogAnime = await getR2Anime(animeId).catch(() => null);
+  const worldArtId = catalogAnime?.catalogSource === "kodik" && !catalogAnime.shikimoriId
+    ? catalogAnime.worldArtId ?? ""
+    : "";
+  const shikimoriId = catalogAnime?.shikimoriId ?? animeId;
+  if (worldArtId && !/^\d{1,12}$/.test(worldArtId)) return json({ error: "Invalid World Art ID." }, 400);
   const url = new URL("https://kodik-api.com/search");
   url.searchParams.set("token", token);
-  url.searchParams.set("shikimori_id", animeId);
+  if (worldArtId) url.searchParams.set("worldart_animation_id", worldArtId);
+  else url.searchParams.set("shikimori_id", shikimoriId);
   url.searchParams.set("with_episodes_data", "true");
   url.searchParams.set("limit", "100");
 
@@ -115,6 +125,10 @@ async function handleKodik(request: Request): Promise<Response> {
   // the separate availability checker so it cannot hide the playable sources.
   const sources = new Map<string, { id: string; title: string; episodes: Map<number, { number: number; title: string; link: string }> }>();
   for (const result of payload.results) {
+    if (worldArtId) {
+      const linkedId = (() => { try { return new URL(result.worldart_link ?? "").searchParams.get("id") ?? ""; } catch { return ""; } })();
+      if (String(result.worldart_animation_id ?? linkedId) !== worldArtId) continue;
+    } else if (String(result.shikimori_id ?? "") !== shikimoriId) continue;
     const translationId = String(result.translation?.id ?? result.id ?? "");
     const translationTitle = (result.translation?.title || result.title || "").trim();
     if (!translationId || !translationTitle) continue;
