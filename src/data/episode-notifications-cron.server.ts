@@ -52,7 +52,7 @@ export async function runScheduledEpisodeNotifications(input: unknown): Promise<
   if (!token) throw new Error("KODIK_API_TOKEN is not configured for episode notifications.");
 
   const catalogStartedAt = Date.now();
-  let catalog: Awaited<ReturnType<typeof readCatalogState>>;
+  let catalog;
   try {
     catalog = await readCatalogState();
   } catch (error) {

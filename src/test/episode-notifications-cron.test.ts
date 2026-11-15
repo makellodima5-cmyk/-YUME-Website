@@ -143,11 +143,13 @@ describe("Kodik voice-over episode notification cron", () => {
   });
 
   it("fails closed when the private catalogue reader is unavailable", async () => {
-    const bindings = env as unknown as Record<string, unknown>;
-    const previousReader = bindings.YUME_CATALOG_READER;
-    bindings.YUME_CATALOG_READER = {
-      fetch: async () => Response.json({ error: "catalog_unavailable" }, { status: 503 }),
-    };
+    const restoreCatalog = setupCatalog();
+    const reader = (env as unknown as { YUME_CATALOG_READER: { fetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response> } }).YUME_CATALOG_READER;
+    const previousFetch = reader.fetch;
+    reader.fetch = async () => new Response(JSON.stringify({ error: "catalog_unavailable" }), {
+      status: 503,
+      headers: { "Content-Type": "application/json" },
+    });
     const { db, updates } = fakeDatabase([
       { anime_id: "123", translation_id: "voice-a", translation_title: "Озвучка A", source_last_episode: 5, baseline_episode: 5 },
     ]);
@@ -161,7 +163,8 @@ describe("Kodik voice-over episode notification cron", () => {
       expect(fetchMock).not.toHaveBeenCalled();
       expect(updates).toHaveLength(0);
     } finally {
-      bindings.YUME_CATALOG_READER = previousReader;
+      reader.fetch = previousFetch;
+      restoreCatalog();
       vi.unstubAllGlobals();
     }
   });
