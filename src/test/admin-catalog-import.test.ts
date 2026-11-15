@@ -194,7 +194,7 @@ describe("Kodik catalogue title search mapping", () => {
   it("ignores results without a valid Shikimori identity or Kodik material ID", () => {
     expect(normalizeKodikCatalogResults([
       { ...kodikMaterial, shikimori_id: null },
-      { ...kodikMaterial, id: "not-numeric" },
+      { ...kodikMaterial, id: "bad/id" },
     ], [])).toEqual([]);
   });
 });
