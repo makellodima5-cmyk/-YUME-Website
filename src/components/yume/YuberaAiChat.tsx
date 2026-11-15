@@ -124,6 +124,10 @@ export function YuberaAiChat() {
         return;
       }
       if (response.status === 429) {
+        if (data.error === "rate_limited") {
+          setNotice(ru ? "Слишком много запросов подряд. Попробуй через минуту." : "Too many requests in a short period. Try again in a minute.");
+          return;
+        }
         const used = Number(data.limit ?? usage.limit);
         setUsage(current => ({ ...current, remaining: 0, used: used || current.limit }));
         setNotice(ru ? "Дневной лимит из 20 вопросов исчерпан." : "The daily limit of 20 questions has been reached.");
