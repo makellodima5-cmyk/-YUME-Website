@@ -446,6 +446,11 @@ function Index() {
   const [notificationDraftTitle, setNotificationDraftTitle] = useState("");
   const [notificationDraftBody, setNotificationDraftBody] = useState("");
   const [notificationDraftTarget, setNotificationDraftTarget] = useState("");
+  const [notificationRecipientMode, setNotificationRecipientMode] = useState<"all" | "individual">("all");
+  const [notificationUsernameQuery, setNotificationUsernameQuery] = useState("");
+  const [notificationSearchBusy, setNotificationSearchBusy] = useState(false);
+  const [notificationSearchResults, setNotificationSearchResults] = useState<Array<{id:string;username:string|null;displayName:string}>>([]);
+  const [notificationSelectedRecipient, setNotificationSelectedRecipient] = useState<{id:string;username:string|null;displayName:string}|null>(null);
   const [notificationPublishBusy, setNotificationPublishBusy] = useState(false);
   const [notificationItems, setNotificationItems] = useState<Array<{id:string;publishedAt:string;title:{ru:string;en:string};description:{ru:string;en:string};targetUrl?:string|null;dynamic?:boolean}>>([...USER_NOTIFICATIONS]);
   const [notificationReadIds, setNotificationReadIds] = useState<string[]>([]);
@@ -2194,13 +2199,93 @@ function Index() {
               </section>
               <details open={expandedAdminSections.notifications} onToggle={event => { const isOpen = event.currentTarget.open; setExpandedAdminSections(current => current.notifications === isOpen ? current : {...current, notifications: isOpen}); }} className="group mb-3 overflow-hidden rounded-2xl border border-[#22232B] bg-[#101116]" aria-label={language === "ru" ? "Уведомления пользователям" : "User notifications"}>
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 hover:bg-card/80 [&::-webkit-details-marker]:hidden">
-                  <span className="flex items-center gap-3"><Bell className="h-5 w-5 text-[#FF764F]"/><span><span className="block font-semibold">{language === "ru" ? "Уведомления пользователям" : "Notify users"}</span><span className="mt-1 block text-xs text-muted-foreground">{language === "ru" ? "Опубликовать сообщение для всех аккаунтов" : "Publish a message for all accounts"}</span></span></span><ChevronDown className="h-4 w-4 text-muted-foreground transition-transform group-open:rotate-180"/>
+                  <span className="flex items-center gap-3"><Bell className="h-5 w-5 text-[#FF764F]"/><span><span className="block font-semibold">{language === "ru" ? "Уведомления пользователям" : "Notify users"}</span><span className="mt-1 block text-xs text-muted-foreground">{language === "ru" ? "Общая или персональная рассылка" : "Broadcast or individual notification"}</span></span></span><ChevronDown className="h-4 w-4 text-muted-foreground transition-transform group-open:rotate-180"/>
                 </summary>
-                <form className="grid gap-3 border-t border-border/70 p-4" onSubmit={async event => { event.preventDefault(); if (!isAdmin || notificationPublishBusy) return; setNotificationPublishBusy(true); setAdminMessage(""); try { const response = await fetch("/api/admin-notifications", { method:"POST", credentials:"same-origin", cache:"no-store", headers:{"Content-Type":"application/json"}, body:JSON.stringify({title:notificationDraftTitle,body:notificationDraftBody,targetUrl:notificationDraftTarget || null}) }); const payload = await response.json().catch(()=>({})) as {error?:string;notification?:{id:string;title:string;body:string;targetUrl:string|null}}; if (!response.ok || !payload.notification) throw new Error(payload.error || "publish_failed"); const n = payload.notification; setNotificationItems(current => [{id:n.id,publishedAt:new Date().toISOString(),title:{ru:n.title,en:n.title},description:{ru:n.body,en:n.body},targetUrl:n.targetUrl,dynamic:true},...current]); setNotificationDraftTitle(""); setNotificationDraftBody(""); setNotificationDraftTarget(""); setAdminMessage(language === "ru" ? "Уведомление опубликовано для всех пользователей." : "Notification published for all users."); } catch { setAdminMessage(language === "ru" ? "Не удалось опубликовать уведомление. Проверь подключение и права администратора." : "Could not publish notification. Check connection and admin access."); } finally { setNotificationPublishBusy(false); } }}>
-                  <label className="grid gap-1 text-sm"><span>{language === "ru" ? "Заголовок" : "Title"}</span><input required maxLength={120} value={notificationDraftTitle} onChange={event=>setNotificationDraftTitle(event.target.value)} className="rounded-lg border border-border bg-background px-3 py-2" placeholder={language === "ru" ? "Например, технические работы" : "For example, scheduled maintenance"}/></label>
-                  <label className="grid gap-1 text-sm"><span>{language === "ru" ? "Текст уведомления" : "Notification message"}</span><textarea required maxLength={2000} rows={4} value={notificationDraftBody} onChange={event=>setNotificationDraftBody(event.target.value)} className="resize-y rounded-lg border border-border bg-background px-3 py-2" placeholder={language === "ru" ? "Сообщение для всех пользователей" : "Message for all users"}/></label>
-                  <label className="grid gap-1 text-sm"><span>{language === "ru" ? "Внутренняя ссылка (необязательно)" : "Internal link (optional)"}</span><input value={notificationDraftTarget} onChange={event=>setNotificationDraftTarget(event.target.value)} pattern="\/(?!\/).*" maxLength={500} className="rounded-lg border border-border bg-background px-3 py-2" placeholder="/"/></label>
-                  <button type="submit" disabled={notificationPublishBusy || !notificationDraftTitle.trim() || !notificationDraftBody.trim()} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">{notificationPublishBusy ? (language === "ru" ? "Публикуем…" : "Publishing…") : (language === "ru" ? "Отправить всем пользователям" : "Send to all users")}</button>
+                <form className="grid gap-3 border-t border-border/70 p-4" onSubmit={async event => {
+                  event.preventDefault();
+                  if (!isAdmin || notificationPublishBusy || (notificationRecipientMode === "individual" && !notificationSelectedRecipient)) return;
+                  setNotificationPublishBusy(true);
+                  setAdminMessage("");
+                  try {
+                    const response = await fetch("/api/admin-notifications", {
+                      method: "POST", credentials: "same-origin", cache: "no-store",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        title: notificationDraftTitle,
+                        body: notificationDraftBody,
+                        targetUrl: notificationDraftTarget || null,
+                        recipientUserId: notificationRecipientMode === "individual" ? notificationSelectedRecipient?.id : null,
+                      }),
+                    });
+                    const payload = await response.json().catch(() => ({})) as {
+                      error?: string;
+                      notification?: { id: string; title: string; body: string; targetUrl: string | null; recipient?: { displayName: string; username: string | null } | null };
+                    };
+                    if (!response.ok || !payload.notification) throw new Error(payload.error || "publish_failed");
+                    const n = payload.notification;
+                    if (notificationRecipientMode === "all") {
+                      setNotificationItems(current => [{ id: n.id, publishedAt: new Date().toISOString(), title: { ru: n.title, en: n.title }, description: { ru: n.body, en: n.body }, targetUrl: n.targetUrl, dynamic: true }, ...current]);
+                    }
+                    setNotificationDraftTitle("");
+                    setNotificationDraftBody("");
+                    setNotificationDraftTarget("");
+                    setAdminMessage(notificationRecipientMode === "individual"
+                      ? (language === "ru" ? `Персональное уведомление отправлено пользователю ${n.recipient?.username ? "@" + n.recipient.username : n.recipient?.displayName}.` : `Individual notification sent to ${n.recipient?.username ? "@" + n.recipient.username : n.recipient?.displayName}.`)
+                      : (language === "ru" ? "Уведомление опубликовано для всех пользователей." : "Notification published for all users."));
+                    setNotificationRecipientMode("all");
+                    setNotificationSelectedRecipient(null);
+                    setNotificationSearchResults([]);
+                    setNotificationUsernameQuery("");
+                  } catch {
+                    setAdminMessage(language === "ru" ? "Не удалось опубликовать уведомление. Проверь подключение и права администратора." : "Could not publish notification. Check connection and admin access.");
+                  } finally { setNotificationPublishBusy(false); }
+                }}>
+                  <div className="grid grid-cols-2 gap-2 rounded-xl bg-background p-1">
+                    <button type="button" onClick={() => setNotificationRecipientMode("all")} className={`rounded-lg px-3 py-2 text-sm font-medium ${notificationRecipientMode === "all" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}>{language === "ru" ? "Всем" : "Everyone"}</button>
+                    <button type="button" onClick={() => setNotificationRecipientMode("individual")} className={`rounded-lg px-3 py-2 text-sm font-medium ${notificationRecipientMode === "individual" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}>{language === "ru" ? "Одному пользователю" : "One user"}</button>
+                  </div>
+                  {notificationRecipientMode === "individual" && (
+                    <div className="grid gap-2 rounded-xl border border-border p-3">
+                      <label className="grid gap-1 text-sm">
+                        <span>{language === "ru" ? "Telegram username пользователя" : "User Telegram username"}</span>
+                        <input value={notificationUsernameQuery} onChange={event => { setNotificationUsernameQuery(event.target.value); setNotificationSelectedRecipient(null); setNotificationSearchResults([]); }} maxLength={33} className="rounded-lg border border-border bg-background px-3 py-2" placeholder="@username"/>
+                      </label>
+                      <button type="button" disabled={notificationSearchBusy || notificationUsernameQuery.trim().replace(/^@/, "").length < 5} onClick={async () => {
+                        if (!isAdmin || notificationSearchBusy) return;
+                        setNotificationSearchBusy(true);
+                        setNotificationSelectedRecipient(null);
+                        setAdminMessage("");
+                        try {
+                          const response = await fetch("/api/admin-notifications?username=" + encodeURIComponent(notificationUsernameQuery.trim()), { credentials: "same-origin", cache: "no-store" });
+                          const payload = await response.json().catch(() => ({})) as { error?: string; users?: Array<{ id: string; username: string | null; displayName: string }> };
+                          if (!response.ok || !Array.isArray(payload.users)) throw new Error(payload.error || "user_search_failed");
+                          setNotificationSearchResults(payload.users);
+                          if (!payload.users.length) setAdminMessage(language === "ru" ? "Пользователь с таким username не найден." : "No user found with that username.");
+                        } catch {
+                          setAdminMessage(language === "ru" ? "Не удалось найти пользователя. Проверь username и попробуй ещё раз." : "Could not find the user. Check the username and try again.");
+                        } finally { setNotificationSearchBusy(false); }
+                      }} className="inline-flex min-h-10 items-center justify-center rounded-lg border border-border px-3 py-2 text-sm font-medium disabled:opacity-50">
+                        {notificationSearchBusy ? (language === "ru" ? "Ищем…" : "Searching…") : (language === "ru" ? "Найти пользователя" : "Find user")}
+                      </button>
+                      {notificationSearchResults.length > 0 && (
+                        <div className="grid gap-1">
+                          {notificationSearchResults.map(user => (
+                            <button key={user.id} type="button" onClick={() => setNotificationSelectedRecipient(user)} className={`rounded-lg border px-3 py-2 text-left text-sm ${notificationSelectedRecipient?.id === user.id ? "border-primary bg-primary/10" : "border-border bg-background"}`}>
+                              <span className="block font-medium">{user.username ? "@" + user.username : user.displayName}</span>
+                              {user.username && <span className="block text-xs text-muted-foreground">{user.displayName}</span>}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {notificationSelectedRecipient && <p className="text-xs text-primary">{language === "ru" ? "Получатель: " : "Recipient: "}{notificationSelectedRecipient.username ? "@" + notificationSelectedRecipient.username : notificationSelectedRecipient.displayName}</p>}
+                    </div>
+                  )}
+                  <label className="grid gap-1 text-sm"><span>{language === "ru" ? "Заголовок" : "Title"}</span><input required maxLength={120} value={notificationDraftTitle} onChange={event => setNotificationDraftTitle(event.target.value)} className="rounded-lg border border-border bg-background px-3 py-2" placeholder={language === "ru" ? "Например, технические работы" : "For example, scheduled maintenance"}/></label>
+                  <label className="grid gap-1 text-sm"><span>{language === "ru" ? "Текст уведомления" : "Notification message"}</span><textarea required maxLength={2000} rows={4} value={notificationDraftBody} onChange={event => setNotificationDraftBody(event.target.value)} className="resize-y rounded-lg border border-border bg-background px-3 py-2" placeholder={language === "ru" ? "Текст уведомления" : "Notification message"}/></label>
+                  <label className="grid gap-1 text-sm"><span>{language === "ru" ? "Внутренняя ссылка (необязательно)" : "Internal link (optional)"}</span><input value={notificationDraftTarget} onChange={event => setNotificationDraftTarget(event.target.value)} pattern="\\/(?!\\/).*" maxLength={500} className="rounded-lg border border-border bg-background px-3 py-2" placeholder="/"/></label>
+                  <button type="submit" disabled={notificationPublishBusy || !notificationDraftTitle.trim() || !notificationDraftBody.trim() || (notificationRecipientMode === "individual" && !notificationSelectedRecipient)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">
+                    {notificationPublishBusy ? (language === "ru" ? "Публикуем…" : "Publishing…") : notificationRecipientMode === "individual" ? (language === "ru" ? "Отправить выбранному пользователю" : "Send to selected user") : (language === "ru" ? "Отправить всем пользователям" : "Send to all users")}
+                  </button>
                 </form>
               </details>
               <details open={expandedAdminSections.import} onToggle={event => { const isOpen = event.currentTarget.open; setExpandedAdminSections(current => current.import === isOpen ? current : {...current, import: isOpen}); }} className="group mb-3 overflow-hidden rounded-2xl border border-[#FF5A3D] bg-[#101116] shadow-[0_0_18px_rgba(157,64,245,0.10)]" aria-label={language === "ru" ? "Пополнение каталога" : "Catalog import"}>
