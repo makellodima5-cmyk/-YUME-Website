@@ -2247,7 +2247,7 @@ function Index() {
                             <div className="min-w-0 flex-1">
                               <h4 className="break-words text-sm font-medium text-white">{item.title}</h4>
                               <p className="mt-0.5 break-words text-xs text-muted-foreground">{[item.originalTitle !== item.title ? item.originalTitle : "", item.englishTitle !== item.originalTitle ? item.englishTitle : "", item.year > 0 ? String(item.year) : "", item.kind ?? "", item.ageRating ? (language==="ru" ? "Возраст: " : "Age: ") + item.ageRating : "", ...(item.genres ?? []).slice(0,3)].filter(Boolean).join(" · ")}</p>
-                              <p className="mt-0.5 text-[11px] text-muted-foreground">{adminTitleImportSource === "kodik" ? "Kodik ID: " + (item.kodikId ?? "—") + " · Shikimori ID: " + item.id : "Shikimori ID: " + item.id}{item.status ? " · " + item.status : ""}</p>
+                              <p className="mt-0.5 text-[11px] text-muted-foreground">{adminTitleImportSource === "kodik" ? "Kodik ID: " + (item.kodikId ?? "—") + (item.shikimoriId ? " · Shikimori ID: " + item.shikimoriId : "") + (item.worldArtId ? " · World Art ID: " + item.worldArtId : "") : "Shikimori ID: " + item.id}{item.status ? " · " + item.status : ""}</p>
                             </div>
                             <button
                               type="button"
