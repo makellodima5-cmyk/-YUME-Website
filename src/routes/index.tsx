@@ -1221,8 +1221,12 @@ function Index() {
   const searchCatalogTitle = async () => {
     if (!isAdmin || adminTitleSearchBusy || adminTitleImportBusy || adminImportRunning || metadataRefreshRunning) return;
     const query = adminImportTitleQuery.trim();
-    if (query.length < 2) {
-      setAdminTitleSearchMessage(language === "ru" ? "Введи не менее двух символов названия." : "Enter at least two characters.");
+    const isWorldArtLookup = adminTitleImportSource === "kodik" &&
+      (/^\d{1,12}$/.test(query) || /^https?:\/\//i.test(query));
+    if (query.length < 2 && !isWorldArtLookup) {
+      setAdminTitleSearchMessage(language === "ru"
+        ? (adminTitleImportSource === "kodik" ? "Введи минимум два символа названия или World Art ID/ссылку." : "Введи не менее двух символов названия.")
+        : (adminTitleImportSource === "kodik" ? "Enter at least two title characters or a World Art ID/link." : "Enter at least two characters."));
       setAdminTitleSearchResults([]);
       return;
     }
@@ -2219,7 +2223,6 @@ function Index() {
                         value={adminImportTitleQuery}
                         onChange={event => { setAdminImportTitleQuery(event.target.value); setAdminTitleSearchResults([]); setAdminTitleSearchMessage(""); }}
                         maxLength={120}
-                        minLength={2}
                         placeholder={language === "ru" ? (adminTitleImportSource === "kodik" ? "Название, World Art ID или ссылка World Art" : "Например: Frieren, フリーレン, Фрирен") : "For example: Frieren"}
                         aria-label={language === "ru" ? "Название аниме для поиска" : "Anime title to search"}
                         disabled={adminTitleSearchBusy || Boolean(adminTitleImportBusy) || adminImportRunning || metadataRefreshRunning}
@@ -2227,7 +2230,7 @@ function Index() {
                       />
                       <button
                         type="submit"
-                        disabled={adminTitleSearchBusy || Boolean(adminTitleImportBusy) || adminImportRunning || metadataRefreshRunning || adminImportTitleQuery.trim().length < 2}
+                        disabled={adminTitleSearchBusy || Boolean(adminTitleImportBusy) || adminImportRunning || metadataRefreshRunning || (adminImportTitleQuery.trim().length < 2 && !(adminTitleImportSource === "kodik" && (/^\d{1,12}$/.test(adminImportTitleQuery.trim()) || /^https?:\/\//i.test(adminImportTitleQuery.trim()))))}
                         className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#FF764F] px-4 py-2 text-sm font-semibold text-[#F6F4F5] transition hover:bg-[#22232B] disabled:cursor-wait disabled:opacity-50"
                       >
                         <Search className="h-4 w-4" />
