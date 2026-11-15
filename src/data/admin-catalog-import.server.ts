@@ -59,6 +59,8 @@ type KodikCatalogResult = {
   other_title?: string | null;
   year?: number | string | null;
   shikimori_id?: string | number | null;
+  worldart_animation_id?: string | number | null;
+  worldart_link?: string | null;
   screenshots?: string[] | null;
   material_data?: KodikMaterialData | null;
 };
@@ -66,6 +68,8 @@ type KodikCatalogPayload = { results?: KodikCatalogResult[]; error?: string };
 export type KodikCatalogSearchItem = {
   id: string;
   kodikId: string;
+  shikimoriId: string | null;
+  worldArtId: string | null;
   title: string;
   englishTitle: string;
   originalTitle: string;
@@ -96,9 +100,12 @@ function normalizeKodikAge(value: string | null | undefined, minimalAge: number 
   return ({G:"Без ограничений",PG:"Без ограничений","PG-13":"12+",R:"16+","R+":"16+",RX:"18+"} as Record<string,string>)[mpaa] ?? null;
 }
 function normalizeKodikMaterial(item: KodikCatalogResult, existingIds: Set<string>): KodikCatalogSearchItem | null {
-  const id = String(item.shikimori_id ?? "").trim();
+  const shikimoriId = String(item.shikimori_id ?? "").trim();
   const kodikId = String(item.id ?? "").trim();
-  if (!/^\d{1,12}$/.test(id) || Number(id) < 1 || !/^\d{1,20}$/.test(kodikId)) return null;
+  const worldArtId = String(item.worldart_animation_id ?? parseWorldArtAnimationId(item.worldart_link) ?? "").trim();
+  if ((!/^\d{1,12}$/.test(shikimoriId) || Number(shikimoriId) < 1) && (!/^\d{1,12}$/.test(worldArtId) || Number(worldArtId) < 1)) return null;
+  if (!/^[A-Za-z0-9_-]{1,40}$/.test(kodikId)) return null;
+  const id = /^\d{1,12}$/.test(shikimoriId) && Number(shikimoriId) > 0 ? shikimoriId : worldArtId;
   const data = item.material_data ?? {};
   const firstTitle = (value: string | string[] | null | undefined) => clean(Array.isArray(value) ? value[0] : value);
   const originalTitle = clean(item.title_orig) || firstTitle(data.other_titles_jp) || firstTitle(data.anime_title_jp) || clean(item.title);
@@ -111,15 +118,25 @@ function normalizeKodikMaterial(item: KodikCatalogResult, existingIds: Set<strin
   const year = Math.max(0,Math.floor(Number(data.year ?? item.year ?? 0) || 0));
   const genres = Array.from(new Set((data.anime_genres ?? []).map((genre) => clean(genre)).filter(Boolean))).slice(0,20);
   return {
-    id,kodikId,title,englishTitle,originalTitle:originalTitle || title,year,
+    id,kodikId,shikimoriId:/^\d{1,12}$/.test(shikimoriId) ? shikimoriId : null,
+    worldArtId:/^\d{1,12}$/.test(worldArtId) ? worldArtId : null,title,englishTitle,originalTitle:originalTitle || title,year,
     kind:normalizeKodikKind(data.anime_kind),status:normalizeKodikStatus(data.anime_status),
     posterUrl:safeImage(data.anime_poster_url) ?? safeImage(data.poster_url),
     description:clean(data.anime_description ?? data.description),
     genres,ageRating:normalizeKodikAge(data.rating_mpaa,data.minimal_age),rating,
     episodes:Math.max(0,Math.floor(Number(data.episodes_total ?? 0) || 0)),
     episodesAired:Math.max(0,Math.floor(Number(data.episodes_aired ?? 0) || 0)),studios,
-    alreadyInCatalog:existingIds.has(id),
+    alreadyInCatalog:existingIds.has(id) || (Boolean(worldArtId) && existingIds.has(worldArtId)),
   };
+}
+export function parseWorldArtAnimationId(value: string | null | undefined): string | null {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    if (url.hostname.toLowerCase().replace(/^www\./, "") !== "world-art.ru" || url.pathname !== "/animation/animation.php") return null;
+    const id = url.searchParams.get("id") ?? "";
+    return /^\d{1,12}$/.test(id) && Number(id) > 0 ? id : null;
+  } catch { return null; }
 }
 export function normalizeKodikCatalogResults(results: KodikCatalogResult[], existingIds: string[]): KodikCatalogSearchItem[] {
   const existing = new Set(existingIds);
@@ -142,6 +159,7 @@ function mapKodikAnime(item: KodikCatalogSearchItem): Anime {
     glyph:Array.from(item.originalTitle || item.title)[0] || "Y",isNew:item.status==="Онгоинг",popular:false,
     posterUrl:item.posterUrl ?? undefined,bannerUrl:item.posterUrl ?? undefined,kind:item.kind ?? undefined,
     ageRating:item.ageRating ?? undefined,studios:item.studios,catalogSource:"kodik",
+    shikimoriId:item.shikimoriId ?? undefined,worldArtId:item.worldArtId ?? undefined,kodikId:item.kodikId,
   };
 }
 function mapKodikScreenshots(item: KodikCatalogResult): Array<{original:string;preview:string}> {
@@ -156,15 +174,17 @@ function mapKodikScreenshots(item: KodikCatalogResult): Array<{original:string;p
   }
   return result;
 }
-async function fetchKodikByTitle(title: string): Promise<KodikCatalogResult[]> {
+async function fetchKodikByTitle(title: string, worldArtId = "", worldArtLink = ""): Promise<KodikCatalogResult[]> {
   const normalized = clean(title).slice(0,120);
-  if (normalized.length < 2) return [];
+  if (normalized.length < 2 && !worldArtId && !worldArtLink) return [];
   const env = environment();
   const token = typeof env.KODIK_API_TOKEN === "string" ? env.KODIK_API_TOKEN.trim() : "";
   if (!token) throw new Error("Kodik API не настроен.");
   const url = new URL("https://kodik-api.com/search");
   url.searchParams.set("token",token);
-  url.searchParams.set("title",normalized);
+  if (normalized.length >= 2) url.searchParams.set("title",normalized);
+  if (worldArtId) url.searchParams.set("worldart_animation_id",worldArtId);
+  if (worldArtLink) url.searchParams.set("worldart_link",worldArtLink);
   url.searchParams.set("types","anime-serial,anime");
   url.searchParams.set("with_material_data","true");
   url.searchParams.set("limit","100");
@@ -511,28 +531,34 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
     if (action === "search_kodik_title") {
       const queryText = typeof body.query === "string" ? body.query : typeof body.title === "string" ? body.title : "";
       const normalized = clean(queryText);
-      if (normalized.length < 2 || normalized.length > 120) return json({error:"invalid_query"},400);
+      const rawWorldArt = typeof body.worldArt === "string" ? body.worldArt.trim() : "";
+      const worldArtLink = /^https?:\/\//i.test(rawWorldArt) ? rawWorldArt : "";
+      const worldArtId = worldArtLink ? parseWorldArtAnimationId(worldArtLink) ?? "" : /^\d{1,12}$/.test(rawWorldArt) ? rawWorldArt : "";
+      if ((normalized.length < 2 && !worldArtId && !worldArtLink) || normalized.length > 120 || (rawWorldArt && !worldArtId && !worldArtLink)) return json({error:"invalid_query"},400);
       const rateLimit = await enforceRateLimit(env.KODIK_RATE_LIMITER,request,"kodik");
       if (rateLimit === "limited") return json({error:"Слишком много запросов к Kodik. Повтори через минуту."},429);
       if (rateLimit !== "allowed") return json({error:"Ограничитель запросов Kodik временно недоступен."},503);
-      const rows = await fetchKodikByTitle(normalized);
-      const results = normalizeKodikCatalogResults(rows,state.items.map((item)=>item.id));
+      const rows = await fetchKodikByTitle(normalized,worldArtId,worldArtLink);
+      const results = normalizeKodikCatalogResults(rows,state.items.flatMap((item)=>[item.id,item.worldArtId ?? ""]));
       return json({isAdmin:true,source:"kodik",query:normalized,results});
     }
     if (action === "import_kodik_title") {
       const animeId = typeof body.animeId === "string" ? body.animeId.trim() : "";
       const kodikId = typeof body.kodikId === "string" ? body.kodikId.trim() : "";
+      const shikimoriId = typeof body.shikimoriId === "string" ? body.shikimoriId.trim() : "";
+      const worldArtId = typeof body.worldArtId === "string" ? body.worldArtId.trim() : "";
       const queryText = typeof body.query === "string" ? clean(body.query) : "";
-      if (!/^\d{1,12}$/.test(animeId) || Number(animeId) < 1 || !/^\d{1,20}$/.test(kodikId) || queryText.length < 2 || queryText.length > 120) return json({error:"invalid_kodik_import_target"},400);
+      if (!/^\d{1,12}$/.test(animeId) || Number(animeId) < 1 || !/^[A-Za-z0-9_-]{1,40}$/.test(kodikId) ||
+          (!/^\d{1,12}$/.test(shikimoriId) && !/^\d{1,12}$/.test(worldArtId)) || queryText.length > 120) return json({error:"invalid_kodik_import_target"},400);
       const existing = state.items.find((item)=>item.id===animeId);
       if (existing) return json({isAdmin:true,alreadyInCatalog:true,anime:{id:existing.id,title:existing.title},message:"Этот тайтл уже находится в каталоге."},409);
       const rateLimit = await enforceRateLimit(env.KODIK_RATE_LIMITER,request,"kodik");
       if (rateLimit === "limited") return json({error:"Слишком много запросов к Kodik. Повтори через минуту."},429);
       if (rateLimit !== "allowed") return json({error:"Ограничитель запросов Kodik временно недоступен."},503);
-      const rows = await fetchKodikByTitle(queryText);
-      const selected = rows.find((item)=>String(item.id??"")===kodikId && String(item.shikimori_id??"")===animeId);
+      const rows = await fetchKodikByTitle(queryText,worldArtId);
+      const selected = rows.find((item)=>String(item.id??"")===kodikId && (shikimoriId ? String(item.shikimori_id??"")===shikimoriId : String(item.worldart_animation_id??parseWorldArtAnimationId(item.worldart_link)??"")===worldArtId));
       if (!selected) return json({error:"kodik_title_not_found"},404);
-      const mapped = normalizeKodikCatalogResults([selected],state.items.map((item)=>item.id))[0];
+      const mapped = normalizeKodikCatalogResults([selected],state.items.flatMap((item)=>[item.id,item.worldArtId ?? ""]))[0];
       if (!mapped) return json({error:"kodik_title_metadata_unavailable"},422);
       if (mapped.alreadyInCatalog) return json({isAdmin:true,alreadyInCatalog:true,anime:{id:animeId,title:mapped.title},message:"Этот тайтл уже находится в каталоге."},409);
       const anime = mapKodikAnime(mapped);
