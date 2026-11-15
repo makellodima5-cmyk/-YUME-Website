@@ -95,7 +95,18 @@ export default {
     if (adminMessages.length) await handleAdminNotificationQueue({ messages: adminMessages }, env);
   },
 
-  async scheduled(_controller: unknown, env: unknown): Promise<void> {
+  async scheduled(controller: unknown, env: unknown): Promise<void> {
+    const cron = controller && typeof controller === "object" && "cron" in controller
+      ? (controller as { cron?: unknown }).cron
+      : undefined;
+    if (cron === "0 * * * *") {
+      await runScheduledEpisodeNotifications(env);
+      return;
+    }
+    if (cron === "0 */3 * * *") {
+      await runScheduledNonEpisodeMaintenance(env);
+      return;
+    }
     await runScheduledMaintenance(env);
   },
 };
