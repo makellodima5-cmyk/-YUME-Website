@@ -1262,7 +1262,7 @@ function Index() {
     }
   };
 
-  const importCatalogTitle = async (animeId: string, kodikId?: string, shikimoriId?: string | null, worldArtId?: string | null) => {
+  const importCatalogTitle = async (animeId: string, kodikId?: string, shikimoriId?: string | null, worldArtId?: string | null, worldArtType?: "animation" | "cinema" | null) => {
     if (!isAdmin || adminTitleImportBusy || adminImportRunning || metadataRefreshRunning) return;
     setAdminTitleImportBusy(animeId);
     setAdminTitleSearchMessage("");
@@ -1272,7 +1272,7 @@ function Index() {
         credentials: "same-origin",
         cache: "no-store",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(adminTitleImportSource === "kodik" ? { action:"import_kodik_title", animeId, kodikId, shikimoriId, worldArtId, query: /^https?:\/\//i.test(adminImportTitleQuery.trim()) || /^\d{1,12}$/.test(adminImportTitleQuery.trim()) ? "" : adminImportTitleQuery.trim(), worldArt: /^https?:\/\//i.test(adminImportTitleQuery.trim()) || /^\d{1,12}$/.test(adminImportTitleQuery.trim()) ? adminImportTitleQuery.trim() : "" } : { action:"import_title", animeId }),
+        body: JSON.stringify(adminTitleImportSource === "kodik" ? { action:"import_kodik_title", animeId, kodikId, shikimoriId, worldArtId, worldArtType, query: /^https?:\/\//i.test(adminImportTitleQuery.trim()) || /^\d{1,12}$/.test(adminImportTitleQuery.trim()) ? "" : adminImportTitleQuery.trim(), worldArt: /^https?:\/\//i.test(adminImportTitleQuery.trim()) || /^\d{1,12}$/.test(adminImportTitleQuery.trim()) ? adminImportTitleQuery.trim() : "" } : { action:"import_title", animeId }),
       });
       const payload = await response.json().catch(() => ({})) as {
         isAdmin?: boolean;
@@ -2254,7 +2254,7 @@ function Index() {
                             </div>
                             <button
                               type="button"
-                              onClick={() => { void importCatalogTitle(item.id,item.kodikId,item.shikimoriId,item.worldArtId); }}
+                              onClick={() => { void importCatalogTitle(item.id,item.kodikId,item.shikimoriId,item.worldArtId,item.worldArtType); }}
                               disabled={item.alreadyInCatalog || Boolean(adminTitleImportBusy) || adminTitleSearchBusy || adminImportRunning || metadataRefreshRunning}
                               className={item.alreadyInCatalog
                                 ? "min-h-9 shrink-0 rounded-lg border border-border px-2.5 py-2 text-[11px] font-medium text-muted-foreground"
