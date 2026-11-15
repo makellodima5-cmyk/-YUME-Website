@@ -243,7 +243,8 @@ async function generateAnswer(question:string,historyItems:Array<{role:"user"|"a
   const prompt=SYSTEM_PROMPT+taskHint+"\n\nYUBERA_CATALOG_CONTEXT (единственный источник данных о тайтлах):\n"+injected;
   const result=await providerCompletion([{role:"system",content:prompt},...historyItems.slice(-YUBERA_AI_CONTEXT_MESSAGES*2),{role:"user",content:question}],model,key,base);
   const parsed=extractRecommendations(result.content),reasons=new Map(parsed.recommendations.map(item=>[item.id,item.reason]));
-  const candidateIds=new Set(shortlist.map(item=>item.id));\n  let selected=items.filter(item=>candidateIds.has(item.id)&&reasons.has(item.id)&&(!source||item.id!==source.id));
+  const candidateIds=new Set(shortlist.map(item=>item.id));
+  let selected=items.filter(item=>candidateIds.has(item.id)&&reasons.has(item.id)&&(!source||item.id!==source.id));
   if(recommendationIntent&&selected.length===0){
     selected=(related.length>0?related:shortlist).filter(item=>item.posterUrl&&(!source||item.id!==source.id)).slice(0,dailyPick?3:5);
   }
