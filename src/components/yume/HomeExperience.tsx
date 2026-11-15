@@ -154,9 +154,9 @@ export function HomeExperience({
                 aria-label={t((`collection.${collection.id}.title`) as TranslationKey) + ", " + collectionCountLabel(count, language, t)}
               >
                 <span className="yubera-home-collection-posters" aria-hidden="true">
-                  {posters[0] && <PosterArt anime={posters[0]} className="yubera-home-collection-poster is-left" />}
-                  {posters[1] && <PosterArt anime={posters[1]} className="yubera-home-collection-poster is-center" />}
-                  {posters[2] && <PosterArt anime={posters[2]} className="yubera-home-collection-poster is-right" />}
+                  {posters[0] && <PosterArt anime={posters[0]} showAgeRating={false} className="yubera-home-collection-poster is-left" />}
+                  {posters[1] && <PosterArt anime={posters[1]} showAgeRating={false} className="yubera-home-collection-poster is-center" />}
+                  {posters[2] && <PosterArt anime={posters[2]} showAgeRating={false} className="yubera-home-collection-poster is-right" />}
                 </span>
                 <span className="yubera-home-collection-copy">
                   <span className="yubera-home-collection-title">{t((`collection.${collection.id}.title`) as TranslationKey)}</span>
