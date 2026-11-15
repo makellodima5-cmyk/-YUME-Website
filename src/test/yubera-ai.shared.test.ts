@@ -5,7 +5,9 @@ describe("YUBERA AI topic restrictions",()=>{
   for(const query of ["Сколько людей живёт на Земле?","Напиши программу на Python","Какая погода сегодня?","Реши квадратное уравнение","Расскажи о выборах","Напиши рецепт борща","Кто такой Альберт Эйнштейн?","Расскажи историю Японии","How do I fix a bicycle?","Порекомендуй книгу","What should I watch on Netflix?"])expect(isAllowedYuberaAiTopic(query)).toBe(false);
   expect(isAllowedYuberaAiTopic("Что посмотреть сегодня?")).toBe(true);
   expect(isAllowedYuberaAiTopic("Посоветуй аниме, похожее на Наруто")).toBe(true);
-  expect(isAllowedYuberaAiTopic("Подбери похожий тайтл из каталога")).toBe(true);\n  expect(isAllowedYuberaAiTopic("Там главный герой переродился в другом мире и стал магом")).toBe(true);\n  expect(isAllowedYuberaAiTopic("Хочу историю про ниндзя и самураев")).toBe(true);
+  expect(isAllowedYuberaAiTopic("Подбери похожий тайтл из каталога")).toBe(true);
+  expect(isAllowedYuberaAiTopic("Там главный герой переродился в другом мире и стал магом")).toBe(true);
+  expect(isAllowedYuberaAiTopic("Хочу историю про ниндзя и самураев")).toBe(true);
   expect(isAllowedYuberaAiTopic("Расскажи историю Японии")).toBe(false);
  });
  it("rejects unrelated requests before provider calls",()=>{
