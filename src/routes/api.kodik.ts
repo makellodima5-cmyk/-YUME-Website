@@ -10,6 +10,7 @@ type KodikResult = {
   id?: string;
   shikimori_id?: string | number;
   worldart_animation_id?: string | number;
+  worldart_cinema_id?: string | number;
   worldart_link?: string;
   link?: string;
   title?: string;
@@ -62,7 +63,7 @@ export function episodeLink(value: EpisodeValue): { link: string; title: string 
 
 async function handleKodik(request: Request): Promise<Response> {
   const animeId = new URL(request.url).searchParams.get("animeId") ?? "";
-  if (!/^\d{1,12}$/.test(animeId) || Number(animeId) < 1) return json({ error: "Invalid anime ID." }, 400);
+  if (!/^(?:\d{1,12}|wa-cinema-\d{1,12})$/.test(animeId)) return json({ error: "Invalid anime ID." }, 400);
 
   let token = "";
   let rateLimitBinding: unknown;
@@ -90,10 +91,11 @@ async function handleKodik(request: Request): Promise<Response> {
     ? catalogAnime.worldArtId ?? ""
     : "";
   const shikimoriId = catalogAnime?.shikimoriId ?? animeId;
+  const worldArtType = catalogAnime?.worldArtType ?? "animation";
   if (worldArtId && !/^\d{1,12}$/.test(worldArtId)) return json({ error: "Invalid World Art ID." }, 400);
   const url = new URL("https://kodik-api.com/search");
   url.searchParams.set("token", token);
-  if (worldArtId) url.searchParams.set("worldart_animation_id", worldArtId);
+  if (worldArtId) url.searchParams.set(worldArtType === "cinema" ? "worldart_cinema_id" : "worldart_animation_id", worldArtId);
   else url.searchParams.set("shikimori_id", shikimoriId);
   url.searchParams.set("with_episodes_data", "true");
   url.searchParams.set("limit", "100");
@@ -126,8 +128,10 @@ async function handleKodik(request: Request): Promise<Response> {
   const sources = new Map<string, { id: string; title: string; episodes: Map<number, { number: number; title: string; link: string }> }>();
   for (const result of payload.results) {
     if (worldArtId) {
-      const linkedId = (() => { try { return new URL(result.worldart_link ?? "").searchParams.get("id") ?? ""; } catch { return ""; } })();
-      if (String(result.worldart_animation_id ?? linkedId) !== worldArtId) continue;
+      const linkedReference = (() => { try { const link = new URL(result.worldart_link ?? ""); return { id: link.searchParams.get("id") ?? "", type: link.pathname === "/cinema/cinema.php" ? "cinema" : link.pathname === "/animation/animation.php" ? "animation" : "" }; } catch { return { id: "", type: "" }; } })();
+      const linkedId = linkedReference.type === worldArtType ? linkedReference.id : "";
+      const returnedId = worldArtType === "cinema" ? result.worldart_cinema_id : result.worldart_animation_id;
+      if (String(returnedId ?? linkedId) !== worldArtId) continue;
     } else if (String(result.shikimori_id ?? "") !== shikimoriId) continue;
     const translationId = String(result.translation?.id ?? result.id ?? "");
     const translationTitle = (result.translation?.title || result.title || "").trim();

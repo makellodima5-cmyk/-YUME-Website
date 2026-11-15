@@ -147,7 +147,7 @@ function AnimeDetailPage() {
   }, [anime, language]);
 
   useEffect(() => {
-    if (!anime) {
+    if (!anime || (anime.catalogSource === "kodik" && !anime.shikimoriId)) {
       setEpisodeSubscribed(false);
       setEpisodeSubscribedVoiceover("");
       return;
@@ -422,7 +422,7 @@ function AnimeDetailPage() {
     let cancelled = false;
     setScreenshots([]);
     setActiveScreenshotIndex(null);
-    if (!/^\d{1,12}$/.test(animeId)) return;
+    if (!/^(?:\d{1,12}|wa-cinema-\d{1,12})$/.test(animeId)) return;
     getShikimoriAnimeScreenshots({ data: { animeId } })
       .then((result) => {
         if (!cancelled) setScreenshots(result.items ?? []);
@@ -638,14 +638,15 @@ function AnimeDetailPage() {
   );
 
   const canSubscribeToEpisodes = anime.status === "Онгоинг" && !(anime.episodes > 0 && (anime.episodesAired ?? 0) >= anime.episodes);
-  const episodeSubscriptionButton = (
+  const supportsShikimoriAccountFeatures = !(anime.catalogSource === "kodik" && !anime.shikimoriId);
+  const episodeSubscriptionButton = supportsShikimoriAccountFeatures ? (
     <AnimeEpisodeSubscription
       animeId={anime.id} language={language} disabled={!canSubscribeToEpisodes}
       subscribed={episodeSubscribed} subscribedVoiceover={episodeSubscribedVoiceover}
       onSubscribed={(subscribed, voiceover) => { setEpisodeSubscribed(subscribed); setEpisodeSubscribedVoiceover(voiceover ?? ""); }}
       onAuthRequired={() => navigateToSection("login")} onError={() => setSaveSyncError(true)}
     />
-  );
+  ) : null;
 
   const listButton = (
     <button
@@ -879,7 +880,7 @@ function AnimeDetailPage() {
               </button>)}
             </div>
           </section>
-          <AnimeComments animeId={anime.id} language={language} />
+          {supportsShikimoriAccountFeatures && <AnimeComments animeId={anime.id} language={language} />}
         </div>
       </main>
 
