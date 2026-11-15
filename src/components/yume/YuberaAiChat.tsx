@@ -94,7 +94,12 @@ export function YuberaAiChat() {
   const [loading, setLoading] = useState(false);
   const [booting, setBooting] = useState(true);
   const [notice, setNotice] = useState("");
-  const [collectionTarget, setCollectionTarget] = useState<YuberaAiMessage["recommendations"][number] | null>(null);\n  const [userCollections, setUserCollections] = useState<UserCollection[]>([]);\n  const [collectionLoading, setCollectionLoading] = useState(false);\n  const [collectionBusy, setCollectionBusy] = useState(false);\n  const [collectionError, setCollectionError] = useState("");\n  const [newCollectionTitle, setNewCollectionTitle] = useState("");
+  const [collectionTarget, setCollectionTarget] = useState<YuberaAiMessage["recommendations"][number] | null>(null);
+  const [userCollections, setUserCollections] = useState<UserCollection[]>([]);
+  const [collectionLoading, setCollectionLoading] = useState(false);
+  const [collectionBusy, setCollectionBusy] = useState(false);
+  const [collectionError, setCollectionError] = useState("");
+  const [newCollectionTitle, setNewCollectionTitle] = useState("");
   const pageRef = useRef<HTMLDivElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
