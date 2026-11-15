@@ -143,8 +143,8 @@ jobs:
               && item.dead_letter_queue === "yume-web-tasks-dlq",
           );
           const cleanupCron = queueConfig.triggers?.crons ?? [];
-          if (cleanupCron.length !== 1 || cleanupCron[0] !== "0 * * * *") {
-            throw new Error("Queue consumer Worker must run the hourly episode notification cron.");
+          if (cleanupCron.length !== 2 || !cleanupCron.includes("0 * * * *") || !cleanupCron.includes("0 */3 * * *")) {
+            throw new Error("Queue consumer Worker must run hourly episode polling and retain the three-hour maintenance cron.");
           }
           const queueDatabase = (queueConfig.d1_databases ?? []).find(
             (item) => item.binding === "YUME_DB"
@@ -169,6 +169,9 @@ jobs:
           }
           if (!queueEntry.includes("runScheduledEpisodeNotifications")) {
             throw new Error("Dedicated Queue Worker entry does not invoke scheduled episode notifications.");
+          }
+          if (!queueEntry.includes("runScheduledNonEpisodeMaintenance")) {
+            throw new Error("Dedicated Queue Worker entry does not isolate the three-hour non-episode maintenance schedule.");
           }
           if (queueConfig.workers_dev !== false || queueConfig.preview_urls !== false) {
             throw new Error("Queue consumer must not expose public workers.dev or preview URLs.");

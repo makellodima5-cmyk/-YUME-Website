@@ -19,21 +19,26 @@ type ScheduledJobOverrides = {
 
 // Keep the maintenance jobs independent: a cleanup failure must not prevent
 // the episode poller from running during the same scheduled invocation.
-export async function runScheduledMaintenance(
+function createScheduledJobs(
   env: unknown,
-  overrides: ScheduledJobOverrides = {},
-): Promise<void> {
+  overrides: ScheduledJobOverrides,
+  includeEpisodeNotifications: boolean,
+): Array<{ name: string; run: () => Promise<void> }> {
   const jobs = [
     {
       name: "notification cleanup",
       run: () => overrides.cleanup ? overrides.cleanup(env) : runScheduledNotificationCleanup(env),
     },
-    {
+  ];
+  if (includeEpisodeNotifications) {
+    jobs.push({
       name: "episode notifications",
       run: () => overrides.episodeNotifications
         ? overrides.episodeNotifications(env)
         : runScheduledEpisodeNotifications(env),
-    },
+    });
+  }
+  jobs.push(
     {
       name: "admin notification dispatch",
       run: () => overrides.adminNotifications
@@ -46,8 +51,11 @@ export async function runScheduledMaintenance(
         ? overrides.animeComments(env)
         : runScheduledAnimeCommentCleanup(env),
     },
-  ];
+  );
+  return jobs;
+}
 
+async function runScheduledJobs(jobs: Array<{ name: string; run: () => Promise<void> }>): Promise<void> {
   const results = await Promise.allSettled(jobs.map((job) => Promise.resolve().then(job.run)));
   const failedJobs: string[] = [];
   results.forEach((result, index) => {
@@ -62,6 +70,22 @@ export async function runScheduledMaintenance(
   }
 }
 
+// The hourly trigger runs only episode polling. Existing maintenance retains
+// its original three-hour cadence to avoid increasing unrelated D1 work.
+export async function runScheduledMaintenance(
+  env: unknown,
+  overrides: ScheduledJobOverrides = {},
+): Promise<void> {
+  await runScheduledJobs(createScheduledJobs(env, overrides, true));
+}
+
+export async function runScheduledNonEpisodeMaintenance(
+  env: unknown,
+  overrides: Omit<ScheduledJobOverrides, "episodeNotifications"> = {},
+): Promise<void> {
+  await runScheduledJobs(createScheduledJobs(env, overrides, false));
+}
+
 // Dedicated Worker consumer keeps Queue delivery separate from the Nitro HTTP Worker.
 export default {
   async queue(batch: QueueBatch, env: unknown): Promise<void> {
@@ -71,7 +95,18 @@ export default {
     if (adminMessages.length) await handleAdminNotificationQueue({ messages: adminMessages }, env);
   },
 
-  async scheduled(_controller: unknown, env: unknown): Promise<void> {
+  async scheduled(controller: unknown, env: unknown): Promise<void> {
+    const cron = controller && typeof controller === "object" && "cron" in controller
+      ? (controller as { cron?: unknown }).cron
+      : undefined;
+    if (cron === "0 * * * *") {
+      await runScheduledEpisodeNotifications(env);
+      return;
+    }
+    if (cron === "0 */3 * * *") {
+      await runScheduledNonEpisodeMaintenance(env);
+      return;
+    }
     await runScheduledMaintenance(env);
   },
 };
