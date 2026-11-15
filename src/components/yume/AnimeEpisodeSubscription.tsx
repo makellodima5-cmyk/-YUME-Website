@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Bell, X } from "lucide-react";
 
-type Source = { id: string; title: string };
+type Source = { id: string; title: string; episodes: Array<{ number: number }> };
 type Props = {
   animeId: string;
   language: "ru" | "en";
@@ -34,7 +34,7 @@ export function AnimeEpisodeSubscription({
         credentials: "same-origin", cache: "no-store", headers: { Accept: "application/json" },
       });
       const payload = await response.json().catch(() => ({})) as {
-        sources?: Source[];
+        sources?: Array<{ id: string; title: string; episodes?: Array<{ number: number }> }>;
         error?: string;
       };
       if (response.status === 401) {
@@ -44,7 +44,7 @@ export function AnimeEpisodeSubscription({
       }
       if (!response.ok) throw new Error(payload.error || "kodik_sources_unavailable");
       const available = Array.isArray(payload.sources)
-        ? payload.sources.filter((source) => source && typeof source.id === "string" && typeof source.title === "string")
+        ? payload.sources.filter((source) => source && typeof source.id === "string" && typeof source.title === "string").map(source => ({ ...source, episodes: Array.isArray(source.episodes) ? source.episodes : [] }))
         : [];
       setSources(available);
       setSelectedSourceId(available[0]?.id ?? "");
@@ -172,7 +172,7 @@ export function AnimeEpisodeSubscription({
                   onChange={(event) => setSelectedSourceId(event.target.value)}
                   className="w-full rounded-xl border border-border bg-background px-3 py-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 >
-                  {sources.map((source) => <option key={source.id} value={source.id}>{source.title}</option>)}
+                  {sources.map((source) => <option key={source.id} value={source.id}>{source.title} ({source.episodes.length}.эп)</option>)}
                 </select>
               </label>
             )}
