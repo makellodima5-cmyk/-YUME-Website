@@ -2,6 +2,7 @@ import { env as cloudflareEnv } from "cloudflare:workers";
 import { getAuthenticatedYumeUserId } from "@/data/telegram-auth.server";
 import { YUBERA_SUPPORT_LEVELS, YUBERA_XP_LEVELS } from "@/data/yubera-config";
 import { hasAdminPasswordSession, isAdminPasswordConfigured } from "@/lib/admin-password.server";
+import { isTelegramAdminIdAllowed } from "@/lib/admin-access";
 type S={bind(...v:unknown[]):S;first<T=Record<string,unknown>>():Promise<T|null>;all<T=Record<string,unknown>>():Promise<{results:T[]}>;run():Promise<{meta?:{changes?:number}}>} ;
 type DB={prepare(sql:string):S;batch?:(statements:S[])=>Promise<Array<{meta?:{changes?:number}}>>};
 type E=Record<string,unknown>&{YUME_DB?:unknown;TELEGRAM_BOT_TOKEN?:string;TELEGRAM_ADMIN_ID?:string;YUME_AUTH_SESSION_SECRET?:string;YUME_ADMIN_PASSWORD?:string;TELEGRAM_STARS_RATE_LIMITER?:unknown};
