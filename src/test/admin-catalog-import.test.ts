@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { adminCatalogImportNextResumeAt, adminCatalogImportPageOperationId, adminCatalogImportResumeCursor, adminCatalogImportShouldResumeCounters, chunkAdminCatalogIds, isCatalogMetadataIncomplete, mapAdminCatalogScreenshots, normalizeAdminCatalogIds, isValidAdminImportTarget, normalizeKodikCatalogResults } from "@/data/admin-catalog-import.server";
+import { adminCatalogImportNextResumeAt, adminCatalogImportPageOperationId, adminCatalogImportResumeCursor, adminCatalogImportShouldResumeCounters, chunkAdminCatalogIds, isCatalogMetadataIncomplete, mapAdminCatalogScreenshots, normalizeAdminCatalogIds, isValidAdminImportTarget, normalizeKodikCatalogResults, parseWorldArtAnimationId } from "@/data/admin-catalog-import.server";
 
 describe("admin catalog import target", () => {
   it("accepts targets above the old 500-title application cap", () => {
@@ -196,5 +196,51 @@ describe("Kodik catalogue title search mapping", () => {
       { ...kodikMaterial, shikimori_id: null },
       { ...kodikMaterial, id: "not-numeric" },
     ], [])).toEqual([]);
+  });
+});
+
+describe("Kodik World Art catalogue import", () => {
+  it("extracts only a valid World Art animation ID from an animation detail URL", () => {
+    expect(parseWorldArtAnimationId("http://www.world-art.ru/animation/animation.php?id=11464")).toBe("11464");
+    expect(parseWorldArtAnimationId("https://world-art.ru/animation/")).toBeNull();
+    expect(parseWorldArtAnimationId("https://example.org/animation/animation.php?id=11464")).toBeNull();
+    expect(parseWorldArtAnimationId("https://www.world-art.ru/animation/animation.php?id=../x")).toBeNull();
+  });
+
+  it("keeps a Kodik title without a Shikimori ID when World Art identifies it", () => {
+    const [item] = normalizeKodikCatalogResults([{
+      id: "serial-6647",
+      title: "Naruto",
+      title_orig: "Naruto",
+      year: 2002,
+      worldart_link: "http://www.world-art.ru/animation/animation.php?id=262",
+      material_data: {
+        anime_title: "Наруто",
+        anime_title_en: "Naruto",
+        anime_description: "История ниндзя.",
+        anime_poster_url: "https://cdn.example.org/naruto.jpg",
+        anime_genres: ["Экшен", "Приключения"],
+        anime_kind: "tv",
+        anime_status: "released",
+      },
+    }], []);
+    expect(item).toMatchObject({
+      id: "262",
+      kodikId: "serial-6647",
+      shikimoriId: null,
+      worldArtId: "262",
+      title: "Наруто",
+      alreadyInCatalog: false,
+    });
+  });
+
+  it("marks World Art-backed duplicates even when their canonical catalog ID differs", () => {
+    const [item] = normalizeKodikCatalogResults([{
+      id: "serial-6647",
+      title: "Naruto",
+      worldart_animation_id: 262,
+      material_data: { anime_title: "Наруто" },
+    }], ["20", "262"]);
+    expect(item?.alreadyInCatalog).toBe(true);
   });
 });

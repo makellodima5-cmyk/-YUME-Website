@@ -1235,7 +1235,7 @@ function Index() {
         credentials: "same-origin",
         cache: "no-store",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(adminTitleImportSource === "kodik" ? (/^\\d{1,12}$/.test(query) || /^https?:\\/\\//i.test(query) ? { action:"search_kodik_title", worldArt:query } : { action:"search_kodik_title", query }) : { action:"search_title", query }),
+        body: JSON.stringify(adminTitleImportSource === "kodik" ? (/^\d{1,12}$/.test(query) || /^https?:\\/\\//i.test(query) ? { action:"search_kodik_title", worldArt:query } : { action:"search_kodik_title", query }) : { action:"search_title", query }),
       });
       const payload = await response.json().catch(() => ({})) as {
         isAdmin?: boolean;
@@ -1268,7 +1268,7 @@ function Index() {
         credentials: "same-origin",
         cache: "no-store",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(adminTitleImportSource === "kodik" ? { action:"import_kodik_title", animeId, kodikId, shikimoriId, worldArtId, query: /^https?:\\/\\//i.test(adminImportTitleQuery.trim()) || /^\\d{1,12}$/.test(adminImportTitleQuery.trim()) ? "" : adminImportTitleQuery.trim(), worldArt: /^https?:\\/\\//i.test(adminImportTitleQuery.trim()) || /^\\d{1,12}$/.test(adminImportTitleQuery.trim()) ? adminImportTitleQuery.trim() : "" } : { action:"import_title", animeId }),
+        body: JSON.stringify(adminTitleImportSource === "kodik" ? { action:"import_kodik_title", animeId, kodikId, shikimoriId, worldArtId, query: /^https?:\\/\\//i.test(adminImportTitleQuery.trim()) || /^\d{1,12}$/.test(adminImportTitleQuery.trim()) ? "" : adminImportTitleQuery.trim(), worldArt: /^https?:\\/\\//i.test(adminImportTitleQuery.trim()) || /^\d{1,12}$/.test(adminImportTitleQuery.trim()) ? adminImportTitleQuery.trim() : "" } : { action:"import_title", animeId }),
       });
       const payload = await response.json().catch(() => ({})) as {
         isAdmin?: boolean;

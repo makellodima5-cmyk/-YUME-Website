@@ -89,7 +89,7 @@ async function handleKodik(request: Request): Promise<Response> {
     ? catalogAnime.worldArtId ?? ""
     : "";
   const shikimoriId = catalogAnime?.shikimoriId ?? animeId;
-  if (worldArtId && !/^\\d{1,12}$/.test(worldArtId)) return json({ error: "Invalid World Art ID." }, 400);
+  if (worldArtId && !/^\d{1,12}$/.test(worldArtId)) return json({ error: "Invalid World Art ID." }, 400);
   const url = new URL("https://kodik-api.com/search");
   url.searchParams.set("token", token);
   if (worldArtId) url.searchParams.set("worldart_animation_id", worldArtId);
@@ -124,7 +124,10 @@ async function handleKodik(request: Request): Promise<Response> {
   // the separate availability checker so it cannot hide the playable sources.
   const sources = new Map<string, { id: string; title: string; episodes: Map<number, { number: number; title: string; link: string }> }>();
   for (const result of payload.results) {
-    if (worldArtId ? String(result.worldart_animation_id ?? "") !== worldArtId : String(result.shikimori_id ?? "") !== shikimoriId) continue;
+    if (worldArtId) {
+      const linkedId = (() => { try { return new URL(result.worldart_link ?? "").searchParams.get("id") ?? ""; } catch { return ""; } })();
+      if (String(result.worldart_animation_id ?? linkedId) !== worldArtId) continue;
+    } else if (String(result.shikimori_id ?? "") !== shikimoriId) continue;
     const translationId = String(result.translation?.id ?? result.id ?? "");
     const translationTitle = (result.translation?.title || result.title || "").trim();
     if (!translationId || !translationTitle) continue;
