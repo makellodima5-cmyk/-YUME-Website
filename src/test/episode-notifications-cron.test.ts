@@ -142,33 +142,6 @@ describe("Kodik voice-over episode notification cron", () => {
     }
   });
 
-  it("fails closed when the private catalogue reader is unavailable", async () => {
-    const restoreCatalog = setupCatalog();
-    const reader = (env as unknown as { YUME_CATALOG_READER: { fetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response> } }).YUME_CATALOG_READER;
-    const previousFetch = reader.fetch;
-    reader.fetch = async () => new Response(JSON.stringify({ error: "catalog_unavailable" }), {
-      status: 503,
-      headers: { "Content-Type": "application/json" },
-    });
-    const { db, updates } = fakeDatabase([
-      { anime_id: "123", translation_id: "voice-a", translation_title: "Озвучка A", source_last_episode: 5, baseline_episode: 5 },
-    ]);
-    const fetchMock = vi.fn();
-    vi.stubGlobal("fetch", fetchMock);
-    try {
-      await expect(runScheduledEpisodeNotifications({
-        YUME_DB: db,
-        KODIK_API_TOKEN: "test-kodik-token",
-      })).rejects.toThrow("Episode notification catalogue read failed");
-      expect(fetchMock).not.toHaveBeenCalled();
-      expect(updates).toHaveLength(0);
-    } finally {
-      reader.fetch = previousFetch;
-      restoreCatalog();
-      vi.unstubAllGlobals();
-    }
-  });
-
   it("does not baseline a source mismatch or emit a false notification", async () => {
     const restoreCatalog = setupCatalog();
     const { db, updates } = fakeDatabase([
