@@ -228,7 +228,7 @@ async function generateAnswer(question:string,historyItems:Array<{role:"user"|"a
   const recommendationIntent=similarIntent||/рекоменд|посовет|что посмотреть|что глянуть|выбери аниме|подбери|предложи|найди мне|хочу посмотреть|что-нибудь на вечер/i.test(question);
   const source=similarIntent?items.find(item=>[item.title,item.englishTitle,item.original].some(name=>name&&question.toLocaleLowerCase("ru-RU").includes(name.toLocaleLowerCase("ru-RU")))):undefined;
   const related=source?localRelated(question,items):[];
-  const shortlist=source?[source,...related]:candidatesFor(question,items,20);
+  const shortlist=source?[source,...related]:similarIntent?items.map(item=>({item,score:searchScore(question,item)})).filter(entry=>entry.score>0).sort((a,b)=>b.score-a.score||(b.item.rating??-1)-(a.item.rating??-1)).slice(0,20).map(entry=>entry.item):candidatesFor(question,items,20);
   const projectInfo=items.filter(item=>searchScore(question,item)>0).slice(0,4).map(item=>({title:item.title,genres:item.genres,year:item.year,description:cleanText(item.description,240)}));
   const injected=JSON.stringify({catalog:catalogContext(shortlist),projectInfo});
   const taskHint=dailyPick
