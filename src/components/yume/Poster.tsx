@@ -44,7 +44,7 @@ export function PosterArt({ anime, className = "" }: { anime: Anime; className?:
   );
 }
 
-export function AnimeCard({ anime, onSelect }: { anime: Anime; onSelect: (a: Anime) => void }) {
+export function AnimeCard({ anime, onSelect, hasRemoveAction = false }: { anime: Anime; onSelect: (a: Anime) => void; hasRemoveAction?: boolean }) {
   const { language, t } = useYumePreferences();
 
   return (
@@ -64,7 +64,7 @@ export function AnimeCard({ anime, onSelect }: { anime: Anime; onSelect: (a: Ani
             </span>
           )}
           {anime.ageRating && (
-            <span className="absolute right-2 top-2 text-xs font-extrabold leading-none text-white [text-shadow:0_1px_4px_rgba(0,0,0,.95),0_0_8px_rgba(0,0,0,.8)] sm:text-sm">
+            <span className={`absolute right-2 ${hasRemoveAction ? "top-11" : "top-2"} text-xs font-extrabold leading-none text-white [text-shadow:0_1px_4px_rgba(0,0,0,.95),0_0_8px_rgba(0,0,0,.8)] sm:text-sm`}>
               {anime.ageRating.trim()}
             </span>
           )}
