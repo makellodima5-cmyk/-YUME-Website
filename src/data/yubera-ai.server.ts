@@ -206,24 +206,29 @@ async function generateAnswer(question:string,historyItems:Array<{role:"user"|"a
   const model=getYuberaAiModelId(env.YUME_AI_MODEL)||"mistralai/mistral-medium-3.5";
   const base=typeof env.YUME_AI_BASE_URL==="string"&&env.YUME_AI_BASE_URL.trim()?env.YUME_AI_BASE_URL.trim():"https://api.xkiro.com/v1";
   const dailyPick=/что посмотреть сегодня|что глянуть сегодня|выбери аниме на сегодня/i.test(question);
-  const recommendationIntent=/похож|аналог|рекоменд|посовет|подобн|что посмотреть|что глянуть|выбери аниме|подбери/i.test(question);
-  const related=localRelated(question,items);
-  const shortlist=related.length>0?related:candidatesFor(question,items,14);
+  const similarIntent=/похож|аналог|подобн|similar/i.test(question);
+  const recommendationIntent=similarIntent||/рекоменд|посовет|что посмотреть|что глянуть|выбери аниме|подбери|предложи/i.test(question);
+  const source=similarIntent?items.find(item=>[item.title,item.englishTitle,item.original].some(name=>name&&question.toLocaleLowerCase("ru-RU").includes(name.toLocaleLowerCase("ru-RU")))):undefined;
+  const related=source?localRelated(question,items):[];
+  const shortlist=source?[source,...related]:similarIntent?[]:candidatesFor(question,items,14);
   const projectInfo=items.filter(item=>searchScore(question,item)>0).slice(0,4).map(item=>({title:item.title,genres:item.genres,year:item.year,description:cleanText(item.description,240)}));
   const injected=JSON.stringify({catalog:catalogContext(shortlist),projectInfo});
   const taskHint=dailyPick
     ?"\n\nСЦЕНАРИЙ: пользователь выбирает аниме на сегодня. Выбери 1–3 разных тайтла из переданных случайно перемешанных кандидатов."
-    :related.length>0
-      ?"\n\nСЦЕНАРИЙ ПОХОЖЕГО ТАЙТЛА: в каталоге найден исходный тайтл и переданы кандидаты, отсортированные по совпадению жанров. Предложи наиболее близкие варианты и объясни сходство, не называя исходный тайтл рекомендацией."
-      :recommendationIntent
+    :similarIntent&&!source
+      ?"\n\nСЦЕНАРИЙ ПОХОЖЕГО ТАЙТЛА: исходный тайтл не найден в каталоге. Не подбирай случайные произведения; вежливо попроси пользователя уточнить точное название."
+      :related.length>0
+        ?"\n\nСЦЕНАРИЙ ПОХОЖЕГО ТАЙТЛА: первый объект каталога — исходный тайтл, остальные — кандидаты, отсортированные по совпадению жанров. Предложи наиболее близкие варианты и объясни сходство. Никогда не включай исходный тайтл в рекомендации."
+        :recommendationIntent
         ?"\n\nСЦЕНАРИЙ ПОДБОРА: предложи несколько наиболее подходящих тайтлов из кандидатов и объясни, кому и почему они подойдут."
         :"";
   const prompt=SYSTEM_PROMPT+taskHint+"\n\nYUBERA_CATALOG_CONTEXT (единственный источник данных о тайтлах):\n"+injected;
   const result=await providerCompletion([{role:"system",content:prompt},...historyItems.slice(-YUBERA_AI_CONTEXT_MESSAGES*2),{role:"user",content:question}],model,key,base);
   const parsed=extractRecommendations(result.content),reasons=new Map(parsed.recommendations.map(item=>[item.id,item.reason]));
-  let selected=items.filter(item=>reasons.has(item.id));
-  if(recommendationIntent&&selected.length===0){
-    selected=(related.length>0?related:shortlist).filter(item=>item.posterUrl).slice(0,dailyPick?3:5);
+  let selected=items.filter(item=>reasons.has(item.id)&&(!source||item.id!==source.id));
+  if(similarIntent&&!source) selected=[];
+  else if(recommendationIntent&&selected.length===0){
+    selected=(related.length>0?related:shortlist).filter(item=>item.posterUrl&&(!source||item.id!==source.id)).slice(0,dailyPick?3:5);
   }
   const fallbackReason=(item:Anime)=>related.length>0
     ? "Похож по жанрам и тематике на выбранный тайтл: "+item.genres.slice(0,3).join(", ")
