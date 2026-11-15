@@ -26,8 +26,17 @@ const SYSTEM_PROMPT = `Ты — YUBERA AI, аниме-помощник прое�
 Стиль: дружелюбно, естественно, конкретно. Не называй модель, её ID или провайдера. Не отвечай на темы вне разрешённой области.`;
 
 function environment(): Environment {
-  try { return cloudflareEnv as unknown as Environment; }
-  catch { const value=(globalThis as RuntimeGlobal).__YUME_RUNTIME_ENV__; return value && typeof value==="object" ? value as Environment : {}; }
+  try {
+    const native = cloudflareEnv as unknown as Environment;
+    if (native && typeof native === "object" && (
+      native.YUME_DB || native.YUME_AI_API_KEY || native.YUME_AI_MODEL ||
+      native.YUME_AI_BASE_URL || native.YUME_AI_RATE_LIMITER
+    )) return native;
+  } catch {
+    // Tests may provide an isolated runtime environment.
+  }
+  const value = (globalThis as RuntimeGlobal).__YUME_RUNTIME_ENV__;
+  return value && typeof value === "object" ? value as Environment : {};
 }
 function database(): Database | null {
   const value=environment().YUME_DB;
@@ -234,7 +243,19 @@ export async function handleYuberaAiChat(request:Request):Promise<Response> {
   const conversationId=typeof body.conversationId==="string"&&/^[a-f0-9]{32}$/.test(body.conversationId)?body.conversationId:null;
   if(message.length<2)return json({error:"empty_message"},400);
   if(message.length>YUBERA_AI_MESSAGE_MAX_CHARS)return json({error:"message_too_long"},400);
-  if(!isAllowedYuberaAiTopic(message))return json({error:"off_topic",message:"Я могу помогать только с аниме и возможностями YUBERA."},422);
+  let previous:Array<{role:"user"|"assistant";content:string}>=[];
+  if(conversationId) {
+    try {
+      const owned=await db.prepare("SELECT id FROM yume_ai_conversations WHERE id=? AND user_id=?")
+        .bind(conversationId,account.userId).first<{id:string}>();
+      if(owned)previous=await history(db,account.userId,conversationId);
+    } catch {
+      return json({error:"conversation_unavailable"},503);
+    }
+  }
+  if(!isAllowedYuberaAiTopic(message,previous.map(item=>item.content).join("\\n"))) {
+    return json({error:"off_topic",message:"Я могу помогать только с аниме и возможностями YUBERA."},422);
+  }
   const env=environment(),key=typeof env.YUME_AI_API_KEY==="string"?env.YUME_AI_API_KEY.trim():"";
   if(!key)return json({error:"ai_not_configured"},503);
   const date=utcDate(),limited=await rateLimit(userId,date);
@@ -243,8 +264,7 @@ export async function handleYuberaAiChat(request:Request):Promise<Response> {
   const quota=await takeDailyQuestion(db,userId,date);
   if(!quota)return json({error:"daily_limit_reached",limit:YUBERA_AI_DAILY_QUESTION_LIMIT,remaining:0},429);
   let conversation;
-  try{conversation=await getOrCreateConversation(db,userId,conversationId);}catch{return json({error:"conversation_unavailable",questionCharged:false},503);}
-  const previous=await history(db,userId,conversation.id);
+  try{conversation=await getOrCreateConversation(db,userId,conversationId);}catch{return json({error:"conversation_unavailable",questionCharged:true},503);}
   const userMessage=await saveMessage(db,userId,conversation.id,"user",message);
   try{
     const items=await readCatalog();
