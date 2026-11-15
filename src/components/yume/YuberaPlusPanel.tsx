@@ -17,7 +17,7 @@ type PlanMonths = 1 | 3;
 const formatDate = (value: number) => new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long", year: "numeric" }).format(new Date(value));
 
 const benefits = [
-  { title: "AI-помощник", description: "Рекомендации, создание подборок и помощь в поиске аниме", icon: Headphones, soon: true },
+  { title: "AI-помощник", description: "Персональные рекомендации, создание подборок и помощь в поиске аниме", icon: Headphones },
   { title: "Расширенные подборки", description: "Больше лимитов и гибкие настройки", icon: Layers3 },
   { title: "Эксклюзивные рамки аватара", description: "Специальные рамки только для подписчиков Plus", icon: Image },
   { title: "Эксклюзивный статус", description: "Особый статус YUBERA Plus в профиле", icon: BadgeCheck },
@@ -136,7 +136,7 @@ export function YuberaPlusPanel() {
           Преимущества подписки
         </h3>
         <div className="space-y-1">
-          {benefits.map(({ title, description, icon: Icon, soon }) => (
+          {benefits.map(({ title, description, icon: Icon }) => (
             <div key={title} className="flex items-center gap-3 rounded-[15px] border border-white/[0.08] bg-gradient-to-r from-[#211b24] to-[#17171e] px-3 py-2">
               <span className="grid h-11 w-11 shrink-0 place-items-center rounded-[13px] border border-[#8b453d]/25 bg-gradient-to-br from-[#542c2b] to-[#29202a] text-[#FF704F]">
                 <Icon className="h-6 w-6" strokeWidth={1.9} />
@@ -144,7 +144,6 @@ export function YuberaPlusPanel() {
               <span className="min-w-0 flex-1">
                 <span className="flex flex-wrap items-center gap-1.5 text-[14px] font-bold leading-tight text-white">
                   {title}
-                  {soon && <span className="rounded-full bg-[#a99aff]/20 px-2 py-0.5 text-[10px] font-semibold text-[#c8bbff]">Скоро</span>}
                 </span>
                 <span className="mt-0.5 block text-[11px] leading-snug text-white/65">{description}</span>
               </span>
