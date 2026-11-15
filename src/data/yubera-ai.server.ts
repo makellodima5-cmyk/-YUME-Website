@@ -54,6 +54,7 @@ function sameOrigin(request:Request) {
   try{return new URL(origin).origin===new URL(request.url).origin;}catch{return false;}
 }
 function cleanText(value:unknown,max:number) {
+  // eslint-disable-next-line no-control-regex
   return typeof value==="string" ? value.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g,"").trim().slice(0,max) : "";
 }
 function makeId(){return crypto.randomUUID().replace(/-/g,"");}
