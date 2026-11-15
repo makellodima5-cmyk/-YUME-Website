@@ -61,7 +61,7 @@
       "namespace_id": "202611016",
       "simple": {
         "limit": 20,
-        "period": 86400
+        "period": 60
       }
     }
   ],
