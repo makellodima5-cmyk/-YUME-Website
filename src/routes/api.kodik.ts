@@ -175,7 +175,7 @@ async function handleKodik(request: Request): Promise<Response> {
 
   return json({
     sources: [...sources.values()]
-      .map((source) => ({ id: source.id, title: source.title, episodes: [...source.episodes.values()].sort((a, b) => a.number - b.number) }))
+      .map((source) => ({ id: source.id, title: source.title, episodeCount: source.episodes.size, episodes: [...source.episodes.values()].sort((a, b) => a.number - b.number) }))
       .sort((a, b) => a.title.localeCompare(b.title, "ru")),
   });
 }
