@@ -31,7 +31,9 @@ describe("automatic Worker maintenance", () => {
     expect(queueWorker).toContain("runScheduledNotificationCleanup(env)");
     expect(queueWorker).toContain("runScheduledEpisodeNotifications(env)");
     expect(queueWorker).toContain("runScheduledAnimeCommentCleanup(env)");
-    expect(queueConfig).toContain('"0 */3 * * *"');
+    expect(queueConfig).toContain('"0 * * * *"');
+    expect(queueConfig).toContain('"YUME_CATALOG_READER"');
+    expect(queueConfig).toContain('"yume-catalog-reader"');
     expect(workflow).toContain("Automatic scheduled Worker jobs must remain disabled.");
     expect(workflow).toContain("Generated Worker entry still includes scheduled job");
     expect(workflow).toContain("Dedicated Queue Worker entry does not invoke scheduled episode notifications.");

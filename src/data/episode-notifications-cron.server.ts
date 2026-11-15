@@ -51,7 +51,21 @@ export async function runScheduledEpisodeNotifications(input: unknown): Promise<
   const token = typeof bindings.KODIK_API_TOKEN === "string" ? bindings.KODIK_API_TOKEN.trim() : "";
   if (!token) throw new Error("KODIK_API_TOKEN is not configured for episode notifications.");
 
-  const catalog = await readCatalogState();
+  const catalogStartedAt = Date.now();
+  let catalog;
+  try {
+    catalog = await readCatalogState();
+  } catch (error) {
+    const details = error instanceof Error
+      ? { errorName: error.name, errorMessage: error.message }
+      : { errorName: "UnknownError", errorMessage: "Unknown catalogue reader failure" };
+    console.error("[YUME][EPISODE_NOTIFICATIONS] Catalogue read failed; source baselines were not changed.", {
+      stage: "catalog_read",
+      durationMs: Date.now() - catalogStartedAt,
+      ...details,
+    });
+    throw new Error("Episode notification catalogue read failed: " + details.errorMessage);
+  }
   const titles = new Map(catalog.items.map((anime) => [anime.id, anime]));
   const byAnime = new Map<string, Sub[]>();
   for (const subscription of subscriptions) {
@@ -62,16 +76,28 @@ export async function runScheduledEpisodeNotifications(input: unknown): Promise<
 
   const entries = [...byAnime.entries()];
   const failures: string[] = [];
+  let checkedAnime = 0;
+  let missingSources = 0;
+  let queuedEpisodes = 0;
   for (let offset = 0; offset < entries.length; offset += 4) {
     await Promise.all(entries.slice(offset, offset + 4).map(async ([animeId, selected]) => {
       try {
         const anime = titles.get(animeId);
         const sources = await fetchKodikEpisodeSources(animeId, token, anime?.worldArtId && !anime.shikimoriId ? anime.worldArtId : undefined);
+        checkedAnime += 1;
         const animeTitle = anime?.title || "Аниме " + animeId;
         const posterUrl = poster(anime?.posterUrl);
         for (const subscription of selected) {
           const source = sources.find((item) => item.id === subscription.translation_id);
-          if (!source) continue;
+          if (!source) {
+            missingSources += 1;
+            console.warn("[YUME][EPISODE_NOTIFICATIONS] Selected Kodik voice-over is absent from the successful response; preserving its high-water mark.", {
+              animeId,
+              translationId: subscription.translation_id,
+              translationTitle: subscription.translation_title,
+            });
+            continue;
+          }
           const stored = subscription.source_last_episode;
           const known = stored !== null && Number.isFinite(Number(stored));
           const baseline = known
@@ -84,6 +110,7 @@ export async function runScheduledEpisodeNotifications(input: unknown): Promise<
               subscription.translation_id,
               source.title,
             );
+            queuedEpisodes += 1;
           }
           const lastEpisode = Math.max(baseline, source.episodes.length ? Math.max(...source.episodes) : baseline);
           const now = new Date().toISOString();
@@ -97,5 +124,22 @@ export async function runScheduledEpisodeNotifications(input: unknown): Promise<
       }
     }));
   }
-  if (failures.length) throw new Error("Kodik episode notification checks failed: " + failures.join("; "));
+  if (failures.length) {
+    console.error("[YUME][EPISODE_NOTIFICATIONS] Poll completed with anime-level failures; failed source baselines were preserved.", {
+      subscribedAnime: entries.length,
+      checkedAnime,
+      missingSources,
+      queuedEpisodes,
+      failedAnime: failures.length,
+      failures,
+    });
+    throw new Error("Kodik episode notification checks failed: " + failures.join("; "));
+  }
+  console.info("[YUME][EPISODE_NOTIFICATIONS] Poll completed.", {
+    subscribedAnime: entries.length,
+    checkedAnime,
+    missingSources,
+    queuedEpisodes,
+    failedAnime: 0,
+  });
 }

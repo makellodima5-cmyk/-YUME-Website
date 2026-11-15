@@ -143,13 +143,17 @@ jobs:
               && item.dead_letter_queue === "yume-web-tasks-dlq",
           );
           const cleanupCron = queueConfig.triggers?.crons ?? [];
-          if (cleanupCron.length !== 1 || cleanupCron[0] !== "0 */3 * * *") {
-            throw new Error("Queue consumer Worker must run the three-hour episode notification cron.");
+          if (cleanupCron.length !== 1 || cleanupCron[0] !== "0 * * * *") {
+            throw new Error("Queue consumer Worker must run the hourly episode notification cron.");
           }
           const queueDatabase = (queueConfig.d1_databases ?? []).find(
             (item) => item.binding === "YUME_DB"
               && item.database_id === "c2f0f25d-e29b-47e2-ad11-b726f7a3e9a2",
           );
+          const queueReaderService = (queueConfig.services ?? []).find((item) => item.binding === "YUME_CATALOG_READER" && item.service === "yume-catalog-reader");
+          if (!queueReaderService) {
+            throw new Error("Queue consumer Worker is missing the private YUME_CATALOG_READER Service Binding.");
+          }
           if (!queueConsumer || !queueDatabase || queueConfig.main !== "src/queue-worker.ts") {
             throw new Error("Queue consumer Worker config is missing its bounded consumer, DLQ, D1 binding or entrypoint.");
           }
