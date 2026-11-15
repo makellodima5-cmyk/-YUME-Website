@@ -65,8 +65,8 @@ export async function runScheduledEpisodeNotifications(input: unknown): Promise<
   for (let offset = 0; offset < entries.length; offset += 4) {
     await Promise.all(entries.slice(offset, offset + 4).map(async ([animeId, selected]) => {
       try {
-        const sources = await fetchKodikEpisodeSources(animeId, token, anime?.worldArtId && !anime.shikimoriId ? anime.worldArtId : undefined);
         const anime = titles.get(animeId);
+        const sources = await fetchKodikEpisodeSources(animeId, token, anime?.worldArtId && !anime.shikimoriId ? anime.worldArtId : undefined);
         const animeTitle = anime?.title || "Аниме " + animeId;
         const posterUrl = poster(anime?.posterUrl);
         for (const subscription of selected) {
