@@ -318,7 +318,7 @@ describe("YUBERA community foundation", () => {
     expect(server).toContain("import { hasTelegramAdminIdentity } from \"@/data/admin-password.server\"");
     expect(server).toContain("await hasTelegramAdminIdentity(request)");
     expect(adminAuth).toContain("async function isTelegramAdministrator(request: Request, env: Environment)");
-    expect(adminAuth).toContain("row.telegram_user_id === adminId");
+    expect(adminAuth).toContain("isTelegramAdminIdAllowed(adminIds, row.telegram_user_id)");
     expect(adminAuth).toContain("row.expires_at > Date.now()");
     expect(adminAuth).toContain("u.provider='telegram'");
     expect(server).toContain("profileSummary(database, target, userId, adminCheck)");
