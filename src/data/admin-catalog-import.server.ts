@@ -99,7 +99,7 @@ function normalizeKodikAge(value: string | null | undefined, minimalAge: number 
   const mpaa = (value ?? "").toUpperCase();
   return ({G:"Без ограничений",PG:"Без ограничений","PG-13":"12+",R:"16+","R+":"16+",RX:"18+"} as Record<string,string>)[mpaa] ?? null;
 }
-function normalizeKodikMaterial(item: KodikCatalogResult, existingIds: Set<string>): KodikCatalogSearchItem | null {
+function normalizeKodikMaterial(item: KodikCatalogResult, existingIds: Set<string>, existingWorldArtIds: Set<string>): KodikCatalogSearchItem | null {
   const shikimoriId = String(item.shikimori_id ?? "").trim();
   const kodikId = String(item.id ?? "").trim();
   const worldArtId = String(item.worldart_animation_id ?? parseWorldArtAnimationId(item.worldart_link) ?? "").trim();
@@ -126,7 +126,7 @@ function normalizeKodikMaterial(item: KodikCatalogResult, existingIds: Set<strin
     genres,ageRating:normalizeKodikAge(data.rating_mpaa,data.minimal_age),rating,
     episodes:Math.max(0,Math.floor(Number(data.episodes_total ?? 0) || 0)),
     episodesAired:Math.max(0,Math.floor(Number(data.episodes_aired ?? 0) || 0)),studios,
-    alreadyInCatalog:existingIds.has(id) || (Boolean(worldArtId) && existingIds.has(worldArtId)),
+    alreadyInCatalog:existingIds.has(id) || (Boolean(worldArtId) && existingWorldArtIds.has(worldArtId)),
   };
 }
 export function parseWorldArtAnimationId(value: string | null | undefined): string | null {
@@ -138,11 +138,12 @@ export function parseWorldArtAnimationId(value: string | null | undefined): stri
     return /^\d{1,12}$/.test(id) && Number(id) > 0 ? id : null;
   } catch { return null; }
 }
-export function normalizeKodikCatalogResults(results: KodikCatalogResult[], existingIds: string[]): KodikCatalogSearchItem[] {
+export function normalizeKodikCatalogResults(results: KodikCatalogResult[], existingIds: string[], existingWorldArtIds: string[] = []): KodikCatalogSearchItem[] {
   const existing = new Set(existingIds);
+  const existingWorldArt = new Set(existingWorldArtIds);
   const byAnime = new Map<string,KodikCatalogSearchItem>();
   for (const row of results) {
-    const mapped = normalizeKodikMaterial(row,existing);
+    const mapped = normalizeKodikMaterial(row,existing,existingWorldArt);
     if (!mapped) continue;
     const previous = byAnime.get(mapped.id);
     const score = (value:KodikCatalogSearchItem) => Number(Boolean(value.posterUrl))*4 + Number(Boolean(value.description))*4 + Number(Boolean(value.genres.length))*2 + Number(Boolean(value.year)) + Number(Boolean(value.englishTitle));
@@ -539,7 +540,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
       if (rateLimit === "limited") return json({error:"Слишком много запросов к Kodik. Повтори через минуту."},429);
       if (rateLimit !== "allowed") return json({error:"Ограничитель запросов Kodik временно недоступен."},503);
       const rows = await fetchKodikByTitle(normalized,worldArtId,worldArtLink);
-      const results = normalizeKodikCatalogResults(rows,state.items.flatMap((item)=>[item.id,item.worldArtId ?? ""]));
+      const results = normalizeKodikCatalogResults(rows,state.items.map((item)=>item.id),state.items.map((item)=>item.worldArtId ?? "").filter(Boolean));
       return json({isAdmin:true,source:"kodik",query:normalized,results});
     }
     if (action === "import_kodik_title") {
@@ -558,7 +559,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
       const rows = await fetchKodikByTitle(queryText,worldArtId);
       const selected = rows.find((item)=>String(item.id??"")===kodikId && (shikimoriId ? String(item.shikimori_id??"")===shikimoriId : String(item.worldart_animation_id??parseWorldArtAnimationId(item.worldart_link)??"")===worldArtId));
       if (!selected) return json({error:"kodik_title_not_found"},404);
-      const mapped = normalizeKodikCatalogResults([selected],state.items.flatMap((item)=>[item.id,item.worldArtId ?? ""]))[0];
+      const mapped = normalizeKodikCatalogResults([selected],state.items.map((item)=>item.id),state.items.map((item)=>item.worldArtId ?? "").filter(Boolean))[0];
       if (!mapped) return json({error:"kodik_title_metadata_unavailable"},422);
       if (mapped.alreadyInCatalog) return json({isAdmin:true,alreadyInCatalog:true,anime:{id:animeId,title:mapped.title},message:"Этот тайтл уже находится в каталоге."},409);
       const anime = mapKodikAnime(mapped);
