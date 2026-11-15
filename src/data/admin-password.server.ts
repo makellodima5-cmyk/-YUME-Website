@@ -1,5 +1,6 @@
 import { env as cloudflareEnv } from "cloudflare:workers";
 import { enforceRateLimit } from "@/lib/rate-limit";
+import { isTelegramAdminIdAllowed } from "@/lib/admin-access";
 import {
   buildAdminPasswordCookie,
   createAdminPasswordCookieValue,
@@ -60,17 +61,17 @@ function sameOrigin(request: Request): boolean {
 
 async function isTelegramAdministrator(request: Request, env: Environment): Promise<boolean> {
   const db = env.YUME_DB;
-  const adminId = typeof env.TELEGRAM_ADMIN_ID === "string" ? env.TELEGRAM_ADMIN_ID.trim() : "";
+  const adminIds = env.TELEGRAM_ADMIN_ID;
   const secret = typeof env.YUME_AUTH_SESSION_SECRET === "string" ? env.YUME_AUTH_SESSION_SECRET : "";
   const token = cookie(request, USER_SESSION_COOKIE);
-  if (!db || !/^\d{1,20}$/.test(adminId) || secret.length < 32 || !token) return false;
+  if (!db || typeof adminIds !== "string" || !adminIds.split(",").some((id) => /^\d{1,20}$/.test(id.trim())) || secret.length < 32 || !token) return false;
 
   const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
   const digest = new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(token)));
   const tokenHash = Array.from(digest, byte => byte.toString(16).padStart(2, "0")).join("");
   const row = await db.prepare("SELECT u.telegram_user_id, s.expires_at FROM yume_sessions s JOIN yume_users u ON u.id=s.user_id WHERE s.token_hash=? AND u.provider='telegram'")
     .bind(tokenHash).first<{ telegram_user_id: string; expires_at: number }>();
-  return Boolean(row && row.expires_at > Date.now() && row.telegram_user_id === adminId);
+  return Boolean(row && row.expires_at > Date.now() && isTelegramAdminIdAllowed(adminIds, row.telegram_user_id));
 }
 
 export async function hasTelegramAdminIdentity(request: Request): Promise<boolean> {

@@ -2,6 +2,7 @@ import { env as cloudflareEnv } from "cloudflare:workers";
 import { getAuthenticatedYumeUserId } from "@/data/telegram-auth.server";
 import { YUBERA_SUPPORT_LEVELS, YUBERA_XP_LEVELS } from "@/data/yubera-config";
 import { hasAdminPasswordSession, isAdminPasswordConfigured } from "@/lib/admin-password.server";
+import { isTelegramAdminIdAllowed } from "@/lib/admin-access";
 type S={bind(...v:unknown[]):S;first<T=Record<string,unknown>>():Promise<T|null>;all<T=Record<string,unknown>>():Promise<{results:T[]}>;run():Promise<{meta?:{changes?:number}}>} ;
 type DB={prepare(sql:string):S;batch?:(statements:S[])=>Promise<Array<{meta?:{changes?:number}}>>};
 type E=Record<string,unknown>&{YUME_DB?:unknown;TELEGRAM_BOT_TOKEN?:string;TELEGRAM_ADMIN_ID?:string;YUME_AUTH_SESSION_SECRET?:string;YUME_ADMIN_PASSWORD?:string;TELEGRAM_STARS_RATE_LIMITER?:unknown};
@@ -58,7 +59,7 @@ export async function handleYuberaPlus(r:Request):Promise<Response>{
  }
  return json({error:"invalid_action"},400);
 }
-async function isAdmin(r:Request,d:DB,e:E){const id=String(e.TELEGRAM_ADMIN_ID??""),secret=String(e.YUME_AUTH_SESSION_SECRET??""),token=cookie(r,COOKIE);if(!/^\d{1,20}$/.test(id)||secret.length<32||!token)return null;const h=await sign(token,secret);const row=await d.prepare("SELECT u.id,u.telegram_user_id,s.expires_at FROM yume_sessions s JOIN yume_users u ON u.id=s.user_id WHERE s.token_hash=? AND u.provider='telegram'").bind(h).first<{id:string;telegram_user_id:string;expires_at:number}>();return row&&row.expires_at>Date.now()&&row.telegram_user_id===id?row.id:null;}
+async function isAdmin(r:Request,d:DB,e:E){const ids=e.TELEGRAM_ADMIN_ID,secret=String(e.YUME_AUTH_SESSION_SECRET??""),token=cookie(r,COOKIE);if(typeof ids!=="string"||!ids.split(",").some(id=>/^[0-9]{1,20}$/.test(id.trim()))||secret.length<32||!token)return null;const h=await sign(token,secret);const row=await d.prepare("SELECT u.id,u.telegram_user_id,s.expires_at FROM yume_sessions s JOIN yume_users u ON u.id=s.user_id WHERE s.token_hash=? AND u.provider='telegram'").bind(h).first<{id:string;telegram_user_id:string;expires_at:number}>();return row&&row.expires_at>Date.now()&&isTelegramAdminIdAllowed(ids,row.telegram_user_id)?row.id:null;}
 export async function handleAdminYuberaPlus(r:Request):Promise<Response>{
  if(!["GET","POST"].includes(r.method))return json({error:"method_not_allowed"},405);if(r.method==="POST"&&!origin(r))return json({error:"cross_origin_request"},403);
  const d=db();if(!d)return json({error:"database_unavailable"},503);const e=env(),admin=await isAdmin(r,d,e);if(!admin)return json({isAdmin:false,error:"admin_required"},403);if(!isAdminPasswordConfigured(e))return json({isAdmin:false,error:"admin_password_not_configured"},503);if(!await hasAdminPasswordSession(r,e))return json({isAdmin:false,error:"admin_password_required"},428);
