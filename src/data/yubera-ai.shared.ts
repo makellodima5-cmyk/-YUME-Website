@@ -25,7 +25,11 @@ const OFF_TOPIC_TERMS = /населени[ея]|погод[аы]|курс вал
 const QUICK_WATCH_PROMPT = /^(?:что посмотреть сегодня|что глянуть сегодня|выбери аниме на сегодня)[?!.,\s]*$/i;
 const FOLLOW_UP = /^(?:а\s+)?(?:почему|зачем|как именно|подробнее|расскажи подробнее|а он|а она|а этот|а эта|а это|а какие|а какой|а сколько|а есть|можешь подробнее|продолжи|и что дальше|что насчет этого|почему именно|what about|tell me more|why is that|and what about)(?:\s|[?!.,]|$)/i;
 
-export function isExplicitlyOffTopicYuberaAiTopic(value: string): boolean {\n  return OFF_TOPIC_TERMS.test(value.toLocaleLowerCase("ru-RU").replace(/ё/g, "е"));\n}\n\nexport function isAllowedYuberaAiTopic(value: string, previousContext = ""): boolean {
+export function isExplicitlyOffTopicYuberaAiTopic(value: string): boolean {
+  return OFF_TOPIC_TERMS.test(value.toLocaleLowerCase("ru-RU").replace(/ё/g, "е"));
+}
+
+export function isAllowedYuberaAiTopic(value: string, previousContext = ""): boolean {
   const text = value.toLocaleLowerCase("ru-RU").replace(/ё/g, "е").trim();
   if (text.length < 2 || isExplicitlyOffTopicYuberaAiTopic(text)) return false;
   if (DOMAIN_TERMS.test(text) || QUICK_WATCH_PROMPT.test(text)) return true;
