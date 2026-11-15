@@ -1967,8 +1967,8 @@ nav[aria-label="Main navigation"] button[aria-current="page"] svg {
 
 
 /* YUBERA AI chat surface and floating assistant shortcut. */
-.yubera-ai-fab{position:fixed;z-index:75;right:max(16px,env(safe-area-inset-right,0px),var(--yume-tg-safe-right,0px));bottom:calc(5.75rem + max(env(safe-area-inset-bottom,0px),var(--yume-tg-safe-bottom,0px)));display:grid;width:56px;height:56px;place-items:center;border:1px solid rgba(255,112,80,.8);border-radius:999px;background:linear-gradient(145deg,#ff6849,#e83f2e);color:#fff;box-shadow:0 0 0 5px rgba(255,87,56,.08),0 0 28px rgba(255,79,50,.38),0 8px 24px rgba(0,0,0,.35);transition:transform .18s,box-shadow .18s}
-.yubera-ai-fab:hover{transform:translateY(-2px);box-shadow:0 0 0 6px rgba(255,87,56,.1),0 0 36px rgba(255,79,50,.48),0 10px 28px rgba(0,0,0,.4)}
+.yubera-ai-fab{position:fixed;z-index:75;right:max(16px,env(safe-area-inset-right,0px),var(--yume-tg-safe-right,0px));bottom:calc(5.75rem + max(env(safe-area-inset-bottom,0px),var(--yume-tg-safe-bottom,0px)));display:grid;width:56px;height:56px;place-items:center;border:1px solid rgba(255,255,255,.2);border-radius:999px;background:linear-gradient(145deg,#252630,#171820);color:#fff;box-shadow:0 8px 24px rgba(0,0,0,.32);transition:transform .18s,border-color .18s}
+.yubera-ai-fab:hover{transform:translateY(-2px);border-color:rgba(255,255,255,.38)}
 .yubera-ai-fab:focus-visible{outline:3px solid #fff;outline-offset:4px}
 .yubera-ai-page{position:fixed;z-index:80;top:var(--yubera-ai-viewport-top,0px);left:0;right:0;width:100%;height:var(--yubera-ai-viewport-height,100dvh);min-height:0;display:flex;flex-direction:column;overflow:hidden;background:radial-gradient(ellipse 82% 40% at 50% 0%,rgba(255,80,54,.1),transparent 70%),#0b0c12;color:#f8f7f8;padding-top:max(env(safe-area-inset-top,0px),var(--yume-tg-content-safe-top,0px));padding-bottom:max(env(safe-area-inset-bottom,0px),var(--yume-tg-safe-bottom,0px))}
 .yubera-ai-main{flex:1;min-height:0;display:flex;flex-direction:column;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:10px 16px 18px;scrollbar-width:none}
@@ -1999,3 +1999,13 @@ nav[aria-label="Main navigation"] button[aria-current="page"] svg {
 @media(max-height:740px){.yubera-ai-mascot{width:clamp(94px,19vh,142px)}.yubera-ai-intro{margin-top:7px}.yubera-ai-quick{margin-top:13px;gap:6px}.yubera-ai-quick button{min-height:48px}.yubera-ai-quick-icon{width:32px;height:32px}}
 @media(max-width:370px){.yubera-ai-quick button{grid-template-columns:34px minmax(0,1fr) 16px;gap:6px;padding:6px 8px;font-size:.78rem}.yubera-ai-quick-icon{width:30px;height:30px}.yubera-ai-quick-icon svg{width:21px;height:21px}.yubera-ai-composer-wrap{padding-inline:9px}}
 @media(prefers-reduced-motion:reduce){.yubera-ai-fab,.yubera-ai-quick button{transition:none}}
+
+
+/* YUBERA AI: readable assistant typography and stable compact recommendation cards. */
+.yubera-ai-rich-text{display:grid;gap:10px;overflow-wrap:anywhere}
+.yubera-ai-rich-text p{margin:0;line-height:1.65}
+.yubera-ai-rich-text h3{margin:2px 0 0;color:#fff;font-size:1rem;font-weight:800;line-height:1.35}
+.yubera-ai-rich-text ul{display:grid;gap:6px;margin:0;padding-left:1.15rem;list-style:disc}
+.yubera-ai-rich-text li{padding-left:2px;line-height:1.55}
+.yubera-ai-rich-text strong{font-weight:750}
+.yubera-ai-rich-text code{font-size:.92em}
