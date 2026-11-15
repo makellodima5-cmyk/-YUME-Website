@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import type { Anime } from "@/data/anime";
 import { YumePreferencesProvider } from "@/data/preferences";
-import { AnimeCard } from "@/components/yume/Poster";
+import { AnimeCard, PosterArt } from "@/components/yume/Poster";
 
 vi.mock("@/lib/telegram-mini-app", () => ({ telegramHapticImpact: vi.fn() }));
 
@@ -34,6 +34,22 @@ describe("anime poster card actions and age rating", () => {
     expect(ageRating).toBeInTheDocument();
     expect(ageRating).not.toHaveClass("rounded-full");
     expect(screen.queryByRole("button", { name: /избранное|favorites/i })).not.toBeInTheDocument();
+  });
+
+  it("shows the age rating on standalone poster artwork used across the site", () => {
+    const { rerender } = render(
+      <YumePreferencesProvider>
+        <PosterArt anime={sampleAnime} />
+      </YumePreferencesProvider>,
+    );
+    expect(screen.getByText("18+")).toBeInTheDocument();
+
+    rerender(
+      <YumePreferencesProvider>
+        <PosterArt anime={sampleAnime} showAgeRating={false} />
+      </YumePreferencesProvider>,
+    );
+    expect(screen.queryByText("18+")).not.toBeInTheDocument();
   });
 
   it("moves the age rating below the remove control in saved lists", () => {
