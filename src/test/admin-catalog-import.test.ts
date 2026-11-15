@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { adminCatalogImportNextResumeAt, adminCatalogImportPageOperationId, adminCatalogImportResumeCursor, adminCatalogImportShouldResumeCounters, chunkAdminCatalogIds, isCatalogMetadataIncomplete, mapAdminCatalogScreenshots, normalizeAdminCatalogIds, isValidAdminImportTarget, normalizeKodikCatalogResults, parseWorldArtAnimationId } from "@/data/admin-catalog-import.server";
+import { adminCatalogImportNextResumeAt, adminCatalogImportPageOperationId, adminCatalogImportResumeCursor, adminCatalogImportShouldResumeCounters, chunkAdminCatalogIds, isCatalogMetadataIncomplete, mapAdminCatalogScreenshots, normalizeAdminCatalogIds, isValidAdminImportTarget, normalizeKodikCatalogResults, parseWorldArtAnimationId, parseWorldArtCinemaId, parseWorldArtReference } from "@/data/admin-catalog-import.server";
 
 describe("admin catalog import target", () => {
   it("accepts targets above the old 500-title application cap", () => {
@@ -207,6 +207,35 @@ describe("Kodik World Art catalogue import", () => {
     expect(parseWorldArtAnimationId("https://www.world-art.ru/animation/animation.php?id=../x")).toBeNull();
   });
 
+  it("recognizes the independent World Art Cinema ID namespace", () => {
+    expect(parseWorldArtCinemaId("http://www.world-art.ru/cinema/cinema.php?id=73880")).toBe("73880");
+    expect(parseWorldArtAnimationId("http://www.world-art.ru/cinema/cinema.php?id=73880")).toBeNull();
+    expect(parseWorldArtReference("https://www.world-art.ru/cinema/cinema.php?id=73880")).toEqual({ id: "73880", type: "cinema" });
+  });
+
+  it("maps a cinema-section Kodik result without a Shikimori ID into the shared catalogue", () => {
+    const [item] = normalizeKodikCatalogResults([{
+      id: "movie-73880",
+      title: "Castlevania",
+      title_orig: "Castlevania",
+      worldart_cinema_id: 73880,
+      worldart_link: "http://www.world-art.ru/cinema/cinema.php?id=73880",
+      material_data: {
+        title: "Кастлвания", title_en: "Castlevania",
+        description: "A vampire hunter battles Dracula.",
+        poster_url: "https://cdn.example.org/castlevania.jpg",
+        genres: ["Анимация", "Фэнтези"], kind: "cartoon-serial", status: "released", year: 2017,
+      },
+    }], []);
+    expect(item).toMatchObject({
+      id: "wa-cinema-73880", kodikId: "movie-73880", worldArtId: "73880", worldArtType: "cinema",
+      title: "Кастлвания", englishTitle: "Castlevania",
+      description: "A vampire hunter battles Dracula.",
+      posterUrl: "https://cdn.example.org/castlevania.jpg",
+      genres: ["Анимация", "Фэнтези"], kind: "cartoon-serial", year: 2017,
+    });
+  });
+
   it("keeps a Kodik title without a Shikimori ID when World Art identifies it", () => {
     const [item] = normalizeKodikCatalogResults([{
       id: "serial-6647",
@@ -240,7 +269,7 @@ describe("Kodik World Art catalogue import", () => {
       title: "Naruto",
       worldart_animation_id: 262,
       material_data: { anime_title: "Наруто" },
-    }], ["20"], ["262"]);
+    }], ["20"], ["animation:262"]);
     expect(item?.alreadyInCatalog).toBe(true);
   });
 });

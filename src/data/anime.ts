@@ -32,6 +32,8 @@ export type Anime = {
   /** External identifiers retained for Kodik-backed records. */
   shikimoriId?: string;
   worldArtId?: string;
+  /** World Art IDs are independent between the animation and cinema sections. */
+  worldArtType?: "animation" | "cinema";
   kodikId?: string;
 };
 
