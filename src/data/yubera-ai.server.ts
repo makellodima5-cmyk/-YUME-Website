@@ -68,7 +68,17 @@ function searchScore(query:string,item:Anime) {
   }
   return score;
 }
+function shuffleCatalog(items:Anime[],limit:number):Anime[] {
+  const pool=items.filter(item=>item.posterUrl && item.status!=="Анонс");
+  for(let i=pool.length-1;i>0;i--){
+    const bytes=crypto.getRandomValues(new Uint32Array(1));
+    const j=bytes[0]!%(i+1);
+    [pool[i],pool[j]]=[pool[j]!,pool[i]!];
+  }
+  return pool.slice(0,limit);
+}
 function candidatesFor(query:string,items:Anime[],limit=14) {
+  if(/что посмотреть сегодня|что глянуть сегодня|выбери аниме на сегодня/i.test(query))return shuffleCatalog(items,Math.max(6,limit));
   return items.map(item=>({item,score:searchScore(query,item)}))
     .sort((a,b)=>b.score-a.score||(b.item.rating??-1)-(a.item.rating??-1))
     .slice(0,limit).map(x=>x.item);
@@ -180,10 +190,8 @@ async function generateAnswer(question:string,historyItems:Array<{role:"user"|"a
   const shortlist=candidatesFor(question,items,14);
   const projectInfo=items.filter(item=>searchScore(question,item)>0).slice(0,4).map(item=>({title:item.title,genres:item.genres,year:item.year,description:cleanText(item.description,240)}));
   const injected=JSON.stringify({catalog:catalogContext(shortlist),projectInfo});
-  const prompt=SYSTEM_PROMPT+"
-
-YUBERA_CATALOG_CONTEXT (only source of recommendation ids and titles):
-"+injected;
+  const dailyPick=/что посмотреть сегодня|что глянуть сегодня|выбери аниме на сегодня/i.test(question);
+  const prompt=SYSTEM_PROMPT+(dailyPick?"\n\nSPECIAL REQUEST: The user asks what to watch today. Choose 1-3 different entries from the provided randomized catalog candidates. Give short reasons and include their real ids in YUBERA_RECOMMENDATIONS_JSON.":"")+"\n\nYUBERA_CATALOG_CONTEXT (only source of recommendation ids and titles):\n"+injected;
   const result=await providerCompletion([{role:"system",content:prompt},...historyItems.slice(-YUBERA_AI_CONTEXT_MESSAGES*2),{role:"user",content:question}],model,key,base);
   const parsed=extractRecommendations(result.content),reasons=new Map(parsed.recommendations.map(item=>[item.id,item.reason]));
   let selected=items.filter(item=>reasons.has(item.id));
