@@ -338,7 +338,7 @@ describe("YUBERA community foundation", () => {
     const component = await readFile(resolve(process.cwd(), "src/components/yume/YuberaProfileHub.tsx"), "utf8");
     const profile = await readFile(resolve(process.cwd(), "src/components/yume/Profile.tsx"), "utf8");
     const server = await readFile(resolve(process.cwd(), "src/data/yubera-community.server.ts"), "utf8");
-    expect(server).toContain('isAdmin: account.user.telegram_user_id === String((env().TELEGRAM_ADMIN_ID ?? "")).trim()');
+    expect(server).toContain("isAdmin: isTelegramAdminIdAllowed(env().TELEGRAM_ADMIN_ID, account.user.telegram_user_id)");
     expect(component).toContain("{profile.isAdmin &&");
     expect(component).toContain("{publicProfile.isAdmin &&");
     expect(component).toContain("АДМИН");
