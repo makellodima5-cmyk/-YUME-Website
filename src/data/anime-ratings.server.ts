@@ -71,8 +71,10 @@ export async function applyPublicAnimeRatings(items: readonly Anime[]): Promise<
     const db = database(environment());
     if (db) {
       try {
-        for (let offset = 0; offset < missingIds.length; offset += 400) {
-          const batch = missingIds.slice(offset, offset + 400);
+        for (let offset = 0; offset < missingIds.length; offset += 80) {
+          // Keep the IN-list plus its vote-threshold binding comfortably below
+          // the effective D1 bind-variable ceiling in production.
+          const batch = missingIds.slice(offset, offset + 80);
           const placeholders = batch.map(() => "?").join(", ");
           const query = await db.prepare(
             "SELECT anime_id, rating_sum, vote_count FROM yume_anime_rating_summary " +
