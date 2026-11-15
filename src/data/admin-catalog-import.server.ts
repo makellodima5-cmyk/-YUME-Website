@@ -371,7 +371,7 @@ async function authorize(request: Request, env: Environment): Promise<{ db: D1Da
   const adminIds = env.TELEGRAM_ADMIN_ID;
   const secret = typeof env.YUME_AUTH_SESSION_SECRET === "string" ? env.YUME_AUTH_SESSION_SECRET : "";
   const token = cookieValue(request);
-  if (!db || !/^\d{1,20}$/.test(adminId) || secret.length < 32 || !token) return null;
+  if (!db || typeof adminIds !== "string" || !adminIds.split(",").some((id) => /^\d{1,20}$/.test(id.trim())) || secret.length < 32 || !token) return null;
   const row = await db.prepare("SELECT u.telegram_user_id, s.expires_at FROM yume_sessions s JOIN yume_users u ON u.id=s.user_id WHERE s.token_hash=? AND u.provider='telegram'")
     .bind(await tokenHash(token, secret)).first<{ telegram_user_id: string; expires_at: number }>();
   if (!row || row.expires_at <= Date.now() || !isTelegramAdminIdAllowed(adminIds, row.telegram_user_id)) return null;
