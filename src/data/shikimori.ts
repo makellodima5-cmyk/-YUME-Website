@@ -645,12 +645,17 @@ export const getShikimoriAnimeDetails = createServerFn({ method: "GET" })
     let anime = stored;
     let apiError: string | null = null;
     try {
-      const liveResult = await fetchShikimoriAnimes(validateRequest({ ids: data.animeId, includeVideos: true }));
-      const liveAnime = liveResult.items.find((item) => item.id === data.animeId);
-      if (liveAnime && !liveResult.error) anime = mergeLiveAnimeDetails(stored, liveAnime);
-      else {
+      if (stored.catalogSource === "kodik" && !stored.shikimoriId) {
+        anime = stored;
+      } else {
+        const sourceId = stored.shikimoriId ?? data.animeId;
+        const liveResult = await fetchShikimoriAnimes(validateRequest({ ids: sourceId, includeVideos: true }));
+        const liveAnime = liveResult.items.find((item) => item.id === sourceId);
+        if (liveAnime && !liveResult.error) anime = mergeLiveAnimeDetails(stored, liveAnime);
+        else {
         apiError = liveResult.error ?? "Не удалось обновить данные из Shikimori.";
-        anime = { ...stored, nextEpisodeAt: isUpcomingEpisodeDate(stored.nextEpisodeAt) ? stored.nextEpisodeAt : undefined };
+          anime = { ...stored, nextEpisodeAt: isUpcomingEpisodeDate(stored.nextEpisodeAt) ? stored.nextEpisodeAt : undefined };
+        }
       }
     } catch (error) {
       console.error("[YUME] Failed to refresh selected anime from Shikimori:", error);
@@ -690,6 +695,7 @@ export const getShikimoriAnimeScreenshots = createServerFn({ method: "GET" })
       }
       const catalog = await readCatalogState();
       const anime = catalog.items.find((item) => item.id === data.animeId);
+      if (anime?.catalogSource === "kodik" && !anime.shikimoriId) return { items: [] as ShikimoriScreenshot[] };
       const airedOn = anime?.airedOn;
       const futureRelease = typeof airedOn === "string" && /^\d{4}-\d{2}-\d{2}/.test(airedOn)
         && airedOn.slice(0, 10) > new Date().toISOString().slice(0, 10);
