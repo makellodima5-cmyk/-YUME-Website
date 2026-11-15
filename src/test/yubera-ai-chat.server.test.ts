@@ -15,18 +15,16 @@ class FakeStatement {
  async first<T=Record<string,unknown>>():Promise<T|null>{
   if(this.sql.includes("FROM yume_sessions s JOIN yume_users"))return this.state.sessionHash===this.values[0]?{user_id:"user-1",expires_at:Date.now()+60000} as T:null;
   if(this.sql.includes("FROM yume_plus_subscriptions"))return this.state.plus?{active:1} as T:null;
+  if(this.sql.includes("INSERT INTO yume_ai_daily_usage")){
+   if(this.state.questions>=20)return null;
+   this.state.questions++;
+   return{questions:this.state.questions} as T;
+  }
   if(this.sql.includes("FROM yume_ai_daily_usage"))return{questions:this.state.questions} as T;
   return null;
  }
  async all<T=Record<string,unknown>>():Promise<{results:T[]}>{return{results:[]};}
- async run(){
-  if(this.sql.includes("INSERT INTO yume_ai_daily_usage")){
-   if(this.state.questions>=20)return{meta:{changes:0}};
-   this.state.questions++;
-   return{meta:{changes:1}};
-  }
-  return{meta:{changes:1}};
- }
+ async run(){return{meta:{changes:1}};}
 }
 class FakeDb {
  sessionHash="";
