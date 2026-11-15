@@ -5,6 +5,7 @@ import { MAX_SAVED_ANIME_IDS, normalizeSavedAnimeIds } from "@/data/telegram-lib
 import { isSameOriginRequest } from "@/lib/request-security";
 
 type TelegramEnvironment = Record<string, unknown> & {
+  YUME_AI_RATE_LIMITER?: unknown;
   TELEGRAM_BOT_TOKEN?: string;
   YUME_AUTH_SESSION_SECRET?: string;
   YUME_DB?: unknown;
