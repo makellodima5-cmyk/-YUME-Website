@@ -8,6 +8,7 @@ import { retryAfterMilliseconds } from "@/data/retry-after";
 export { retryAfterMilliseconds };
 import { filterCatalogForCurrentRequest } from "@/data/territorial-restrictions.server";
 import { applyPublicAnimeRatings } from "@/data/anime-ratings.server";
+import { isValidCatalogId } from "@/data/catalog-r2.shared";
 
 const API_URL = "https://shikimori.io/api/graphql";
 const SCREENSHOT_API_URL = "https://shikimori.one/api/animes/";
@@ -627,7 +628,7 @@ export const getShikimoriCatalog = createServerFn({ method: "GET" })
  */
 export const getShikimoriAnimeDetails = createServerFn({ method: "GET" })
   .validator((input: { animeId?: unknown }) => ({
-    animeId: typeof input?.animeId === "string" && /^\d{1,12}$/.test(input.animeId) ? input.animeId : "",
+    animeId: isValidCatalogId(input?.animeId) ? input.animeId : "",
   }))
   .handler(async ({ data }) => {
     const empty = { anime: null, relatedAnime: [] as Anime[], apiError: null as string | null, ratingEnabled: false };
@@ -669,7 +670,7 @@ export const getShikimoriAnimeDetails = createServerFn({ method: "GET" })
       anime: visibleById.get(stored.id) ?? null,
       relatedAnime: related.map((item) => visibleById.get(item.id)).filter((item): item is Anime => Boolean(item)),
       apiError,
-      ratingEnabled: stored.status !== "Анонс",
+      ratingEnabled: stored.status !== "Анонс" && !(stored.catalogSource === "kodik" && !stored.shikimoriId),
     };
   });
 
@@ -679,7 +680,7 @@ export const getShikimoriAnimeDetails = createServerFn({ method: "GET" })
  */
 export const getShikimoriAnimeScreenshots = createServerFn({ method: "GET" })
   .validator((input: { animeId?: unknown }) => ({
-    animeId: typeof input?.animeId === "string" && /^\d{1,12}$/.test(input.animeId) ? input.animeId : "",
+    animeId: isValidCatalogId(input?.animeId) ? input.animeId : "",
   }))
   .handler(async ({ data }) => {
     if (!data.animeId) return { items: [] as ShikimoriScreenshot[] };

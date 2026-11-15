@@ -1,10 +1,27 @@
 import { describe, expect, it } from "vitest";
-import { applyCatalogMutation, emptyCatalogState, isCatalogRevisionPinned } from "@/data/catalog-r2.shared";
+import { applyCatalogMutation, emptyCatalogState, isCatalogRevisionPinned, isValidCatalogId } from "@/data/catalog-r2.shared";
 import type { Anime } from "@/data/anime";
 
 const anime=(id:string,title="Title"):Anime=>({id,title,original:title,year:2024,episodes:12,episodesAired:0,rating:8,genres:["Драма"],status:"Онгоинг",description:"",hue:120,glyph:"A"});
 
+describe("catalogue identity validation",()=>{
+  it("accepts numeric provider IDs and namespaced World Art Cinema IDs",()=>{
+    expect(isValidCatalogId("73880")).toBe(true);
+    expect(isValidCatalogId("wa-cinema-73880")).toBe(true);
+    expect(isValidCatalogId("wa-animation-73880")).toBe(false);
+    expect(isValidCatalogId("wa-cinema-")).toBe(false);
+    expect(isValidCatalogId("wa-cinema-73880/other")).toBe(false);
+    expect(isValidCatalogId(73880)).toBe(false);
+  });
+});
+
 describe("R2 catalogue state mutations",()=>{
+  it("upserts a World Art Cinema record with a namespaced ID",()=>{
+    const record={...anime("wa-cinema-73880","Кастлвания"),catalogSource:"kodik" as const,worldArtId:"73880",worldArtType:"cinema" as const,kodikId:"serial-4241"};
+    const state=applyCatalogMutation(emptyCatalogState(),{type:"upsert",items:[record]});
+    expect(state.items).toHaveLength(1);
+    expect(state.items[0]).toMatchObject({id:"wa-cinema-73880",worldArtId:"73880",worldArtType:"cinema"});
+  });
   it("upserts by Shikimori ID without duplicating catalogue rows",()=>{
     const state=applyCatalogMutation(emptyCatalogState(),{type:"upsert",items:[anime("1"),anime("2")]});
     const next=applyCatalogMutation(state,{type:"upsert",items:[anime("1","Updated")]});
