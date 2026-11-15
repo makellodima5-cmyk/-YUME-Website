@@ -4,7 +4,7 @@ import { readCatalogState } from "@/data/catalog-r2.server";
 import type { Anime } from "@/data/anime";
 import {
   YUBERA_AI_CONTEXT_MESSAGES, YUBERA_AI_DAILY_QUESTION_LIMIT, YUBERA_AI_MESSAGE_MAX_CHARS,
-  YUBERA_AI_REPLY_MAX_TOKENS, getYuberaAiModelId, isAllowedYuberaAiTopic, sanitizeAiRecommendations,
+  YUBERA_AI_REPLY_MAX_TOKENS, getYuberaAiModelId, isAllowedYuberaAiTopic, isExplicitlyOffTopicYuberaAiTopic, sanitizeAiRecommendations,
   type YuberaAiConversation, type YuberaAiMessage, type YuberaAiRecommendation, type YuberaAiModelId,
 } from "@/data/yubera-ai.shared";
 
@@ -67,14 +67,32 @@ function extractRecommendations(content:string) {
 function animeText(item:Anime) {
   return [item.title,item.englishTitle,item.original,item.description,item.genres.join(", "),item.studios?.join(", ")??"",item.kind??""].filter(Boolean).join(" | ");
 }
+const CATALOG_QUERY_STOPWORDS = new Set(["аниме","тайтл","титл","пожалуйста","посоветуй","порекомендуй","подбери","предложи","найди","хочу","что","мне","можно","есть","какой","какая","какие","похожее","похожий","похожие","вроде","типа","как","это","тот","там","где","про","для","или","you","recommend","anime","something","similar","like","please","find","show"]);
+function catalogQueryTokens(query:string) {
+  return [...new Set(query.toLocaleLowerCase("ru-RU").replace(/ё/g,"е").split(/[^\p{L}\p{N}]+/u)
+    .filter(token=>token.length>=3&&!CATALOG_QUERY_STOPWORDS.has(token)))];
+}
 function searchScore(query:string,item:Anime) {
-  const normalized=query.toLocaleLowerCase("ru-RU").replace(/ё/g,"е");
+  const tokens=catalogQueryTokens(query);
+  const title=[item.title,item.englishTitle,item.original].filter(Boolean).join(" ").toLocaleLowerCase("ru-RU").replace(/ё/g,"е");
   const haystack=animeText(item).toLocaleLowerCase("ru-RU").replace(/ё/g,"е");
   let score=0;
-  for(const token of normalized.split(/[^\p{L}\p{N}]+/u).filter(x=>x.length>2)) {
-    if(haystack.includes(token))score+=item.title.toLocaleLowerCase("ru-RU").includes(token)?6:1;
+  for(const token of tokens) {
+    if(title.includes(token))score+=8;
+    else if(haystack.includes(token))score+=2;
   }
   return score;
+}
+function hasCatalogEvidence(query:string,items:Anime[]) {
+  const tokens=catalogQueryTokens(query);
+  if(tokens.length===0)return false;
+  return items.some(item=>{
+    const title=[item.title,item.englishTitle,item.original].filter(Boolean).join(" ").toLocaleLowerCase("ru-RU").replace(/ё/g,"е");
+    const haystack=animeText(item).toLocaleLowerCase("ru-RU").replace(/ё/g,"е");
+    const titleHits=tokens.filter(token=>title.includes(token));
+    if(titleHits.some(token=>token.length>=4))return true;
+    return tokens.filter(token=>haystack.includes(token)).length>=2;
+  });
 }
 function shuffleCatalog(items:Anime[],limit:number):Anime[] {
   const pool=items.filter(item=>item.posterUrl && item.status!=="Анонс");
@@ -206,17 +224,17 @@ async function generateAnswer(question:string,historyItems:Array<{role:"user"|"a
   const model=getYuberaAiModelId(env.YUME_AI_MODEL)||"mistralai/mistral-medium-3.5";
   const base=typeof env.YUME_AI_BASE_URL==="string"&&env.YUME_AI_BASE_URL.trim()?env.YUME_AI_BASE_URL.trim():"https://api.xkiro.com/v1";
   const dailyPick=/что посмотреть сегодня|что глянуть сегодня|выбери аниме на сегодня/i.test(question);
-  const similarIntent=/похож|аналог|подобн|similar/i.test(question);
-  const recommendationIntent=similarIntent||/рекоменд|посовет|что посмотреть|что глянуть|выбери аниме|подбери|предложи/i.test(question);
+  const similarIntent=/похож|аналог|подобн|similar|в духе|вроде|как у|как в|напоминает|с похожим сюжетом|похоже на|такое же/i.test(question);
+  const recommendationIntent=similarIntent||/рекоменд|посовет|что посмотреть|что глянуть|выбери аниме|подбери|предложи|найди мне|хочу посмотреть|что-нибудь на вечер/i.test(question);
   const source=similarIntent?items.find(item=>[item.title,item.englishTitle,item.original].some(name=>name&&question.toLocaleLowerCase("ru-RU").includes(name.toLocaleLowerCase("ru-RU")))):undefined;
   const related=source?localRelated(question,items):[];
-  const shortlist=source?[source,...related]:similarIntent?[]:candidatesFor(question,items,14);
+  const shortlist=source?[source,...related]:candidatesFor(question,items,20);
   const projectInfo=items.filter(item=>searchScore(question,item)>0).slice(0,4).map(item=>({title:item.title,genres:item.genres,year:item.year,description:cleanText(item.description,240)}));
   const injected=JSON.stringify({catalog:catalogContext(shortlist),projectInfo});
   const taskHint=dailyPick
     ?"\n\nСЦЕНАРИЙ: пользователь выбирает аниме на сегодня. Выбери 1–3 разных тайтла из переданных случайно перемешанных кандидатов."
     :similarIntent&&!source
-      ?"\n\nСЦЕНАРИЙ ПОХОЖЕГО ТАЙТЛА: исходный тайтл не найден в каталоге. Не подбирай случайные произведения; вежливо попроси пользователя уточнить точное название."
+      ?"\n\nСЦЕНАРИЙ ПОХОЖЕГО ТАЙТЛА: пользователь может описывать произведение, не называя его. Сначала сопоставь детали запроса с описаниями и названиями всех переданных кандидатов. Если можешь уверенно определить исходный тайтл, предложи другие близкие варианты; если уверенности нет, задай один короткий уточняющий вопрос. Не утверждай, что тайтла нет в каталоге только из-за отсутствия точного совпадения названия."
       :related.length>0
         ?"\n\nСЦЕНАРИЙ ПОХОЖЕГО ТАЙТЛА: первый объект каталога — исходный тайтл, остальные — кандидаты, отсортированные по совпадению жанров. Предложи наиболее близкие варианты и объясни сходство. Никогда не включай исходный тайтл в рекомендации."
         :recommendationIntent
@@ -226,13 +244,13 @@ async function generateAnswer(question:string,historyItems:Array<{role:"user"|"a
   const result=await providerCompletion([{role:"system",content:prompt},...historyItems.slice(-YUBERA_AI_CONTEXT_MESSAGES*2),{role:"user",content:question}],model,key,base);
   const parsed=extractRecommendations(result.content),reasons=new Map(parsed.recommendations.map(item=>[item.id,item.reason]));
   let selected=items.filter(item=>reasons.has(item.id)&&(!source||item.id!==source.id));
-  if(similarIntent&&!source) selected=[];
-  else if(recommendationIntent&&selected.length===0){
+  if(recommendationIntent&&selected.length===0){
     selected=(related.length>0?related:shortlist).filter(item=>item.posterUrl&&(!source||item.id!==source.id)).slice(0,dailyPick?3:5);
   }
   const fallbackReason=(item:Anime)=>related.length>0
     ? "Похож по жанрам и тематике на выбранный тайтл: "+item.genres.slice(0,3).join(", ")
     : dailyPick ? "Вариант для сегодняшнего просмотра из каталога YUBERA."
+    : similarIntent ? "Вариант совпадает с запросом по жанрам и деталям описания."
     : "Подходит под запрос по жанрам и описанию.";
   const completeReasons=new Map(recommendationsReasonEntries(selected,reasons,fallbackReason));
   const recommendations=recommendationRecords(selected.slice(0,8),completeReasons);
@@ -284,8 +302,14 @@ export async function handleYuberaAiChat(request:Request):Promise<Response> {
       return json({error:"conversation_unavailable"},503);
     }
   }
+  let catalogueItems:Anime[]|null=null;
   if(!isAllowedYuberaAiTopic(message,previous.map(item=>item.content).join("\n"))) {
-    return json({error:"off_topic",message:"Я могу помогать только с темами аниме и возможностями YUBERA."},422);
+    if(!isExplicitlyOffTopicYuberaAiTopic(message)) {
+      try { catalogueItems=await readCatalog(); } catch { catalogueItems=null; }
+    }
+    if(isExplicitlyOffTopicYuberaAiTopic(message)||!catalogueItems?.length||!hasCatalogEvidence(message,catalogueItems)) {
+      return json({error:"off_topic",message:"Я могу помогать только с темами аниме и возможностями YUBERA."},422);
+    }
   }
   const env=environment(),key=typeof env.YUME_AI_API_KEY==="string"?env.YUME_AI_API_KEY.trim():"";
   if(!key)return json({error:"ai_not_configured"},503);
@@ -304,7 +328,7 @@ export async function handleYuberaAiChat(request:Request):Promise<Response> {
   // never consume a user's 20 successful answers.
   let answer:Awaited<ReturnType<typeof generateAnswer>>;
   try {
-    const items=await readCatalog();
+    const items=catalogueItems??await readCatalog();
     if(!items.length)throw new Error("CATALOG_UNAVAILABLE");
     answer=await generateAnswer(message,previous,items);
   } catch(error) {
