@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { MessageCircle, Sparkles } from "lucide-react";
+import { MessageCircle } from "lucide-react";
 import { Link, useLocation } from "@tanstack/react-router";
 import { useYumePreferences } from "@/data/preferences";
 
@@ -33,7 +33,7 @@ export function YuberaAiFloatingButton() {
   if (!checked || !entitled || location.pathname === "/ai") return null;
   return (
     <Link to="/ai" aria-label={language === "ru" ? "Открыть YUBERA AI" : "Open YUBERA AI"} title="YUBERA AI" className="yubera-ai-fab">
-      <span className="relative"><MessageCircle className="h-6 w-6" /><Sparkles className="absolute -right-1 -top-1 h-3.5 w-3.5 text-[#ff785b]" /></span>
+      <span className="relative grid place-items-center"><MessageCircle className="h-7 w-7" /><span className="absolute top-[9px] text-[9px] font-black leading-none tracking-tight">AI</span></span>
     </Link>
   );
 }
