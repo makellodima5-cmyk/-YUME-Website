@@ -16,26 +16,23 @@ function environment(): RuntimeEnv {
 
 export type R2CatalogResult = { items: Anime[]; revision: number; updatedAt: string; error: string | null };
 
-// The public catalogue is immutable between published revisions. Reuse the parsed
-// snapshot in a warm Website isolate instead of parsing the same multi-megabyte
-// JSON response for every route/server-function invocation.
+// The public catalogue is immutable between published revisions. Reuse only
+// resolved snapshots in a warm Website isolate. Do not cache an in-flight Promise
+// at module scope: Cloudflare Workers may run it from a later request context,
+ // which can reject cross-request Promise settlement.
 const CATALOG_STATE_CACHE_TTL_MS = 60_000;
 const ADMIN_CATALOG_STATE_CACHE_TTL_MS = 5_000;
 type CachedCatalogState = { state: CatalogState; expiresAt: number };
 let catalogStateCache: CachedCatalogState | null = null;
-let catalogStateRequest: Promise<CatalogState> | null = null;
 let catalogStateGeneration = 0;
 let adminCatalogStateCache: CachedCatalogState | null = null;
-let adminCatalogStateRequest: Promise<CatalogState> | null = null;
 let adminCatalogStateGeneration = 0;
 
 function invalidateCatalogStateCache(): void {
   catalogStateGeneration += 1;
   catalogStateCache = null;
-  catalogStateRequest = null;
   adminCatalogStateGeneration += 1;
   adminCatalogStateCache = null;
-  adminCatalogStateRequest = null;
 }
 
 const RETRYABLE_READER_STATUSES = new Set([429, 500, 502, 503, 504]);
@@ -95,47 +92,30 @@ async function fetchCatalogState(useAdminCheckpoint = false): Promise<CatalogSta
 
 async function readCachedCatalogState(useAdminCheckpoint: boolean, forceFresh: boolean): Promise<CatalogState> {
   const cache = useAdminCheckpoint ? adminCatalogStateCache : catalogStateCache;
-  const pending = useAdminCheckpoint ? adminCatalogStateRequest : catalogStateRequest;
   const generation = useAdminCheckpoint ? adminCatalogStateGeneration : catalogStateGeneration;
   if (!forceFresh && cache && cache.expiresAt > Date.now()) return cache.state;
-  if (!forceFresh && pending) return pending;
 
+  // A request-scoped Promise is deliberately not shared through module state.
+  // Resolved snapshots are safe to reuse across Worker requests; a pending
+  // service-binding Promise is not.
   const nextGeneration = generation + 1;
   if (useAdminCheckpoint) {
     adminCatalogStateGeneration = nextGeneration;
-    if (forceFresh) {
-      adminCatalogStateCache = null;
-      adminCatalogStateRequest = null;
-    }
+    if (forceFresh) adminCatalogStateCache = null;
   } else {
     catalogStateGeneration = nextGeneration;
-    if (forceFresh) {
-      catalogStateCache = null;
-      catalogStateRequest = null;
-    }
+    if (forceFresh) catalogStateCache = null;
   }
 
-  const request = fetchCatalogState(useAdminCheckpoint);
-  if (useAdminCheckpoint) adminCatalogStateRequest = request;
-  else catalogStateRequest = request;
-
-  try {
-    const state = await request;
-    if (useAdminCheckpoint) {
-      if (adminCatalogStateGeneration === nextGeneration) {
-        adminCatalogStateCache = { state, expiresAt: Date.now() + ADMIN_CATALOG_STATE_CACHE_TTL_MS };
-      }
-    } else if (catalogStateGeneration === nextGeneration) {
-      catalogStateCache = { state, expiresAt: Date.now() + CATALOG_STATE_CACHE_TTL_MS };
+  const state = await fetchCatalogState(useAdminCheckpoint);
+  if (useAdminCheckpoint) {
+    if (adminCatalogStateGeneration === nextGeneration) {
+      adminCatalogStateCache = { state, expiresAt: Date.now() + ADMIN_CATALOG_STATE_CACHE_TTL_MS };
     }
-    return state;
-  } finally {
-    if (useAdminCheckpoint) {
-      if (adminCatalogStateRequest === request) adminCatalogStateRequest = null;
-    } else if (catalogStateRequest === request) {
-      catalogStateRequest = null;
-    }
+  } else if (catalogStateGeneration === nextGeneration) {
+    catalogStateCache = { state, expiresAt: Date.now() + CATALOG_STATE_CACHE_TTL_MS };
   }
+  return state;
 }
 
 export async function readCatalogState(forceFresh = false): Promise<CatalogState> {
