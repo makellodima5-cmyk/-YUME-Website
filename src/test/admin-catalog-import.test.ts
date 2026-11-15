@@ -240,7 +240,7 @@ describe("Kodik World Art catalogue import", () => {
       title: "Naruto",
       worldart_animation_id: 262,
       material_data: { anime_title: "Наруто" },
-    }], ["20", "262"]);
+    }], ["20"], ["262"]);
     expect(item?.alreadyInCatalog).toBe(true);
   });
 });
