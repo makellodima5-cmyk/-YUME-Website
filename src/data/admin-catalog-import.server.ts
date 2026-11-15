@@ -219,12 +219,12 @@ async function fetchKodikByTitle(title: string, worldArtId = "", worldArtLink = 
   const env = environment();
   const token = typeof env.KODIK_API_TOKEN === "string" ? env.KODIK_API_TOKEN.trim() : "";
   if (!token) throw new Error("Kodik API не настроен.");
-  const request = async (section: "animation" | "cinema" | "" = ""): Promise<KodikCatalogResult[]> => {
+  const request = async (section: "animation" | "cinema" | "" = "", forceId = false): Promise<KodikCatalogResult[]> => {
     const url = new URL("https://kodik-api.com/search");
     url.searchParams.set("token",token);
     if (normalized.length >= 2) url.searchParams.set("title",normalized);
-    if (worldArtLink && !worldArtId) url.searchParams.set("worldart_link",worldArtLink);
-    if (worldArtId) url.searchParams.set(section === "cinema" || worldArtType === "cinema" ? "worldart_cinema_id" : "worldart_animation_id",worldArtId);
+    if (worldArtLink && !forceId) url.searchParams.set("worldart_link",worldArtLink);
+    else if (worldArtId) url.searchParams.set(section === "cinema" || worldArtType === "cinema" ? "worldart_cinema_id" : "worldart_animation_id",worldArtId);
     url.searchParams.set("with_material_data","true");
     url.searchParams.set("limit","100");
     let response:Response;
@@ -235,11 +235,16 @@ async function fetchKodikByTitle(title: string, worldArtId = "", worldArtLink = 
     if (payload.error || !Array.isArray(payload.results)) throw new Error("Kodik API вернул некорректный ответ.");
     return payload.results;
   };
+  if (worldArtLink && worldArtType) {
+    const byLink = await request();
+    if (byLink.length) return byLink;
+    return request(worldArtType,true);
+  }
   if (worldArtId && !worldArtType && !worldArtLink) {
-    const [animation,cinema] = await Promise.all([request("animation"),request("cinema")]);
+    const [animation,cinema] = await Promise.all([request("animation",true),request("cinema",true)]);
     return [...animation,...cinema];
   }
-  return request(worldArtType);
+  return request(worldArtType,Boolean(worldArtId));
 }
 
 
