@@ -151,6 +151,18 @@ export function normalizeKodikCatalogResults(results: KodikCatalogResult[], exis
   }
   return [...byAnime.values()].slice(0,20);
 }
+function normalizeCatalogTitle(value: string | undefined): string {
+  return clean(value).normalize("NFKC").toLocaleLowerCase("ru-RU").replace(/[ё]/g, "е");
+}
+function isKodikCatalogDuplicate(candidate: KodikCatalogSearchItem, items: Anime[]): boolean {
+  const candidateNames = new Set([candidate.title, candidate.englishTitle, candidate.originalTitle].map(normalizeCatalogTitle).filter(Boolean));
+  return items.some((item) => {
+    if (item.id === candidate.id || (candidate.worldArtId && item.worldArtId === candidate.worldArtId) ||
+        (candidate.shikimoriId && (item.id === candidate.shikimoriId || item.shikimoriId === candidate.shikimoriId))) return true;
+    if (!candidate.year || !item.year || candidate.year !== item.year) return false;
+    return [item.title, item.englishTitle, item.original].map(normalizeCatalogTitle).some((name) => name && candidateNames.has(name));
+  });
+}
 function mapKodikAnime(item: KodikCatalogSearchItem): Anime {
   const numericId = Number(item.id);
   return {
@@ -540,7 +552,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
       if (rateLimit === "limited") return json({error:"Слишком много запросов к Kodik. Повтори через минуту."},429);
       if (rateLimit !== "allowed") return json({error:"Ограничитель запросов Kodik временно недоступен."},503);
       const rows = await fetchKodikByTitle(normalized,worldArtId,worldArtLink);
-      const results = normalizeKodikCatalogResults(rows,state.items.map((item)=>item.id),state.items.map((item)=>item.worldArtId ?? "").filter(Boolean));
+      const results = normalizeKodikCatalogResults(rows,state.items.map((item)=>item.id),state.items.map((item)=>item.worldArtId ?? "").filter(Boolean)).map((item)=>({...item,alreadyInCatalog:item.alreadyInCatalog || isKodikCatalogDuplicate(item,state.items)}));
       return json({isAdmin:true,source:"kodik",query:normalized,results});
     }
     if (action === "import_kodik_title") {
@@ -561,7 +573,7 @@ export async function handleAdminCatalogImport(request: Request): Promise<Respon
       if (!selected) return json({error:"kodik_title_not_found"},404);
       const mapped = normalizeKodikCatalogResults([selected],state.items.map((item)=>item.id),state.items.map((item)=>item.worldArtId ?? "").filter(Boolean))[0];
       if (!mapped) return json({error:"kodik_title_metadata_unavailable"},422);
-      if (mapped.alreadyInCatalog) return json({isAdmin:true,alreadyInCatalog:true,anime:{id:animeId,title:mapped.title},message:"Этот тайтл уже находится в каталоге."},409);
+      if (mapped.alreadyInCatalog || isKodikCatalogDuplicate(mapped,state.items)) return json({isAdmin:true,alreadyInCatalog:true,anime:{id:animeId,title:mapped.title},message:"Этот тайтл уже находится в каталоге."},409);
       const anime = mapKodikAnime(mapped);
       const shots = mapKodikScreenshots(selected);
       const mutations:import("@/data/catalog-r2.shared").CatalogMutation[]=[{type:"upsert",items:[anime]}];
