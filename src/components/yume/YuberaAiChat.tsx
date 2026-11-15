@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ChangeEvent, type FormEvent, type KeyboardEvent } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, ArrowRight, BookOpen, CalendarDays, LoaderCircle, Play, Send, Sparkles, SquarePen } from "lucide-react";
+import { ArrowLeft, ArrowRight, BookOpen, BookmarkPlus, CalendarDays, LoaderCircle, Play, Plus, Send, Sparkles, SquarePen, X } from "lucide-react";
 import { useYumePreferences } from "@/data/preferences";
 import { YUBERA_AI_DAILY_QUESTION_LIMIT, type YuberaAiConversation, type YuberaAiMessage } from "@/data/yubera-ai.shared";
 
@@ -10,25 +10,32 @@ const QUICK_QUESTIONS = [
   { text: "Что посмотреть сегодня?", icon: "calendar" },
   { text: "Расскажи интересный факт об аниме", icon: "book" },
 ] as const;
-const MASCOT = "/images/yubera/YUBERA_AI_Mascot_Transparent.webp";
+const MASCOT = "/images/yubera/YUBERA_AI_Mascot_Transparent.webp";\ntype UserCollection = { id: string; title: string; title_count: number; is_public: number };
 
 async function json(response: Response): Promise<Record<string, unknown>> {
   return await response.json().catch(() => ({})) as Record<string, unknown>;
 }
-function RecommendationCard({ item }: { item: YuberaAiMessage["recommendations"][number] }) {
+function RecommendationCard({ item, onAdd }: { item: YuberaAiMessage["recommendations"][number]; onAdd: (item: YuberaAiMessage["recommendations"][number]) => void }) {
   const navigate = useNavigate();
   return (
-    <button type="button" onClick={() => void navigate({ to: "/anime/$animeId", params: { animeId: item.id } })}
-      className="group flex w-full items-start gap-3 rounded-2xl border border-white/10 bg-black/25 p-2.5 text-left transition hover:border-[#FF5A3C]/50 hover:bg-white/[.04]">
-      {item.posterUrl ? <img src={item.posterUrl} alt="" loading="lazy" className="h-24 w-16 shrink-0 rounded-xl object-cover" /> : <div className="h-24 w-16 shrink-0 rounded-xl bg-white/5" />}
-      <span className="min-w-0 flex-1">
-        <strong className="block text-sm text-white">{item.title}</strong>
-        <span className="mt-1 block text-xs text-white/55">{[item.year, item.ageRating, item.rating !== null ? item.rating.toFixed(1) : null].filter(Boolean).join(" · ")}</span>
-        {item.genres.length > 0 && <span className="mt-1 block text-xs text-white/65">{item.genres.slice(0, 3).join(" · ")}</span>}
-        {item.reason && <span className="mt-2 block text-xs leading-relaxed text-white/70">{item.reason}</span>}
-      </span>
-      <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-white/45 group-hover:text-[#FF6548]" />
-    </button>
+    <div className="flex gap-2 rounded-2xl border border-white/10 bg-black/25 p-2.5">
+      <button type="button" onClick={() => void navigate({ to: "/anime/$animeId", params: { animeId: item.id } })}
+        className="group flex min-w-0 flex-1 items-start gap-3 text-left">
+        {item.posterUrl ? <img src={item.posterUrl} alt="" loading="lazy" className="h-24 w-16 shrink-0 rounded-xl object-cover" /> : <div className="h-24 w-16 shrink-0 rounded-xl bg-white/5" />}
+        <span className="min-w-0 flex-1">
+          <strong className="block text-sm text-white">{item.title}</strong>
+          <span className="mt-1 block text-xs text-white/55">{[item.year, item.ageRating, item.rating !== null ? item.rating.toFixed(1) : null].filter(Boolean).join(" · ")}</span>
+          {item.genres.length > 0 && <span className="mt-1 block text-xs text-white/65">{item.genres.slice(0, 3).join(" · ")}</span>}
+          {item.reason && <span className="mt-2 block text-xs leading-relaxed text-white/70">{item.reason}</span>}
+        </span>
+        <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-white/45 group-hover:text-[#FF6548]" />
+      </button>
+      <button type="button" onClick={() => onAdd(item)} aria-label="Добавить в подборку" title="Добавить в подборку"
+        className="flex shrink-0 flex-col items-center justify-center gap-1 self-center rounded-xl border border-[#ff6548]/25 bg-[#ff5738]/10 px-2 py-2 text-[10px] font-semibold text-[#ff947f] hover:bg-[#ff5738]/20">
+        <BookmarkPlus className="h-5 w-5" />
+        <span>В подборку</span>
+      </button>
+    </div>
   );
 }
 function renderInline(text: string, keyPrefix: string) {
@@ -56,13 +63,13 @@ function AssistantText({ content }: { content: string }) {
     return <p key={index}>{lines.map((line, lineIndex) => <span key={lineIndex}>{lineIndex > 0 && <br />}{renderInline(line.replace(/^\*\*(.+)\*\*$/, "$1"), "p" + index + "-" + lineIndex)}</span>)}</p>;
   })}</div>;
 }
-function MessageBubble({ message }: { message: YuberaAiMessage }) {
+function MessageBubble({ message, onAddToCollection }: { message: YuberaAiMessage; onAddToCollection: (item: YuberaAiMessage["recommendations"][number]) => void }) {
   const user = message.role === "user";
   return (
     <div className={user ? "flex justify-end" : "flex justify-start"}>
       <div className={user ? "max-w-[88%] rounded-[22px] rounded-br-md border border-[#FF6548]/25 bg-[#FF5738]/15 px-4 py-3 text-sm leading-relaxed text-white" : "max-w-[94%] rounded-[22px] rounded-bl-md border border-white/10 bg-[#191a22] px-4 py-3 text-sm leading-relaxed text-white/90"}>
         {user ? <p className="whitespace-pre-wrap break-words">{message.content}</p> : <AssistantText content={message.content} />}
-        {!user && message.recommendations.length > 0 && <div className="mt-3 grid gap-2">{message.recommendations.map(item => <RecommendationCard key={item.id} item={item} />)}</div>}
+        {!user && message.recommendations.length > 0 && <div className="mt-3 grid gap-2">{message.recommendations.map(item => <RecommendationCard key={item.id} item={item} onAdd={onAddToCollection} />)}</div>}
         <time className="mt-2 block text-right text-[10px] text-white/35">{new Date(message.createdAt).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}</time>
       </div>
     </div>
@@ -85,7 +92,7 @@ export function YuberaAiChat() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [booting, setBooting] = useState(true);
-  const [notice, setNotice] = useState("");
+  const [notice, setNotice] = useState("");\n  const [collectionTarget, setCollectionTarget] = useState<YuberaAiMessage["recommendations"][number] | null>(null);\n  const [userCollections, setUserCollections] = useState<UserCollection[]>([]);\n  const [collectionLoading, setCollectionLoading] = useState(false);\n  const [collectionBusy, setCollectionBusy] = useState(false);\n  const [collectionError, setCollectionError] = useState("");\n  const [newCollectionTitle, setNewCollectionTitle] = useState("");
   const pageRef = useRef<HTMLDivElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -155,8 +162,14 @@ export function YuberaAiChat() {
     if (!content || loading || usage.remaining <= 0) return;
     setNotice("");
     setLoading(true);
+    const optimisticId = `pending-${Date.now()}`;
+    const optimisticMessage: YuberaAiMessage = { id: optimisticId, role: "user", content, recommendations: [], createdAt: new Date().toISOString() };
+    setMessages(current => [...current, optimisticMessage]);
+    setInput("");
+    if (inputRef.current) inputRef.current.style.height = "24px";
     const controller = new AbortController();
     abort.current = controller;
+    let persisted = false;
     try {
       const response = await fetch("/api/yubera/ai", {
         method: "POST", credentials: "same-origin",
@@ -190,22 +203,92 @@ export function YuberaAiChat() {
       }
       const userMessage = data.userMessage as YuberaAiMessage;
       const assistantMessage = data.assistantMessage as YuberaAiMessage;
-      setMessages(current => [...current, userMessage, assistantMessage]);
+      setMessages(current => [...current.filter(message => message.id !== optimisticId), userMessage, assistantMessage]);
+      persisted = true;
       const conversationId = String(data.conversationId);
       setActiveId(conversationId);
       const used = Number(data.used ?? usage.used + 1);
       setUsage(current => ({ ...current, used, remaining: Math.max(0, current.limit - used) }));
-      setInput("");
-      if (inputRef.current) inputRef.current.style.height = "24px";
     } catch (error) {
       if (!(error instanceof Error && error.name === "AbortError")) {
         setNotice(ru ? "Ошибка соединения с AI. Вопрос не списан." : "AI connection error. This question was not counted.");
       }
     } finally {
+      if (!persisted) setMessages(current => current.filter(message => message.id !== optimisticId));
       setLoading(false);
       abort.current = null;
     }
   }, [activeId, loading, usage.remaining, usage.limit, usage.used, ru, navigate]);
+
+  const openCollectionPicker = async (item: YuberaAiMessage["recommendations"][number]) => {
+    setCollectionTarget(item);
+    setCollectionError("");
+    setNewCollectionTitle("");
+    setCollectionLoading(true);
+    try {
+      const response = await fetch("/api/yubera/community?action=me", { credentials: "same-origin", cache: "no-store" });
+      const data = await json(response);
+      if (!response.ok) throw new Error(response.status === 401 ? "Войди в аккаунт, чтобы пользоваться подборками." : "Не удалось загрузить подборки.");
+      setUserCollections(Array.isArray(data.collections) ? data.collections as UserCollection[] : []);
+    } catch (error) {
+      setCollectionError(error instanceof Error ? error.message : "Не удалось загрузить подборки.");
+    } finally {
+      setCollectionLoading(false);
+    }
+  };
+  const addToCollection = async (collectionId: string) => {
+    if (!collectionTarget || collectionBusy) return;
+    setCollectionBusy(true);
+    setCollectionError("");
+    try {
+      const response = await fetch("/api/yubera/community", {
+        method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "collection.item.add", id: collectionId, animeId: collectionTarget.id }),
+      });
+      const data = await json(response);
+      if (!response.ok) {
+        const errors: Record<string,string> = { collection_title_limit_reached: "В этой подборке достигнут лимит тайтлов.", not_found: "Подборка не найдена.", anime_not_found: "Тайтл больше не найден в каталоге.", catalog_unavailable: "Каталог временно недоступен." };
+        throw new Error(errors[String(data.error)] ?? "Не удалось добавить аниме в подборку.");
+      }
+      const title = userCollections.find(item => item.id === collectionId)?.title ?? "подборку";
+      setCollectionTarget(null);
+      setNotice(`«${collectionTarget.title}» добавлено в подборку «${title}».`);
+    } catch (error) {
+      setCollectionError(error instanceof Error ? error.message : "Не удалось добавить аниме.");
+    } finally {
+      setCollectionBusy(false);
+    }
+  };
+  const createCollectionAndAdd = async () => {
+    const title = newCollectionTitle.trim();
+    if (!title || !collectionTarget || collectionBusy) return;
+    setCollectionBusy(true);
+    setCollectionError("");
+    try {
+      const created = await fetch("/api/yubera/community", {
+        method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "collection.create", title, description: "", coverKey: null, isPublic: false }),
+      });
+      const createdData = await json(created);
+      if (!created.ok || typeof createdData.id !== "string") {
+        const errors: Record<string,string> = { collection_limit_reached: "Достигнут лимит подборок для вашего тарифа." };
+        throw new Error(errors[String(createdData.error)] ?? "Не удалось создать подборку.");
+      }
+      const id = createdData.id;
+      const added = await fetch("/api/yubera/community", {
+        method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "collection.item.add", id, animeId: collectionTarget.id }),
+      });
+      const addedData = await json(added);
+      if (!added.ok) throw new Error(addedData.error === "collection_title_limit_reached" ? "Подборка создана, но добавить тайтл не удалось из-за лимита." : "Подборка создана, но добавить тайтл не удалось.");
+      setCollectionTarget(null);
+      setNotice(`«${collectionTarget.title}» добавлено в новую подборку «${title}».`);
+    } catch (error) {
+      setCollectionError(error instanceof Error ? error.message : "Не удалось создать подборку.");
+    } finally {
+      setCollectionBusy(false);
+    }
+  };
 
   const newChat = () => {
     setActiveId(null);
@@ -237,10 +320,27 @@ export function YuberaAiChat() {
             <p className="yubera-ai-intro">{ru ? "Задавай вопросы, ищи аниме, получай рекомендации и узнавай новое из мира аниме." : "Ask questions, discover anime, get recommendations and learn new things about anime."}</p>
             <div className="yubera-ai-quick">{QUICK_QUESTIONS.map(question => <button key={question.text} type="button" disabled={loading || usage.remaining <= 0} onClick={() => void send(question.text)}><span className="yubera-ai-quick-icon"><QuickIcon icon={question.icon} /></span><span>{ru ? question.text : ({ "Расскажи о проекте YUBERA": "Tell me about YUBERA", "Порекомендуй мне аниме": "Recommend an anime", "Что посмотреть сегодня?": "What should I watch today?", "Расскажи интересный факт об аниме": "Tell me an interesting anime fact" } as Record<string, string>)[question.text]}</span><ArrowRight className="h-4 w-4 text-white/50" /></button>)}</div>
           </div>
-          {(messages.length > 0 || loading) && <div className="yubera-ai-messages">{messages.map(message => <MessageBubble key={message.id} message={message} />)}{loading && <div className="flex items-center gap-2 text-xs text-white/60"><span className="h-2 w-2 animate-pulse rounded-full bg-[#FF6548]" />YUBERA AI…</div>}</div>}
+          {(messages.length > 0 || loading) && <div className="yubera-ai-messages">{messages.map(message => <MessageBubble key={message.id} message={message} onAddToCollection={openCollectionPicker} />)}{loading && <div className="flex items-center gap-2 text-xs text-white/60"><span className="h-2 w-2 animate-pulse rounded-full bg-[#FF6548]" />YUBERA AI…</div>}</div>}
         </>}
         {notice && <div role="status" className="mx-2 mb-3 rounded-xl border border-[#FF6548]/25 bg-[#FF5738]/10 px-3 py-2 text-xs text-white/80">{notice}</div>}
       </main>
+      {collectionTarget && <div className="fixed inset-0 z-[120] grid place-items-center bg-black/75 p-4" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget && !collectionBusy) setCollectionTarget(null); }}>
+        <section role="dialog" aria-modal="true" aria-labelledby="yubera-ai-collection-title" className="max-h-[min(78vh,640px)] w-full max-w-md overflow-y-auto rounded-3xl border border-white/15 bg-[#191a22] p-4 shadow-2xl">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div className="min-w-0"><h2 id="yubera-ai-collection-title" className="text-base font-bold text-white">Добавить в подборку</h2><p className="mt-1 truncate text-xs text-white/55">{collectionTarget.title}</p></div>
+            <button type="button" disabled={collectionBusy} onClick={() => setCollectionTarget(null)} aria-label="Закрыть" className="rounded-full p-2 text-white/60 hover:bg-white/10"><X className="h-5 w-5" /></button>
+          </div>
+          {collectionLoading ? <div className="flex justify-center py-8"><LoaderCircle className="h-6 w-6 animate-spin text-[#ff6548]" /></div> : <>
+            {userCollections.length > 0 && <div className="mb-4 max-h-52 space-y-2 overflow-y-auto">{userCollections.map(collection => <button key={collection.id} type="button" disabled={collectionBusy} onClick={() => void addToCollection(collection.id)} className="flex w-full items-center gap-3 rounded-xl border border-white/10 bg-black/20 px-3 py-3 text-left hover:border-[#ff6548]/40 disabled:opacity-50"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-[#ff5738]/10 text-[#ff765c]"><BookmarkPlus className="h-5 w-5" /></span><span className="min-w-0 flex-1"><b className="block truncate text-sm text-white">{collection.title}</b><span className="text-xs text-white/45">{collection.title_count} тайтлов · {collection.is_public ? "Публичная" : "Приватная"}</span></span><Plus className="h-4 w-4 text-white/45" /></button>)}</div>}
+            {userCollections.length === 0 && <p className="mb-3 rounded-xl border border-dashed border-white/15 px-3 py-4 text-center text-sm text-white/55">У тебя пока нет подборок. Создай первую прямо здесь.</p>}
+            <form onSubmit={event => { event.preventDefault(); void createCollectionAndAdd(); }} className="rounded-xl border border-white/10 bg-black/20 p-3">
+              <label htmlFor="yubera-ai-new-collection" className="mb-2 block text-xs font-semibold text-white/70">Новая подборка</label>
+              <div className="flex gap-2"><input id="yubera-ai-new-collection" value={newCollectionTitle} onChange={event => setNewCollectionTitle(event.target.value)} maxLength={50} placeholder="Название подборки" className="min-w-0 flex-1 rounded-lg border border-white/10 bg-[#101116] px-3 py-2.5 text-sm text-white outline-none focus:border-[#ff6548]/60" /><button type="submit" disabled={!newCollectionTitle.trim() || collectionBusy} className="shrink-0 rounded-lg bg-[#ff5738]/20 px-3 py-2 text-xs font-bold text-[#ff947f] disabled:opacity-40">{collectionBusy ? <LoaderCircle className="h-4 w-4 animate-spin" /> : "Создать и добавить"}</button></div>
+            </form>
+          </>}
+          {collectionError && <p role="alert" className="mt-3 rounded-lg border border-red-500/25 bg-red-500/10 px-3 py-2 text-xs text-red-200">{collectionError}</p>}
+        </section>
+      </div>}
       <div className="yubera-ai-composer-wrap">
         <div className="yubera-ai-composer-meta">
           <span>YUBERA AI</span>
