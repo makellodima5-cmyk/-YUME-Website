@@ -64,7 +64,7 @@ async function isTelegramAdministrator(request: Request, env: Environment): Prom
   const adminIds = env.TELEGRAM_ADMIN_ID;
   const secret = typeof env.YUME_AUTH_SESSION_SECRET === "string" ? env.YUME_AUTH_SESSION_SECRET : "";
   const token = cookie(request, USER_SESSION_COOKIE);
-  if (!db || !/^\d{1,20}$/.test(adminId) || secret.length < 32 || !token) return false;
+  if (!db || typeof adminIds !== "string" || !adminIds.split(",").some((id) => /^\d{1,20}$/.test(id.trim())) || secret.length < 32 || !token) return false;
 
   const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
   const digest = new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(token)));
