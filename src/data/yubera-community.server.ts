@@ -1,6 +1,7 @@
 import { env as cloudflareEnv } from "cloudflare:workers";
 import { getAuthenticatedYumeUserId } from "@/data/telegram-auth.server";
 import { hasTelegramAdminIdentity } from "@/data/admin-password.server";
+import { isTelegramAdminIdAllowed } from "@/lib/admin-access";
 import { getR2Anime } from "@/data/catalog-r2.server";
 import { YUBERA_SUPPORT_LEVELS, YUBERA_XP_LEVELS, YUBERA_XP_REWARDS, YUBERA_XP_RULES } from "@/data/yubera-config";
 
@@ -157,7 +158,7 @@ async function profileSummary(database: Database, userId: string, viewerId: stri
     bio: account.profile.bio, avatarFrame: isAdminFrame(account.profile.avatar_frame) || isSupportFrame(account.profile.avatar_frame) ? account.profile.avatar_frame : plus ? account.profile.avatar_frame : null,
     visibility: account.profile.visibility, xp: isOwner ? xp : { level: xp.level, title: xp.title }, support: isOwner ? effectiveSupport : { level: effectiveSupport.level, title: effectiveSupport.title, asset: effectiveSupport.asset },
     availableSupportFrames: isOwner ? unlockedSupportFrames.results.map((row) => SUPPORT_FRAME_ASSETS[row.frame_level - 1]).filter(Boolean) : [],
-    availableAdminFrames: isOwner && adminCheck ? [...ADMIN_FRAME_ASSETS] : [], isAdmin: account.user.telegram_user_id === String((env().TELEGRAM_ADMIN_ID ?? "")).trim() && /^\d{1,20}$/.test(String(env().TELEGRAM_ADMIN_ID ?? "")),
+    availableAdminFrames: isOwner && adminCheck ? [...ADMIN_FRAME_ASSETS] : [], isAdmin: isTelegramAdminIdAllowed(env().TELEGRAM_ADMIN_ID, account.user.telegram_user_id),
     isPlus: plus, followers: Number(followers?.count ?? 0), following: Number(following?.count ?? 0),
     publicCollections: Number(collections?.count ?? 0), publicTitles: Number(collections?.titles ?? 0),
     collectionLikes: Number(collections?.likes ?? 0), isFollowing: Boolean(follow),
