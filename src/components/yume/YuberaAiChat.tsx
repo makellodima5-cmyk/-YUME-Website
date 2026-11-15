@@ -10,7 +10,8 @@ const QUICK_QUESTIONS = [
   { text: "Что посмотреть сегодня?", icon: "calendar" },
   { text: "Расскажи интересный факт об аниме", icon: "book" },
 ] as const;
-const MASCOT = "/images/yubera/YUBERA_AI_Mascot_Transparent.webp";\ntype UserCollection = { id: string; title: string; title_count: number; is_public: number };
+const MASCOT = "/images/yubera/YUBERA_AI_Mascot_Transparent.webp";
+type UserCollection = { id: string; title: string; title_count: number; is_public: number };
 
 async function json(response: Response): Promise<Record<string, unknown>> {
   return await response.json().catch(() => ({})) as Record<string, unknown>;
