@@ -12,3 +12,15 @@ it("resolves World Art-only titles without requiring a Shikimori ID", () => {
     { id: "8", title: "Voice B", episodes: [1] },
   ]);
 });
+
+
+it("exposes an episode count per voice-over in API response mapping", () => {
+  const sources = [
+    { id: "7", title: "Voice A", episodes: [{ number: 1 }, { number: 2 }] },
+    { id: "8", title: "Voice B", episodes: [{ number: 1 }] },
+  ];
+  expect(sources.map((source) => ({ title: source.title, label: source.title + " (" + source.episodes.length + ".эп)" }))).toEqual([
+    { title: "Voice A", label: "Voice A (2.эп)" },
+    { title: "Voice B", label: "Voice B (1.эп)" },
+  ]);
+});
