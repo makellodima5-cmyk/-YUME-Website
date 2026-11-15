@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, ArrowRight, BookOpen, CalendarDays, LoaderCircle, MessageCircle, Paperclip, Play, Send, Sparkles } from "lucide-react";
+import { ArrowLeft, ArrowRight, BookOpen, CalendarDays, LoaderCircle, Play, Send, Sparkles, SquarePen } from "lucide-react";
 import { useYumePreferences } from "@/data/preferences";
 import { YUBERA_AI_DAILY_QUESTION_LIMIT, type YuberaAiConversation, type YuberaAiMessage } from "@/data/yubera-ai.shared";
 
@@ -43,18 +43,17 @@ function MessageBubble({ message }: { message: YuberaAiMessage }) {
     </div>
   );
 }
-function BrandIcon() { return <img src="/images/yubera/yubera_logo.webp" alt="" className="h-9 w-9 object-contain" />; }
+function BrandIcon() { return <img src="/images/yubera/yubera_logo.webp" alt="" className="h-7 w-7 object-contain" />; }
 function QuickIcon({ icon }: { icon: string }) {
-  if (icon === "play") return <Play className="h-7 w-7" />;
-  if (icon === "calendar") return <CalendarDays className="h-7 w-7" />;
-  if (icon === "book") return <BookOpen className="h-7 w-7" />;
+  if (icon === "play") return <Play className="h-6 w-6" />;
+  if (icon === "calendar") return <CalendarDays className="h-6 w-6" />;
+  if (icon === "book") return <BookOpen className="h-6 w-6" />;
   return <BrandIcon />;
 }
 export function YuberaAiChat() {
   const { language } = useYumePreferences();
   const ru = language === "ru";
   const navigate = useNavigate();
-  const [conversations, setConversations] = useState<YuberaAiConversation[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [messages, setMessages] = useState<YuberaAiMessage[]>([]);
   const [usage, setUsage] = useState({ used: 0, limit: YUBERA_AI_DAILY_QUESTION_LIMIT, remaining: YUBERA_AI_DAILY_QUESTION_LIMIT });
@@ -62,9 +61,31 @@ export function YuberaAiChat() {
   const [loading, setLoading] = useState(false);
   const [booting, setBooting] = useState(true);
   const [notice, setNotice] = useState("");
+  const pageRef = useRef<HTMLDivElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const abort = useRef<AbortController | null>(null);
+
+  const updateVisualViewport = useCallback(() => {
+    const page = pageRef.current;
+    if (!page) return;
+    const viewport = window.visualViewport;
+    page.style.setProperty("--yubera-ai-viewport-top", `${Math.max(0, viewport?.offsetTop ?? 0)}px`);
+    page.style.setProperty("--yubera-ai-viewport-height", `${Math.max(1, viewport?.height ?? window.innerHeight)}px`);
+  }, []);
+
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    updateVisualViewport();
+    window.addEventListener("resize", updateVisualViewport);
+    viewport?.addEventListener("resize", updateVisualViewport);
+    viewport?.addEventListener("scroll", updateVisualViewport);
+    return () => {
+      window.removeEventListener("resize", updateVisualViewport);
+      viewport?.removeEventListener("resize", updateVisualViewport);
+      viewport?.removeEventListener("scroll", updateVisualViewport);
+    };
+  }, [updateVisualViewport]);
 
   const load = useCallback(async () => {
     setBooting(true);
@@ -78,7 +99,6 @@ export function YuberaAiChat() {
         return;
       }
       const rows = Array.isArray(data.conversations) ? data.conversations as YuberaAiConversation[] : [];
-      setConversations(rows);
       setUsage({ used: Number(data.used ?? 0), limit: Number(data.limit ?? 20), remaining: Number(data.remaining ?? 20) });
       if (rows.length > 0) {
         setActiveId(rows[0]!.id);
@@ -100,13 +120,14 @@ export function YuberaAiChat() {
     return () => abort.current?.abort();
   }, [load]);
   useEffect(() => {
-    scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: "smooth" });
+    if (messages.length > 0 || loading) {
+      scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: "smooth" });
+    }
   }, [messages, loading]);
 
   const send = useCallback(async (text: string) => {
     const content = text.trim();
     if (!content || loading || usage.remaining <= 0) return;
-    setInput("");
     setNotice("");
     setLoading(true);
     const controller = new AbortController();
@@ -128,16 +149,18 @@ export function YuberaAiChat() {
           setNotice(ru ? "Слишком много запросов подряд. Попробуй через минуту." : "Too many requests in a short period. Try again in a minute.");
           return;
         }
-        const used = Number(data.limit ?? usage.limit);
-        setUsage(current => ({ ...current, remaining: 0, used: used || current.limit }));
+        const used = Number(data.used ?? data.limit ?? usage.limit);
+        setUsage(current => ({ ...current, remaining: 0, used: Math.min(current.limit, used || current.limit) }));
         setNotice(ru ? "Дневной лимит из 20 вопросов исчерпан." : "The daily limit of 20 questions has been reached.");
         return;
       }
       if (response.status === 401) { void navigate({ to: "/", search: { section: "login" } }); return; }
       if (response.status === 403) { setNotice(ru ? "Для YUBERA AI нужна подписка Plus." : "YUBERA AI requires Plus."); return; }
       if (!response.ok) {
-        if (data.questionCharged === true) setUsage(current => ({ ...current, used: Math.min(current.limit, current.used + 1), remaining: Math.max(0, current.remaining - 1) }));
-        setNotice(ru ? "AI временно недоступен. Попробуй ещё раз позже." : "AI is temporarily unavailable. Try again later.");
+        if (data.questionCharged === true) {
+          setUsage(current => ({ ...current, used: Math.min(current.limit, current.used + 1), remaining: Math.max(0, current.remaining - 1) }));
+        }
+        setNotice(ru ? "AI временно недоступен. Попробуй ещё раз позже. Вопрос не списан." : "AI is temporarily unavailable. This question was not counted.");
         return;
       }
       const userMessage = data.userMessage as YuberaAiMessage;
@@ -147,49 +170,60 @@ export function YuberaAiChat() {
       setActiveId(conversationId);
       const used = Number(data.used ?? usage.used + 1);
       setUsage(current => ({ ...current, used, remaining: Math.max(0, current.limit - used) }));
-      setConversations(current => [
-        { id: conversationId, title: current.find(item => item.id === conversationId)?.title ?? content.slice(0, 90), updatedAt: new Date().toISOString(), messages: [...messages, userMessage, assistantMessage] },
-        ...current.filter(item => item.id !== conversationId),
-      ].slice(0, 30));
+      setInput("");
+      if (inputRef.current) inputRef.current.style.height = "24px";
     } catch (error) {
-      if (!(error instanceof Error && error.name === "AbortError")) setNotice(ru ? "Ошибка соединения с AI." : "AI connection error.");
+      if (!(error instanceof Error && error.name === "AbortError")) {
+        setNotice(ru ? "Ошибка соединения с AI. Вопрос не списан." : "AI connection error. This question was not counted.");
+      }
     } finally {
       setLoading(false);
       abort.current = null;
     }
-  }, [activeId, loading, usage.remaining, usage.limit, usage.used, ru, navigate, messages]);
+  }, [activeId, loading, usage.remaining, usage.limit, usage.used, ru, navigate]);
 
-  const newChat = () => { setActiveId(null); setMessages([]); setNotice(""); setInput(""); inputRef.current?.focus(); };
+  const newChat = () => {
+    setActiveId(null);
+    setMessages([]);
+    setNotice("");
+    setInput("");
+    if (inputRef.current) inputRef.current.style.height = "24px";
+    inputRef.current?.focus();
+  };
+  const changeInput = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const element = event.currentTarget;
+    setInput(element.value);
+    element.style.height = "24px";
+    element.style.height = `${Math.min(element.scrollHeight, 112)}px`;
+  };
   const submit = (event: FormEvent) => { event.preventDefault(); void send(input); };
   const keyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void send(input); }
   };
 
   return (
-    <div className="yubera-ai-page">
-      <header className="yubera-ai-header">
-        <button type="button" onClick={() => void navigate({ to: "/" })} aria-label={ru ? "Назад" : "Back"}><ArrowLeft /></button>
-        <div className="flex items-center gap-2"><span className="font-display text-lg font-extrabold tracking-tight">YUBERA <span className="text-[#FF5B3D]">AI</span></span></div>
-        <button type="button" onClick={newChat} aria-label={ru ? "Новый диалог" : "New chat"}><Sparkles /></button>
-      </header>
-      {conversations.length > 0 && <div className="yubera-ai-history flex gap-2 overflow-x-auto px-4 py-2">{conversations.map(item => <button key={item.id} type="button" onClick={() => { setActiveId(item.id); setMessages(item.messages); setNotice(""); }} className={"max-w-48 shrink-0 truncate rounded-full border px-3 py-1.5 text-xs " + (activeId === item.id ? "border-[#FF6548] bg-[#FF5738]/10" : "border-white/10 bg-white/[.03]")}>{item.title}</button>)}</div>}
+    <div className="yubera-ai-page" ref={pageRef}>
       <main className="yubera-ai-main" ref={scroller}>
-        {booting ? <div className="flex flex-1 items-center justify-center"><LoaderCircle className="h-7 w-7 animate-spin text-[#FF6548]" /></div> :
-          messages.length === 0 ? <div className="yubera-ai-welcome">
+        {booting ? <div className="flex flex-1 items-center justify-center"><LoaderCircle className="h-7 w-7 animate-spin text-[#FF6548]" /></div> : <>
+          <div className="yubera-ai-welcome">
             <img src={MASCOT} alt="" className="yubera-ai-mascot" />
             <h1>YUBERA <span>AI</span></h1>
             <div className="yubera-ai-tag"><Sparkles /><span>{ru ? "Твой аниме помощник" : "Your anime assistant"}</span></div>
             <p className="yubera-ai-intro">{ru ? "Задавай вопросы, ищи аниме, получай рекомендации и узнавай новое из мира аниме." : "Ask questions, discover anime, get recommendations and learn new things about anime."}</p>
-            <div className="yubera-ai-quick">{QUICK_QUESTIONS.map(question => <button key={question.text} type="button" onClick={() => void send(question.text)}><span className="yubera-ai-quick-icon"><QuickIcon icon={question.icon} /></span><span>{ru ? question.text : ({ "Расскажи о проекте YUBERA": "Tell me about YUBERA", "Порекомендуй мне аниме": "Recommend an anime", "Что посмотреть сегодня?": "What should I watch today?", "Расскажи интересный факт об аниме": "Tell me an interesting anime fact" } as Record<string, string>)[question.text]}</span><ArrowRight className="h-5 w-5 text-white/50" /></button>)}</div>
-          </div> :
-          <div className="yubera-ai-messages">{messages.map(message => <MessageBubble key={message.id} message={message} />)}{loading && <div className="flex items-center gap-2 text-xs text-white/60"><span className="h-2 w-2 animate-pulse rounded-full bg-[#FF6548]" />YUBERA AI…</div>}</div>}
-        {notice && <div role="status" className="mx-4 mb-2 rounded-xl border border-[#FF6548]/25 bg-[#FF5738]/10 px-3 py-2 text-xs text-white/80">{notice}</div>}
+            <div className="yubera-ai-quick">{QUICK_QUESTIONS.map(question => <button key={question.text} type="button" disabled={loading || usage.remaining <= 0} onClick={() => void send(question.text)}><span className="yubera-ai-quick-icon"><QuickIcon icon={question.icon} /></span><span>{ru ? question.text : ({ "Расскажи о проекте YUBERA": "Tell me about YUBERA", "Порекомендуй мне аниме": "Recommend an anime", "Что посмотреть сегодня?": "What should I watch today?", "Расскажи интересный факт об аниме": "Tell me an interesting anime fact" } as Record<string, string>)[question.text]}</span><ArrowRight className="h-4 w-4 text-white/50" /></button>)}</div>
+          </div>
+          {messages.length > 0 && <div className="yubera-ai-messages">{messages.map(message => <MessageBubble key={message.id} message={message} />)}{loading && <div className="flex items-center gap-2 text-xs text-white/60"><span className="h-2 w-2 animate-pulse rounded-full bg-[#FF6548]" />YUBERA AI…</div>}</div>}
+        </>}
+        {notice && <div role="status" className="mx-2 mb-3 rounded-xl border border-[#FF6548]/25 bg-[#FF5738]/10 px-3 py-2 text-xs text-white/80">{notice}</div>}
       </main>
       <div className="yubera-ai-composer-wrap">
-        <div className="mb-2 flex justify-between text-[11px] text-white/45"><span>YUBERA AI</span><span>{usage.used}/{usage.limit} {ru ? "вопросов сегодня" : "questions today"}</span></div>
+        <div className="yubera-ai-composer-meta">
+          <span>YUBERA AI</span>
+          <button type="button" onClick={newChat} disabled={booting || loading} aria-label={ru ? "Новый диалог" : "New chat"}><SquarePen className="h-3.5 w-3.5" /><span>{ru ? "Новый диалог" : "New chat"}</span></button>
+          <span>{usage.used}/{usage.limit} {ru ? "вопросов сегодня" : "questions today"}</span>
+        </div>
         <form onSubmit={submit} className="yubera-ai-composer">
-          <button type="button" aria-label={ru ? "Прикрепление пока недоступно" : "Attachments are not available yet"} disabled title={ru ? "Прикрепление файлов пока не поддерживается" : "Attachments are not supported yet"}><Paperclip /></button>
-          <textarea ref={inputRef} value={input} onChange={event => setInput(event.target.value)} onKeyDown={keyDown} maxLength={1200} rows={1} placeholder={ru ? "Напишите сообщение…" : "Write a message…"} disabled={loading || booting || usage.remaining <= 0} />
+          <textarea ref={inputRef} value={input} onChange={changeInput} onKeyDown={keyDown} maxLength={1200} rows={1} placeholder={ru ? "Напишите сообщение…" : "Write a message…"} disabled={loading || booting || usage.remaining <= 0} />
           <button type="submit" disabled={!input.trim() || loading || booting || usage.remaining <= 0} aria-label={ru ? "Отправить" : "Send"}><Send /></button>
         </form>
       </div>
