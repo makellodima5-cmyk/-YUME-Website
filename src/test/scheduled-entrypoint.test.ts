@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { runScheduledMaintenance } from "@/queue-worker";
+import { runScheduledMaintenance, runScheduledNonEpisodeMaintenance } from "@/queue-worker";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
@@ -32,6 +32,8 @@ describe("automatic Worker maintenance", () => {
     expect(queueWorker).toContain("runScheduledEpisodeNotifications(env)");
     expect(queueWorker).toContain("runScheduledAnimeCommentCleanup(env)");
     expect(queueConfig).toContain('"0 * * * *"');
+    expect(queueConfig).toContain('"0 */3 * * *"');
+    expect(queueWorker).toContain("runScheduledNonEpisodeMaintenance(env)");
     expect(queueConfig).toContain('"YUME_CATALOG_READER"');
     expect(queueConfig).toContain('"yume-catalog-reader"');
     expect(workflow).toContain("Automatic scheduled Worker jobs must remain disabled.");
@@ -59,6 +61,17 @@ describe("automatic Worker maintenance", () => {
 
 
 describe("scheduled maintenance isolation", () => {
+  it("keeps non-episode maintenance out of the hourly episode poll", async () => {
+    const completed: string[] = [];
+    await runScheduledNonEpisodeMaintenance({}, {
+      cleanup: async () => { completed.push("cleanup"); },
+      adminNotifications: async () => { completed.push("admin"); },
+      animeComments: async () => { completed.push("comments"); },
+    });
+    expect(completed.sort()).toEqual(["cleanup", "admin", "comments"].sort());
+  });
+
+
   it("runs the episode poller even when notification cleanup fails", async () => {
     const completed: string[] = [];
 

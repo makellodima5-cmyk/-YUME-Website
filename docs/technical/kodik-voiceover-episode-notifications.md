@@ -6,7 +6,7 @@ The anime detail page requests the currently available Kodik voice-overs when a 
 The first episode number available at subscription time is stored as the personal baseline. Existing episodes are not sent retroactively. A user can select one voice-over per anime; selecting another updates the existing subscription. Unsubscribing deactivates the row.
 
 ## Scheduled polling
-The dedicated Queue Worker runs the episode checker every hour at minute zero UTC (`0 * * * *`). It queries only distinct anime IDs with active subscriptions and requests Kodik once per subscribed anime. It compares only the translation IDs selected by users.
+The dedicated Queue Worker runs the episode checker every hour at minute zero UTC (`0 * * * *`). This trigger runs only episode polling. The existing notification cleanup, admin Telegram dispatch and anime-comment cleanup remain on their original three-hour trigger (`0 */3 * * *`). The checker queries only distinct anime IDs with active subscriptions and requests Kodik once per subscribed anime. It compares only the translation IDs selected by users.
 
 Each source has an independent high-water mark. A new episode is queued only when its episode number exceeds the saved source high-water mark. The high-water mark advances after all new episode jobs for that source have been queued. A missing source in an otherwise successful Kodik response does not reset or advance the saved state.
 
@@ -18,6 +18,6 @@ Queue notification IDs include anime ID, translation ID and episode number. Fan-
 2. Configure `KODIK_API_TOKEN` as a Worker secret on both the public site Worker and the dedicated Queue consumer Worker.
 3. Configure `YUME_CATALOG_READER_TOKEN` as a Worker secret on the dedicated Queue consumer Worker, using the same value configured on the public site Worker. The Queue consumer also requires the `YUME_CATALOG_READER` Service Binding to `yume-catalog-reader` declared in `wrangler.queue.jsonc`.
 4. Keep the existing `KODIK_RATE_LIMITER` binding on the public site Worker. The subscription endpoint uses it when validating the user-selected source.
-5. Deploy the Queue consumer using `wrangler.queue.jsonc` so its hourly cron is active.
+5. Deploy the Queue consumer using `wrangler.queue.jsonc` so its hourly episode-polling and existing three-hour maintenance triggers are active.
 
 Kodik does not provide a player-originated push event in the inspected material. A notification can arrive up to almost one hour after Kodik exposes the episode, plus any delay on Kodik's side. CI and Wrangler validation do not apply the database migration or deploy Cloudflare.
