@@ -108,7 +108,7 @@ function localRelated(query:string,items:Anime[]):Anime[] {
     .slice(0,5).map(x=>x.item);
 }
 function recommendationsReasonEntries(items:Anime[],reasons:Map<string,string>,fallback:(item:Anime)=>string):Array<[string,string]> {
-  return items.map(item=>[item.id,reasons.get(item.id)||fallback(item)]);
+  return items.map(item=>[item.id,reasons.get(item.id)||fallback(item)] as [string,string]);
 }
 function recommendationRecords(items:Anime[],reasons:Map<string,string>) {
   return items.map(item=>({
