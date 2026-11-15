@@ -1,7 +1,6 @@
 import { env as cloudflareEnv } from "cloudflare:workers";
 import { getAuthenticatedYumeAccount } from "@/data/telegram-auth.server";
 import { readCatalogState } from "@/data/catalog-r2.server";
-import { applyPublicAnimeRatings } from "@/data/anime-ratings.server";
 import type { Anime } from "@/data/anime";
 import {
   YUBERA_AI_CONTEXT_MESSAGES, YUBERA_AI_DAILY_QUESTION_LIMIT, YUBERA_AI_MESSAGE_MAX_CHARS,
@@ -116,13 +115,20 @@ function recommendationRecords(items:Anime[],reasons:Map<string,string>) {
   }));
 }
 async function readCatalog():Promise<Anime[]> {
+  // The published R2 snapshot already contains catalogue ratings. Do not run
+  // the full D1 public-rating overlay for every AI request: it scales with the
+  // entire catalogue and can exceed both D1 bind-variable and Worker CPU limits.
   const state=await readCatalogState();
-  return applyPublicAnimeRatings(state.items);
+  return state.items;
 }
 async function takeDailyQuestion(db:Database,userId:string,date:string) {
-  const row=await db.prepare("INSERT INTO yume_ai_daily_usage(user_id,usage_date,questions) VALUES(?,?,1) ON CONFLICT(user_id,usage_date) DO UPDATE SET questions=questions+1,updated_at=CURRENT_TIMESTAMP WHERE questions<20 RETURNING questions")
-    .bind(userId,date).first<{questions:number}>();
-  return Boolean(row);
+  const row=await db.prepare("INSERT INTO yume_ai_daily_usage(user_id,usage_date,questions) VALUES(?,?,1) ON CONFLICT(user_id,usage_date) DO UPDATE SET questions=questions+1,updated_at=CURRENT_TIMESTAMP WHERE questions<? RETURNING questions")
+    .bind(userId,date,YUBERA_AI_DAILY_QUESTION_LIMIT).first<{questions:number}>();
+  return row?.questions ?? null;
+}
+async function releaseDailyQuestion(db:Database,userId:string,date:string) {
+  await db.prepare("UPDATE yume_ai_daily_usage SET questions=CASE WHEN questions>0 THEN questions-1 ELSE 0 END,updated_at=CURRENT_TIMESTAMP WHERE user_id=? AND usage_date=?")
+    .bind(userId,date).run();
 }
 async function updateUsage(db:Database,userId:string,date:string,prompt:number,completion:number) {
   await db.prepare("UPDATE yume_ai_daily_usage SET prompt_tokens=prompt_tokens+?,completion_tokens=completion_tokens+?,updated_at=CURRENT_TIMESTAMP WHERE user_id=? AND usage_date=?")
@@ -248,37 +254,91 @@ export async function handleYuberaAiChat(request:Request):Promise<Response> {
   if(conversationId) {
     try {
       const owned=await db.prepare("SELECT id FROM yume_ai_conversations WHERE id=? AND user_id=?")
-        .bind(conversationId,account.userId).first<{id:string}>();
-      if(owned)previous=await history(db,account.userId,conversationId);
+        .bind(conversationId,userId).first<{id:string}>();
+      if(owned)previous=await history(db,userId,conversationId);
     } catch {
       return json({error:"conversation_unavailable"},503);
     }
   }
-  if(!isAllowedYuberaAiTopic(message,previous.map(item=>item.content).join("\\n"))) {
-    return json({error:"off_topic",message:"Я могу помогать только с аниме и возможностями YUBERA."},422);
+  if(!isAllowedYuberaAiTopic(message,previous.map(item=>item.content).join("\n"))) {
+    return json({error:"off_topic",message:"Я могу помогать только с темами аниме и возможностями YUBERA."},422);
   }
   const env=environment(),key=typeof env.YUME_AI_API_KEY==="string"?env.YUME_AI_API_KEY.trim():"";
   if(!key)return json({error:"ai_not_configured"},503);
-  const date=utcDate(),limited=await rateLimit(userId,date);
+  const date=utcDate();
+  const currentUsage=await db.prepare("SELECT questions FROM yume_ai_daily_usage WHERE user_id=? AND usage_date=?")
+    .bind(userId,date).first<{questions:number}>();
+  if(Number(currentUsage?.questions??0)>=YUBERA_AI_DAILY_QUESTION_LIMIT) {
+    return json({error:"daily_limit_reached",limit:YUBERA_AI_DAILY_QUESTION_LIMIT,used:YUBERA_AI_DAILY_QUESTION_LIMIT,remaining:0},429);
+  }
+  const limited=await rateLimit(userId,date);
   if(limited==="limited")return json({error:"rate_limited"},429,{"Retry-After":"60"});
   if(limited==="unavailable")return json({error:"rate_limit_unavailable"},503);
-  const quota=await takeDailyQuestion(db,userId,date);
-  if(!quota)return json({error:"daily_limit_reached",limit:YUBERA_AI_DAILY_QUESTION_LIMIT,remaining:0},429);
-  let conversation;
-  try{conversation=await getOrCreateConversation(db,userId,conversationId);}catch{return json({error:"conversation_unavailable",questionCharged:true},503);}
-  const userMessage=await saveMessage(db,userId,conversation.id,"user",message);
-  try{
+
+  // Prepare the catalogue and complete the provider request before reserving a
+  // daily question. Provider errors, R2 errors and Worker timeouts therefore
+  // never consume a user's 20 successful answers.
+  let answer:Awaited<ReturnType<typeof generateAnswer>>;
+  try {
     const items=await readCatalog();
     if(!items.length)throw new Error("CATALOG_UNAVAILABLE");
-    const answer=await generateAnswer(message,previous,items);
-    const assistantMessage=await saveMessage(db,userId,conversation.id,"assistant",answer.content,answer.recommendations);
+    answer=await generateAnswer(message,previous,items);
+  } catch(error) {
+    console.error("[YUBERA_AI] Inference failed; daily quota was not charged.",{
+      name:error instanceof Error?error.name:"UnknownError",
+      reason:error instanceof Error?error.message:"Unknown inference error",
+    });
+    return json({error:"ai_temporarily_unavailable",questionCharged:false},502);
+  }
+
+  let charged=false;
+  let conversation:{id:string;title:string;updated_at:string}|null=null;
+  let userMessage:YuberaAiMessage|undefined;
+  let assistantMessage:YuberaAiMessage|undefined;
+  try {
+    const reserved=await takeDailyQuestion(db,userId,date);
+    if(reserved===null) {
+      return json({error:"daily_limit_reached",limit:YUBERA_AI_DAILY_QUESTION_LIMIT,used:YUBERA_AI_DAILY_QUESTION_LIMIT,remaining:0},429);
+    }
+    charged=true;
+    conversation=await getOrCreateConversation(db,userId,conversationId);
+    userMessage=await saveMessage(db,userId,conversation.id,"user",message);
+    assistantMessage=await saveMessage(db,userId,conversation.id,"assistant",answer.content,answer.recommendations);
     await db.prepare("UPDATE yume_ai_conversations SET title=CASE WHEN title='Новый диалог' THEN ? ELSE title END,updated_at=CURRENT_TIMESTAMP WHERE id=? AND user_id=?")
       .bind(message.slice(0,90),conversation.id,userId).run();
-    await updateUsage(db,userId,date,answer.promptTokens,answer.completionTokens);
+    try {
+      await updateUsage(db,userId,date,answer.promptTokens,answer.completionTokens);
+    } catch(error) {
+      console.error("[YUBERA_AI] Token usage counters could not be updated.",{
+        name:error instanceof Error?error.name:"UnknownError",
+      });
+    }
     const current=await db.prepare("SELECT questions FROM yume_ai_daily_usage WHERE user_id=? AND usage_date=?").bind(userId,date).first<{questions:number}>();
-    return json({conversationId:conversation.id,userMessage,assistantMessage,used:Number(current?.questions??1),limit:YUBERA_AI_DAILY_QUESTION_LIMIT});
-  }catch(error){
-    console.error("[YUBERA_AI] Chat request failed.",{name:error instanceof Error?error.name:"UnknownError"});
-    return json({error:"ai_temporarily_unavailable",conversationId:conversation.id,userMessage,questionCharged:true},502);
+    return json({conversationId:conversation.id,userMessage,assistantMessage,used:Number(current?.questions??reserved),limit:YUBERA_AI_DAILY_QUESTION_LIMIT});
+  } catch(error) {
+    if(assistantMessage?.id&&conversation) {
+      await db.prepare("DELETE FROM yume_ai_messages WHERE id=? AND conversation_id=? AND user_id=?")
+        .bind(assistantMessage.id,conversation.id,userId).run().catch(()=>undefined);
+    }
+    if(userMessage?.id&&conversation) {
+      await db.prepare("DELETE FROM yume_ai_messages WHERE id=? AND conversation_id=? AND user_id=?")
+        .bind(userMessage.id,conversation.id,userId).run().catch(()=>undefined);
+    }
+    if(charged) {
+      await releaseDailyQuestion(db,userId,date).catch(releaseError=>{
+        console.error("[YUBERA_AI] Could not release a failed question reservation.",{
+          name:releaseError instanceof Error?releaseError.name:"UnknownError",
+        });
+      });
+    }
+    if(conversation) {
+      await db.prepare("DELETE FROM yume_ai_conversations WHERE id=? AND user_id=? AND NOT EXISTS (SELECT 1 FROM yume_ai_messages WHERE conversation_id=?)")
+        .bind(conversation.id,userId,conversation.id).run().catch(()=>undefined);
+    }
+    console.error("[YUBERA_AI] Could not persist completed inference; daily quota was released.",{
+      name:error instanceof Error?error.name:"UnknownError",
+      reason:error instanceof Error?error.message:"Unknown persistence error",
+    });
+    return json({error:"ai_temporarily_unavailable",questionCharged:false},503);
   }
 }
