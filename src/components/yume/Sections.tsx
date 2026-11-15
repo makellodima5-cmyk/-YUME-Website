@@ -240,7 +240,7 @@ export function Grid({ items, onSelect, empty, onRemove, removeLabel }: {
     <div className="yubera-anime-grid grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
       {items.map((anime) => (
         <div key={anime.id} className="relative min-w-0 w-full [&>button:first-child]:w-full">
-          <AnimeCard anime={anime} onSelect={onSelect} showBookmark={!onRemove} />
+          <AnimeCard anime={anime} onSelect={onSelect} hasRemoveAction={!!onRemove} />
           {onRemove && (
             <button
               type="button"
