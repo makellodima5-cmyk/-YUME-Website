@@ -861,6 +861,25 @@ export async function handleTelegramSession(request: Request): Promise<Response>
 }
 
 
+
+/** Read-only identity snapshot for server-owned feature authorization. */
+export async function getAuthenticatedYumeAccount(request: Request): Promise<{ userId: string; isPlus: boolean } | null> {
+  const env = environment();
+  const db = database(env);
+  const secret = sessionSecret(env);
+  if (!db || !secret) return null;
+  try {
+    const userId = await authenticatedTelegramUserId(request, db, secret);
+    if (!userId) return null;
+    const subscription = await db.prepare(
+      "SELECT 1 AS active FROM yume_plus_subscriptions WHERE user_id = ? AND status = 'active' AND expires_at > ? LIMIT 1",
+    ).bind(userId, Date.now()).first<{ active: number }>();
+    return { userId, isPlus: Boolean(subscription) };
+  } catch {
+    return null;
+  }
+}
+
 /** Returns the current account id after validating the signed, HttpOnly site session. */
 export async function getAuthenticatedYumeUserId(request: Request): Promise<string | null> {
   const env = environment();
