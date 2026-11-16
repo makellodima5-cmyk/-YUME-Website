@@ -4,6 +4,7 @@ import { TelegramStarsDonation } from "./TelegramStarsDonation";
 import { getTelegramWebApp } from "@/lib/telegram-mini-app";
 import { YuberaPlusPanel } from "./YuberaPlusPanel";
 import { YuberaFriendsPanel } from "./YuberaFriendsPanel";
+import { TelegramAvatarImage } from "./TelegramAvatarImage";
 import type { Anime } from "@/data/anime";
 import { YUBERA_SUPPORT_LEVELS, YUBERA_XP_LEVELS, YUBERA_XP_REWARDS, YUBERA_XP_RULES } from "@/data/yubera-config";
 
@@ -330,11 +331,14 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, onSettings, sett
     const adminFrame = Boolean(p?.avatarFrame?.startsWith("Admin_Frame_"));
     return (
       <div className={`relative ${size} shrink-0 rounded-full ${hasFrame ? "bg-transparent" : "border-2 border-[#FF5738] bg-[#252630] p-1"}`}>
-        {p?.photoUrl
-          ? <img src={p.photoUrl} alt="" className={hasFrame ? `absolute ${adminFrame ? "inset-[17%] h-[66%] w-[66%]" : "inset-[14%] h-[72%] w-[72%]"} rounded-full object-cover` : "h-full w-full rounded-full object-cover"} />
-          : hasFrame
+        <TelegramAvatarImage
+          src={p?.photoUrl}
+          loading="eager"
+          className={hasFrame ? `absolute ${adminFrame ? "inset-[17%] h-[66%] w-[66%]" : "inset-[14%] h-[72%] w-[72%]"} rounded-full object-cover` : "h-full w-full rounded-full object-cover"}
+          fallback={hasFrame
             ? <div className={`absolute ${adminFrame ? "inset-[17%] h-[66%] w-[66%]" : "inset-[14%] h-[72%] w-[72%]"} grid place-items-center rounded-full text-2xl text-white/50`}><Users /></div>
             : <div className="grid h-full w-full place-items-center rounded-full text-2xl text-white/50"><Users /></div>}
+        />
         {p?.avatarFrame && <img src={`/images/yubera/${p.avatarFrame}`} alt="" className="pointer-events-none absolute inset-0 h-full w-full object-contain" />}
       </div>
     );
