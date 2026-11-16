@@ -279,23 +279,6 @@ export async function handleYuberaCommunity(request: Request): Promise<Response>
       const count = Number(total?.count ?? 0);
       return json({ users: rows.results, total: count, hasMore: offset + rows.results.length < count });
     }
-    if (action === "recommendations") {
-      if (!userId) return json({ error: "authentication_required" }, 401);
-      const page = Math.max(0, Math.min(1000, Number.parseInt(url.searchParams.get("page") ?? "0", 10) || 0));
-      const seed = Math.max(1, Math.min(2147483646, Number.parseInt(url.searchParams.get("seed") ?? "0", 10) || 0));
-      const rows = await database.prepare(`SELECT u.id,u.telegram_first_name,u.telegram_last_name,u.telegram_username,u.telegram_photo_url,
-        p.bio,
-        CASE WHEN p.avatar_frame LIKE 'YUBERA_Contribution_Avatar_Frame_%' THEN p.avatar_frame
-          WHEN p.avatar_frame LIKE 'YUBERA_Plus_Avatar_Frame_%' AND EXISTS(
-            SELECT 1 FROM yume_plus_subscriptions s WHERE s.user_id=u.id AND s.status='active' AND s.expires_at > ?
-          ) THEN p.avatar_frame ELSE NULL END AS avatar_frame
-        FROM yume_users u JOIN yume_profiles p ON p.user_id = u.id
-        WHERE p.visibility = 'public' AND u.id <> ?
-        AND NOT EXISTS(SELECT 1 FROM yume_follows f WHERE f.follower_id = ? AND f.followed_id = u.id)
-        ORDER BY abs((unicode(substr(u.id,-1))*1103515245 + unicode(substr(u.id,-2,1))*12345 + unicode(substr(u.id,-3,1))*2654435761 + unicode(substr(u.id,-4,1))*97 + unicode(substr(u.id,-5,1))*193 + unicode(substr(u.id,-6,1))*389 + unicode(substr(u.id,-7,1))*769 + unicode(substr(u.id,-8,1))*1543 + ?) % 2147483647), u.id
-        LIMIT 13 OFFSET ?`).bind(Date.now(), userId, userId, seed, page * 12).all<UserRow>();
-      return json({ users: rows.results.slice(0, 12), hasMore: rows.results.length > 12 });
-    }
     if (action === "collection") {
       const collectionId = url.searchParams.get("id") ?? "";
       const row = await database.prepare("SELECT c.*,u.id AS owner_id,p.visibility FROM yume_collections c JOIN yume_users u ON u.id = c.user_id JOIN yume_profiles p ON p.user_id = u.id WHERE c.id = ?")
