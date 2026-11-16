@@ -41,6 +41,7 @@ class FakeStatement {
  async all<T=Record<string,unknown>>():Promise<{results:T[]}>{return{results:[]};}
  async run(){
   if(this.sql.includes("INSERT INTO yume_ai_messages"))this.state.messageWrites++;
+  if(this.sql.includes("DELETE FROM yume_ai_conversations"))this.state.conversationDeletes++;
   return{meta:{changes:1}};
  }
 }
@@ -49,6 +50,7 @@ class FakeDb {
  plus=true;
  questions=0;
  messageWrites=0;
+ conversationDeletes=0;
  prepare(sql:string){return new FakeStatement(this,sql);}
 }
 let previousEnvironment:unknown;
@@ -86,6 +88,26 @@ describe("YUBERA AI authentication and topic checks",()=>{
   expect(response.status).toBe(422);
   expect(db.questions).toBe(0);
   expect(provider).not.toHaveBeenCalled();
+ });
+ it("deletes only the authenticated user's selected conversation when starting a new chat",async()=>{
+  const {db,requestHeaders}=await setup(true);
+  const response=await handleYuberaAiChat(new Request("https://yume.test/api/yubera/ai",{
+   method:"POST",headers:{...requestHeaders,"Content-Type":"application/json"},
+   body:JSON.stringify({action:"new_conversation",conversationId:"a".repeat(32)}),
+  }));
+  expect(response.status).toBe(200);
+  expect(await response.json()).toEqual({ok:true,deleted:true});
+  expect(db.conversationDeletes).toBe(1);
+  expect(db.messageWrites).toBe(0);
+ });
+ it("does not delete a conversation without a valid conversation ID",async()=>{
+  const {db,requestHeaders}=await setup(true);
+  const response=await handleYuberaAiChat(new Request("https://yume.test/api/yubera/ai",{
+   method:"POST",headers:{...requestHeaders,"Content-Type":"application/json"},
+   body:JSON.stringify({action:"new_conversation",conversationId:"not-an-id"}),
+  }));
+  expect(response.status).toBe(400);
+  expect(db.conversationDeletes).toBe(0);
  });
  it("rejects a state-changing request without same-origin proof",async()=>{
   await setup(true);
