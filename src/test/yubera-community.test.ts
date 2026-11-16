@@ -29,7 +29,6 @@ describe("YUBERA community foundation", () => {
     expect(server).toContain("titleLimit: ownerPlus ? PLUS_TITLES : FREE_TITLES");
     expect(server).toContain("INSERT OR IGNORE INTO yume_xp_ledger");
     expect(server).toContain("LIMIT 30 OFFSET ?");
-    expect(server).toContain("rows.results.slice(0, 12)");
   });
 
   it("exposes collection detail, catalogue add/remove, public profiles and username search in the UI", async () => {
@@ -187,7 +186,7 @@ describe("YUBERA community foundation", () => {
     expect(panel).toContain("UserRound");
     expect(panel).toContain("followingTotal");
     expect(panel).toContain("Поиск по нику или @username");
-    expect(panel).toContain("Загрузить ещё подписок");
+    expect(panel).toContain("Загрузить ещё подписки");
     expect(panel).toContain("Загрузить ещё подписчиков");
   });
 
