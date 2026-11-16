@@ -225,7 +225,7 @@ export function YuberaFriendsPanel({ onOpenProfile, onFollowChange }: Props) {
         )}
       </section>
 
-      {search.trim() ? (
+      {search.trim() && (
         <section>
           <h3 className="mb-3 flex items-center gap-2 font-semibold text-white"><Search className="h-4 w-4 text-[#ff7658]" />Результаты поиска</h3>
           {searchLoading ? <div className="h-24 animate-pulse rounded-2xl bg-white/[0.04]" />
