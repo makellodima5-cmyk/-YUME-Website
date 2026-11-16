@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ChevronDown, ChevronRight, LoaderCircle, Search, UserPlus, Users, UserCheck, UserRound } from "lucide-react";
+import { ChevronRight, LoaderCircle, Search, UserPlus, Users, UserCheck, UserRound } from "lucide-react";
 import { TelegramAvatarImage } from "./TelegramAvatarImage";
 
 type CommunityPerson = {
