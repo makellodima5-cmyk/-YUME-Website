@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronRight, LoaderCircle, Search, UserPlus, Users, UserCheck, UserRound } from "lucide-react";
+import { TelegramAvatarImage } from "./TelegramAvatarImage";
 
 type CommunityPerson = {
   id: string;
@@ -28,9 +29,11 @@ function PersonAvatar({ person }: { person: CommunityPerson }) {
   const hasFrame = Boolean(person.avatar_frame);
   return (
     <span className={"relative block h-14 w-14 shrink-0 rounded-full " + (hasFrame ? "bg-transparent" : "border border-white/20 bg-[#252630] p-1")}>
-      {person.telegram_photo_url
-        ? <img src={person.telegram_photo_url} alt="" className={hasFrame ? "absolute inset-[13%] h-[74%] w-[74%] rounded-full object-cover" : "h-full w-full rounded-full object-cover"} />
-        : <span className={hasFrame ? "absolute inset-[13%] grid h-[74%] w-[74%] place-items-center rounded-full bg-white/5 text-white/55" : "grid h-full w-full place-items-center rounded-full bg-white/5 text-white/55"}><UserRound className="h-7 w-7" /></span>}
+      <TelegramAvatarImage
+        src={person.telegram_photo_url}
+        className={hasFrame ? "absolute inset-[13%] h-[74%] w-[74%] rounded-full object-cover" : "h-full w-full rounded-full object-cover"}
+        fallback={<span className={hasFrame ? "absolute inset-[13%] grid h-[74%] w-[74%] place-items-center rounded-full bg-white/5 text-white/55" : "grid h-full w-full place-items-center rounded-full bg-white/5 text-white/55"}><UserRound className="h-7 w-7" /></span>}
+      />
       {person.avatar_frame && <img src={`/images/yubera/${person.avatar_frame}`} alt="" className="pointer-events-none absolute inset-0 h-full w-full object-contain" />}
     </span>
   );

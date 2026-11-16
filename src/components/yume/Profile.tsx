@@ -197,7 +197,7 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
       .then(async (response) => {
         const payload = await response.json().catch(() => ({})) as {
           authenticated?: boolean;
-          user?: { id?: string; firstName?: string; lastName?: string; username?: string };
+          user?: { id?: string; firstName?: string; lastName?: string; username?: string; photoUrl?: string };
         };
         if (cancelled) return;
         const signedIn = response.ok && payload.authenticated === true && Boolean(payload.user?.id);
@@ -209,7 +209,7 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
             first_name: payload.user.firstName,
             last_name: payload.user.lastName,
             username: payload.user.username,
-            photo_url: unsafeUser?.photo_url,
+            photo_url: payload.user.photoUrl ?? unsafeUser?.photo_url,
           });
         } else {
           setTelegramUser(null);
