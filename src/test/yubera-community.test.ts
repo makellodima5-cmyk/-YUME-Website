@@ -29,11 +29,9 @@ describe("YUBERA community foundation", () => {
     expect(server).toContain("titleLimit: ownerPlus ? PLUS_TITLES : FREE_TITLES");
     expect(server).toContain("INSERT OR IGNORE INTO yume_xp_ledger");
     expect(server).toContain("LIMIT 30 OFFSET ?");
-    expect(server).toContain("LIMIT 13 OFFSET ?");
-    expect(server).toContain("rows.results.slice(0, 12)");
   });
 
-  it("exposes collection detail, catalogue add/remove, public profiles and people discovery in the UI", async () => {
+  it("exposes collection detail, catalogue add/remove, public profiles and username search in the UI", async () => {
     const component = await readFile(resolve(process.cwd(), "src/components/yume/YuberaProfileHub.tsx"), "utf8");
     const friendsPanel = await readFile(resolve(process.cwd(), "src/components/yume/YuberaFriendsPanel.tsx"), "utf8");
     expect(component).toContain('"collection-detail"');
@@ -44,8 +42,10 @@ describe("YUBERA community foundation", () => {
     expect(component).toContain("YuberaFriendsPanel");
     expect(component).toContain("w-max max-w-none flex-nowrap items-center gap-1 whitespace-nowrap");
     expect(component).toContain("h-9 w-9 sm:h-11 sm:w-11");
-    expect(friendsPanel).toContain("Показать ещё");
-    expect(friendsPanel).toContain("Найти друзей");
+    expect(friendsPanel).toContain("Загрузить ещё подписчиков");
+    expect(friendsPanel).toContain("Поиск по нику или @username");
+    expect(friendsPanel).not.toContain("Найти друзей");
+    expect(friendsPanel).not.toContain("recommendation");
     expect(friendsPanel).toContain("truncate whitespace-nowrap line-clamp-1");
     expect(friendsPanel).not.toContain("По дате подписки");
     expect(friendsPanel).toContain("bg-neon text-white shadow-neon");
@@ -186,7 +186,8 @@ describe("YUBERA community foundation", () => {
     expect(panel).toContain("UserRound");
     expect(panel).toContain("followingTotal");
     expect(panel).toContain("Поиск по нику или @username");
-    expect(panel).toContain("Показать ещё");
+    expect(panel).toContain("Загрузить ещё подписки");
+    expect(panel).toContain("Загрузить ещё подписчиков");
   });
 
   it("debounces user search and discards stale responses", async () => {
@@ -197,7 +198,7 @@ describe("YUBERA community foundation", () => {
     expect(panel).toContain("setSearchResults([])");
   });
 
-  it("does not expose expired Plus avatar frames in people discovery", async () => {
+  it("does not expose expired Plus avatar frames in public people lists", async () => {
     const server = await readFile(resolve(process.cwd(), "src/data/yubera-community.server.ts"), "utf8");
     expect(server).toContain("p.avatar_frame LIKE 'YUBERA_Plus_Avatar_Frame_%'");
     expect(server).toContain("s.status='active' AND s.expires_at > ?");
@@ -301,15 +302,17 @@ describe("YUBERA community foundation", () => {
     expect(edit).toContain("maxLength={250}");
   });
 
-  it("keeps recommendation pagination shuffled but stable within one screen session", async () => {
+  it("removes user recommendations while preserving username search and follow lists", async () => {
     const server = await readFile(resolve(process.cwd(), "src/data/yubera-community.server.ts"), "utf8");
     const panel = await readFile(resolve(process.cwd(), "src/components/yume/YuberaFriendsPanel.tsx"), "utf8");
-    expect(server).toContain("url.searchParams.get(\"seed\")");
-    expect(server).toContain("ORDER BY abs((unicode(substr(u.id,-1))*1103515245 + unicode(substr(u.id,-2,1))*12345");
-    expect(server).toContain("LIMIT 13 OFFSET ?");
-    expect(server).toContain("hasMore: rows.results.length > 12");
-    expect(panel).toContain("recommendationSeed");
-    expect(panel).toContain("&seed=${recommendationSeed}");
+    expect(server).not.toContain('action === "recommendations"');
+    expect(server).toContain('action === "friends"');
+    expect(server).toContain('url.searchParams.get("q")');
+    expect(panel).not.toContain("recommendation");
+    expect(panel).not.toContain("Найти друзей");
+    expect(panel).toContain("Поиск по нику или @username");
+    expect(panel).toContain("Мои подписки");
+    expect(panel).toContain("Мои подписчики");
   });
 
   it("verifies admin identity using the existing Telegram session and configured Telegram ID", async () => {

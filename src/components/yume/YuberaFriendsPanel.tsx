@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ChevronDown, ChevronRight, LoaderCircle, Search, UserPlus, Users, UserCheck, UserRound } from "lucide-react";
+import { ChevronRight, LoaderCircle, Search, UserPlus, Users, UserCheck, UserRound } from "lucide-react";
 import { TelegramAvatarImage } from "./TelegramAvatarImage";
 
 type CommunityPerson = {
@@ -52,21 +52,15 @@ export function YuberaFriendsPanel({ onOpenProfile, onFollowChange }: Props) {
   const [followersLoading, setFollowersLoading] = useState(true);
   const [followersError, setFollowersError] = useState("");
   const [listMode, setListMode] = useState<"following" | "followers">("following");
-  const [recommendations, setRecommendations] = useState<CommunityPerson[]>([]);
-  const [recommendationPage, setRecommendationPage] = useState(0);
-  const [recommendationSeed] = useState(() => Math.floor(Math.random() * 2147483646) + 1);
-  const [recommendationsHasMore, setRecommendationsHasMore] = useState(false);
-  const [recommendationsLoading, setRecommendationsLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [searchResults, setSearchResults] = useState<CommunityPerson[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState("");
   const [followingError, setFollowingError] = useState("");
-  const [recommendationError, setRecommendationError] = useState("");
   const [actionError, setActionError] = useState("");
   const [busyUserId, setBusyUserId] = useState<string | null>(null);
   const searchRequestId = useRef(0);
-  const recommendationRequestId = useRef(0);
+
 
   const loadFollowing = useCallback(async (page = 0, append = false) => {
     setFollowingLoading(true);
@@ -112,34 +106,10 @@ export function YuberaFriendsPanel({ onOpenProfile, onFollowChange }: Props) {
     }
   }, []);
 
-  const loadRecommendations = useCallback(async (page: number, append: boolean) => {
-    const requestId = ++recommendationRequestId.current;
-    setRecommendationsLoading(true);
-    setRecommendationError("");
-    try {
-      const response = await fetch(`/api/yubera/community?action=recommendations&page=${page}&seed=${recommendationSeed}`, { credentials: "same-origin", cache: "no-store" });
-      const data = await response.json() as PeopleResponse;
-      if (!response.ok) throw new Error(data.error || "Не удалось загрузить рекомендации");
-      if (requestId !== recommendationRequestId.current) return;
-      const incoming = Array.isArray(data.users) ? data.users : [];
-      setRecommendations((current) => {
-        const combined = append ? [...current, ...incoming] : incoming;
-        return combined.filter((person, index) => combined.findIndex((candidate) => candidate.id === person.id) === index);
-      });
-      setRecommendationPage(page);
-      setRecommendationsHasMore(Boolean(data.hasMore));
-    } catch (cause) {
-      if (requestId === recommendationRequestId.current) setRecommendationError(cause instanceof Error ? cause.message : "Не удалось загрузить рекомендации");
-    } finally {
-      if (requestId === recommendationRequestId.current) setRecommendationsLoading(false);
-    }
-  }, [recommendationSeed]);
-
   useEffect(() => {
     void loadFollowing();
     void loadFollowers();
-    void loadRecommendations(0, false);
-  }, [loadFollowing, loadFollowers, loadRecommendations]);
+  }, [loadFollowing, loadFollowers]);
 
   useEffect(() => {
     const query = search.trim();
@@ -184,9 +154,8 @@ export function YuberaFriendsPanel({ onOpenProfile, onFollowChange }: Props) {
       });
       const data = await response.json() as { error?: string };
       if (!response.ok) throw new Error(data.error || "Не удалось подписаться на пользователя");
-      setRecommendations((current) => current.filter((item) => item.id !== person.id));
       setSearchResults((current) => current.map((item) => item.id === person.id ? { ...item, is_following: 1 } : item));
-      await Promise.all([loadFollowing(0, false), loadFollowers(0, false), loadRecommendations(0, false)]);
+      await Promise.all([loadFollowing(0, false), loadFollowers(0, false)]);
       await onFollowChange?.();
     } catch (cause) {
       setActionError(cause instanceof Error ? cause.message : "Не удалось подписаться на пользователя");
@@ -195,7 +164,7 @@ export function YuberaFriendsPanel({ onOpenProfile, onFollowChange }: Props) {
     }
   };
 
-  const personCard = (person: CommunityPerson, mode: "following" | "followers" | "discover" | "search") => (
+  const personCard = (person: CommunityPerson, mode: "following" | "followers" | "search") => (
     <div key={person.id} className="flex items-center gap-3 rounded-2xl border border-white/[0.08] bg-[#1d1e25] p-3">
       <button type="button" onClick={() => onOpenProfile(person.id)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
         <PersonAvatar person={person} />
@@ -256,7 +225,7 @@ export function YuberaFriendsPanel({ onOpenProfile, onFollowChange }: Props) {
         )}
       </section>
 
-      {search.trim() ? (
+      {search.trim() && (
         <section>
           <h3 className="mb-3 flex items-center gap-2 font-semibold text-white"><Search className="h-4 w-4 text-[#ff7658]" />Результаты поиска</h3>
           {searchLoading ? <div className="h-24 animate-pulse rounded-2xl bg-white/[0.04]" />
@@ -264,17 +233,7 @@ export function YuberaFriendsPanel({ onOpenProfile, onFollowChange }: Props) {
             : searchResults.length ? <div className="space-y-2">{searchResults.map((person) => personCard(person, "search"))}</div>
             : <div className="rounded-2xl border border-white/10 bg-[#17181e] px-4 py-6 text-center"><Search className="mx-auto mb-2 h-7 w-7 text-white/25" /><p className="text-sm text-white/75">Пользователи не найдены</p><p className="mt-1 text-xs text-white/45">Попробуйте изменить имя или username</p></div>}
         </section>
-      ) : (
-        <section>
-          <div className="mb-3 flex items-center gap-2"><Search className="h-5 w-5 text-[#ff7658]" /><span><h3 className="font-semibold text-white">Найти друзей</h3><p className="text-xs text-white/50">Ищите других пользователей YUBERA</p></span></div>
-          {recommendationError && !recommendations.length ? <div className="rounded-2xl border border-red-500/20 bg-red-500/5 p-4 text-center text-sm text-red-200">{recommendationError}<button type="button" onClick={() => void loadRecommendations(0, false)} className="ml-2 underline">Повторить</button></div>
-            : recommendations.length ? <div className="space-y-2">{recommendations.map((person) => personCard(person, "discover"))}</div>
-            : !recommendationsLoading && <p className="rounded-2xl border border-white/10 bg-[#17181e] p-5 text-center text-sm text-white/50">Пока нет пользователей для рекомендации</p>}
-          {recommendationsHasMore && <button type="button" disabled={recommendationsLoading} onClick={() => void loadRecommendations(recommendationPage + 1, true)} className="mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-white/15 bg-[#17181e] text-sm text-white/75 disabled:opacity-50">
-            {recommendationsLoading ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <>Показать ещё <ChevronDown className="h-4 w-4" /></>}
-          </button>}
-          {!recommendationsHasMore && recommendations.length > 0 && !recommendationsLoading && <p className="pt-2 text-center text-xs text-white/35">Больше пользователей пока нет</p>}
-        </section>
+
       )}
       {actionError && <p role="alert" className="rounded-xl border border-red-500/20 bg-red-500/5 p-3 text-xs text-red-200">{actionError}</p>}
       {followingError && following.length > 0 && <p role="alert" className="rounded-xl border border-red-500/20 bg-red-500/5 p-3 text-xs text-red-200">{followingError}</p>}
