@@ -297,13 +297,34 @@ export function YuberaAiChat() {
     }
   };
 
-  const newChat = () => {
-    setActiveId(null);
-    setMessages([]);
+  const newChat = async () => {
+    if (loading || booting) return;
+    setLoading(true);
     setNotice("");
-    setInput("");
-    if (inputRef.current) inputRef.current.style.height = "24px";
-    inputRef.current?.focus();
+    try {
+      if (activeId) {
+        const response = await fetch("/api/yubera/ai", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "new_conversation", conversationId: activeId }),
+        });
+        const data = await json(response);
+        if (!response.ok) {
+          if (response.status === 401) void navigate({ to: "/", search: { section: "login" } });
+          throw new Error(String(data.error ?? "conversation_delete_failed"));
+        }
+      }
+      setActiveId(null);
+      setMessages([]);
+      setInput("");
+      if (inputRef.current) inputRef.current.style.height = "24px";
+      inputRef.current?.focus();
+    } catch {
+      setNotice(ru ? "Не удалось удалить предыдущий диалог. Попробуй ещё раз." : "Could not delete the previous conversation. Try again.");
+    } finally {
+      setLoading(false);
+    }
   };
   const changeInput = (event: ChangeEvent<HTMLTextAreaElement>) => {
     const element = event.currentTarget;
