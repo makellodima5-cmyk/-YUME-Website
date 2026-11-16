@@ -289,6 +289,17 @@ export async function handleYuberaAiChat(request:Request):Promise<Response> {
   let body:unknown;
   try{body=JSON.parse(raw);}catch{return json({error:"invalid_json"},400);}
   if(!isRecord(body))return json({error:"invalid_request"},400);
+  if(body.action==="new_conversation") {
+    const conversationId=typeof body.conversationId==="string"&&/^[a-f0-9]{32}$/.test(body.conversationId)?body.conversationId:null;
+    if(!conversationId)return json({error:"invalid_conversation_id"},400);
+    try {
+      await db.prepare("DELETE FROM yume_ai_conversations WHERE id=? AND user_id=?")
+        .bind(conversationId,userId).run();
+      return json({ok:true,deleted:true});
+    } catch {
+      return json({error:"conversation_delete_failed"},503);
+    }
+  }
   const message=cleanText(body.message,YUBERA_AI_MESSAGE_MAX_CHARS);
   const conversationId=typeof body.conversationId==="string"&&/^[a-f0-9]{32}$/.test(body.conversationId)?body.conversationId:null;
   if(message.length<2)return json({error:"empty_message"},400);
