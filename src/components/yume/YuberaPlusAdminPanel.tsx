@@ -2,7 +2,7 @@ import { useEffect,useState,type FormEvent } from "react";
 import { Crown,Save,Search } from "lucide-react";
 type Entry={id:number;action:string;details_json:string;created_at:string};
 type AuditDetails={oldPrice?:number;newPrice?:number;username?:string;days?:number;expiresAt?:number};
-export function YuberaPlusAdminPanel({language}:{language:"ru"|"en"}){
+export function YuberaPlusAdminPanel({language,onOpenUser}:{language:"ru"|"en";onOpenUser:(userId:string)=>void}){
  const [price,setPrice]=useState(""),[saved,setSaved]=useState<number|null>(null),[audit,setAudit]=useState<Entry[]>([]);
  const [busy,setBusy]=useState(false),[message,setMessage]=useState(""),[error,setError]=useState("");
  const [searchUsername,setSearchUsername]=useState("");
@@ -20,11 +20,11 @@ export function YuberaPlusAdminPanel({language}:{language:"ru"|"en"}){
     <button type="submit" disabled={searchBusy} className="inline-flex min-h-11 items-center justify-center gap-2 self-end rounded-xl bg-white/10 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"><Search className="h-4 w-4"/>{searchBusy?(ru?"Ищем…":"Searching…"):(ru?"Найти":"Search")}</button>
    </form>
    {searchError&&<p role="alert" className="mt-2 text-sm text-red-300">{searchError}</p>}
-   {searchResults.length>0&&<div className="mt-3 space-y-2">{searchResults.map(user=><a key={user.id} href={"/profile?userId="+encodeURIComponent(user.id)} className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.04] p-3 transition hover:border-[#FF764F]/50">
+   {searchResults.length>0&&<div className="mt-3 space-y-2">{searchResults.map(user=><button type="button" key={user.id} onClick={()=>onOpenUser(user.id)} className="flex w-full items-center gap-3 rounded-xl border border-white/10 bg-white/[0.04] p-3 text-left transition hover:border-[#FF764F]/50">
     <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#FF6847]/15 text-sm font-bold text-[#FF8A70]">{(user.displayName||user.username).slice(0,1).toUpperCase()}</span>
     <span className="min-w-0 flex-1"><b className="block truncate text-sm">{user.displayName||user.username}</b><span className="block text-xs text-white/55">@{user.username}</span><span className="mt-1 block truncate text-[11px] text-white/45">{user.xpTitle} · {user.supportTitle}</span></span>
     <span className="shrink-0 text-right text-[11px] text-white/55">{user.isPlus?"Plus":ru?"Без Plus":"No Plus"}<ChevronRight className="ml-auto mt-1 h-4 w-4"/></span>
-   </a>)}</div>}
+   </button>)}</div>}
    <p className="mt-2 text-xs leading-relaxed text-white/45">{ru?"Открой карточку пользователя, чтобы выдать Plus, назначить уровень или статус.":"Open a user profile to grant Plus or assign a level and support status."}</p>
   </section>
   <div className="my-4 border-t border-white/10"/>
