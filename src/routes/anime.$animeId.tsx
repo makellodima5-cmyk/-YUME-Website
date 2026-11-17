@@ -42,6 +42,7 @@ import { AnimeEpisodeSubscription } from "@/components/yume/AnimeEpisodeSubscrip
 import { AnimeComments } from "@/components/yume/AnimeComments";
 import { canReturnToAnimeOrigin } from "@/data/anime-navigation";
 import { shouldTreatEpisodeSubscriptionAsActive } from "@/data/anime-subscription-state";
+import { getTelegramWebApp } from "@/lib/telegram-mini-app";
 
 function formatAnimeDate(value: string | undefined, language: "ru" | "en", includeTime = false): string | null {
   if (!value) return null;
@@ -176,6 +177,12 @@ function AnimeDetailPage() {
   const [kodikError, setKodikError] = useState("");
   const [kodikLoading, setKodikLoading] = useState(false);
   const [episodeProgress, setEpisodeProgress] = useState<PlaybackProgressEntry[]>([]);
+  const [isTelegramMiniApp, setIsTelegramMiniApp] = useState(false);
+  const [browserHelpExpanded, setBrowserHelpExpanded] = useState(false);
+
+  useEffect(() => {
+    setIsTelegramMiniApp(document.documentElement.classList.contains("telegram-mini-app"));
+  }, []);
 
   useEffect(() => {
     const syncEpisodeProgress = () => {
@@ -218,9 +225,12 @@ function AnimeDetailPage() {
         const params = new URLSearchParams(window.location.search);
         const requestedEpisode = Number(params.get("episode"));
         const requestedResume = Number(params.get("resume"));
-        const matchingSource = Number.isInteger(requestedEpisode) && requestedEpisode > 0
-          ? sources.find((source) => source.episodes.some((episode) => episode.number === requestedEpisode)) ?? sources[0]
-          : sources[0];
+        const requestedTranslation = params.get("translation");
+        const matchingSource = sources.find((source) => source.id === requestedTranslation && (!Number.isInteger(requestedEpisode) || requestedEpisode <= 0 || source.episodes.some((episode) => episode.number === requestedEpisode)))
+          ?? (Number.isInteger(requestedEpisode) && requestedEpisode > 0
+            ? sources.find((source) => source.episodes.some((episode) => episode.number === requestedEpisode))
+            : undefined)
+          ?? sources[0];
         const matchingEpisode = matchingSource?.episodes.find((episode) => episode.number === requestedEpisode);
         setKodikTranslationId(matchingSource?.id ?? "");
         setKodikEpisode(matchingEpisode?.number ?? matchingSource?.episodes[0]?.number ?? 1);
@@ -842,6 +852,55 @@ function AnimeDetailPage() {
                     <div id="kodik-player-container" className="absolute inset-0 h-full w-full [&_iframe]:!absolute [&_iframe]:!inset-0 [&_iframe]:!h-full [&_iframe]:!w-full" />
                     {!kodikEmbedUrl && <div className="absolute inset-0 flex items-center justify-center p-5 text-center text-sm text-muted-foreground">{kodikError || (language === "en" ? "Loading Kodik player…" : "Загрузка плеера Kodik…")}</div>}
                   </div>
+                  {isTelegramMiniApp && (
+                    <div className="mt-3 rounded-xl border border-border/70 bg-card/60">
+                      <button
+                        type="button"
+                        aria-expanded={browserHelpExpanded}
+                        aria-controls="telegram-player-browser-help"
+                        onClick={() => setBrowserHelpExpanded((expanded) => !expanded)}
+                        className="flex w-full items-center justify-between gap-3 px-3 py-3 text-left text-sm font-medium"
+                      >
+                        <span>{language === "en" ? "What if fullscreen mode doesn't open?" : "Не открывается полноэкранный режим?"}</span>
+                        <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${browserHelpExpanded ? "rotate-180" : ""}`} />
+                      </button>
+                      {browserHelpExpanded && (
+                        <div id="telegram-player-browser-help" className="space-y-2 border-t border-border/60 px-3 pb-3 pt-2 text-sm leading-relaxed text-muted-foreground">
+                          <p>{language === "en"
+                            ? "Telegram on Android has a limitation that can prevent the video player from switching to fullscreen. This is a Telegram issue, not a Yubera error."
+                            : "В Telegram на Android есть ограничение, из-за которого видеоплеер может не переходить в полноэкранный режим. Это проблема Telegram, а не ошибка Yubera."}</p>
+                          <p>{language === "en"
+                            ? "You can continue watching in your browser — fullscreen works there."
+                            : "Вы можете продолжить просмотр в браузере — там эта функция работает корректно."}</p>
+                          <a
+                            href={(() => {
+                              const params = new URLSearchParams({ watch: "1", episode: String(kodikEpisode) });
+                              if (kodikTranslationId) params.set("translation", kodikTranslationId);
+                              const progress = episodeProgress.find((entry) => entry.episode === kodikEpisode && !entry.completed);
+                              if (progress && progress.positionSeconds > 0) params.set("resume", String(Math.floor(progress.positionSeconds)));
+                              return `/anime/${encodeURIComponent(animeId)}?${params.toString()}`;
+                            })()}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(event) => {
+                              const webApp = getTelegramWebApp();
+                              if (webApp?.openLink) {
+                                event.preventDefault();
+                                const url = new URL(event.currentTarget.href, window.location.origin).toString();
+                                try { webApp.openLink(url); } catch { window.open(url, "_blank", "noopener,noreferrer"); }
+                              }
+                            }}
+                            className="inline-flex font-semibold text-primary underline underline-offset-4"
+                          >
+                            {language === "en" ? "Open this anime in browser" : "Открыть аниме в браузере"}
+                          </a>
+                          <p className="text-xs">{language === "en"
+                            ? "To save your watching progress, sign in to your Yubera account in the browser using Telegram."
+                            : "Чтобы сохранить прогресс просмотра, войдите в свой аккаунт Yubera через Telegram в браузере."}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )) : (anime.youtubeTrailerId ? (
                 <div className="relative mx-auto aspect-video w-full min-w-0 overflow-hidden rounded-2xl border border-white/10 bg-[#101116] shadow-2xl">
