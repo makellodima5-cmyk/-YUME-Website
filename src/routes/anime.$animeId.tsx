@@ -9,8 +9,6 @@ import {
   ChevronRight,
   CirclePlay,
   Heart,
-  Maximize2,
-  Minimize2,
   Play,
   Star,
   X,
@@ -43,7 +41,6 @@ import { UserAnimeRating } from "@/components/yume/UserAnimeRating";
 import { AnimeEpisodeSubscription } from "@/components/yume/AnimeEpisodeSubscription";
 import { AnimeComments } from "@/components/yume/AnimeComments";
 import { canReturnToAnimeOrigin } from "@/data/anime-navigation";
-import { exitTelegramFullscreen, getTelegramWebApp, requestTelegramFullscreen } from "@/lib/telegram-mini-app";
 import { shouldTreatEpisodeSubscriptionAsActive } from "@/data/anime-subscription-state";
 
 function formatAnimeDate(value: string | undefined, language: "ru" | "en", includeTime = false): string | null {
@@ -129,8 +126,6 @@ function AnimeDetailPage() {
   const navigate = useNavigate();
   const { anime, relatedAnime, apiError, ratingEnabled } = Route.useLoaderData();
   const playerSectionRef = useRef<HTMLElement | null>(null);
-  const playerStageRef = useRef<HTMLDivElement | null>(null);
-  const [playerFullscreen, setPlayerFullscreen] = useState(false);
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
   const [inList, setInList] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
@@ -245,41 +240,6 @@ function AnimeDetailPage() {
   const selectedKodikSource = kodikSources.find((source) => source.id === kodikTranslationId);
   const selectedKodikEpisode = selectedKodikSource?.episodes.find((episode) => episode.number === kodikEpisode);
   const kodikEmbedUrl = selectedKodikEpisode?.link ? (selectedKodikEpisode.link.startsWith("//") ? "https:" + selectedKodikEpisode.link : selectedKodikEpisode.link) : "";
-
-  const enterPlayerFullscreen = () => {
-    setPlayerFullscreen(true);
-    // Telegram's fullscreen API must be called from a real user gesture.
-    // The previous implementation called it during app startup, where Android
-    // clients can ignore the request because there is no user activation.
-    if (getTelegramWebApp()) {
-      requestTelegramFullscreen();
-      return;
-    }
-    const stage = playerStageRef.current;
-    if (stage?.requestFullscreen) {
-      void stage.requestFullscreen().catch(() => {
-        // The fixed-position stage remains a usable fullscreen fallback.
-      });
-    }
-  };
-
-  const leavePlayerFullscreen = () => {
-    setPlayerFullscreen(false);
-    if (getTelegramWebApp()) {
-      exitTelegramFullscreen();
-      return;
-    }
-    if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
-  };
-
-  useEffect(() => {
-    const syncFullscreen = () => {
-      if (!getTelegramWebApp() && document.fullscreenElement) setPlayerFullscreen(document.fullscreenElement === playerStageRef.current);
-      else if (!getTelegramWebApp() && !document.fullscreenElement) setPlayerFullscreen(false);
-    };
-    document.addEventListener("fullscreenchange", syncFullscreen);
-    return () => document.removeEventListener("fullscreenchange", syncFullscreen);
-  }, []);
 
   useEffect(() => {
     if (watchMode !== "episodes" || !kodikEmbedUrl) return;
@@ -878,23 +838,9 @@ function AnimeDetailPage() {
                       </div>
                     </div>
                   </div>
-                  <div
-                    ref={playerStageRef}
-                    className={playerFullscreen
-                      ? "yume-player-fullscreen-stage"
-                      : "relative mx-auto aspect-video w-full min-w-0 overflow-hidden rounded-2xl border border-white/10 bg-[#101116] shadow-2xl"}
-                  >
+                  <div className="relative mx-auto aspect-video w-full min-w-0 overflow-hidden rounded-2xl border border-white/10 bg-[#101116] shadow-2xl">
                     <div id="kodik-player-container" className="absolute inset-0 h-full w-full [&_iframe]:!absolute [&_iframe]:!inset-0 [&_iframe]:!h-full [&_iframe]:!w-full" />
                     {!kodikEmbedUrl && <div className="absolute inset-0 flex items-center justify-center p-5 text-center text-sm text-muted-foreground">{kodikError || (language === "en" ? "Loading Kodik player…" : "Загрузка плеера Kodik…")}</div>}
-                    {playerFullscreen ? (
-                      <button type="button" onClick={leavePlayerFullscreen} aria-label={language === "en" ? "Exit fullscreen player" : "Выйти из полноэкранного режима"} className="yume-player-fullscreen-exit">
-                        <Minimize2 className="h-5 w-5" />
-                      </button>
-                    ) : (
-                      <button type="button" onClick={enterPlayerFullscreen} aria-label={language === "en" ? "Open fullscreen player" : "Открыть плеер на весь экран"} className="yume-player-fullscreen-enter">
-                        <Maximize2 className="h-5 w-5" />
-                      </button>
-                    )}
                   </div>
                 </div>
               )) : (anime.youtubeTrailerId ? (
