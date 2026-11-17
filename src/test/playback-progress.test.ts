@@ -141,6 +141,17 @@ describe("episode list playback progress", () => {
     }));
   });
 
+  it("keeps identical episode numbers separate across seasons", () => {
+    savePlaybackProgress({ ...entry(1, 120), seasonNumber: 1 });
+    savePlaybackProgress({ ...entry(1, 240), seasonNumber: 2 });
+    expect(readPlaybackProgress().filter(item => item.animeId === "123" && item.episode === 1)).toHaveLength(2);
+    expect(readPlaybackProgress().find(item => item.seasonNumber === 1)?.positionSeconds).toBe(120);
+    expect(readPlaybackProgress().find(item => item.seasonNumber === 2)?.positionSeconds).toBe(240);
+    markPlaybackEpisodeCompleted({ ...entry(1, 1380), seasonNumber: 2 });
+    expect(readPlaybackProgress().find(item => item.seasonNumber === 1)?.completed).toBe(false);
+    expect(readPlaybackProgress().find(item => item.seasonNumber === 2)?.completed).toBe(true);
+  });
+
   it("updates a saved episode instead of creating duplicate indicators", () => {
     savePlaybackProgress(entry(1, 120));
     savePlaybackProgress(entry(1, 240));

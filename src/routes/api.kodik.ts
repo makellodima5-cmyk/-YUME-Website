@@ -6,6 +6,7 @@ import { getR2Anime } from "@/data/catalog-r2.server";
 type Environment = Record<string, unknown> & { KODIK_API_TOKEN?: string; KODIK_RATE_LIMITER?: unknown };
 type EpisodeValue = string | { link?: string; title?: string | null };
 type KodikSeason = { episodes?: Record<string, EpisodeValue> };
+type Episode = { number: number; title: string; link: string };
 type KodikResult = {
   id?: string;
   shikimori_id?: string | number;
@@ -125,7 +126,7 @@ async function handleKodik(request: Request): Promise<Response> {
   // Keep the existing Kodik player search/selection behaviour. Kodik's player
   // endpoint owns its own source mapping; strict ID validation is only used by
   // the separate availability checker so it cannot hide the playable sources.
-  const sources = new Map<string, { id: string; title: string; episodes: Map<number, { number: number; title: string; link: string }> }>();
+  const sources = new Map<string, { id: string; title: string; episodes: Map<number, Episode>; seasons: Map<number, Map<number, Episode>> }>();
   for (const result of payload.results) {
     if (worldArtId) {
       const linkedReference = (() => { try { const link = new URL(result.worldart_link ?? ""); return { id: link.searchParams.get("id") ?? "", type: link.pathname === "/cinema/cinema.php" ? "cinema" : link.pathname === "/animation/animation.php" ? "animation" : "" }; } catch { return { id: "", type: "" }; } })();
@@ -137,45 +138,48 @@ async function handleKodik(request: Request): Promise<Response> {
     const translationTitle = (result.translation?.title || result.title || "").trim();
     if (!translationId || !translationTitle) continue;
 
-    const seasons = result.seasons && typeof result.seasons === "object" ? result.seasons : null;
-    let episodeEntries: [string, EpisodeValue][] = [];
-    if (seasons) {
-      // A separate YUME card is expected to identify one season/title. Do not expose a season selector.
-      // Kodik can return season maps; use the first season included for this Shikimori ID.
-      const seasonKeys = Object.keys(seasons).sort((a, b) => Number(a) - Number(b));
-      const season = seasonKeys.length ? seasons[seasonKeys[0]] : null;
-      if (season?.episodes && typeof season.episodes === "object") episodeEntries = Object.entries(season.episodes);
+    const seasonMaps = result.seasons && typeof result.seasons === "object" ? result.seasons : null;
+    const entriesBySeason = new Map<number, [string, EpisodeValue][]>();
+    if (worldArtId && seasonMaps) {
+      for (const [key, season] of Object.entries(seasonMaps)) {
+        const number = Number(key);
+        if (Number.isSafeInteger(number) && number > 0 && season?.episodes && typeof season.episodes === "object") entriesBySeason.set(number, Object.entries(season.episodes));
+      }
     } else if (result.episodes && typeof result.episodes === "object") {
-      episodeEntries = Object.entries(result.episodes);
+      entriesBySeason.set(1, Object.entries(result.episodes));
     } else if (result.link) {
-      episodeEntries = [["1", result.link]];
+      entriesBySeason.set(1, [["1", result.link]]);
+    } else if (seasonMaps) {
+      const key = Object.keys(seasonMaps).sort((a, b) => Number(a) - Number(b))[0];
+      const first = key ? seasonMaps[key] : null;
+      if (first?.episodes && typeof first.episodes === "object") entriesBySeason.set(1, Object.entries(first.episodes));
     }
-
-    const episodes = episodeEntries
-      .map(([number, value]) => {
-        const parsedNumber = Number(number);
-        const parsed = episodeLink(value);
-        return Number.isSafeInteger(parsedNumber) && parsedNumber > 0 && parsed
-          ? { number: parsedNumber, title: parsed.title, link: parsed.link }
-          : null;
-      })
-      .filter((episode): episode is { number: number; title: string; link: string } => episode !== null)
-      .sort((a, b) => a.number - b.number);
-    if (!episodes.length) continue;
-
+    const parsedSeasons = new Map<number, Map<number, Episode>>();
+    for (const [seasonNumber, entries] of entriesBySeason) {
+      const episodes = entries.map(([key, value]) => {
+        const number = Number(key), parsed = episodeLink(value);
+        return Number.isSafeInteger(number) && number > 0 && parsed ? { number, title: parsed.title, link: parsed.link } : null;
+      }).filter((episode): episode is Episode => episode !== null).sort((a, b) => a.number - b.number);
+      if (episodes.length) parsedSeasons.set(seasonNumber, new Map(episodes.map(episode => [episode.number, episode])));
+    }
+    if (!parsedSeasons.size) continue;
     let source = sources.get(translationId);
-    if (!source) {
-      source = { id: translationId, title: translationTitle, episodes: new Map() };
-      sources.set(translationId, source);
+    if (!source) { source = { id: translationId, title: translationTitle, episodes: new Map(), seasons: new Map() }; sources.set(translationId, source); }
+    for (const [seasonNumber, episodes] of parsedSeasons) {
+      let target = source.seasons.get(seasonNumber);
+      if (!target) { target = new Map(); source.seasons.set(seasonNumber, target); }
+      for (const [number, episode] of episodes) if (!target.has(number)) target.set(number, episode);
     }
-    for (const episode of episodes) {
-      if (!source.episodes.has(episode.number)) source.episodes.set(episode.number, episode);
-    }
+    const firstSeasonNumber = [...source.seasons.keys()].sort((a, b) => a - b)[0];
+    for (const [number, episode] of source.seasons.get(firstSeasonNumber) ?? []) if (!source.episodes.has(number)) source.episodes.set(number, episode);
   }
 
   return json({
     sources: [...sources.values()]
-      .map((source) => ({ id: source.id, title: source.title, episodeCount: source.episodes.size, episodes: [...source.episodes.values()].sort((a, b) => a.number - b.number) }))
+      .map((source) => {
+        const seasons = [...source.seasons.entries()].sort(([a], [b]) => a - b).map(([number, episodes]) => ({ number, episodes: [...episodes.values()].sort((a, b) => a.number - b.number) }));
+        return { id: source.id, title: source.title, episodeCount: seasons[0]?.episodes.length ?? source.episodes.size, episodes: seasons[0]?.episodes ?? [...source.episodes.values()].sort((a, b) => a.number - b.number), ...(worldArtId && seasons.length ? { seasons } : {}) };
+      })
       .sort((a, b) => a.title.localeCompare(b.title, "ru")),
   });
 }
