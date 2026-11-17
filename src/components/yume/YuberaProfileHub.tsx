@@ -196,11 +196,30 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, onSettings, sett
 
   const viewPublicProfile = async (id: string) => {
     try {
+      if (id === profile?.id) { changeScreen("home"); return; }
+      const response = await fetch(`/api/yubera/community?action=profile&userId=${encodeURIComponent(id)}`, { credentials: "same-origin", cache: "no-store" });
+      const data = await response.json().catch(() => ({})) as {profile?:ProfileData;collections?:Collection[];error?:string};
+      if (response.ok && data.profile) {
+        setPublicProfileReturnScreen(screen);
+        setBioSheet(null);
+        setPublicProfile(data.profile);
+        setPublicCollections(Array.isArray(data.collections) ? data.collections : []);
+        setAdminProfile(null);
+        if (profile?.isAdmin) {
+          const adminResponse=await fetch("/api/admin/yubera-plus?userId="+encodeURIComponent(id),{credentials:"same-origin",cache:"no-store"});
+          const adminData=await adminResponse.json().catch(()=>({})) as {target?:typeof adminProfile};
+          if(adminResponse.ok&&adminData.target)setAdminProfile(adminData.target);
+        }
+        changeScreen("public-profile");
+        return;
+      }
       if (profile?.isAdmin) {
         const adminResponse = await fetch("/api/admin/yubera-plus?userId=" + encodeURIComponent(id), { credentials: "same-origin", cache: "no-store" });
         const adminData = await adminResponse.json().catch(() => ({})) as { target?: NonNullable<typeof adminProfile>; error?: string };
         if (adminResponse.ok && adminData.target) {
-          setPublicProfileReturnScreen(screen); setBioSheet(null); setAdminProfile(adminData.target);
+          setPublicProfileReturnScreen(screen);
+          setBioSheet(null);
+          setAdminProfile(adminData.target);
           setPublicProfile({
             id: adminData.target.id, displayName: adminData.target.displayName || adminData.target.username, username: adminData.target.username,
             photoUrl: null, bio: "", avatarFrame: null, visibility: "private", isPlus: adminData.target.isPlus,
@@ -208,27 +227,14 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, onSettings, sett
             xp: { total: adminData.target.xpTotal, level: adminData.target.xpLevel, title: adminData.target.xpTitle },
             support: { level: adminData.target.supportLevel, title: adminData.target.supportTitle, asset: null, total: adminData.target.supportTotal },
           });
-          setPublicCollections([]); changeScreen("public-profile"); return;
+          setPublicCollections([]);
+          changeScreen("public-profile");
+          return;
         }
       }
-      const response = await fetch(`/api/yubera/community?action=profile&userId=${encodeURIComponent(id)}`, { credentials: "same-origin", cache: "no-store" });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Профиль недоступен");
-      if (id === profile?.id) { changeScreen("home"); return; }
-      setPublicProfileReturnScreen(screen); setBioSheet(null); setAdminProfile(null);
-      setPublicProfile(data.profile); setPublicCollections(Array.isArray(data.collections) ? data.collections : []); changeScreen("public-profile");
+      throw new Error(data.error || "Профиль недоступен");
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Профиль недоступен"); }
   };
-  useEffect(() => {
-    if (!adminTargetUserId || !profile?.isAdmin) return;
-    void viewPublicProfile(adminTargetUserId).finally(() => onAdminTargetHandled?.());
-  }, [adminTargetUserId, profile?.isAdmin]);
-  useEffect(() => {
-    if (!adminTargetUserId || !profile?.isAdmin) return;
-    const id = adminTargetUserId;
-    setAdminTargetUserId(null);
-    void viewPublicProfile(id);
-  }, [adminTargetUserId, profile?.isAdmin]);
   const follow = async (id: string, following: boolean) => {
     const result = await request({ action: "follow", userId: id, following });
     if (result) {
