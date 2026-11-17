@@ -147,8 +147,8 @@ async function handleKodik(request: Request): Promise<Response> {
       }
     } else if (result.episodes && typeof result.episodes === "object") {
       entriesBySeason.set(1, Object.entries(result.episodes));
-    } else if (result.link) {
-      entriesBySeason.set(1, [["1", result.link]]);
+    } else {
+      if (result.link) entriesBySeason.set(1, [["1", result.link]]);
     }
     const parsedSeasons = new Map<number, Map<number, Episode>>();
     for (const [seasonNumber, entries] of entriesBySeason) {
