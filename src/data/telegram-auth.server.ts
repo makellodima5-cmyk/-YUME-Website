@@ -581,6 +581,10 @@ export async function handleTelegramHistory(request: Request): Promise<Response>
       return jsonResponse({ deleted: true });
     }
     const episodeNumber = input.episodeNumber;
+    const seasonNumber = input.seasonNumber === undefined || input.seasonNumber === null ? null : input.seasonNumber;
+    if (seasonNumber !== null && (typeof seasonNumber !== "number" || !Number.isInteger(seasonNumber) || seasonNumber < 1 || seasonNumber > 100)) {
+      return jsonResponse({ error: "invalid_season_number" }, 400);
+    }
     if (input.event === "progress" || input.event === "completed") {
       if (typeof episodeNumber !== "number" || !Number.isInteger(episodeNumber) || episodeNumber < 1 || episodeNumber > 10_000) {
         return jsonResponse({ error: "invalid_episode_number" }, 400);
@@ -605,7 +609,7 @@ export async function handleTelegramHistory(request: Request): Promise<Response>
         : Math.floor((watchedSeconds as number) * 1000);
       const durationMillis = durationSeconds === null ? 0 : Math.floor(durationSeconds * 1000);
       const now = new Date().toISOString();
-      await db.prepare("INSERT INTO yume_view_history (user_id, anime_id, viewed_at, view_count, episode_number, position_millis, duration_millis, progress_updated_at_epoch_ms) VALUES (?, ?, ?, 1, ?, ?, ?, ?) ON CONFLICT(user_id, anime_id) DO UPDATE SET viewed_at = excluded.viewed_at, view_count = CASE WHEN yume_view_history.episode_number IS NOT excluded.episode_number THEN yume_view_history.view_count + 1 ELSE yume_view_history.view_count END, episode_number = excluded.episode_number, position_millis = excluded.position_millis, duration_millis = excluded.duration_millis, progress_updated_at_epoch_ms = excluded.progress_updated_at_epoch_ms")
+      await db.prepare("undefined")
         .bind(userId, animeId, now, episodeNumber, positionMillis, durationMillis, Date.now()).run();
     await db.prepare("DELETE FROM yume_view_history WHERE user_id = ? AND anime_id NOT IN (SELECT anime_id FROM yume_view_history WHERE user_id = ? ORDER BY viewed_at DESC LIMIT 100)")
         .bind(userId, userId).run();
