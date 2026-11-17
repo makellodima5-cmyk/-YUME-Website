@@ -99,16 +99,8 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [historyCount, setHistoryCount] = useState(0);
   const [profileHubScreen, setProfileHubScreen] = useState("home");
-  useEffect(() => {
-    const handleAdminOpenUser = (event: Event) => {
-      const userId = (event as CustomEvent<{userId?:unknown}>).detail?.userId;
-      if (typeof userId === "string" && userId.length > 0) setAdminTargetUserId(userId);
-    };
-    window.addEventListener("yume-admin-open-user", handleAdminOpenUser);
-    return () => window.removeEventListener("yume-admin-open-user", handleAdminOpenUser);
-  }, []);
 
-  const [adminTargetUserId, setAdminTargetUserId] = useState<string | null>(null);
+
   useEffect(() => {
     let cancelled = false;
     const syncLocalHistory = () => setHistoryCount(new Set(readPlaybackProgress().map(entry => entry.animeId)).size);
@@ -562,8 +554,6 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
         ) : panel === "overview" ? (
           <>
             <YuberaProfileHub
-              adminTargetUserId={adminTargetUserId}
-              onAdminTargetHandled={() => setAdminTargetUserId(null)}
               animeList={animeList}
               onSelect={onSelect}
               onBack={() => { if (window.history.length > 1) window.history.back(); }}
