@@ -101,7 +101,7 @@ describe("Telegram viewing history", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ saved: true, event: "progress" });
     const insert = db.executed.find(statement => statement.sql.includes("INSERT INTO yume_view_history"));
-    expect(insert?.values).toEqual(["user-history-test", "123", expect.any(String), 4, 8000, 1_200_000, expect.any(Number)]);
+    expect(insert?.values).toEqual(["user-history-test", "123", expect.any(String), null, 4, 8000, 1_200_000, expect.any(Number)]);
     expect(db.executed.some(statement => statement.sql.includes("DELETE FROM yume_view_history"))).toBe(true);
   });
 
@@ -163,6 +163,6 @@ describe("Telegram viewing history", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ saved: true, event: "completed" });
     const insert = db.executed.find(statement => statement.sql.includes("INSERT INTO yume_view_history"));
-    expect(insert?.values).toEqual(["user-history-test", "123", expect.any(String), 2, 0, 0, expect.any(Number)]);
+    expect(insert?.values).toEqual(["user-history-test", "123", expect.any(String), null, 2, 0, 0, expect.any(Number)]);
   });
 });

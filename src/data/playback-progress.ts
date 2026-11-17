@@ -4,6 +4,7 @@ export type PlaybackProgressEntry = {
   englishTitle?: string;
   posterUrl?: string;
   episode: number;
+  seasonNumber?: number;
   positionSeconds: number;
   durationSeconds: number | null;
   completed: boolean;
@@ -33,6 +34,7 @@ function normalizeEntry(value: unknown): PlaybackProgressEntry | null {
     ...(typeof item.englishTitle === "string" && item.englishTitle.trim() ? { englishTitle: item.englishTitle.trim().slice(0, 240) } : {}),
     ...(typeof item.posterUrl === "string" && /^https?:\/\//i.test(item.posterUrl) ? { posterUrl: item.posterUrl } : {}),
     episode: item.episode ?? 1,
+    ...(Number.isSafeInteger(item.seasonNumber) && (item.seasonNumber ?? 0) > 0 ? { seasonNumber: item.seasonNumber } : {}),
     positionSeconds: duration === null ? position : Math.min(position, duration),
     durationSeconds: duration,
     completed: item.completed === true || inferredCompleted,
@@ -73,7 +75,7 @@ export function savePlaybackProgress(entry: PlaybackProgressEntry): void {
   const normalized = normalizeEntry(entry);
   if (!normalized) return;
   const current = readPlaybackProgress().filter(
-    (item) => item.animeId !== normalized.animeId || item.episode !== normalized.episode,
+    (item) => item.animeId !== normalized.animeId || item.episode !== normalized.episode || (item.seasonNumber ?? 1) !== (normalized.seasonNumber ?? 1),
   );
   current.unshift(normalized);
   writeProgress(current.slice(0, 500));
@@ -90,7 +92,7 @@ export function removeAnimePlaybackProgress(animeId: string): void {
 /** Marks an episode as completed without discarding its history. */
 export function markPlaybackEpisodeCompleted(entry: Omit<PlaybackProgressEntry, "completed" | "updatedAt">): void {
   const existing = readPlaybackProgress().find(
-    (item) => item.animeId === entry.animeId && item.episode === entry.episode,
+    (item) => item.animeId === entry.animeId && item.episode === entry.episode && (item.seasonNumber ?? 1) === (entry.seasonNumber ?? 1),
   );
   savePlaybackProgress({
     ...existing,
