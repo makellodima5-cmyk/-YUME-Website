@@ -22,7 +22,7 @@ type ProfileData = {
 type Collection = { id: string; title: string; description: string; cover_key: string | null; is_public: number; is_pinned: number; title_count: number; like_count: number; liked: number };
 type CollectionFormSnapshot = { title: string; description: string; cover: string | null; isPublic: boolean; editingCollectionId: string | null };
 type ProfileFormSnapshot = { bio: string; visibility: "public" | "private"; frame: string | null };
-type Props = { animeList: Anime[]; onSelect: (anime: Anime) => void; onBack: () => void; onSettings?: () => void; settingsExpanded?: boolean; onLegal?: () => void; onAbout?: () => void; onAdmin?: () => void; onSupport?: () => void; onAccount?: () => void; onScreenChange?: (screen: Screen) => void; adminTargetUserId?: string | null; onAdminTargetHandled?: () => void };
+type Props = { animeList: Anime[]; onSelect: (anime: Anime) => void; onBack: () => void; onSettings?: () => void; settingsExpanded?: boolean; onLegal?: () => void; onAbout?: () => void; onAdmin?: () => void; onSupport?: () => void; onAccount?: () => void; onScreenChange?: (screen: Screen) => void };
 
 const covers = [
   "YUBERA_Collection_Cover_Action.webp",
@@ -82,7 +82,7 @@ function formatCollectionTitleCount(value: number): string {
   return `${value} ${word}`;
 }
 
-export function YuberaProfileHub({ animeList, onSelect, onBack, onSettings, settingsExpanded = false, onLegal, onAbout, onAdmin, onSupport, onAccount, onScreenChange, adminTargetUserId, onAdminTargetHandled }: Props) {
+export function YuberaProfileHub({ animeList, onSelect, onBack, onSettings, settingsExpanded = false, onLegal, onAbout, onAdmin, onSupport, onAccount, onScreenChange }: Props) {
   const [screen, setScreen] = useState<Screen>("home");
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [collections, setCollections] = useState<Collection[]>([]);
@@ -115,7 +115,6 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, onSettings, sett
   const [animeSearch, setAnimeSearch] = useState("");
 
   const [publicProfile, setPublicProfile] = useState<ProfileData | null>(null);
-  const [adminProfile, setAdminProfile] = useState<{id:string;username:string;displayName:string;xpTotal:number;supportTotal:number;xpLevel:number;xpTitle:string;supportLevel:number;supportTitle:string;xpOverride:number|null;supportOverride:number|null;automaticXpLevel:number;automaticSupportLevel:number;isPlus:boolean;plusExpiresAt:number|null} | null>(null);
   const [adminProfile, setAdminProfile] = useState<{id:string;username:string;displayName:string;xpTotal:number;supportTotal:number;xpLevel:number;xpTitle:string;supportLevel:number;supportTitle:string;xpOverride:number|null;supportOverride:number|null;automaticXpLevel:number;automaticSupportLevel:number;isPlus:boolean;plusExpiresAt:number|null} | null>(null);
   const [publicCollections, setPublicCollections] = useState<Collection[]>([]);
   const [likeBusyCollectionId, setLikeBusyCollectionId] = useState<string | null>(null);
