@@ -122,14 +122,7 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, onSettings, sett
   const [donationOpen, setDonationOpen] = useState(false);
 
 
-  useEffect(() => {
-    const handleAdminOpenUser = (event: Event) => {
-      const userId = (event as CustomEvent<{userId?: unknown}>).detail?.userId;
-      if (typeof userId === "string" && userId.length > 0) void viewPublicProfile(userId);
-    };
-    window.addEventListener("yume-admin-open-user", handleAdminOpenUser);
-    return () => window.removeEventListener("yume-admin-open-user", handleAdminOpenUser);
-  }, [profile?.id, profile?.isAdmin, screen]);
+
   useEffect(() => {
     if (!bioSheet) return;
     const previousOverflow = document.body.style.overflow;
@@ -194,6 +187,14 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, onSettings, sett
   const pinned = orderedCollections.filter(item => item.is_pinned);
   const rest = orderedCollections.filter(item => !item.is_pinned);
 
+  useEffect(() => {
+    const handleAdminOpenUser = (event: Event) => {
+      const userId = (event as CustomEvent<{userId?: unknown}>).detail?.userId;
+      if (typeof userId === "string" && userId.length > 0) void viewPublicProfile(userId);
+    };
+    window.addEventListener("yume-admin-open-user", handleAdminOpenUser);
+    return () => window.removeEventListener("yume-admin-open-user", handleAdminOpenUser);
+  }, [profile?.id, profile?.isAdmin, screen]);
   const viewPublicProfile = async (id: string) => {
     try {
       if (id === profile?.id) { changeScreen("home"); return; }
