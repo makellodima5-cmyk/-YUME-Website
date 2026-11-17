@@ -55,6 +55,10 @@ describe("YUBERA Plus admin grants",()=>{
   expect(panel).toContain("Цена в Telegram Stars");
   expect(panel).toContain("Plus operation history");
   expect(panel).toContain("История операций Plus");
+  expect(panel).toContain("totalUsers");
+  expect(panel).toContain("max-h-64");
+  expect(panel).toContain("loadUsers(usersOffset,true)");
+  expect(panel).toContain("users=1&limit=10&offset=");
  });
  it("exposes the selected private user through the admin-only profile lookup and renders per-profile controls",async()=>{
   const [server,hub]=await Promise.all([
