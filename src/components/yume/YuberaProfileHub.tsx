@@ -4,7 +4,6 @@ import { TelegramStarsDonation } from "./TelegramStarsDonation";
 import { getTelegramWebApp } from "@/lib/telegram-mini-app";
 import { YuberaPlusPanel } from "./YuberaPlusPanel";
 import { YuberaFriendsPanel } from "./YuberaFriendsPanel";
-import { YuberaPlusAdminPanel } from "./YuberaPlusAdminPanel";
 import { TelegramAvatarImage } from "./TelegramAvatarImage";
 import type { Anime } from "@/data/anime";
 import { YUBERA_SUPPORT_LEVELS, YUBERA_XP_LEVELS, YUBERA_XP_REWARDS, YUBERA_XP_RULES } from "@/data/yubera-config";
