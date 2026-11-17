@@ -121,14 +121,7 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, onSettings, sett
   const [likeBusyCollectionId, setLikeBusyCollectionId] = useState<string | null>(null);
   const [donationOpen, setDonationOpen] = useState(false);
 
-  useEffect(() => {
-    const handleAdminOpenUser = (event: Event) => {
-      const userId = (event as CustomEvent<{userId?: unknown}>).detail?.userId;
-      if (typeof userId === "string" && userId.length > 0) setAdminTargetUserId(userId);
-    };
-    window.addEventListener("yume-admin-open-user", handleAdminOpenUser);
-    return () => window.removeEventListener("yume-admin-open-user", handleAdminOpenUser);
-  }, []);
+
   useEffect(() => {
     if (!bioSheet) return;
     const previousOverflow = document.body.style.overflow;
