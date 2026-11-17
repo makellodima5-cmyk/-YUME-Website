@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   getTelegramWebApp,
   initializeTelegramMiniApp,
+  requestTelegramFullscreen,
+  exitTelegramFullscreen,
   telegramHapticImpact,
   telegramHapticNotification,
   telegramHapticSelection,
@@ -56,6 +58,23 @@ describe("Telegram Mini App haptics", () => {
     expect(() => telegramHapticImpact()).not.toThrow();
     expect(() => telegramHapticSelection()).not.toThrow();
     expect(() => telegramHapticNotification("warning")).not.toThrow();
+  });
+
+  it("requests and exits fullscreen only through explicit calls", () => {
+    const webApp = { ...mockWebApp(), requestFullscreen: vi.fn(), exitFullscreen: vi.fn() };
+    window.Telegram = { WebApp: webApp };
+
+    expect(requestTelegramFullscreen()).toBe(true);
+    expect(exitTelegramFullscreen()).toBe(true);
+    expect(webApp.requestFullscreen).toHaveBeenCalledTimes(1);
+    expect(webApp.exitFullscreen).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not request fullscreen automatically during initialization", () => {
+    const webApp = { ...mockWebApp(), requestFullscreen: vi.fn() };
+    window.Telegram = { WebApp: webApp };
+    initializeTelegramMiniApp();
+    expect(webApp.requestFullscreen).not.toHaveBeenCalled();
   });
 
   it("keeps Mini App initialization and cleanup working alongside haptic support", () => {

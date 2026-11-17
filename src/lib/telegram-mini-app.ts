@@ -35,6 +35,7 @@ export interface TelegramWebApp {
   disableVerticalSwipes?(): void;
   /** Telegram Bot API 8.0+. Unsupported clients may throw when this is called. */
   requestFullscreen?(): void;
+  exitFullscreen?(): void;
   HapticFeedback?: {
     impactOccurred(style: "light" | "medium" | "heavy" | "rigid" | "soft"): void;
     notificationOccurred(type: "error" | "success" | "warning"): void;
@@ -101,6 +102,32 @@ export function getTelegramWebApp(): TelegramWebApp | null {
   return window.Telegram?.WebApp ?? null;
 }
 
+/** Request Telegram Mini App fullscreen from a direct user interaction. */
+export function requestTelegramFullscreen(): boolean {
+  const webApp = getTelegramWebApp();
+  if (!webApp?.requestFullscreen) return false;
+  try {
+    webApp.requestFullscreen();
+    return true;
+  } catch (error) {
+    console.warn("[YUME][TELEGRAM] Fullscreen request failed.", error);
+    return false;
+  }
+}
+
+/** Exit Telegram Mini App fullscreen when the client supports it. */
+export function exitTelegramFullscreen(): boolean {
+  const webApp = getTelegramWebApp();
+  if (!webApp?.exitFullscreen) return false;
+  try {
+    webApp.exitFullscreen();
+    return true;
+  } catch (error) {
+    console.warn("[YUME][TELEGRAM] Exiting fullscreen failed.", error);
+    return false;
+  }
+}
+
 export function initializeTelegramMiniApp(): (() => void) | undefined {
   const webApp = getTelegramWebApp();
   if (!webApp) return;
@@ -111,9 +138,6 @@ export function initializeTelegramMiniApp(): (() => void) | undefined {
   try { webApp.ready(); } catch (error) { console.warn('[YUME][TELEGRAM] ready() is unavailable.', error); }
   try { webApp.expand(); } catch (error) { console.warn('[YUME][TELEGRAM] expand() is unavailable.', error); }
   try { webApp.disableVerticalSwipes?.(); } catch (error) { console.warn('[YUME][TELEGRAM] disableVerticalSwipes() is unavailable.', error); }
-  // requestFullscreen is available in newer Telegram clients (Bot API 8.0+).
-  // Older clients keep the expanded viewport; failure here is intentionally non-fatal.
-  try { webApp.requestFullscreen?.(); } catch (error) { console.warn('[YUME][TELEGRAM] Fullscreen mode is unavailable in this client.', error); }
   setInsetVariables(webApp);
 
   const refreshViewport = () => setInsetVariables(webApp);
