@@ -169,9 +169,10 @@ function AnimeDetailPage() {
   }, [anime?.id, anime?.status, anime?.episodes, anime?.episodesAired]);
 
 
-  const [kodikSources, setKodikSources] = useState<Array<{ id: string; title: string; episodes: Array<{ number: number; title: string; link: string }> }>>([]);
+  const [kodikSources, setKodikSources] = useState<Array<{ id: string; title: string; episodes: Array<{ number: number; title: string; link: string }>; seasons?: Array<{ number: number; episodeCount: number; episodes: Array<{ number: number; title: string; link: string }> }> }>>([]);
   const [kodikTranslationId, setKodikTranslationId] = useState("");
   const [kodikEpisode, setKodikEpisode] = useState(1);
+  const [kodikSeason, setKodikSeason] = useState(1);
   const [resumeTargetEpisode, setResumeTargetEpisode] = useState<number | null>(null);
   const [resumeTargetSeconds, setResumeTargetSeconds] = useState(0);
   const [kodikError, setKodikError] = useState("");
@@ -213,11 +214,12 @@ function AnimeDetailPage() {
     setKodikSources([]);
     setKodikTranslationId("");
     setKodikEpisode(1);
+    setKodikSeason(1);
     setKodikError("");
     setKodikLoading(true);
     fetch("/api/kodik?animeId=" + encodeURIComponent(animeId), { credentials: "same-origin", cache: "no-store", headers: { Accept: "application/json" } })
       .then(async (response) => {
-        const result = await response.json().catch(() => ({})) as { sources?: Array<{ id: string; title: string; episodes: Array<{ number: number; title: string; link: string }> }>; error?: string };
+        const result = await response.json().catch(() => ({})) as { sources?: Array<{ id: string; title: string; episodes: Array<{ number: number; title: string; link: string }>; seasons?: Array<{ number: number; episodeCount: number; episodes: Array<{ number: number; title: string; link: string }> }> }>; error?: string };
         if (!response.ok) throw new Error(result.error || "Kodik API request failed");
         if (cancelled) return;
         const sources = Array.isArray(result.sources) ? result.sources : [];
@@ -225,16 +227,22 @@ function AnimeDetailPage() {
         setKodikLoading(false);
         const params = new URLSearchParams(window.location.search);
         const requestedEpisode = Number(params.get("episode"));
+        const requestedSeason = Number(params.get("season"));
         const requestedResume = Number(params.get("resume"));
         const requestedTranslation = params.get("translation");
-        const matchingSource = sources.find((source) => source.id === requestedTranslation && (!Number.isInteger(requestedEpisode) || requestedEpisode <= 0 || source.episodes.some((episode) => episode.number === requestedEpisode)))
+        const matchingSource = sources.find((source) => source.id === requestedTranslation && (!Number.isInteger(requestedEpisode) || requestedEpisode <= 0 || (source.seasons?.some((season) => season.number === requestedSeason && season.episodes.some((episode) => episode.number === requestedEpisode)) ?? source.episodes.some((episode) => episode.number === requestedEpisode))))
           ?? (Number.isInteger(requestedEpisode) && requestedEpisode > 0
-            ? sources.find((source) => source.episodes.some((episode) => episode.number === requestedEpisode))
+            ? sources.find((source) => (source.seasons?.some((season) => season.episodes.some((episode) => episode.number === requestedEpisode)) ?? source.episodes.some((episode) => episode.number === requestedEpisode)))
             : undefined)
           ?? sources[0];
-        const matchingEpisode = matchingSource?.episodes.find((episode) => episode.number === requestedEpisode);
+        const matchingSeason = matchingSource?.seasons?.find((season) => season.number === requestedSeason)
+          ?? matchingSource?.seasons?.find((season) => season.episodes.some((episode) => episode.number === requestedEpisode))
+          ?? matchingSource?.seasons?.[0];
+        const matchingEpisodes = matchingSeason?.episodes ?? matchingSource?.episodes ?? [];
+        const matchingEpisode = matchingEpisodes.find((episode) => episode.number === requestedEpisode);
         setKodikTranslationId(matchingSource?.id ?? "");
-        setKodikEpisode(matchingEpisode?.number ?? matchingSource?.episodes[0]?.number ?? 1);
+        setKodikSeason(matchingSeason?.number ?? 1);
+        setKodikEpisode(matchingEpisode?.number ?? matchingEpisodes[0]?.number ?? 1);
         setResumeTargetEpisode(matchingEpisode ? matchingEpisode.number : null);
         setResumeTargetSeconds(Number.isFinite(requestedResume) && requestedResume > 0 ? Math.floor(requestedResume) : 0);
         // Empty successful responses are rendered as the dedicated no-episodes state.
@@ -249,7 +257,11 @@ function AnimeDetailPage() {
   }, [watchMode, animeId, anime, language]);
 
   const selectedKodikSource = kodikSources.find((source) => source.id === kodikTranslationId);
-  const selectedKodikEpisode = selectedKodikSource?.episodes.find((episode) => episode.number === kodikEpisode);
+  const isWorldArtSeasoned = anime?.catalogSource === "kodik" && !anime.shikimoriId;
+  const availableKodikSeasons = selectedKodikSource?.seasons ?? [];
+  const selectedKodikSeason = availableKodikSeasons.find((season) => season.number === kodikSeason) ?? availableKodikSeasons[0];
+  const visibleKodikEpisodes = isWorldArtSeasoned ? (selectedKodikSeason?.episodes ?? []) : (selectedKodikSource?.episodes ?? []);
+  const selectedKodikEpisode = visibleKodikEpisodes.find((episode) => episode.number === kodikEpisode);
   const kodikEmbedUrl = selectedKodikEpisode?.link ? (selectedKodikEpisode.link.startsWith("//") ? "https:" + selectedKodikEpisode.link : selectedKodikEpisode.link) : "";
 
   useEffect(() => {
@@ -302,7 +314,7 @@ function AnimeDetailPage() {
           const response = await fetch("/api/yubera/episode-watch", {
             method: "POST", credentials: "same-origin", cache: "no-store",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ action: "start", animeId, episodeNumber: kodikEpisode, durationSeconds: duration, currentTime: position }),
+            body: JSON.stringify({ action: "start", animeId, episodeNumber: kodikEpisode, seasonNumber: isWorldArtSeasoned ? kodikSeason : null, durationSeconds: duration, currentTime: position }),
           });
           const payload = await response.json().catch(() => ({})) as { sessionId?: string };
           if (response.ok && typeof payload.sessionId === "string") {
@@ -340,6 +352,7 @@ function AnimeDetailPage() {
         ...(anime.englishTitle ? { englishTitle: anime.englishTitle } : {}),
         ...((anime.bannerUrl || anime.posterUrl) ? { posterUrl: anime.bannerUrl || anime.posterUrl } : {}),
         episode: kodikEpisode,
+        ...(isWorldArtSeasoned ? { seasonNumber: kodikSeason } : {}),
       };
       if (playbackEvent.type === "ended") {
         if (lastKnownDuration !== null) void syncServerWatch(lastSavedPosition, lastKnownDuration);
@@ -359,6 +372,7 @@ function AnimeDetailPage() {
               animeId,
               event: "completed",
               episodeNumber: kodikEpisode,
+              ...(isWorldArtSeasoned ? { seasonNumber: kodikSeason } : {}),
               watchedSeconds: Math.max(0, lastSavedPosition),
               durationSeconds: lastKnownDuration,
             }),
@@ -378,7 +392,7 @@ function AnimeDetailPage() {
       const completed = completionDuration !== null && watchedSeconds / completionDuration >= 0.95;
       if (completed) {
         const alreadyCompleted = readPlaybackProgress().some((entry) =>
-          entry.animeId === animeId && entry.episode === kodikEpisode && entry.completed,
+          entry.animeId === animeId && entry.episode === kodikEpisode && (entry.seasonNumber ?? 1) === (isWorldArtSeasoned ? kodikSeason : 1) && entry.completed,
         );
         if (!alreadyCompleted) {
           markPlaybackEpisodeCompleted({ ...progressEntry, positionSeconds: watchedSeconds, durationSeconds });
@@ -809,7 +823,7 @@ function AnimeDetailPage() {
                       <span className="relative block">
                         <select id="kodik-translation" value={kodikTranslationId} onChange={(event) => { const next = kodikSources.find(source => source.id === event.target.value); setKodikTranslationId(event.target.value); setKodikEpisode(next?.episodes.some(episode => episode.number === kodikEpisode) ? kodikEpisode : (next?.episodes[0]?.number ?? 1)); }} disabled={!kodikSources.length} className="w-full appearance-none rounded-full border border-border bg-secondary px-4 py-3 pr-10 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-60">
                           {!kodikSources.length && <option value="">{language === "en" ? "Loading voice-overs…" : "Загрузка озвучек…"}</option>}
-                          {kodikSources.map(source => <option key={source.id} value={source.id}>{source.title} ({source.episodes.length}.эп)</option>)}
+                          {kodikSources.map(source => <option key={source.id} value={source.id}>{source.title} ({source.episodeCount ?? source.episodes.length} эп.)</option>)}
                         </select>
                         <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                       </span>
@@ -875,9 +889,9 @@ function AnimeDetailPage() {
                             : "Вы можете продолжить просмотр в браузере — там эта функция работает корректно."}</p>
                           <a
                             href={(() => {
-                              const params = new URLSearchParams({ watch: "1", episode: String(kodikEpisode) });
+                              const params = new URLSearchParams({ watch: "1", episode: String(kodikEpisode) });\n                              if (isWorldArtSeasoned) params.set("season", String(kodikSeason));
                               if (kodikTranslationId) params.set("translation", kodikTranslationId);
-                              const progress = episodeProgress.find((entry) => entry.episode === kodikEpisode && !entry.completed);
+                              const progress = episodeProgress.find((entry) => entry.episode === kodikEpisode && (entry.seasonNumber ?? 1) === (isWorldArtSeasoned ? kodikSeason : 1) && !entry.completed);
                               if (progress && progress.positionSeconds > 0) params.set("resume", String(Math.floor(progress.positionSeconds)));
                               return `/anime/${encodeURIComponent(animeId)}?${params.toString()}`;
                             })()}
