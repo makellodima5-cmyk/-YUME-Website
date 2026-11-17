@@ -99,6 +99,8 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [historyCount, setHistoryCount] = useState(0);
   const [profileHubScreen, setProfileHubScreen] = useState("home");
+
+
   useEffect(() => {
     let cancelled = false;
     const syncLocalHistory = () => setHistoryCount(new Set(readPlaybackProgress().map(entry => entry.animeId)).size);

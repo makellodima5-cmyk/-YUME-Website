@@ -28,11 +28,11 @@ describe("YUBERA Plus admin grants",()=>{
   expect(normalizePlusGrantUsername("@")).toBeNull();
   expect(normalizePlusGrantUsername(null)).toBeNull();
  });
- it("limits manual grant durations to whole days from 1 to 3650",()=>{
+ it("limits manual grant durations to whole days from 1 to one million",()=>{
   expect(isValidPlusGrantDays(1)).toBe(true);
-  expect(isValidPlusGrantDays(3650)).toBe(true);
+  expect(isValidPlusGrantDays(1000000)).toBe(true);
   expect(isValidPlusGrantDays(0)).toBe(false);
-  expect(isValidPlusGrantDays(3651)).toBe(false);
+  expect(isValidPlusGrantDays(1000001)).toBe(false);
   expect(isValidPlusGrantDays(30.5)).toBe(false);
   expect(isValidPlusGrantDays("30")).toBe(false);
  });
@@ -45,13 +45,32 @@ describe("YUBERA Plus admin grants",()=>{
   expect(source).toContain("plus_granted_by_admin");
   expect(source).toContain("d.batch([");
  });
- it("shows the username grant form and reports successful grants in the admin panel",async()=>{
+ it("shows one username search and keeps price settings with the Plus operation history",async()=>{
   const panel=await import("node:fs/promises").then(m=>m.readFile("src/components/yume/YuberaPlusAdminPanel.tsx","utf8"));
-  expect(panel).toContain("grant-by-username");
+  expect(panel).toContain("plus-user-search-title");
   expect(panel).toContain("Telegram username");
-  expect(panel).toContain("Выдать Plus");
-  expect(panel).toContain("Plus granted");
+  expect(panel).toContain("onOpenUser");
+  expect(panel).not.toContain("grant-by-username");
+  expect(panel).not.toContain("set-user-level-overrides");
+  expect(panel).toContain("Цена в Telegram Stars");
+  expect(panel).toContain("Plus operation history");
   expect(panel).toContain("История операций Plus");
+  expect(panel).toContain("totalUsers");
+  expect(panel).toContain("max-h-64");
+  expect(panel).toContain("loadUsers(usersOffset,true)");
+  expect(panel).toContain("users=1&limit=10&offset=");
+ });
+ it("exposes the selected private user through the admin-only profile lookup and renders per-profile controls",async()=>{
+  const [server,hub]=await Promise.all([
+   import("node:fs/promises").then(m=>m.readFile("src/data/yubera-plus.server.ts","utf8")),
+   import("node:fs/promises").then(m=>m.readFile("src/components/yume/YuberaProfileHub.tsx","utf8")),
+  ]);
+  expect(server).toContain("profileIdParam!==null");
+  expect(server).toContain("if(!await hasAdminPasswordSession(r,e))");
+  expect(hub).toContain("Администрирование пользователя");
+  expect(hub).toContain("function AdminUserControls");
+  expect(hub).toContain("grant-by-username");
+  expect(hub).toContain("set-user-level-overrides");
  });
 });
 

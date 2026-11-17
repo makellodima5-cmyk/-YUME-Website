@@ -2528,7 +2528,7 @@ function Index() {
                 </div>
               </details>
 
-              <YuberaPlusAdminPanel language={language} />
+              <YuberaPlusAdminPanel language={language} onOpenUser={userId=>{setView("profile");window.setTimeout(()=>window.dispatchEvent(new CustomEvent("yume-admin-open-user",{detail:{userId}})),0);}} />
 
               </>
             ) : (

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { ArrowLeft, Bookmark, Check, ChevronRight, ChevronDown, Crown, Eye, FileText, Globe2, Heart, Image as ImageIcon, Info, Layers3, LifeBuoy, LockKeyhole, LogOut, Pencil, Pin, Plus, Search, Settings, Shield, ShieldCheck, Sparkles, Star, Trash2, Type, Users, X } from "lucide-react";
 import { TelegramStarsDonation } from "./TelegramStarsDonation";
 import { getTelegramWebApp } from "@/lib/telegram-mini-app";
@@ -16,6 +16,7 @@ type ProfileData = {
   xp: { total?: number; level: number; title: string; nextLevel?: number | null; nextTitle?: string | null; nextThreshold?: number | null; progress?: number; remaining?: number };
   support: { level: number; title: string; asset: string | null; total?: number; nextThreshold?: number | null; progress?: number; remaining?: number };
   stats?: { favorites: number; watchlist: number; history: number } | null;
+  adminControls?: boolean;
 };
 type Collection = { id: string; title: string; description: string; cover_key: string | null; is_public: number; is_pinned: number; title_count: number; like_count: number; liked: number };
 type CollectionFormSnapshot = { title: string; description: string; cover: string | null; isPublic: boolean; editingCollectionId: string | null };
@@ -58,6 +59,18 @@ function YuberaCard({ children, className = "" }: { children: React.ReactNode; c
   return <section className={`rounded-[18px] border border-white/10 bg-[#17181e] p-3 ${className}`}>{children}</section>;
 }
 
+function AdminUserControls({user,onRefresh}:{user:{id:string;username:string;isPlus:boolean;plusExpiresAt:number|null;xpOverride:number|null;supportOverride:number|null;xpLevel:number;supportLevel:number};onRefresh:()=>Promise<void>}){
+ const [days,setDays]=useState("30"),[busy,setBusy]=useState(false),[levelBusy,setLevelBusy]=useState(false),[error,setError]=useState(""),[message,setMessage]=useState("");
+ const [xp,setXp]=useState(user.xpOverride===null?"":String(user.xpOverride)),[support,setSupport]=useState(user.supportOverride===null?"":String(user.supportOverride));
+ const submitPlus=async(e:FormEvent<HTMLFormElement>)=>{e.preventDefault();const amount=Number(days);if(!Number.isSafeInteger(amount)||amount<1||amount>1000000){setError("Срок должен быть целым числом от 1 до 1 000 000 дней.");return;}setBusy(true);setError("");setMessage("");try{const response=await fetch("/api/admin/yubera-plus",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"grant-by-username",username:user.username,days:amount})});const result=await response.json().catch(()=>({})) as {granted?:boolean;expiresAt?:number;error?:string};if(!response.ok||result.granted!==true||typeof result.expiresAt!=="number")throw new Error(result.error==="invalid_duration"?"Некорректный срок выдачи.":result.error??"Не удалось выдать Plus.");setMessage("YUBERA Plus выдан на "+amount+" дн. До "+new Date(result.expiresAt).toLocaleString("ru-RU")+".");await onRefresh();}catch(error){setError(error instanceof Error?error.message:"Ошибка выдачи Plus.");}finally{setBusy(false);}};
+ const submitLevels=async(e:FormEvent<HTMLFormElement>)=>{e.preventDefault();setLevelBusy(true);setError("");setMessage("");try{const response=await fetch("/api/admin/yubera-plus",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"set-user-level-overrides",username:user.username,xpLevel:xp===""?null:Number(xp),supportLevel:support===""?null:Number(support)})});const result=await response.json().catch(()=>({})) as {saved?:boolean;error?:string};if(!response.ok||result.saved!==true)throw new Error(result.error??"Не удалось сохранить назначения.");setMessage("Уровень и статус сохранены.");await onRefresh();}catch(error){setError(error instanceof Error?error.message:"Ошибка сохранения.");}finally{setLevelBusy(false);}};
+ return <div className="space-y-4">
+  <section><h4 className="mb-2 flex items-center gap-2 text-sm font-semibold"><Crown className="h-4 w-4 text-[#FF704F]"/>YUBERA Plus</h4>{user.isPlus&&user.plusExpiresAt&&<p className="mb-2 text-xs text-emerald-300">Подписка активна до {new Date(user.plusExpiresAt).toLocaleString("ru-RU")}</p>}<form onSubmit={submitPlus} className="grid gap-2 sm:grid-cols-[1fr_auto]"><label className="grid gap-1 text-sm">Срок подписки, дней<input type="number" min="1" max="1000000" step="1" value={days} onChange={e=>setDays(e.target.value)} required className="min-h-11 rounded-xl border border-white/15 bg-[#191a20] px-3 text-base"/></label><button disabled={busy} className="inline-flex min-h-11 items-center justify-center gap-2 self-end rounded-xl bg-[#FF6847] px-4 py-2 text-sm font-semibold disabled:opacity-50"><Crown className="h-4 w-4"/>{busy?"Выдаём…":"Выдать Plus"}</button></form><p className="mt-1 text-xs text-white/45">При активном Plus новый срок добавляется к текущей дате окончания.</p></section>
+  <div className="border-t border-white/10"/>
+  <section><h4 className="mb-2 flex items-center gap-2 text-sm font-semibold"><ShieldCheck className="h-4 w-4 text-[#FF704F]"/>Назначение уровня и статуса</h4><form onSubmit={submitLevels} className="grid gap-3"><label className="grid gap-1 text-sm">Уровень YUBERA<select value={xp} onChange={e=>setXp(e.target.value)} className="min-h-11 rounded-xl border border-white/15 bg-[#191a20] px-3 text-base"><option value="">Автоматически по XP</option>{YUBERA_XP_LEVELS.map(level=><option key={level.level} value={level.level}>{level.level}. {level.title}</option>)}</select></label><label className="grid gap-1 text-sm">Статус поддержки<select value={support} onChange={e=>setSupport(e.target.value)} className="min-h-11 rounded-xl border border-white/15 bg-[#191a20] px-3 text-base"><option value="">Автоматически по пожертвованиям</option>{YUBERA_SUPPORT_LEVELS.map(level=><option key={level.level} value={level.level}>{level.level===0?"Без статуса":level.title}</option>)}</select></label><p className="text-xs text-white/45">Автоматический режим возвращает расчёт по XP и пожертвованиям. Ручное назначение не меняет историю пользователя.</p><button disabled={levelBusy} className="min-h-11 rounded-xl bg-[#FF6847] px-4 py-2 text-sm font-semibold disabled:opacity-50">{levelBusy?"Сохраняем…":"Выдать выбранные назначения"}</button></form></section>
+  {message&&<p role="status" className="text-sm text-emerald-300">{message}</p>}{error&&<p role="alert" className="break-words text-sm text-red-300">{error}</p>}
+ </div>;
+}
 function formatCollectionTitleCount(value: number): string {
   const remainder100 = value % 100;
   const remainder10 = value % 10;
@@ -101,9 +114,12 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, onSettings, sett
   const [animeSearch, setAnimeSearch] = useState("");
 
   const [publicProfile, setPublicProfile] = useState<ProfileData | null>(null);
+  const [adminProfile, setAdminProfile] = useState<{id:string;username:string;displayName:string;xpTotal:number;supportTotal:number;xpLevel:number;xpTitle:string;supportLevel:number;supportTitle:string;xpOverride:number|null;supportOverride:number|null;automaticXpLevel:number;automaticSupportLevel:number;isPlus:boolean;plusExpiresAt:number|null} | null>(null);
   const [publicCollections, setPublicCollections] = useState<Collection[]>([]);
   const [likeBusyCollectionId, setLikeBusyCollectionId] = useState<string | null>(null);
   const [donationOpen, setDonationOpen] = useState(false);
+
+
 
   useEffect(() => {
     if (!bioSheet) return;
@@ -169,17 +185,56 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, onSettings, sett
   const pinned = orderedCollections.filter(item => item.is_pinned);
   const rest = orderedCollections.filter(item => !item.is_pinned);
 
+
   const viewPublicProfile = async (id: string) => {
     try {
-      const response = await fetch(`/api/yubera/community?action=profile&userId=${encodeURIComponent(id)}`, { credentials: "same-origin", cache: "no-store" });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Профиль недоступен");
       if (id === profile?.id) { changeScreen("home"); return; }
-      setPublicProfileReturnScreen(screen);
-      setBioSheet(null);
-      setPublicProfile(data.profile); setPublicCollections(Array.isArray(data.collections) ? data.collections : []); changeScreen("public-profile");
+      const response = await fetch(`/api/yubera/community?action=profile&userId=${encodeURIComponent(id)}`, { credentials: "same-origin", cache: "no-store" });
+      const data = await response.json().catch(() => ({})) as {profile?:ProfileData;collections?:Collection[];error?:string};
+      if (response.ok && data.profile) {
+        setPublicProfileReturnScreen(screen);
+        setBioSheet(null);
+        setPublicProfile(data.profile);
+        setPublicCollections(Array.isArray(data.collections) ? data.collections : []);
+        setAdminProfile(null);
+        if (profile?.isAdmin) {
+          const adminResponse=await fetch("/api/admin/yubera-plus?userId="+encodeURIComponent(id),{credentials:"same-origin",cache:"no-store"});
+          const adminData=await adminResponse.json().catch(()=>({})) as {target?:typeof adminProfile};
+          if(adminResponse.ok&&adminData.target)setAdminProfile(adminData.target);
+        }
+        changeScreen("public-profile");
+        return;
+      }
+      if (profile?.isAdmin) {
+        const adminResponse = await fetch("/api/admin/yubera-plus?userId=" + encodeURIComponent(id), { credentials: "same-origin", cache: "no-store" });
+        const adminData = await adminResponse.json().catch(() => ({})) as { target?: NonNullable<typeof adminProfile>; error?: string };
+        if (adminResponse.ok && adminData.target) {
+          setPublicProfileReturnScreen(screen);
+          setBioSheet(null);
+          setAdminProfile(adminData.target);
+          setPublicProfile({
+            id: adminData.target.id, displayName: adminData.target.displayName || adminData.target.username, username: adminData.target.username,
+            photoUrl: null, bio: "", avatarFrame: null, visibility: "private", isPlus: adminData.target.isPlus,
+            followers: 0, following: 0, publicCollections: 0, publicTitles: 0, collectionLikes: 0,
+            xp: { total: adminData.target.xpTotal, level: adminData.target.xpLevel, title: adminData.target.xpTitle },
+            support: { level: adminData.target.supportLevel, title: adminData.target.supportTitle, asset: null, total: adminData.target.supportTotal },
+          });
+          setPublicCollections([]);
+          changeScreen("public-profile");
+          return;
+        }
+      }
+      throw new Error(data.error || "Профиль недоступен");
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Профиль недоступен"); }
   };
+  useEffect(() => {
+    const handleAdminOpenUser = (event: Event) => {
+      const userId = (event as CustomEvent<{userId?: unknown}>).detail?.userId;
+      if (typeof userId === "string" && userId.length > 0) void viewPublicProfile(userId);
+    };
+    window.addEventListener("yume-admin-open-user", handleAdminOpenUser);
+    return () => window.removeEventListener("yume-admin-open-user", handleAdminOpenUser);
+  }, []);
   const follow = async (id: string, following: boolean) => {
     const result = await request({ action: "follow", userId: id, following });
     if (result) {
@@ -297,7 +352,7 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, onSettings, sett
   const goBack = () => {
     if (screen === "home") onBack();
     else if (screen === "public-collections") changeScreen("public-profile");
-    else if (screen === "public-profile") changeScreen(publicProfileReturnScreen);
+    else if (screen === "public-profile") { setAdminProfile(null); changeScreen(publicProfileReturnScreen); }
     else if (screen === "collection-detail" && !activeCollectionIsOwner) changeScreen(collectionReturnScreen);
     else if (screen === "edit") cancelProfileEdit();
     else if (screen === "create" || screen === "edit-collection") cancelCollectionForm();
@@ -772,6 +827,11 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, onSettings, sett
           </button>
         </div>
       </YuberaCard>
+      {profile?.isAdmin && adminProfile?.id === publicProfile.id && <YuberaCard className="mt-3 border-[#FF704F]/35">
+        <div className="mb-3 flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-[#FF704F]"/><span><b className="block text-sm">Администрирование пользователя</b><span className="text-xs text-white/50">Видно только администраторам</span></span></div>
+        <div className="mb-3 grid grid-cols-2 gap-2"><div className="rounded-xl bg-black/20 p-3"><span className="block text-xs text-white/50">Уровень YUBERA</span><b className="mt-1 block text-sm">{adminProfile.xpTitle}</b><span className="text-xs text-white/45">{adminProfile.xpTotal.toLocaleString("ru-RU")} XP</span></div><div className="rounded-xl bg-black/20 p-3"><span className="block text-xs text-white/50">Статус поддержки</span><b className="mt-1 block text-sm">{adminProfile.supportTitle}</b><span className="text-xs text-white/45">{adminProfile.supportTotal.toLocaleString("ru-RU")} ⭐</span></div></div>
+        <AdminUserControls key={adminProfile.id} user={adminProfile} onRefresh={async()=>{const response=await fetch("/api/admin/yubera-plus?userId="+encodeURIComponent(adminProfile.id),{credentials:"same-origin",cache:"no-store"});const result=await response.json().catch(()=>({})) as {target?:NonNullable<typeof adminProfile>};if(response.ok&&result.target){setAdminProfile(result.target);setPublicProfile(current=>current?{...current,isPlus:result.target!.isPlus,xp:{...current.xp,level:result.target!.xpLevel,title:result.target!.xpTitle},support:{...current.support,level:result.target!.supportLevel,title:result.target!.supportTitle}}:current);}}}/>
+      </YuberaCard>}
       <YuberaCard className="mt-3">
         <div className="mb-2 flex items-center justify-between gap-2">
           <div><h4 className="font-semibold">Публичные подборки</h4><p className="text-xs text-white/45">Подборки, доступные всем пользователям</p></div>
