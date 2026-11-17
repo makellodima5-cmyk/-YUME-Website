@@ -435,6 +435,7 @@ function Index() {
   const [telegramAuthReady, setTelegramAuthReady] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminPasswordConfirmed, setAdminPasswordConfirmed] = useState(false);
+  const [adminSelectedUserId, setAdminSelectedUserId] = useState<string | null>(null);
   const [adminPasswordRequired, setAdminPasswordRequired] = useState(false);
   const [adminPassword, setAdminPassword] = useState("");
   const [adminPasswordBusy, setAdminPasswordBusy] = useState(false);
@@ -2528,7 +2529,7 @@ function Index() {
                 </div>
               </details>
 
-              <YuberaPlusAdminPanel language={language} />
+              <YuberaPlusAdminPanel language={language} onOpenUser={userId=>{setAdminSelectedUserId(userId);setView("profile");}} />
 
               </>
             ) : (
