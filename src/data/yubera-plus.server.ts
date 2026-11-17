@@ -67,6 +67,7 @@ export async function handleAdminYuberaPlus(r:Request):Promise<Response>{
   const url=new URL(r.url);
   const usernameParam=url.searchParams.get("username");
   const profileIdParam=url.searchParams.get("userId");
+  const usersParam=url.searchParams.get("users");
   const resolveTarget=async(query:string,byId:boolean)=>{
    const target=byId
     ? await d.prepare("SELECT id,telegram_username,telegram_first_name,telegram_last_name FROM yume_users WHERE provider='telegram' AND id=? LIMIT 1").bind(query).first<{id:string;telegram_username:string|null;telegram_first_name:string;telegram_last_name:string|null}>()
@@ -84,6 +85,18 @@ export async function handleAdminYuberaPlus(r:Request):Promise<Response>{
    const xpLevel=override?.xp_level??autoXp.level,supportLevel=override?.support_level??autoSupport.level;
    return {id:target.id,username:target.telegram_username??query,displayName:[target.telegram_first_name,target.telegram_last_name].filter(Boolean).join(" "),xpTotal,supportTotal,xpLevel,xpTitle:(YUBERA_XP_LEVELS.find(x=>x.level===xpLevel)??autoXp).title,supportLevel,supportTitle:(YUBERA_SUPPORT_LEVELS.find(x=>x.level===supportLevel)??autoSupport).title,xpOverride:override?.xp_level??null,supportOverride:override?.support_level??null,automaticXpLevel:autoXp.level,automaticSupportLevel:autoSupport.level,isPlus:typeof plus?.expires_at==="number"&&plus.expires_at>Date.now(),plusExpiresAt:plus?.expires_at??null};
   };
+  if(usersParam==="1"){
+   const rawLimit=Number(url.searchParams.get("limit")??10),rawOffset=Number(url.searchParams.get("offset")??0);
+   const limit=Number.isSafeInteger(rawLimit)?Math.min(30,Math.max(1,rawLimit)):10;
+   const offset=Number.isSafeInteger(rawOffset)?Math.max(0,Math.min(1000000,rawOffset)):0;
+   const [count,rows]=await Promise.all([
+    d.prepare("SELECT COUNT(*) AS total FROM yume_users").first<{total:number}>(),
+    d.prepare("SELECT id,telegram_username FROM yume_users WHERE provider='telegram' AND telegram_username IS NOT NULL AND trim(telegram_username)<>'' ORDER BY created_at DESC,rowid DESC LIMIT ? OFFSET ?").bind(limit,offset).all<{id:string;telegram_username:string}>()
+   ]);
+   const targets=await Promise.all((rows.results??[]).map(row=>resolveTarget(row.id,true)));
+   const users=targets.filter((target):target is NonNullable<typeof target>=>target!==null);
+   return json({isAdmin:true,totalUsers:Number(count?.total??0),users,hasMore:offset+rows.results.length<Number(count?.total??0),nextOffset:offset+rows.results.length});
+  }
   if(profileIdParam!==null){const target=await resolveTarget(profileIdParam,true);if(!target)return json({error:"telegram_user_not_found"},404);return json({isAdmin:true,target});}
   if(usernameParam!==null){const username=normalizePlusGrantUsername(usernameParam);if(!username)return json({error:"invalid_username"},400);const target=await resolveTarget(username,false);if(!target)return json({error:"telegram_user_not_found"},404);return json({isAdmin:true,target});}
   const [p,a]=await Promise.all([price(d),d.prepare("SELECT id,action,details_json,created_at FROM yume_plus_audit_log ORDER BY id DESC LIMIT 20").all<{id:number;action:string;details_json:string;created_at:string}>()]);
