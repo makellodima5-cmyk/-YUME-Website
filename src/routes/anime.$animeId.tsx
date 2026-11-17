@@ -177,11 +177,12 @@ function AnimeDetailPage() {
   const [kodikError, setKodikError] = useState("");
   const [kodikLoading, setKodikLoading] = useState(false);
   const [episodeProgress, setEpisodeProgress] = useState<PlaybackProgressEntry[]>([]);
-  const [isTelegramMiniApp, setIsTelegramMiniApp] = useState(false);
+  const [isTelegramMiniApp, setIsTelegramMiniApp] = useState(() => getTelegramWebApp() !== null);
   const [browserHelpExpanded, setBrowserHelpExpanded] = useState(false);
 
   useEffect(() => {
-    setIsTelegramMiniApp(document.documentElement.classList.contains("telegram-mini-app"));
+    // Read the Telegram bridge directly: the root initialization effect may run later.
+    setIsTelegramMiniApp(getTelegramWebApp() !== null);
   }, []);
 
   useEffect(() => {
