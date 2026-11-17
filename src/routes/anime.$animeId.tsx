@@ -269,15 +269,20 @@ function AnimeDetailPage() {
     const frame = document.createElement("iframe");
     frame.id = "kodik-player";
     let playerUrl = kodikEmbedUrl;
-    // Kodik may ignore this parameter on some player versions; the saved position is still retained locally.
-    if (resumeTargetEpisode === kodikEpisode && resumeTargetSeconds > 0) {
-      try {
-        const resumeUrl = new URL(kodikEmbedUrl);
-        resumeUrl.searchParams.set("start_from", String(resumeTargetSeconds));
-        playerUrl = resumeUrl.toString();
-      } catch {
-        // The API already validates Kodik URLs; retain the original URL if parsing fails.
+    try {
+      const playerUrlWithOptions = new URL(kodikEmbedUrl);
+      // Shikimori titles use Yubera's own voice-over and episode selectors.
+      // Hide Kodik's duplicate in-player selectors only for Shikimori imports.
+      // World Art titles retain Kodik's native season selector.
+      const isWorldArtImport = anime?.catalogSource === "kodik" && !anime.shikimoriId;
+      if (!isWorldArtImport) playerUrlWithOptions.searchParams.set("hide_selectors", "true");
+      // Kodik may ignore start_from on some player versions; progress is still retained locally.
+      if (resumeTargetEpisode === kodikEpisode && resumeTargetSeconds > 0) {
+        playerUrlWithOptions.searchParams.set("start_from", String(resumeTargetSeconds));
       }
+      playerUrl = playerUrlWithOptions.toString();
+    } catch {
+      // The API already validates Kodik URLs; retain the original URL if parsing fails.
     }
     frame.src = playerUrl;
     frame.title = (anime ? displayAnimeTitle(anime, language) : "Kodik") + " — " + (language === "en" ? "episode player" : "плеер серий");
