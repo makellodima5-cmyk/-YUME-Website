@@ -416,6 +416,7 @@ describe("YUBERA profile navigation and public profile", () => {
   });
 
   it("keeps the public profile summary, Plus badge, level, support and counters in one non-interactive profile card", async () => {
+    const adminLookup = vi.fn();
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
       if (url.includes("/api/telegram/init-data")) {
@@ -425,7 +426,7 @@ describe("YUBERA profile navigation and public profile", () => {
         return jsonResponse({
           profile: {
             id: "owner-1", displayName: "Owner", username: "owner", photoUrl: null, bio: "",
-            avatarFrame: null, availableSupportFrames: [], visibility: "public", isPlus: false,
+            avatarFrame: null, availableSupportFrames: [], visibility: "public", isPlus: false, isAdmin: true,
             followers: 0, following: 1, publicCollections: 0, publicTitles: 0, collectionLikes: 0,
             xp: { total: 10, level: 1, title: "Начинающий зритель" },
             support: { level: 0, title: "Без статуса", asset: null },
@@ -434,6 +435,7 @@ describe("YUBERA profile navigation and public profile", () => {
           collections: [],
         });
       }
+      if (url.includes("/api/admin/yubera-plus")) { adminLookup(); return jsonResponse({ target: { id: "public-1", username: "public_user", displayName: "Public User", xpTotal: 100, supportTotal: 20, xpLevel: 2, xpTitle: "Любитель аниме", supportLevel: 1, supportTitle: "Союзник", xpOverride: null, supportOverride: null, automaticXpLevel: 2, automaticSupportLevel: 1, isPlus: true, plusExpiresAt: null } }); }
       if (url.includes("action=friends")) {
         return jsonResponse({ users: [{ id: "public-1", telegram_first_name: "Public", telegram_last_name: "User", telegram_username: "public_user", telegram_photo_url: "https://example.com/public.jpg", avatar_frame: null }], total: 1, hasMore: false });
       }
@@ -472,6 +474,8 @@ describe("YUBERA profile navigation and public profile", () => {
     expect(screen.getByText("Публичные подборки")).toBeInTheDocument();
     expect(publicName).toHaveClass("whitespace-nowrap");
     expect(screen.getByText("@public_user")).toHaveClass("whitespace-nowrap");
+    expect(adminLookup).not.toHaveBeenCalled();
+    expect(screen.queryByText("Администрирование пользователя")).not.toBeInTheDocument();
   });
 
   it("keeps collection form fields focused while typing", async () => {
