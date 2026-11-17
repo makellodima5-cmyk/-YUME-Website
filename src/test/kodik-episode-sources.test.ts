@@ -24,3 +24,22 @@ it("exposes an episode count per voice-over in API response mapping", () => {
     { title: "Voice B", label: "Voice B (1.эп)" },
   ]);
 });
+
+it("reads the complete first season from seasons for Shikimori imports", () => {
+  expect(parseKodikEpisodeSources({ results: [
+    {
+      shikimori_id: "64",
+      translation: { id: 17, title: "Voice A" },
+      // Kodik may return a legacy top-level episodes map with only the current
+      // episode while the complete season episode map is under seasons.
+      episodes: { "1": "https://kodik.info/current" },
+      seasons: {
+        "1": { episodes: {
+          "1": "https://kodik.info/1",
+          "2": "https://kodik.info/2",
+          "64": "https://kodik.info/64",
+        } },
+      },
+    },
+  ] }, "64")).toEqual([{ id: "17", title: "Voice A", episodes: [1, 2, 64] }]);
+});
