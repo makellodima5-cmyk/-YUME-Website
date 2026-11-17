@@ -478,6 +478,49 @@ describe("YUBERA profile navigation and public profile", () => {
     expect(screen.queryByText("Администрирование пользователя")).not.toBeInTheDocument();
   });
 
+  it("opens the selected private account in administrator mode instead of returning to the current profile", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/api/telegram/init-data")) {
+        return jsonResponse({ authenticated: true, user: { id: "admin-1", firstName: "Admin", username: "admin" } });
+      }
+      if (url.includes("/api/yubera/community?action=me")) {
+        return jsonResponse({
+          profile: {
+            id: "admin-1", displayName: "Admin", username: "admin", photoUrl: null, bio: "",
+            avatarFrame: null, availableSupportFrames: [], visibility: "public", isPlus: false, isAdmin: true,
+            followers: 0, following: 0, publicCollections: 0, publicTitles: 0, collectionLikes: 0,
+            xp: { total: 10, level: 1, title: "Начинающий зритель" },
+            support: { level: 0, title: "Без статуса", asset: null },
+            stats: { favorites: 0, watchlist: 0, history: 0 },
+          },
+          collections: [],
+        });
+      }
+      if (url.includes("action=profile&userId=private-target")) {
+        return { ok: false, status: 403, json: async () => ({ error: "private_profile" }) } as Response;
+      }
+      if (url.includes("/api/admin/yubera-plus?userId=private-target")) {
+        return jsonResponse({ target: {
+          id: "private-target", username: "private_user", displayName: "Private User",
+          xpTotal: 25, supportTotal: 0, xpLevel: 1, xpTitle: "Начинающий зритель",
+          supportLevel: 0, supportTitle: "Без статуса", xpOverride: null, supportOverride: null,
+          automaticXpLevel: 1, automaticSupportLevel: 0, isPlus: false, plusExpiresAt: null,
+        } });
+      }
+      return jsonResponse({ authenticated: true, items: [] });
+    }));
+
+    render(withPreferences(
+      <Profile animeList={[]} onSelect={vi.fn()} onCatalog={vi.fn()} isAdmin adminUserId="private-target" />,
+    ));
+
+    expect(await screen.findByRole("heading", { name: "Профиль пользователя" })).toBeInTheDocument();
+    expect(await screen.findByText("Private User")).toBeInTheDocument();
+    expect(screen.getByText("Администрирование пользователя")).toBeInTheDocument();
+    expect(screen.queryByText("Admin", { selector: "h2" })).not.toBeInTheDocument();
+  });
+
   it("keeps collection form fields focused while typing", async () => {
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
       if (String(input).includes("/api/telegram/init-data")) {
