@@ -125,7 +125,7 @@ async function handleKodik(request: Request): Promise<Response> {
   // Keep the existing Kodik player search/selection behaviour. Kodik's player
   // endpoint owns its own source mapping; strict ID validation is only used by
   // the separate availability checker so it cannot hide the playable sources.
-  const sources = new Map<string, { id: string; title: string; episodes: Map<number, { number: number; title: string; link: string }> }>();
+  const sources = new Map<string, { id: string; title: string; seasons: Map<number, Map<number, { number: number; title: string; link: string }>> }>();
   for (const result of payload.results) {
     if (worldArtId) {
       const linkedReference = (() => { try { const link = new URL(result.worldart_link ?? ""); return { id: link.searchParams.get("id") ?? "", type: link.pathname === "/cinema/cinema.php" ? "cinema" : link.pathname === "/animation/animation.php" ? "animation" : "" }; } catch { return { id: "", type: "" }; } })();
@@ -137,45 +137,58 @@ async function handleKodik(request: Request): Promise<Response> {
     const translationTitle = (result.translation?.title || result.title || "").trim();
     if (!translationId || !translationTitle) continue;
 
-    const seasons = result.seasons && typeof result.seasons === "object" ? result.seasons : null;
-    let episodeEntries: [string, EpisodeValue][] = [];
-    if (seasons) {
-      // A separate YUME card is expected to identify one season/title. Do not expose a season selector.
-      // Kodik can return season maps; use the first season included for this Shikimori ID.
-      const seasonKeys = Object.keys(seasons).sort((a, b) => Number(a) - Number(b));
-      const season = seasonKeys.length ? seasons[seasonKeys[0]] : null;
-      if (season?.episodes && typeof season.episodes === "object") episodeEntries = Object.entries(season.episodes);
+    const seasonMap = result.seasons && typeof result.seasons === "object" ? result.seasons : null;
+    const seasonEntries: Array<[number, Record<string, EpisodeValue>]> = [];
+    if (seasonMap) {
+      for (const [rawSeason, season] of Object.entries(seasonMap)) {
+        const seasonNumber = Number(rawSeason);
+        if (Number.isSafeInteger(seasonNumber) && seasonNumber > 0 && season?.episodes && typeof season.episodes === "object") {
+          seasonEntries.push([seasonNumber, season.episodes]);
+        }
+      }
     } else if (result.episodes && typeof result.episodes === "object") {
-      episodeEntries = Object.entries(result.episodes);
+      seasonEntries.push([1, result.episodes]);
     } else if (result.link) {
-      episodeEntries = [["1", result.link]];
+      seasonEntries.push([1, { "1": result.link }]);
     }
-
-    const episodes = episodeEntries
-      .map(([number, value]) => {
-        const parsedNumber = Number(number);
-        const parsed = episodeLink(value);
-        return Number.isSafeInteger(parsedNumber) && parsedNumber > 0 && parsed
-          ? { number: parsedNumber, title: parsed.title, link: parsed.link }
-          : null;
-      })
-      .filter((episode): episode is { number: number; title: string; link: string } => episode !== null)
-      .sort((a, b) => a.number - b.number);
-    if (!episodes.length) continue;
 
     let source = sources.get(translationId);
     if (!source) {
-      source = { id: translationId, title: translationTitle, episodes: new Map() };
+      source = { id: translationId, title: translationTitle, seasons: new Map() };
       sources.set(translationId, source);
     }
-    for (const episode of episodes) {
-      if (!source.episodes.has(episode.number)) source.episodes.set(episode.number, episode);
+    for (const [seasonNumber, entries] of seasonEntries) {
+      let seasonEpisodes = source.seasons.get(seasonNumber);
+      if (!seasonEpisodes) {
+        seasonEpisodes = new Map();
+        source.seasons.set(seasonNumber, seasonEpisodes);
+      }
+      for (const [rawNumber, value] of Object.entries(entries)) {
+        const episodeNumber = Number(rawNumber);
+        const parsed = episodeLink(value);
+        if (!Number.isSafeInteger(episodeNumber) || episodeNumber < 1 || !parsed || seasonEpisodes.has(episodeNumber)) continue;
+        seasonEpisodes.set(episodeNumber, { number: episodeNumber, title: parsed.title, link: parsed.link });
+      }
     }
   }
 
   return json({
     sources: [...sources.values()]
-      .map((source) => ({ id: source.id, title: source.title, episodeCount: source.episodes.size, episodes: [...source.episodes.values()].sort((a, b) => a.number - b.number) }))
+      .map((source) => {
+        const seasons = [...source.seasons.entries()]
+          .map(([number, episodes]) => ({ number, episodeCount: episodes.size, episodes: [...episodes.values()].sort((a, b) => a.number - b.number) }))
+          .filter((season) => season.episodes.length > 0)
+          .sort((a, b) => a.number - b.number);
+        return {
+          id: source.id,
+          title: source.title,
+          episodeCount: seasons.reduce((sum, season) => sum + season.episodeCount, 0),
+          seasons,
+          // Backward-compatible flat list for existing Shikimori cards.
+          episodes: seasons[0]?.episodes ?? [],
+        };
+      })
+      .filter((source) => source.seasons.length > 0)
       .sort((a, b) => a.title.localeCompare(b.title, "ru")),
   });
 }
