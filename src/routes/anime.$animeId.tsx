@@ -232,7 +232,7 @@ function AnimeDetailPage() {
         const requestedTranslation = params.get("translation");
         const matchingSource = sources.find((source) => source.id === requestedTranslation && (!Number.isInteger(requestedEpisode) || requestedEpisode <= 0 || (source.seasons ?? [{ number: 1, episodes: source.episodes }]).some(season => season.number === (requestedSeason > 0 ? requestedSeason : 1) && season.episodes.some(episode => episode.number === requestedEpisode))))
           ?? (Number.isInteger(requestedEpisode) && requestedEpisode > 0
-            ? sources.find((source) => source.episodes.some((episode) => episode.number === requestedEpisode))
+            ? sources.find((source) => (source.seasons ?? [{ number: 1, episodes: source.episodes }]).some(season => season.number === (requestedSeason > 0 ? requestedSeason : 1) && season.episodes.some(episode => episode.number === requestedEpisode)))
             : undefined)
           ?? sources[0];
         const availableSeasons = matchingSource?.seasons ?? [{ number: 1, episodes: matchingSource?.episodes ?? [] }];
