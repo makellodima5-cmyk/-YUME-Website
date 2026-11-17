@@ -20,8 +20,8 @@ export async function handleYuberaEpisodeWatch(r:Request):Promise<Response>{
  let body:unknown;try{const raw=await r.text();if(raw.length>2048)return json({error:"request_too_large"},413);body=JSON.parse(raw);}catch{return json({error:"invalid_json"},400);}
  if(!body||typeof body!=="object"||Array.isArray(body))return json({error:"invalid_request"},400);const x=body as Record<string,unknown>,now=Date.now();
  if(x.action==="start"){
-  const animeId=typeof x.animeId==="string"?x.animeId:"",episode=Number(x.episodeNumber),duration=Number(x.durationSeconds),position=Number(x.currentTime);
-  if(!/^\d{1,12}$/.test(animeId)||!Number.isSafeInteger(episode)||episode<1||episode>10000||!finiteNumber(duration)||duration<60||duration>10800||!finiteNumber(position)||position<0||position>duration)return json({error:"invalid_playback_data"},400);
+  const animeId=typeof x.animeId==="string"?x.animeId:"",episode=Number(x.episodeNumber),season=x.seasonNumber===undefined?1:Number(x.seasonNumber),duration=Number(x.durationSeconds),position=Number(x.currentTime);
+  if(!/^\d{1,12}$/.test(animeId)||!Number.isSafeInteger(episode)||episode<1||episode>10000||!Number.isSafeInteger(season)||season<1||season>100||!finiteNumber(duration)||duration<60||duration>10800||!finiteNumber(position)||position<0||position>duration)return json({error:"invalid_playback_data"},400);
   let anime: Awaited<ReturnType<typeof getR2Anime>>;
   try{anime=await getR2Anime(animeId);if(!anime)return json({error:"anime_not_found"},404);}catch{return json({error:"catalog_unavailable"},503);}
   const episodeCount=Number(anime.episodes);
@@ -29,17 +29,17 @@ export async function handleYuberaEpisodeWatch(r:Request):Promise<Response>{
   await d.prepare("DELETE FROM yume_episode_watch_sessions WHERE expires_at<=?").bind(now).run();
   const id=crypto.randomUUID();
   const inserted=await d.prepare(
-   "INSERT INTO yume_episode_watch_sessions(id,user_id,anime_id,episode_number,duration_seconds,last_position_seconds,last_heartbeat_at,watched_segments_json,created_at,expires_at) " +
-   "SELECT ?,?,?,?,?,?,?,?,?,? WHERE (SELECT COUNT(*) FROM yume_episode_watch_sessions WHERE user_id=? AND expires_at>? AND completed_at IS NULL) < 5",
-  ).bind(id,userId,animeId,episode,duration,position,now,"[]",now,now+3*60*60*1000,userId,now).run();
+   "INSERT INTO yume_episode_watch_sessions(id,user_id,anime_id,season_number,episode_number,duration_seconds,last_position_seconds,last_heartbeat_at,watched_segments_json,created_at,expires_at) " +
+   "SELECT ?,?,?,?,?,?,?,?,?,?,? WHERE (SELECT COUNT(*) FROM yume_episode_watch_sessions WHERE user_id=? AND expires_at>? AND completed_at IS NULL) < 5",
+  ).bind(id,userId,animeId,season,episode,duration,position,now,"[]",now,now+3*60*60*1000,userId,now).run();
   if(Number(inserted.meta?.changes??0)!==1)return json({error:"too_many_active_watch_sessions"},429);
   return json({ok:true,sessionId:id,heartbeatSeconds:10});
  }
  if(x.action!=="heartbeat")return json({error:"invalid_action"},400);
  const id=typeof x.sessionId==="string"?x.sessionId:"",position=Number(x.currentTime),duration=Number(x.durationSeconds);
  if(!/^[0-9a-f-]{36}$/i.test(id)||!finiteNumber(position)||!finiteNumber(duration))return json({error:"invalid_playback_data"},400);
- const session=await d.prepare("SELECT id,anime_id,episode_number,duration_seconds,last_position_seconds,last_heartbeat_at,watched_segments_json,expires_at,completed_at FROM yume_episode_watch_sessions WHERE id=? AND user_id=?")
-  .bind(id,userId).first<{id:string;anime_id:string;episode_number:number;duration_seconds:number;last_position_seconds:number;last_heartbeat_at:number;watched_segments_json:string;expires_at:number;completed_at:number|null}>();
+ const session=await d.prepare("SELECT id,anime_id,season_number,episode_number,duration_seconds,last_position_seconds,last_heartbeat_at,watched_segments_json,expires_at,completed_at FROM yume_episode_watch_sessions WHERE id=? AND user_id=?")
+  .bind(id,userId).first<{id:string;anime_id:string;season_number:number;episode_number:number;duration_seconds:number;last_position_seconds:number;last_heartbeat_at:number;watched_segments_json:string;expires_at:number;completed_at:number|null}>();
  if(!session)return json({error:"watch_session_not_found"},404);if(session.expires_at<=now)return json({error:"watch_session_expired"},410);if(session.completed_at)return json({ok:true,completed:true,xpAwarded:0});
  if(Math.abs(session.duration_seconds-duration)>Math.max(3,session.duration_seconds*0.015)||position<0||position>session.duration_seconds+2)return json({error:"playback_metadata_changed"},409);
  const elapsed=(now-session.last_heartbeat_at)/1000;if(elapsed<5)return json({error:"heartbeat_too_soon"},429);
@@ -56,7 +56,7 @@ export async function handleYuberaEpisodeWatch(r:Request):Promise<Response>{
   return json({ok:true,completed:false,watchedSeconds:Math.floor(coverage),requiredSeconds:Math.ceil(session.duration_seconds*YUBERA_XP_RULES.episodeCompletionRatio),xpAwarded:0});
  }
  const award=d.prepare("INSERT OR IGNORE INTO yume_xp_ledger(id,user_id,event_key,event_type,amount,metadata_json) SELECT ?,?,?,'episode_complete',?,? WHERE changes()=1")
-  .bind(crypto.randomUUID(),userId,"episode-complete:"+userId+":"+session.anime_id+":"+session.episode_number,YUBERA_XP_REWARDS.episodeNinetyPercent,JSON.stringify({animeId:session.anime_id,episodeNumber:session.episode_number,coverageSeconds:Math.floor(coverage),durationSeconds:session.duration_seconds,sessionId:id}));
+  .bind(crypto.randomUUID(),userId,"episode-complete:"+userId+":"+session.anime_id+":"+session.season_number+":"+session.episode_number,YUBERA_XP_REWARDS.episodeNinetyPercent,JSON.stringify({animeId:session.anime_id,seasonNumber:session.season_number,episodeNumber:session.episode_number,coverageSeconds:Math.floor(coverage),durationSeconds:session.duration_seconds,sessionId:id}));
  if(!d.batch)return json({error:"atomic_watch_xp_batch_unavailable"},503);
  const results=await d.batch([update,award]);
  if(Number(results[0]?.meta?.changes??0)!==1)return json({error:"heartbeat_state_conflict"},409);
