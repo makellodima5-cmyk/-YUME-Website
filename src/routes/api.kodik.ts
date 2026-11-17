@@ -140,19 +140,15 @@ async function handleKodik(request: Request): Promise<Response> {
 
     const seasonMaps = result.seasons && typeof result.seasons === "object" ? result.seasons : null;
     const entriesBySeason = new Map<number, [string, EpisodeValue][]>();
-    if (worldArtId && seasonMaps) {
+    if (seasonMaps) {
       for (const [key, season] of Object.entries(seasonMaps)) {
         const number = Number(key);
         if (Number.isSafeInteger(number) && number > 0 && season?.episodes && typeof season.episodes === "object") entriesBySeason.set(number, Object.entries(season.episodes));
       }
     } else if (result.episodes && typeof result.episodes === "object") {
       entriesBySeason.set(1, Object.entries(result.episodes));
-    } else if (result.link) {
-      entriesBySeason.set(1, [["1", result.link]]);
-    } else if (seasonMaps) {
-      const key = Object.keys(seasonMaps).sort((a, b) => Number(a) - Number(b))[0];
-      const first = key ? seasonMaps[key] : null;
-      if (first?.episodes && typeof first.episodes === "object") entriesBySeason.set(1, Object.entries(first.episodes));
+    } else {
+      if (result.link) entriesBySeason.set(1, [["1", result.link]]);
     }
     const parsedSeasons = new Map<number, Map<number, Episode>>();
     for (const [seasonNumber, entries] of entriesBySeason) {
