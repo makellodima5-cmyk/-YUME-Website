@@ -99,6 +99,7 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [historyCount, setHistoryCount] = useState(0);
   const [profileHubScreen, setProfileHubScreen] = useState("home");
+  const [adminTargetUserId, setAdminTargetUserId] = useState<string | null>(null);
   useEffect(() => {
     let cancelled = false;
     const syncLocalHistory = () => setHistoryCount(new Set(readPlaybackProgress().map(entry => entry.animeId)).size);
@@ -552,6 +553,8 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
         ) : panel === "overview" ? (
           <>
             <YuberaProfileHub
+              adminTargetUserId={adminTargetUserId}
+              onAdminTargetHandled={() => setAdminTargetUserId(null)}
               animeList={animeList}
               onSelect={onSelect}
               onBack={() => { if (window.history.length > 1) window.history.back(); }}
