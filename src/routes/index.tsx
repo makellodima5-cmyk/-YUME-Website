@@ -406,6 +406,7 @@ function Index() {
   const ANIME = catalogAnime;
   // Initialize view before effects that read it during server-side rendering.
   const [view, setViewRaw] = useState<View>(section ?? "home");
+  const [adminUserId, setAdminUserId] = useState<string | null>(null);
   const [newsDetailOpen, setNewsDetailOpen] = useState(false);
 
 
@@ -1400,7 +1401,8 @@ function Index() {
     return () => window.removeEventListener("yume-open-auth", openAuth);
   }, []);
 
-  const setView = (v: View) => {
+  const setView = (v: View, selectedAdminUserId?: string) => {
+    setAdminUserId(v === "profile" ? selectedAdminUserId ?? null : null);
     setNewsDetailOpen(false);
     if (v === "history") {
       void navigate({ to: "/history" });
@@ -2100,7 +2102,7 @@ function Index() {
       ) : view === "news" ? (
         <News animeList={ANIME} onDetailChange={setNewsDetailOpen} telegramMiniApp={isTelegramMiniApp} />
       ) : view === "profile" ? (
-        <Profile animeList={ANIME} onSelect={select} onCatalog={() => setView("catalog")} isAdmin={isAdmin} onAdmin={() => setView("admin")} telegramMiniApp={isTelegramMiniApp} />
+        <Profile animeList={ANIME} onSelect={select} onCatalog={() => setView("catalog")} isAdmin={isAdmin} onAdmin={() => setView("admin")} telegramMiniApp={isTelegramMiniApp} adminUserId={adminUserId} />
       ) : view === "favorites" ? (
         <Profile key="favorites" initialPanel="favorites" animeList={ANIME} onSelect={select} onCatalog={() => setView("catalog")} telegramMiniApp={isTelegramMiniApp} onBack={() => { setViewRaw("my"); void navigate({ to: "/", replace: true, search: { section: "my" } }); window.scrollTo({ top: 0, behavior: "auto" }); }} />
       ) : view === "watchlist" ? (
@@ -2528,7 +2530,7 @@ function Index() {
                 </div>
               </details>
 
-              <YuberaPlusAdminPanel language={language} onOpenUser={userId=>{setView("profile");window.setTimeout(()=>window.dispatchEvent(new CustomEvent("yume-admin-open-user",{detail:{userId}})),0);}} />
+              <YuberaPlusAdminPanel language={language} onOpenUser={userId=>setView("profile",userId)} />
 
               </>
             ) : (
