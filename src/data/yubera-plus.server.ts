@@ -89,13 +89,14 @@ export async function handleAdminYuberaPlus(r:Request):Promise<Response>{
    const rawLimit=Number(url.searchParams.get("limit")??10),rawOffset=Number(url.searchParams.get("offset")??0);
    const limit=Number.isSafeInteger(rawLimit)?Math.min(30,Math.max(1,rawLimit)):10;
    const offset=Number.isSafeInteger(rawOffset)?Math.max(0,Math.min(1000000,rawOffset)):0;
-   const [count,rows]=await Promise.all([
+   const [count,eligibleCount,rows]=await Promise.all([
     d.prepare("SELECT COUNT(*) AS total FROM yume_users").first<{total:number}>(),
+    d.prepare("SELECT COUNT(*) AS total FROM yume_users WHERE provider='telegram' AND telegram_username IS NOT NULL AND trim(telegram_username)<>''").first<{total:number}>(),
     d.prepare("SELECT id,telegram_username FROM yume_users WHERE provider='telegram' AND telegram_username IS NOT NULL AND trim(telegram_username)<>'' ORDER BY created_at DESC,rowid DESC LIMIT ? OFFSET ?").bind(limit,offset).all<{id:string;telegram_username:string}>()
    ]);
    const targets=await Promise.all((rows.results??[]).map(row=>resolveTarget(row.id,true)));
    const users=targets.filter((target):target is NonNullable<typeof target>=>target!==null);
-   return json({isAdmin:true,totalUsers:Number(count?.total??0),users,hasMore:offset+rows.results.length<Number(count?.total??0),nextOffset:offset+rows.results.length});
+   return json({isAdmin:true,totalUsers:Number(count?.total??0),users,hasMore:offset+rows.results.length<Number(eligibleCount?.total??0),nextOffset:offset+rows.results.length});
   }
   if(profileIdParam!==null){const target=await resolveTarget(profileIdParam,true);if(!target)return json({error:"telegram_user_not_found"},404);return json({isAdmin:true,target});}
   if(usernameParam!==null){const username=normalizePlusGrantUsername(usernameParam);if(!username)return json({error:"invalid_username"},400);const target=await resolveTarget(username,false);if(!target)return json({error:"telegram_user_not_found"},404);return json({isAdmin:true,target});}
