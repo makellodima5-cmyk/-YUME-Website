@@ -15,7 +15,7 @@ const PERIOD=2592000000,COOKIE="__Host-yume-session";
 export function isValidPlusPrice(v:unknown):v is number{return typeof v==="number"&&Number.isSafeInteger(v)&&v>=1&&v<=10000;}
 export function calculateYuberaPlusPlanPrice(monthlyPrice:number,months:1|3):number{if(!isValidPlusPrice(monthlyPrice))return 0;const amount=months===1?monthlyPrice:Math.round(monthlyPrice*3*0.83);return isValidPlusPrice(amount)?amount:0;}
 export function normalizePlusGrantUsername(value:unknown):string|null{if(typeof value!=="string")return null;const username=value.trim().replace(/^@/,"");return /^[A-Za-z0-9_]{5,32}$/.test(username)?username:null;}
-export function isValidPlusGrantDays(value:unknown):value is number{return typeof value==="number"&&Number.isSafeInteger(value)&&value>=1&&value<=3650;}
+export function isValidPlusGrantDays(value:unknown):value is number{return typeof value==="number"&&Number.isSafeInteger(value)&&value>=1&&value<=1000000;}
 export function resolveInitialPlusExpiry(exp:number|undefined,now=Date.now()){return typeof exp==="number"&&Number.isSafeInteger(exp)&&exp*1000>now&&exp*1000<=now+PERIOD+300000?exp*1000:now+PERIOD;}
 function env():E{try{return cloudflareEnv as unknown as E;}catch{const x=(globalThis as G).__YUME_RUNTIME_ENV__;return x&&typeof x==="object"?x as E:{ };}}
 function db():DB|null{const x=env().YUME_DB;return x&&typeof x==="object"?x as DB:null;}
@@ -64,21 +64,28 @@ export async function handleAdminYuberaPlus(r:Request):Promise<Response>{
  if(!["GET","POST"].includes(r.method))return json({error:"method_not_allowed"},405);if(r.method==="POST"&&!origin(r))return json({error:"cross_origin_request"},403);
  const d=db();if(!d)return json({error:"database_unavailable"},503);const e=env(),admin=await isAdmin(r,d,e);if(!admin)return json({isAdmin:false,error:"admin_required"},403);if(!isAdminPasswordConfigured(e))return json({isAdmin:false,error:"admin_password_not_configured"},503);if(!await hasAdminPasswordSession(r,e))return json({isAdmin:false,error:"admin_password_required"},428);
  if(r.method==="GET"){
-  const usernameParam=new URL(r.url).searchParams.get("username");
-  if(usernameParam!==null){
-   const username=normalizePlusGrantUsername(usernameParam);if(!username)return json({error:"invalid_username"},400);
-   const target=await d.prepare("SELECT id,telegram_username,telegram_first_name,telegram_last_name FROM yume_users WHERE provider='telegram' AND lower(telegram_username)=lower(?) LIMIT 1").bind(username).first<{id:string;telegram_username:string|null;telegram_first_name:string;telegram_last_name:string|null}>();
-   if(!target)return json({error:"telegram_user_not_found"},404);
-   const [xpRow,supportRow,override]=await Promise.all([
+  const url=new URL(r.url);
+  const usernameParam=url.searchParams.get("username");
+  const profileIdParam=url.searchParams.get("userId");
+  const resolveTarget=async(query:string,byId:boolean)=>{
+   const target=byId
+    ? await d.prepare("SELECT id,telegram_username,telegram_first_name,telegram_last_name FROM yume_users WHERE provider='telegram' AND id=? LIMIT 1").bind(query).first<{id:string;telegram_username:string|null;telegram_first_name:string;telegram_last_name:string|null}>()
+    : await d.prepare("SELECT id,telegram_username,telegram_first_name,telegram_last_name FROM yume_users WHERE provider='telegram' AND lower(telegram_username)=lower(?) LIMIT 1").bind(query).first<{id:string;telegram_username:string|null;telegram_first_name:string;telegram_last_name:string|null}>();
+   if(!target)return null;
+   const [xpRow,supportRow,override,plus]=await Promise.all([
     d.prepare("SELECT COALESCE(SUM(amount),0) AS total FROM yume_xp_ledger WHERE user_id=?").bind(target.id).first<{total:number}>(),
     d.prepare("SELECT COALESCE(SUM(d.amount),0) AS total FROM yume_stars_donations d LEFT JOIN yume_stars_refunds r ON r.telegram_payment_charge_id=d.telegram_payment_charge_id WHERE d.telegram_user_id=(SELECT telegram_user_id FROM yume_users WHERE id=?) AND d.status='paid' AND r.telegram_payment_charge_id IS NULL").bind(target.id).first<{total:number}>(),
-    d.prepare("SELECT xp_level,support_level FROM yume_user_level_overrides WHERE user_id=?").bind(target.id).first<{xp_level:number|null;support_level:number|null}>()
+    d.prepare("SELECT xp_level,support_level FROM yume_user_level_overrides WHERE user_id=?").bind(target.id).first<{xp_level:number|null;support_level:number|null}>(),
+    d.prepare("SELECT MAX(expires_at) AS expires_at FROM yume_plus_subscriptions WHERE user_id=? AND status='active' AND expires_at>?").bind(target.id,Date.now()).first<{expires_at:number|null}>()
    ]);
-   const xpTotalValue=Math.max(0,Number(xpRow?.total??0)),supportTotal=Math.max(0,Number(supportRow?.total??0));
-   const automaticXp=[...YUBERA_XP_LEVELS].reverse().find(x=>xpTotalValue>=x.min)??YUBERA_XP_LEVELS[0];
-   const automaticSupport=[...YUBERA_SUPPORT_LEVELS].reverse().find(x=>supportTotal>=x.min)??YUBERA_SUPPORT_LEVELS[0];
-   return json({isAdmin:true,target:{id:target.id,username:target.telegram_username??username,displayName:[target.telegram_first_name,target.telegram_last_name].filter(Boolean).join(" "),xpTotal:xpTotalValue,supportTotal,xpLevel:override?.xp_level??automaticXp.level,xpTitle:(YUBERA_XP_LEVELS.find(x=>x.level===(override?.xp_level??automaticXp.level))??automaticXp).title,supportLevel:override?.support_level??automaticSupport.level,supportTitle:(YUBERA_SUPPORT_LEVELS.find(x=>x.level===(override?.support_level??automaticSupport.level))??automaticSupport).title,xpOverride:override?.xp_level??null,supportOverride:override?.support_level??null,automaticXpLevel:automaticXp.level,automaticSupportLevel:automaticSupport.level}});
-  }
+   const xpTotal=Math.max(0,Number(xpRow?.total??0)),supportTotal=Math.max(0,Number(supportRow?.total??0));
+   const autoXp=[...YUBERA_XP_LEVELS].reverse().find(x=>xpTotal>=x.min)??YUBERA_XP_LEVELS[0];
+   const autoSupport=[...YUBERA_SUPPORT_LEVELS].reverse().find(x=>supportTotal>=x.min)??YUBERA_SUPPORT_LEVELS[0];
+   const xpLevel=override?.xp_level??autoXp.level,supportLevel=override?.support_level??autoSupport.level;
+   return {id:target.id,username:target.telegram_username??query,displayName:[target.telegram_first_name,target.telegram_last_name].filter(Boolean).join(" "),xpTotal,supportTotal,xpLevel,xpTitle:(YUBERA_XP_LEVELS.find(x=>x.level===xpLevel)??autoXp).title,supportLevel,supportTitle:(YUBERA_SUPPORT_LEVELS.find(x=>x.level===supportLevel)??autoSupport).title,xpOverride:override?.xp_level??null,supportOverride:override?.support_level??null,automaticXpLevel:autoXp.level,automaticSupportLevel:autoSupport.level,isPlus:typeof plus?.expires_at==="number"&&plus.expires_at>Date.now(),plusExpiresAt:plus?.expires_at??null};
+  };
+  if(profileIdParam!==null){const target=await resolveTarget(profileIdParam,true);if(!target)return json({error:"telegram_user_not_found"},404);return json({isAdmin:true,target});}
+  if(usernameParam!==null){const username=normalizePlusGrantUsername(usernameParam);if(!username)return json({error:"invalid_username"},400);const target=await resolveTarget(username,false);if(!target)return json({error:"telegram_user_not_found"},404);return json({isAdmin:true,target});}
   const [p,a]=await Promise.all([price(d),d.prepare("SELECT id,action,details_json,created_at FROM yume_plus_audit_log ORDER BY id DESC LIMIT 20").all<{id:number;action:string;details_json:string;created_at:string}>()]);
   return json({isAdmin:true,price:p,periodDays:30,periodSeconds:YUBERA_PLUS_PERIOD_SECONDS,audit:a.results});
  }
@@ -105,7 +112,7 @@ export async function handleAdminYuberaPlus(r:Request):Promise<Response>{
  if(input.action==="grant-by-username"){
   const username=normalizePlusGrantUsername(input.username),days=input.days===undefined?30:input.days;
   if(!username)return json({error:"invalid_username"},400);
-  if(!isValidPlusGrantDays(days))return json({error:"invalid_duration",min:1,max:3650},400);
+  if(!isValidPlusGrantDays(days))return json({error:"invalid_duration",min:1,max:1000000},400);
   const target=await d.prepare("SELECT id,telegram_username FROM yume_users WHERE provider='telegram' AND lower(telegram_username)=lower(?) LIMIT 1").bind(username).first<{id:string;telegram_username:string|null}>();
   if(!target)return json({error:"telegram_user_not_found"},404);
   const now=Date.now(),startsAt=now,id=crypto.randomUUID();
