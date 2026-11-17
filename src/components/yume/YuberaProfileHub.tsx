@@ -116,10 +116,20 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, onSettings, sett
 
   const [publicProfile, setPublicProfile] = useState<ProfileData | null>(null);
   const [adminProfile, setAdminProfile] = useState<{id:string;username:string;displayName:string;xpTotal:number;supportTotal:number;xpLevel:number;xpTitle:string;supportLevel:number;supportTitle:string;xpOverride:number|null;supportOverride:number|null;automaticXpLevel:number;automaticSupportLevel:number;isPlus:boolean;plusExpiresAt:number|null} | null>(null);
+  const [adminTargetUserId, setAdminTargetUserId] = useState<string | null>(null);
+  const [adminProfile, setAdminProfile] = useState<{id:string;username:string;displayName:string;xpTotal:number;supportTotal:number;xpLevel:number;xpTitle:string;supportLevel:number;supportTitle:string;xpOverride:number|null;supportOverride:number|null;automaticXpLevel:number;automaticSupportLevel:number;isPlus:boolean;plusExpiresAt:number|null} | null>(null);
   const [publicCollections, setPublicCollections] = useState<Collection[]>([]);
   const [likeBusyCollectionId, setLikeBusyCollectionId] = useState<string | null>(null);
   const [donationOpen, setDonationOpen] = useState(false);
 
+  useEffect(() => {
+    const handleAdminOpenUser = (event: Event) => {
+      const userId = (event as CustomEvent<{userId?: unknown}>).detail?.userId;
+      if (typeof userId === "string" && userId.length > 0) setAdminTargetUserId(userId);
+    };
+    window.addEventListener("yume-admin-open-user", handleAdminOpenUser);
+    return () => window.removeEventListener("yume-admin-open-user", handleAdminOpenUser);
+  }, []);
   useEffect(() => {
     if (!bioSheet) return;
     const previousOverflow = document.body.style.overflow;
@@ -212,6 +222,12 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, onSettings, sett
   useEffect(() => {
     if (!adminTargetUserId || !profile?.isAdmin) return;
     void viewPublicProfile(adminTargetUserId).finally(() => onAdminTargetHandled?.());
+  }, [adminTargetUserId, profile?.isAdmin]);
+  useEffect(() => {
+    if (!adminTargetUserId || !profile?.isAdmin) return;
+    const id = adminTargetUserId;
+    setAdminTargetUserId(null);
+    void viewPublicProfile(id);
   }, [adminTargetUserId, profile?.isAdmin]);
   const follow = async (id: string, following: boolean) => {
     const result = await request({ action: "follow", userId: id, following });
