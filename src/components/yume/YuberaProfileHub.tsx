@@ -236,7 +236,7 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, onSettings, sett
     };
     window.addEventListener("yume-admin-open-user", handleAdminOpenUser);
     return () => window.removeEventListener("yume-admin-open-user", handleAdminOpenUser);
-  }, [profile?.id, profile?.isAdmin, screen]);
+  }, []);
   const follow = async (id: string, following: boolean) => {
     const result = await request({ action: "follow", userId: id, following });
     if (result) {
