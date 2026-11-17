@@ -31,6 +31,8 @@ export interface TelegramWebApp {
   ready(): void;
   expand(): void;
   openTelegramLink?(url: string): void;
+  /** Open a URL in the browser selected by the Telegram client. */
+  openLink?(url: string, options?: { try_instant_view?: boolean }): void;
   openInvoice?(url: string, callback?: (status: "paid" | "cancelled" | "failed" | "pending") => void): void;
   disableVerticalSwipes?(): void;
   /** Telegram Bot API 8.0+. Unsupported clients may throw when this is called. */
