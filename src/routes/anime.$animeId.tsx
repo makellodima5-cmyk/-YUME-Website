@@ -262,8 +262,12 @@ function AnimeDetailPage() {
     frame.src = playerUrl;
     frame.title = (anime ? displayAnimeTitle(anime, language) : "Kodik") + " — " + (language === "en" ? "episode player" : "плеер серий");
     frame.className = "absolute inset-0 h-full w-full border-0";
-    frame.allow = "autoplay; fullscreen; picture-in-picture; encrypted-media";
-    frame.allowFullscreen = true;
+    frame.setAttribute("allow", "autoplay; fullscreen; picture-in-picture; encrypted-media; accelerometer; gyroscope");
+    frame.setAttribute("allowfullscreen", "");
+    frame.setAttribute("webkitallowfullscreen", "");
+    frame.setAttribute("mozallowfullscreen", "");
+    frame.setAttribute("playsinline", "");
+    frame.setAttribute("webkit-playsinline", "");
     frame.referrerPolicy = "strict-origin-when-cross-origin";
     player.appendChild(frame);
     return () => { frame.remove(); };
