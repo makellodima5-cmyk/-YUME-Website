@@ -169,7 +169,7 @@ function AnimeDetailPage() {
   }, [anime?.id, anime?.status, anime?.episodes, anime?.episodesAired]);
 
 
-  const [kodikSources, setKodikSources] = useState<Array<{ id: string; title: string; episodes: Array<{ number: number; title: string; link: string }>; seasons?: Array<{ number: number; episodeCount: number; episodes: Array<{ number: number; title: string; link: string }> }> }>>([]);
+  const [kodikSources, setKodikSources] = useState<Array<{ id: string; title: string; episodeCount?: number; episodes: Array<{ number: number; title: string; link: string }>; seasons?: Array<{ number: number; episodeCount: number; episodes: Array<{ number: number; title: string; link: string }> }> }>>([]);
   const [kodikTranslationId, setKodikTranslationId] = useState("");
   const [kodikEpisode, setKodikEpisode] = useState(1);
   const [kodikSeason, setKodikSeason] = useState(1);
