@@ -21,7 +21,7 @@ type ProfileData = {
 type Collection = { id: string; title: string; description: string; cover_key: string | null; is_public: number; is_pinned: number; title_count: number; like_count: number; liked: number };
 type CollectionFormSnapshot = { title: string; description: string; cover: string | null; isPublic: boolean; editingCollectionId: string | null };
 type ProfileFormSnapshot = { bio: string; visibility: "public" | "private"; frame: string | null };
-type Props = { animeList: Anime[]; onSelect: (anime: Anime) => void; onBack: () => void; onSettings?: () => void; settingsExpanded?: boolean; onLegal?: () => void; onAbout?: () => void; onAdmin?: () => void; onSupport?: () => void; onAccount?: () => void; onScreenChange?: (screen: Screen) => void };
+type Props = { animeList: Anime[]; onSelect: (anime: Anime) => void; onBack: () => void; onSettings?: () => void; settingsExpanded?: boolean; onLegal?: () => void; onAbout?: () => void; onAdmin?: () => void; onSupport?: () => void; onAccount?: () => void; onScreenChange?: (screen: Screen) => void; adminUserId?: string | null };
 
 const covers = [
   "YUBERA_Collection_Cover_Action.webp",
@@ -81,7 +81,7 @@ function formatCollectionTitleCount(value: number): string {
   return `${value} ${word}`;
 }
 
-export function YuberaProfileHub({ animeList, onSelect, onBack, onSettings, settingsExpanded = false, onLegal, onAbout, onAdmin, onSupport, onAccount, onScreenChange }: Props) {
+export function YuberaProfileHub({ animeList, onSelect, onBack, onSettings, settingsExpanded = false, onLegal, onAbout, onAdmin, onSupport, onAccount, onScreenChange, adminUserId = null }: Props) {
   const [screen, setScreen] = useState<Screen>("home");
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [collections, setCollections] = useState<Collection[]>([]);
@@ -186,8 +186,9 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, onSettings, sett
   const rest = orderedCollections.filter(item => !item.is_pinned);
 
 
-  const viewPublicProfile = async (id: string) => {
+  const viewPublicProfile = async (id: string, adminMode = false) => {
     try {
+      if (adminMode && !profile?.isAdmin) throw new Error("Недостаточно прав для администрирования пользователя");
       if (id === profile?.id) { changeScreen("home"); return; }
       const response = await fetch(`/api/yubera/community?action=profile&userId=${encodeURIComponent(id)}`, { credentials: "same-origin", cache: "no-store" });
       const data = await response.json().catch(() => ({})) as {profile?:ProfileData;collections?:Collection[];error?:string};
@@ -197,7 +198,7 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, onSettings, sett
         setPublicProfile(data.profile);
         setPublicCollections(Array.isArray(data.collections) ? data.collections : []);
         setAdminProfile(null);
-        if (profile?.isAdmin) {
+        if (adminMode && profile?.isAdmin) {
           const adminResponse=await fetch("/api/admin/yubera-plus?userId="+encodeURIComponent(id),{credentials:"same-origin",cache:"no-store"});
           const adminData=await adminResponse.json().catch(()=>({})) as {target?:typeof adminProfile};
           if(adminResponse.ok&&adminData.target)setAdminProfile(adminData.target);
@@ -205,7 +206,7 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, onSettings, sett
         changeScreen("public-profile");
         return;
       }
-      if (profile?.isAdmin) {
+      if (adminMode && profile?.isAdmin) {
         const adminResponse = await fetch("/api/admin/yubera-plus?userId=" + encodeURIComponent(id), { credentials: "same-origin", cache: "no-store" });
         const adminData = await adminResponse.json().catch(() => ({})) as { target?: NonNullable<typeof adminProfile>; error?: string };
         if (adminResponse.ok && adminData.target) {
@@ -228,13 +229,9 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, onSettings, sett
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Профиль недоступен"); }
   };
   useEffect(() => {
-    const handleAdminOpenUser = (event: Event) => {
-      const userId = (event as CustomEvent<{userId?: unknown}>).detail?.userId;
-      if (typeof userId === "string" && userId.length > 0) void viewPublicProfile(userId);
-    };
-    window.addEventListener("yume-admin-open-user", handleAdminOpenUser);
-    return () => window.removeEventListener("yume-admin-open-user", handleAdminOpenUser);
-  }, []);
+    if (!adminUserId || !profile?.id || !profile.isAdmin) return;
+    void viewPublicProfile(adminUserId, true);
+  }, [adminUserId, profile?.id, profile?.isAdmin]);
   const follow = async (id: string, following: boolean) => {
     const result = await request({ action: "follow", userId: id, following });
     if (result) {
