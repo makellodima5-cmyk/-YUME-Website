@@ -115,7 +115,6 @@ export function YuberaProfileHub({ animeList, onSelect, onBack, onSettings, sett
 
   const [publicProfile, setPublicProfile] = useState<ProfileData | null>(null);
   const [adminProfile, setAdminProfile] = useState<{id:string;username:string;displayName:string;xpTotal:number;supportTotal:number;xpLevel:number;xpTitle:string;supportLevel:number;supportTitle:string;xpOverride:number|null;supportOverride:number|null;automaticXpLevel:number;automaticSupportLevel:number;isPlus:boolean;plusExpiresAt:number|null} | null>(null);
-  const [adminProfile, setAdminProfile] = useState<{id:string;username:string;displayName:string;xpTotal:number;supportTotal:number;xpLevel:number;xpTitle:string;supportLevel:number;supportTitle:string;xpOverride:number|null;supportOverride:number|null;automaticXpLevel:number;automaticSupportLevel:number;isPlus:boolean;plusExpiresAt:number|null} | null>(null);
   const [publicCollections, setPublicCollections] = useState<Collection[]>([]);
   const [likeBusyCollectionId, setLikeBusyCollectionId] = useState<string | null>(null);
   const [donationOpen, setDonationOpen] = useState(false);
