@@ -75,9 +75,10 @@ type Props = {
   onAdmin?: () => void;
   telegramMiniApp?: boolean;
   onBack?: () => void;
+  adminUserId?: string | null;
 };
 
-export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overview", isAdmin = false, onAdmin, telegramMiniApp = false, onBack }: Props) {
+export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overview", isAdmin = false, onAdmin, telegramMiniApp = false, onBack, adminUserId = null }: Props) {
   const { t, language, theme, setTheme, setLanguage } = useYumePreferences();
   const [panel, setPanel] = useState<ProfilePanel>(initialPanel);
   const [settingsExpanded, setSettingsExpanded] = useState(false);
@@ -554,6 +555,7 @@ export function Profile({ animeList, onSelect, onCatalog, initialPanel = "overvi
         ) : panel === "overview" ? (
           <>
             <YuberaProfileHub
+              adminUserId={adminUserId}
               animeList={animeList}
               onSelect={onSelect}
               onBack={() => { if (window.history.length > 1) window.history.back(); }}
